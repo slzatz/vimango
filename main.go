@@ -2,37 +2,29 @@ package main
 
 import (
 	"fmt"
-	"unsafe"
+
+	"github.com/slzatz/vimango/vim"
 )
 
-/*
-#include "src/libvim.h"
-#cgo CFLAGS: -Iproto -DHAVE_CONFIG_H
-#cgo LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
-*/
-import "C"
-
 func main() {
-	//char *c[0];
-	var c *C.char
-	C.vimInit(C.int(0), &c)
+	vim.VimInit(0)
 
-	buf0 := vimBufferOpen("testfile.txt", 1, 0)
+	buf0 := vim.VimBufferOpen("testfile.txt", 1, 0)
 	fmt.Printf("buffer pointer: %p -> %T\n", buf0, buf0)
 
-	i := vimBufferGetId(C.curbuf)
+	i := vim.VimBufferGetId(buf0)
 	fmt.Printf("Current buffer id = %d\n", i)
 
-	n := vimBufferGetLineCount(C.curbuf)
+	n := vim.VimBufferGetLineCount(buf0)
 	fmt.Printf("Line Count = %d\n", n)
 
-	ss := vimBufferLinesS(C.curbuf)
+	ss := vim.VimBufferLinesS(buf0)
 	fmt.Printf("%v\n", ss)
 
-	pos := vimCursorGetPosition()
+	pos := vim.VimCursorGetPosition()
 	fmt.Printf("Position: line = %d, col = %d\n", pos[0]-1, pos[1])
 
-	vimExecute("e!")
+	vim.VimExecute("e!")
 
 	/*
 		var x = []byte("g")
@@ -40,29 +32,30 @@ func main() {
 		C.vimInput((*C.uchar)(&x[0]))
 	*/
 
-	vimKey("<esc>")
-	vimInput("g")
-	vimInput("g")
-	z := vimCursorGetLine()
+	vim.VimKey("<esc>")
+	vim.VimInput("g")
+	vim.VimInput("g")
+	z := vim.VimCursorGetLine()
 	fmt.Printf("line number = %d\n", z)
 
-	vimInput("G")
-	z = vimCursorGetLine()
+	vim.VimInput("G")
+	z = vim.VimCursorGetLine()
 	fmt.Printf("line number = %d\n", z)
-	line := vimBufferGetLine(C.curbuf, 3)
+	line := vim.VimBufferGetLine(buf0, 3)
 	fmt.Printf("%s\n", line)
 
-	vimBufferSetLines(C.curbuf, 0, 0, "Hello very young lovers wherever you are!", 1)
-	line = vimBufferGetLine(C.curbuf, 1)
+	vim.VimBufferSetLines(buf0, 0, 0, "Hello very young lovers wherever you are!", 1)
+	line = vim.VimBufferGetLine(buf0, 1)
 	fmt.Printf("%s\n", line)
-	ss = vimBufferLinesS(C.curbuf)
+	ss = vim.VimBufferLinesS(buf0)
 	fmt.Printf("%v\n", ss)
-	pos = vimCursorGetPosition()
+	pos = vim.VimCursorGetPosition()
 	fmt.Printf("Position: line = %d, col = %d\n", pos[0]-1, pos[1])
 
 	fmt.Println("Done")
 }
 
+/*
 //buf_T *vimBufferOpen(char_u *ffname_arg, linenr_T lnum, int flags);
 func vimBufferOpen(filename string, lnum int, flags int) *C.buf_T {
 	vbuf := C.vimBufferOpen(ucharP(filename), C.long(lnum), C.int(flags))
@@ -164,3 +157,4 @@ func vimCursorGetPosition() [2]int {
 	pos[1] = int(p.col)
 	return pos
 }
+*/
