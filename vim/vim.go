@@ -12,143 +12,96 @@ import (
 */
 import "C"
 
-/*
-func main() {
-	//char *c[0];
-	var c *C.char
-	C.vimInit(C.int(0), &c)
-
-	buf0 := vimBufferOpen("testfile.txt", 1, 0)
-	fmt.Printf("buffer pointer: %p -> %T\n", buf0, buf0)
-
-	i := vimBufferGetId(C.curbuf)
-	fmt.Printf("Current buffer id = %d\n", i)
-
-	n := vimBufferGetLineCount(C.curbuf)
-	fmt.Printf("Line Count = %d\n", n)
-
-	ss := vimBufferLinesS(C.curbuf)
-	fmt.Printf("%v\n", ss)
-
-	pos := vimCursorGetPosition()
-	fmt.Printf("Position: line = %d, col = %d\n", pos[0]-1, pos[1])
-
-	vimExecute("e!")
-
-	//	var x = []byte("g")
-	//	x = append(x, 0)
-	//	C.vimInput((*C.uchar)(&x[0]))
-
-	vimKey("<esc>")
-	vimInput("g")
-	vimInput("g")
-	z := vimCursorGetLine()
-	fmt.Printf("line number = %d\n", z)
-
-	vimInput("G")
-	z = vimCursorGetLine()
-	fmt.Printf("line number = %d\n", z)
-	line := vimBufferGetLine(C.curbuf, 3)
-	fmt.Printf("%s\n", line)
-
-	vimBufferSetLines(C.curbuf, 0, 0, "Hello very young lovers wherever you are!", 1)
-	line = vimBufferGetLine(C.curbuf, 1)
-	fmt.Printf("%s\n", line)
-	ss = vimBufferLinesS(C.curbuf)
-	fmt.Printf("%v\n", ss)
-	pos = vimCursorGetPosition()
-	fmt.Printf("Position: line = %d, col = %d\n", pos[0]-1, pos[1])
-
-	fmt.Println("Done")
-}
-*/
-//void vimInit(int argc, char **argv);
-func VimInit(argc int) {
-	var c *C.char
-	C.vimInit(C.int(argc), &c)
-}
-
-//buf_T *vimBufferOpen(char_u *ffname_arg, linenr_T lnum, int flags);
-func VimBufferOpen(filename string, lnum int, flags int) *C.buf_T {
-	vbuf := C.vimBufferOpen(ucharP(filename), C.long(lnum), C.int(flags))
-	return vbuf
-}
-
-//int vimBufferGetId(buf_T *buf);
-func VimBufferGetId(vbuf *C.buf_T) int {
-	id := C.vimBufferGetId(vbuf)
-	return int(id)
-}
-
-//buf_T *vimBufferGetCurrent(void);
-func vimBufferGetCurrent() *C.buf_T {
-	return C.curbuf
-}
-
-func VimInput(s string) {
-	C.vimInput(ucharP(s))
-}
-
-func VimKey(s string) {
-	C.vimKey(ucharP(s))
-}
-
-//char_u *line = vimBufferGetLine(curbuf, vimCursorGetLine());
-//char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
-//typedef long linenr_T;
-//buf_T -> file_buffer is a complicated struct
-func VimBufferGetLine(vbuf *C.buf_T, lineNum int) string {
-	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
-	data := (*C.char)(unsafe.Pointer(line))
-	s := C.GoString(data)
-	return s
-}
-
-func VimBufferLines(vbuf *C.buf_T) [][]byte {
-	var bb [][]byte
-	lc := VimBufferGetLineCount(vbuf)
-	for i := 1; i <= lc; i++ {
-		s := VimBufferGetLine(vbuf, i)
-		bb = append(bb, []byte(s))
-	}
-	return bb
-}
-
-func VimBufferLinesS(vbuf *C.buf_T) []string {
-	// should probably use string builder
-	// line count starts from 1
-	var ss []string
-	lc := VimBufferGetLineCount(vbuf)
-	for i := 1; i <= lc; i++ {
-		s := VimBufferGetLine(vbuf, i)
-		ss = append(ss, s)
-	}
-	return ss
-}
-
-func VimCursorGetLine() int {
-	lineNum := C.vimCursorGetLine()
-	return int(lineNum)
-}
-
 func ucharP(s string) *C.uchar {
 	var x = []byte(s)
 	x = append(x, 0)
 	return (*C.uchar)(&x[0])
 }
 
-func VimBufferGetLineCount(vbuf *C.buf_T) int {
+//void vimInit(int argc, char **argv);
+func Init(argc int) {
+	var c *C.char
+	C.vimInit(C.int(argc), &c)
+}
+
+//buf_T *vimBufferOpen(char_u *ffname_arg, linenr_T lnum, int flags);
+func BufferOpen(filename string, lnum int, flags int) *C.buf_T {
+	vbuf := C.vimBufferOpen(ucharP(filename), C.long(lnum), C.int(flags))
+	return vbuf
+}
+
+//int vimBufferGetId(buf_T *buf);
+func BufferGetId(vbuf *C.buf_T) int {
+	id := C.vimBufferGetId(vbuf)
+	return int(id)
+}
+
+//buf_T *vimBufferGetCurrent(void);
+func BufferGetCurrent() *C.buf_T {
+	return C.curbuf
+}
+
+//void vimInput(char_u *input);
+func Input(s string) {
+	C.vimInput(ucharP(s))
+}
+
+//void vimKey(char_u *key);
+func Key(s string) {
+	C.vimKey(ucharP(s))
+}
+
+//char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
+//typedef long linenr_T;
+//buf_T -> file_buffer is a complicated struct
+func BufferGetLine(vbuf *C.buf_T, lineNum int) string {
+	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
+	data := (*C.char)(unsafe.Pointer(line))
+	s := C.GoString(data)
+	return s
+}
+
+func BufferLines(vbuf *C.buf_T) [][]byte {
+	var bb [][]byte
+	lc := BufferGetLineCount(vbuf)
+	for i := 1; i <= lc; i++ {
+		s := BufferGetLine(vbuf, i)
+		bb = append(bb, []byte(s))
+	}
+	return bb
+}
+
+func BufferLinesS(vbuf *C.buf_T) []string {
+	// should probably use string builder
+	// line count starts from 1
+	var ss []string
+	lc := BufferGetLineCount(vbuf)
+	for i := 1; i <= lc; i++ {
+		s := BufferGetLine(vbuf, i)
+		ss = append(ss, s)
+	}
+	return ss
+}
+
+//linenr_T vimCursorGetLine(void);
+func CursorGetLine() int {
+	lineNum := C.vimCursorGetLine()
+	return int(lineNum)
+}
+
+//size_t vimBufferGetLineCount(buf_T *buf);
+func BufferGetLineCount(vbuf *C.buf_T) int {
 	lc := C.vimBufferGetLineCount(vbuf)
 	return int(lc)
 }
 
-func VimExecute(s string) {
+//void vimExecute(char_u *cmd);
+func Execute(s string) {
 	C.vimExecute(ucharP(s))
 }
 
 //void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
-func VimBufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
-	//p1 := (*C.uchar)(C.malloc(C.sizeof_uint * C.ulong(len(s)+1)))
+func BufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(len(s)+1)))
 	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
 	p2 = &p1
@@ -167,7 +120,7 @@ func VimBufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 }
 
 //pos_T vimCursorGetPosition(void);
-func VimCursorGetPosition() [2]int {
+func CursorGetPosition() [2]int {
 	p := C.vimCursorGetPosition()
 	var pos [2]int
 	pos[0] = int(p.lnum)
