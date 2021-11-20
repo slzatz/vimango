@@ -13,9 +13,9 @@ import (
 import "C"
 
 func ucharP(s string) *C.uchar {
-	var x = []byte(s)
-	x = append(x, 0)
-	return (*C.uchar)(&x[0])
+	var bb = []byte(s)
+	bb = append(bb, 0)
+	return (*C.uchar)(&bb[0])
 }
 
 //void vimInit(int argc, char **argv);
@@ -43,6 +43,7 @@ func BufferGetCurrent() *C.buf_T {
 
 //void vimInput(char_u *input);
 func Input(s string) {
+	// can't use C.CString because wants uchar
 	C.vimInput(ucharP(s))
 }
 
@@ -126,4 +127,18 @@ func CursorGetPosition() [2]int {
 	pos[0] = int(p.lnum)
 	pos[1] = int(p.col)
 	return pos
+}
+
+//void vimCursorSetPosition(pos_T pos);
+func CursorSetPosition(pos [2]int) {
+	var p C.pos_T
+	p.lnum = C.long(pos[0])
+	p.col = C.int(pos[1])
+	C.vimCursorSetPosition(p)
+}
+
+//int vimGetMode(void);
+func GetMode() int {
+	m := C.vimGetMode()
+	return int(m)
 }

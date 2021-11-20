@@ -24,15 +24,25 @@ func main() {
 	pos := vim.CursorGetPosition()
 	fmt.Printf("Position: line = %d, col = %d\n", pos[0]-1, pos[1])
 
+	vim.CursorSetPosition([2]int{2, 5})
+
+	pos = vim.CursorGetPosition()
+	fmt.Printf("Position: line = %d, col = %d\n", pos[0]-1, pos[1])
+
 	vim.Execute("e!")
 
 	vim.Key("<esc>")
-	vim.Input("g")
-	vim.Input("g")
+	vim.Input("gg")
 	z := vim.CursorGetLine()
 	fmt.Printf("line number = %d\n", z)
 
 	vim.Input("G")
+	z = vim.CursorGetLine()
+	fmt.Printf("line number = %d\n", z)
+	vim.Input("gginorm\x1b")
+	//vim.Key("<esc>")
+	//vim.Input("\x1b")
+	vim.Input("3lijon\x1b")
 	z = vim.CursorGetLine()
 	fmt.Printf("line number = %d\n", z)
 	line := vim.BufferGetLine(buf0, 3)
