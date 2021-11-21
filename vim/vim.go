@@ -1,7 +1,6 @@
 package vim
 
 import (
-	"fmt"
 	"unsafe"
 )
 
@@ -57,21 +56,38 @@ func Key(s string) {
 //buf_T -> file_buffer is a complicated struct
 func BufferGetLine(vbuf *C.buf_T, lineNum int) string {
 	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
+	// not sure about casting C.uchar to C.char
+	// and then using C.GoString but it seems to work
+	// created BufferGetLine2 to explore alternative
 	data := (*C.char)(unsafe.Pointer(line))
 	s := C.GoString(data)
 	return s
 }
 
-func BufferLines(vbuf *C.buf_T) [][]byte {
-	var bb [][]byte
-	lc := BufferGetLineCount(vbuf)
-	for i := 1; i <= lc; i++ {
-		s := BufferGetLine(vbuf, i)
-		bb = append(bb, []byte(s))
-	}
+//char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
+// I think nvim brings back bytes
+func BufferGetLine2(vbuf *C.buf_T, lineNum int) []byte {
+	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
+	// need to cast to *C.char to use strlen
+	// in vim.h: #define STRLEN(s) strlen((char *)(s))
+	// this didn't work ln := C.int(C.STRLEN(unsafe.Pointer(line)))
+	ln := C.int(C.strlen((*C.char)(unsafe.Pointer(line))))
+	bb := C.GoBytes(unsafe.Pointer(line), ln)
 	return bb
 }
 
+// returns [][]byte
+func BufferLines(vbuf *C.buf_T) [][]byte {
+	var bbb [][]byte
+	lc := BufferGetLineCount(vbuf)
+	for i := 1; i <= lc; i++ {
+		bb := BufferGetLine2(vbuf, i)
+		bbb = append(bbb, bb)
+	}
+	return bbb
+}
+
+// returns []string
 func BufferLinesS(vbuf *C.buf_T) []string {
 	// should probably use string builder
 	// line count starts from 1
@@ -112,9 +128,10 @@ func BufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 		view[i] = C.uchar(x)
 		view[len(s)] = 0 //may not be necessary
 	}
-	// need to move some bytes into it - how
+	/* debugging
 	fmt.Printf("%p\n", p2)
 	fmt.Printf("%v\n", &p1)
+	*/
 	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
 	//C.free(unsafe.Pointer(p2)) //panics
 	C.free(unsafe.Pointer(p1))
@@ -137,8 +154,51 @@ func CursorSetPosition(pos [2]int) {
 	C.vimCursorSetPosition(p)
 }
 
-//int vimGetMode(void);
+/*
+int vimGetMode(void);
+modes are in vim.h there are DEFINES for NORMAL, VISUAL, INSERT, OP_PENDING (blocking?)
+etc.
+NORMAL 1
+VISUAL 2
+OP_PENDING 4 examples "2d" "da" etc
+CMDLINE 8
+INSERT 16 0x10
+REPLACE -> NORMAL_BUSY 257 0x101
+*/
 func GetMode() int {
 	m := C.vimGetMode()
 	return int(m)
+}
+
+//int vimBufferGetModified(buf_T *buf);
+func BufferGetModified(vbuf *C.buf_T) bool {
+	b := C.vimBufferGetModified(vbuf)
+	if b == 0 {
+		return false
+	}
+	return true
+}
+
+//void vimVisualGetRange(pos_T *startPos, pos_T *endPos);
+func VisualGetRange() [2][2]int {
+	var startPos, endPos C.pos_T
+	C.vimVisualGetRange(&startPos, &endPos)
+	var pos [2][2]int
+	pos[0][0] = int(startPos.lnum)
+	pos[0][1] = int(startPos.col)
+	pos[1][0] = int(endPos.lnum)
+	pos[1][1] = int(endPos.col)
+	return pos
+}
+
+/*
+vimVisualGetType() == Ctrl_V);
+int vimVisualGetType(void) { return VIsual_mode; }
+Visual = 118 'v'
+Visual Line = 86 'V'
+Visual block = 22  ctrl-v
+*/
+func VisualGetType() int {
+	t := C.vimVisualGetType()
+	return int(t)
 }
