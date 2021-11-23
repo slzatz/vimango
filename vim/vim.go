@@ -202,3 +202,10 @@ func VisualGetType() int {
 	t := C.vimVisualGetType()
 	return int(t)
 }
+
+//char_u *vimEval(char_u *str);
+func Eval(s string) string {
+	r := C.vimEval(ucharP(s))
+	data := (*C.char)(unsafe.Pointer(r))
+	return C.GoString(data)
+}
