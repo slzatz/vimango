@@ -137,6 +137,26 @@ func BufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 	C.free(unsafe.Pointer(p1))
 }
 
+func BufferSetLinesB(vbuf *C.buf_T, start int, end int, b []byte, count int) {
+	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(len(b)+1)))
+	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
+	p2 = &p1
+
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0 : len(b)+1]
+	for i, x := range b {
+		view[i] = C.uchar(x)
+		view[len(s)] = 0 //may not be necessary
+	}
+	/* debugging
+	fmt.Printf("%p\n", p2)
+	fmt.Printf("%v\n", &p1)
+	*/
+	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
+	//C.free(unsafe.Pointer(p2)) //panics
+	C.free(unsafe.Pointer(p1))
+}
+
+//v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
 //pos_T vimCursorGetPosition(void);
 func CursorGetPosition() [2]int {
 	p := C.vimCursorGetPosition()
@@ -159,11 +179,13 @@ int vimGetMode(void);
 modes are in vim.h there are DEFINES for NORMAL, VISUAL, INSERT, OP_PENDING (blocking?)
 etc.
 NORMAL 1
-VISUAL 2
-OP_PENDING 4 examples "2d" "da" etc
+VISUAL 2 (v -> 118; V -> 86; ctrl-v -> 22)
+OP_PENDING 4; examples "2d" "da" etc
 CMDLINE 8
 INSERT 16 0x10
 REPLACE -> NORMAL_BUSY 257 0x101
+SEARCH 8
+Note there are two modes which sometimes overlap and sometimes don't: the mode vim is in and the mode that listmango is in
 */
 func GetMode() int {
 	m := C.vimGetMode()
@@ -201,4 +223,10 @@ Visual block = 22  ctrl-v
 func VisualGetType() int {
 	t := C.vimVisualGetType()
 	return int(t)
+}
+
+func Eval(s string) string {
+	r := C.vimEval(ucharP(s))
+	data := (*C.char)(unsafe.Pointer(r))
+	return C.GoString(data)
 }
