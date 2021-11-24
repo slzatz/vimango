@@ -138,22 +138,22 @@ func main() {
 		}
 	*/
 
-	err = vim.Command("set iskeyword+=*")
+	vim.Execute("set iskeyword+=*")
 	/*
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error in set iskeyword: %v", err)
 			os.Exit(1)
 		}
 	*/
-	err = vim.Command("set iskeyword+=`")
+	vim.Execute("set iskeyword+=`")
 	/*
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error in set iskeyword: %v", err)
-			os.Exit(1)
-		}
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error in set iskeyword: %v", err)
+				os.Exit(1)
+			}
+		redirectMessages(v)
+		messageBuf, _ = v.CreateBuffer(true, true)
 	*/
-	redirectMessages(v)
-	messageBuf, _ = v.CreateBuffer(true, true)
 
 	// enable raw mode
 	origCfg, err := rawmode.Enable()

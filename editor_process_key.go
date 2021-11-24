@@ -113,7 +113,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			}
 			vim.Input("ciw" + p.suggestions[num] + "\x1b")
 			//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
-			p.bb, _ = vim.BufferLines(p.vbuf)
+			p.bb = vim.BufferLines(p.vbuf)
 			//pos, _ := v.WindowCursor(w) //screen cx and cy set from pos
 			pos := vim.CursorGetPosition() //set screen cx and cy from pos
 			p.fr = pos[0] - 1
@@ -164,7 +164,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 				p.command = ""
 				//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
-				p.bb, _ = vim.BufferLines(p.vbuf)
+				p.bb = vim.BufferLines(p.vbuf)
 				//pos, _ := v.WindowCursor(w) //screen cx and cy set from pos
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
@@ -185,7 +185,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			p.mode = NORMAL
 			p.command = ""
 			//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
-			p.bb, _ = vim.BufferLines(p.vbuf)
+			p.bb = vim.BufferLines(p.vbuf)
 			//pos, _ := v.WindowCursor(w)                  //screen cx and cy set from pos
 			pos := vim.CursorGetPosition() //set screen cx and cy from pos
 			p.fr = pos[0] - 1
@@ -212,7 +212,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				p.command = ""
 				//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
 				//pos, _ := v.WindowCursor(w)                  //screen cx and cy set from pos
-				p.bb, _ = vim.BufferLines(p.vbuf)
+				p.bb = vim.BufferLines(p.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
 				//p.fc = pos[1]
@@ -308,7 +308,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	if z, found := termcodes[c]; found {
 		//v.FeedKeys(z, "t", true)
-		v.Input(z)
+		vim.Input(z)
 		// if c is a control character we don't want to send to nvim 07012021
 		// except we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
 		// escape is dealt with first thing
@@ -370,8 +370,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	p.mode = newModeMap[mode] //note that "c" => SEARCH
 	if mode == 2 {            //VISUAL_MODE
-		vmode = VisualGetType()
-		p.mode = visualModeMap(vmode)
+		vmode := vim.VisualGetType()
+		p.mode = visualModeMap[vmode]
 	} else {
 		p.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 	}
@@ -396,15 +396,17 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	//below is done for everything except SEARCH and EX_COMMAND
 	//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
 	//pos, _ := v.WindowCursor(w)                  //set screen cx and cy from pos
-	p.bb, _ = vim.BufferLines(p.vbuf)
+	p.bb = vim.BufferLines(p.vbuf)
 	pos := vim.CursorGetPosition() //set screen cx and cy from pos
 	p.fr = pos[0] - 1
 	//p.fc = pos[1]
 	p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 
-	if (c == 'u' || c == '\x12') && p.mode == NORMAL {
-		showLastVimMessage()
-	}
+	/*
+		if (c == 'u' || c == '\x12') && p.mode == NORMAL {
+			showLastVimMessage()
+		}
+	*/
 
 	if p.mode == PENDING { // -> operator pending (eg. typed 'd')
 		return false
