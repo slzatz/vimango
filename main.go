@@ -13,7 +13,7 @@ func main() {
 	fmt.Printf("buffer pointer: %p -> %T\n", buf0, buf0)
 
 	i := vim.BufferGetId(buf0)
-	fmt.Printf("Current buffer id = %d\n", i)
+	fmt.Printf("Opened buffer id = %d\n", i)
 
 	n := vim.BufferGetLineCount(buf0)
 	fmt.Printf("Line Count = %d\n", n)
@@ -84,7 +84,10 @@ func main() {
 
 	mod := vim.BufferGetModified(buf0)
 	fmt.Printf("Buffer modified = %t\n", mod)
-	vim.Input("gginorm [⌘]\x1b")
+	vim.Input("gginorm [⌘] \x1b")
+	mod = vim.BufferGetModified(buf0)
+	fmt.Printf("Buffer modified = %t\n", mod)
+	vim.Execute("w")
 	mod = vim.BufferGetModified(buf0)
 	fmt.Printf("Buffer modified = %t\n", mod)
 	//vim.Key("<esc>")
@@ -117,5 +120,41 @@ func main() {
 	vim.Execute("let length = strlen('Hello')")
 	s := vim.Eval("length")
 	fmt.Printf("length = %s\n", s)
+
+	vim.Key("<esc>")
+	//vim.Execute("let sug = spellsuggest(expand('<cword>')")
+	vim.Execute("set spell")
+	//vim.Execute("set spell spelllang=/home/slzatz/.vim/spell/en.utf-8.spl")
+	vim.Execute("let sug = spellsuggest('helllo', 5)")
+	//vim.Execute("let sug = [1,2,3,4]") //this works
+	s = vim.Eval("string(sug)")
+	fmt.Printf("sug = %v %d\n", s, len(s))
+	vim.Execute("let word = expand('<cword>')")
+	s = vim.Eval("word")
+	fmt.Printf("word = %s\n", s)
+	buf1 := vim.BufferNew(0)
+	i = vim.BufferGetId(buf1)
+	fmt.Printf("New buffer id = %d\n", i)
+
+	buf_current := vim.BufferGetCurrent()
+	i = vim.BufferGetId(buf_current)
+	fmt.Printf("Current buffer id = %d\n", i)
+
+	vim.BufferSetCurrent(buf1)
+	buf_current = vim.BufferGetCurrent()
+	i = vim.BufferGetId(buf_current)
+	fmt.Printf("Current buffer id = %d\n", i)
+	vim.BufferSetLinesBB(buf1, 0, -1, [][]byte{[]byte("Hello\x00"), []byte("Goodbye\x00"), []byte("Peace\x00")}, 1)
+	ss = vim.BufferLinesS(buf1)
+	fmt.Printf("%v\n", ss)
+	n = vim.BufferGetLineCount(buf1)
+	fmt.Printf("Line Count = %d\n", n)
+	//vim.BufferSetLinesBBB(buf1, 0, -1, [][]byte{[]byte("Hello"), []byte("Goodbye"), []byte("Peace")}, 1)
+	vim.BufferSetLinesBBB(buf1, [][]byte{[]byte("Hello"), []byte("Goodbye"), []byte("Peace")})
+	ss = vim.BufferLinesS(buf1)
+	fmt.Printf("%v\n", ss)
+	n = vim.BufferGetLineCount(buf1)
+	fmt.Printf("Line Count = %d\n", n)
 	fmt.Println("Done")
+
 }

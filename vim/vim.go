@@ -1,6 +1,7 @@
 package vim
 
 import (
+	"fmt"
 	"unsafe"
 )
 
@@ -10,6 +11,8 @@ import (
 #cgo LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
 */
 import "C"
+
+type vbuf *C.buf_T
 
 func ucharP(s string) *C.uchar {
 	var bb = []byte(s)
@@ -29,10 +32,22 @@ func BufferOpen(filename string, lnum int, flags int) *C.buf_T {
 	return vbuf
 }
 
+//buf_T *vimBufferLoad(char_u *ffname_arg, linenr_T lnum, int flags)
+//buf_T *vimBufferNew(int flags)
+func BufferNew(flags int) *C.buf_T {
+	vbuf := C.vimBufferNew(C.int(flags))
+	return vbuf
+}
+
 //int vimBufferGetId(buf_T *buf);
 func BufferGetId(vbuf *C.buf_T) int {
 	id := C.vimBufferGetId(vbuf)
 	return int(id)
+}
+
+//void vimBufferSetCurrent(buf_T *buf);
+func BufferSetCurrent(vbuf *C.buf_T) {
+	C.vimBufferSetCurrent(vbuf)
 }
 
 //buf_T *vimBufferGetCurrent(void);
@@ -135,6 +150,82 @@ func BufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
 	//C.free(unsafe.Pointer(p2)) //panics
 	C.free(unsafe.Pointer(p1))
+}
+
+func BufferSetLinesB(vbuf *C.buf_T, start int, end int, b []byte, count int) {
+	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(len(b)+1)))
+	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
+	p2 = &p1
+
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0 : len(b)+1]
+	for i, x := range b {
+		view[i] = C.uchar(x)
+		view[len(b)] = 0 //may not be necessary
+	}
+	/* debugging
+	fmt.Printf("%p\n", p2)
+	fmt.Printf("%v\n", &p1)
+	*/
+	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
+	//C.free(unsafe.Pointer(p2)) //panics
+	C.free(unsafe.Pointer(p1))
+}
+
+func BufferSetLinesBB(vbuf *C.buf_T, start int, end int, bb [][]byte, count int) {
+	// size really just needs to be the length of the longest line + 1 for null terminator
+	size := unsafe.Sizeof(bb)
+	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
+	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
+	p2 = &p1
+
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
+	for start, line := range bb {
+		//i := 0
+		//for _, line := range bb {
+		for i, x := range line {
+			//for _, x := range line {
+			view[i] = C.uchar(x)
+			//i += 1
+			//view[len(b)] = 0 //may not be necessary
+			fmt.Printf("i = %d\n", i)
+		}
+		/* debugging
+		fmt.Printf("%p\n", p2)
+		fmt.Printf("%v\n", &p1)
+		*/
+		C.vimBufferSetLines(vbuf, C.long(start), C.long(start-1), p2, C.int(count))
+	}
+	//C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
+	C.free(unsafe.Pointer(p1))
+	//C.free(unsafe.Pointer(p2)) //panics
+}
+
+func BufferSetLinesBBB(vbuf *C.buf_T, bb [][]byte) {
+	// size really just needs to be the length of the longest line + 1 for null terminator
+	size := unsafe.Sizeof(bb)
+	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
+	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
+	p2 = &p1
+
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
+	for start, line := range bb {
+		i := 0
+		for _, x := range line {
+			view[i] = C.uchar(x)
+			i += 1
+			//view[len(b)] = 0 //may not be necessary
+			fmt.Printf("i = %d\n", i)
+		}
+		view[i] = 0
+		/* debugging
+		fmt.Printf("%p\n", p2)
+		fmt.Printf("%v\n", &p1)
+		*/
+		C.vimBufferSetLines(vbuf, C.long(start), C.long(start-1), p2, C.int(1))
+	}
+	//C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
+	C.free(unsafe.Pointer(p1))
+	//C.free(unsafe.Pointer(p2)) //panics
 }
 
 //pos_T vimCursorGetPosition(void);
