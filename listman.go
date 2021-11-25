@@ -13,8 +13,8 @@ import (
 
 	//"github.com/neovim/go-client/nvim"
 
-	"github.com/slzatz/listmango/rawmode"
-	"github.com/slzatz/listmango/terminal"
+	"github.com/slzatz/vimango/rawmode"
+	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
 )
 

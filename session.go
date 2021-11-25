@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/slzatz/listmango/rawmode"
+	"github.com/slzatz/vimango/rawmode"
 	"golang.org/x/sys/unix"
 )
 

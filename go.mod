@@ -44,7 +44,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/segmentio/asm v1.1.0 // indirect
 	github.com/segmentio/encoding v0.3.0 // indirect
-	github.com/slzatz/listmango v0.0.0-20211112110117-71e0dc33fc85 // indirect
+	//github.com/slzatz/listmango v0.0.0-20211112110117-71e0dc33fc85 // indirect
 	github.com/yuin/goldmark v1.4.3 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	go.lsp.dev/pkg v0.0.0-20210323044036-f7deec69b52e // indirect
