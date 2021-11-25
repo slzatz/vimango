@@ -137,6 +137,7 @@ func BufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(len(s)+1)))
 	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
 	p2 = &p1
+	fmt.Printf("BufferSetLines len(s) = %v\n", len(s))
 
 	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0 : len(s)+1]
 	for i, x := range s {
@@ -152,28 +153,18 @@ func BufferSetLines(vbuf *C.buf_T, start int, end int, s string, count int) {
 	C.free(unsafe.Pointer(p1))
 }
 
-func BufferSetLinesB(vbuf *C.buf_T, start int, end int, b []byte, count int) {
-	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(len(b)+1)))
-	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
-	p2 = &p1
-
-	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0 : len(b)+1]
-	for i, x := range b {
-		view[i] = C.uchar(x)
-		view[len(b)] = 0 //may not be necessary
-	}
-	/* debugging
-	fmt.Printf("%p\n", p2)
-	fmt.Printf("%v\n", &p1)
-	*/
-	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
-	//C.free(unsafe.Pointer(p2)) //panics
-	C.free(unsafe.Pointer(p1))
-}
-
 func BufferSetLinesBB(vbuf *C.buf_T, start int, end int, bb [][]byte, count int) {
 	// size really just needs to be the length of the longest line + 1 for null terminator
-	size := unsafe.Sizeof(bb)
+	//size := unsafe.Sizeof(bb) //this does not due what you think it does
+	size := 0
+	for _, b := range bb {
+		if len(b) > size {
+			size = len(b)
+		}
+	}
+	size += 1
+
+	fmt.Printf("BufferSetLinesBB size = %v\n", size)
 	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
 	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
 	p2 = &p1
@@ -187,7 +178,7 @@ func BufferSetLinesBB(vbuf *C.buf_T, start int, end int, bb [][]byte, count int)
 			view[i] = C.uchar(x)
 			//i += 1
 			//view[len(b)] = 0 //may not be necessary
-			fmt.Printf("i = %d\n", i)
+			fmt.Printf("i = %d -> %v\n", i, view[i])
 		}
 		/* debugging
 		fmt.Printf("%p\n", p2)
@@ -202,7 +193,15 @@ func BufferSetLinesBB(vbuf *C.buf_T, start int, end int, bb [][]byte, count int)
 
 func BufferSetLinesBBB(vbuf *C.buf_T, bb [][]byte) {
 	// size really just needs to be the length of the longest line + 1 for null terminator
-	size := unsafe.Sizeof(bb)
+	//size := unsafe.Sizeof(bb)
+	size := 0
+	for _, b := range bb {
+		if len(b) > size {
+			size = len(b)
+		}
+	}
+	size += 1
+	fmt.Printf("BufferSetLinesBBB size = %v\n", size)
 	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
 	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
 	p2 = &p1
@@ -212,11 +211,12 @@ func BufferSetLinesBBB(vbuf *C.buf_T, bb [][]byte) {
 		i := 0
 		for _, x := range line {
 			view[i] = C.uchar(x)
+			fmt.Printf("i = %d -> %v\n", i, view[i])
 			i += 1
 			//view[len(b)] = 0 //may not be necessary
-			fmt.Printf("i = %d\n", i)
 		}
 		view[i] = 0
+		fmt.Printf("i = %d -> %v\n", i, view[i])
 		/* debugging
 		fmt.Printf("%p\n", p2)
 		fmt.Printf("%v\n", &p1)
@@ -226,6 +226,30 @@ func BufferSetLinesBBB(vbuf *C.buf_T, bb [][]byte) {
 	//C.vimBufferSetLines(vbuf, C.long(start), C.long(end), p2, C.int(count))
 	C.free(unsafe.Pointer(p1))
 	//C.free(unsafe.Pointer(p2)) //panics
+}
+
+// compiles but doesn't do the right thing
+// not 100% sure it can be done
+func BufferSetLinesBBBB(vbuf *C.buf_T, bb [][]byte) {
+	p2_array := (**C.uchar)(C.malloc(C.sizeof_uint * C.ulong(len(bb))))
+	for i, b := range bb {
+		size := len(b) + 1
+		p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
+		defer C.free(unsafe.Pointer(p1))
+		//ptrPtr := (**Stream)(unsafe.Pointer(uintptr(unsafe.Pointer(streams)) + i*unsafe.Sizeof(*streams)))
+		*(***C.uchar)(unsafe.Pointer(uintptr(unsafe.Pointer(p2_array)) + uintptr(i)*unsafe.Sizeof(*p2_array)))
+		view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
+		i := 0
+		for _, x := range b {
+			view[i] = C.uchar(x)
+			fmt.Printf("i = %d -> %v\n", i, view[i])
+			i += 1
+			//view[len(b)] = 0 //may not be necessary
+		}
+		view[i] = 0
+		fmt.Printf("i = %d -> %v\n", i, view[i])
+	}
+	C.vimBufferSetLines(vbuf, C.long(0), C.long(-1), p2_array, C.int(len(bb)))
 }
 
 //pos_T vimCursorGetPosition(void);
