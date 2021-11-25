@@ -17,8 +17,8 @@ import (
 )
 
 func (e *Editor) highlightInfo() { // [2][4]int {
-	pos := vim.VisualGetRange()
-	e.vb_highlight[0] = [4]int{0, pos[0][0], pos[0][1] + 1, 0}
+	pos := vim.VisualGetRange()                                //[]line col []line col
+	e.vb_highlight[0] = [4]int{0, pos[0][0], pos[0][1] + 1, 0} //[0][1]line [0][2]col
 	e.vb_highlight[1] = [4]int{0, pos[1][0], pos[1][1] + 1, 0}
 }
 
@@ -701,13 +701,21 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 	if e.mode == VISUAL_BLOCK {
 
 		var left, right int
+		/*
+			if e.vb_highlight[1][2] > e.vb_highlight[0][2] {
+				right, left = e.vb_highlight[1][2], e.vb_highlight[0][2]
+			} else {
+				left, right = e.vb_highlight[1][2], e.vb_highlight[0][2]
+			}
+		*/
+
+		e.vb_highlight[1][2] = vim.CursorGetPosition()[1] + 1 //column of cursor
 		if e.vb_highlight[1][2] > e.vb_highlight[0][2] {
 			right, left = e.vb_highlight[1][2], e.vb_highlight[0][2]
 		} else {
 			left, right = e.vb_highlight[1][2], e.vb_highlight[0][2]
 		}
-
-		x := e.getScreenXFromRowColWW(e.vb_highlight[0][1], left) + e.left_margin + e.left_margin_offset
+		x := e.getScreenXFromRowColWW(e.vb_highlight[0][1]-1, left) + e.left_margin + e.left_margin_offset //-1
 		y := e.getScreenYFromRowColWW(e.vb_highlight[0][1], left) + e.top_margin - e.lineOffset - 1
 
 		pab.WriteString("\x1b[48;5;237m")

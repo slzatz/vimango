@@ -15,8 +15,8 @@ type Editor struct {
 	left_margin        int //can vary (so could TOP_MARGIN - will do that later
 	left_margin_offset int // 0 if no line numbers
 	top_margin         int
-	code               string //used by lsp thread and intended to avoid unnecessary calls to editorRowsToString
-	vb_highlight       [2][4]int
+	code               string    //used by lsp thread and intended to avoid unnecessary calls to editorRowsToString
+	vb_highlight       [2][4]int // holds various visual modes highlight coordinates
 	mode               Mode
 	command_line       string //for commands on the command line; string doesn't include ':'
 	command            string // right now includes normal mode commands and command line commands
