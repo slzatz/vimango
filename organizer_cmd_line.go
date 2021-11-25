@@ -856,7 +856,7 @@ func (o *Organizer) printList(unused int) {
 		bb = append(bb, []byte(fmt.Sprintf("%2d. %s", i+1, row.title)))
 	}
 	tempBuf := vim.BufferNew(0)
-	vim.BufferSetLinesBBB(tempBuf, bb)
+	vim.BufferSetLines(tempBuf, bb)
 	vim.BufferSetCurrent(tempBuf)
 	vim.Execute("ha")
 

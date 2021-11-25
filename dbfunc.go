@@ -465,39 +465,9 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	}
 
 	e.bb = bytes.Split([]byte(note), []byte("\n")) // yes, you need to do it this way
-
-	/*
-		e.vbuf, err = v.CreateBuffer(true, false)
-		if err != nil {
-			sess.showOrgMessage("%v", err)
-		}
-	*/
 	e.vbuf = vim.BufferNew(0)
-
-	/*
-		err = v.SetCurrentBuffer(e.vbuf)
-		if err != nil {
-			sess.showOrgMessage("%v", err)
-		} else {
-			sess.showOrgMessage("%v", e.vbuf)
-		}
-	*/
 	vim.BufferSetCurrent(e.vbuf)
-
-	/*
-		err = v.SetBufferLines(e.vbuf, 0, -1, true, e.bb)
-		if err != nil {
-			sess.showEdMessage("Error in SetBufferLines in dbfuc: %v", err)
-		}
-	*/
-	vim.BufferSetLinesBBB(e.vbuf, e.bb)
-
-	/*
-		err = v.Command(fmt.Sprintf("w temp/buf%d", e.vbuf))
-		if err != nil {
-			sess.showEdMessage("Error in writing file in dbfunc: %v", err)
-		}
-	*/
+	vim.BufferSetLines(e.vbuf, e.bb)
 	vim.Execute(fmt.Sprintf("w temp/buf%d", vim.BufferGetId(e.vbuf)))
 }
 

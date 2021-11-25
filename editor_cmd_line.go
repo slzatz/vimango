@@ -612,7 +612,7 @@ func (e *Editor) goFormat() {
 	}
 	e.bb = bb
 
-	vim.BufferSetLinesBBB(e.vbuf, e.bb)
+	vim.BufferSetLines(e.vbuf, e.bb)
 	//v.Input("gg0")
 	pos := vim.CursorGetPosition()
 	e.fr = pos[0] - 1
