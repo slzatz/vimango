@@ -17,6 +17,10 @@ import (
 )
 
 func (e *Editor) highlightInfo() { // [2][4]int {
+	e.highlight = vim.VisualGetRange() //[]line col []line col
+	if p.mode == VISUAL_BLOCK {
+		e.highlight[0][1] = vim.CursorGetPosition()[1] //column of cursor
+	}
 	pos := vim.VisualGetRange()                                //[]line col []line col
 	e.vb_highlight[0] = [4]int{0, pos[0][0], pos[0][1] + 1, 0} //[0][1]line [0][2]col
 	e.vb_highlight[1] = [4]int{0, pos[1][0], pos[1][1] + 1, 0}
@@ -622,8 +626,10 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin+e.left_margin_offset)
 
 	if e.mode == VISUAL_LINE {
-		startRow := e.vb_highlight[0][1] - 1 // i think better to subtract one here
-		endRow := e.vb_highlight[1][1] - 1   //ditto - done differently for visual and v_block
+		//startRow := e.vb_highlight[0][1] - 1 // i think better to subtract one here
+		startRow := e.highlight[0][0] - 1 // i think better to subtract one here
+		//endRow := e.vb_highlight[1][1] - 1   //ditto - done differently for visual and v_block
+		endRow := e.highlight[1][0] - 1 //ditto - done differently for visual and v_block
 
 		x := e.left_margin + e.left_margin_offset + 1
 		y := e.getScreenYFromRowColWW(startRow, 0) - e.lineOffset
@@ -656,13 +662,15 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 	}
 
 	if e.mode == VISUAL {
-		startCol, endcol := e.vb_highlight[0][2], e.vb_highlight[1][2]
+		//startCol, endcol := e.vb_highlight[0][2], e.vb_highlight[1][2]
+		startCol, endcol := e.highlight[0][1], e.highlight[1][1]
 
 		// startRow always <= endRow and need to subtract 1 since counting starts at 1 not zero
-		startRow, endRow := e.vb_highlight[0][1]-1, e.vb_highlight[1][1]-1 //startRow always <= endRow
+		//startRow, endRow := e.vb_highlight[0][1]-1, e.vb_highlight[1][1]-1 //startRow always <= endRow
+		startRow, endRow := e.highlight[0][0]-1, e.highlight[1][0]-1 //startRow always <= endRow
 		numrows := endRow - startRow + 1
 
-		x := e.getScreenXFromRowColWW(startRow, startCol) + e.left_margin + e.left_margin_offset
+		x := e.getScreenXFromRowColWW(startRow, startCol) + e.left_margin + e.left_margin_offset + 1
 		y := e.getScreenYFromRowColWW(startRow, startCol) + e.top_margin - e.lineOffset // - 1
 
 		pab.WriteString("\x1b[48;5;237m")
@@ -682,10 +690,9 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 				continue
 			}
 			if numrows == 1 {
-				//pab.Write(row[startCol-1 : endcol-1])
-				pab.Write(row[startCol-1 : endcol])
+				pab.Write(row[startCol:endcol])
 			} else if n == 0 {
-				pab.Write(row[startCol-1:])
+				pab.Write(row[startCol:])
 			} else if n < numrows-1 {
 				pab.Write(row)
 			} else {
@@ -709,19 +716,27 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			}
 		*/
 
-		e.vb_highlight[1][2] = vim.CursorGetPosition()[1] + 1 //column of cursor
-		if e.vb_highlight[1][2] > e.vb_highlight[0][2] {
-			right, left = e.vb_highlight[1][2], e.vb_highlight[0][2]
+		//e.vb_highlight[1][2] = vim.CursorGetPosition()[1] + 1 //column of cursor
+		e.highlight[1][1] = vim.CursorGetPosition()[1] //column of cursor
+		//if e.vb_highlight[1][2] > e.vb_highlight[0][2] {
+		if e.highlight[1][1] > e.highlight[0][1] {
+			//right, left = e.vb_highlight[1][2], e.vb_highlight[0][2]
+			right, left = e.highlight[1][1], e.vb_highlight[0][1]
 		} else {
-			left, right = e.vb_highlight[1][2], e.vb_highlight[0][2]
+			//left, right = e.vb_highlight[1][2], e.vb_highlight[0][2]
+			left, right = e.highlight[1][1], e.vb_highlight[0][1]
 		}
-		x := e.getScreenXFromRowColWW(e.vb_highlight[0][1]-1, left) + e.left_margin + e.left_margin_offset //-1
-		y := e.getScreenYFromRowColWW(e.vb_highlight[0][1], left) + e.top_margin - e.lineOffset - 1
+		//x := e.getScreenXFromRowColWW(e.vb_highlight[0][1]-1, left) + e.left_margin + e.left_margin_offset //-1
+		x := e.getScreenXFromRowColWW(e.highlight[0][0]-1, left) + e.left_margin + e.left_margin_offset + 1 //-1
+		//y := e.getScreenYFromRowColWW(e.vb_highlight[0][1], left) + e.top_margin - e.lineOffset - 1
+		y := e.getScreenYFromRowColWW(e.highlight[0][0]-1, left) + e.top_margin - e.lineOffset
 
 		pab.WriteString("\x1b[48;5;237m")
-		for n := 0; n < (e.vb_highlight[1][1] - e.vb_highlight[0][1] + 1); n++ {
+		//for n := 0; n < (e.vb_highlight[1][1] - e.vb_highlight[0][1] + 1); n++ {
+		for n := 0; n < (e.highlight[1][0] - e.highlight[0][0] + 1); n++ {
 			fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, x)
-			row := e.bb[e.vb_highlight[0][1]+n-1]
+			//row := e.bb[e.vb_highlight[0][1]+n-1]
+			row := e.bb[e.highlight[0][0]+n-1]
 			rowLen := len(row)
 
 			if rowLen == 0 || rowLen < left {
@@ -729,9 +744,9 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			}
 
 			if rowLen < right {
-				pab.Write(row[left-1 : rowLen])
+				pab.Write(row[left:rowLen])
 			} else {
-				pab.Write(row[left-1 : right])
+				pab.Write(row[left:right])
 			}
 		}
 	}

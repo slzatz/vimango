@@ -379,6 +379,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	//case INSERT, REPLACE, NORMAL:
 	case VISUAL, VISUAL_LINE, VISUAL_BLOCK:
 		p.highlightInfo()
+	//	p.highlight = vim.VisualGetRange() //[]line col []line col
 	case SEARCH:
 		// return puts nvim into normal mode so don't need to catch return
 		if c == DEL_KEY || c == BACKSPACE {
