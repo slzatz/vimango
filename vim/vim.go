@@ -60,6 +60,12 @@ func Input(s string) {
 	C.vimInput(ucharP(s))
 }
 
+func Input2(s string) {
+	for _, b := range []byte(s) {
+		C.vimInput((*C.uchar)(&b))
+	}
+}
+
 //void vimKey(char_u *key);
 func Key(s string) {
 	C.vimKey(ucharP(s))
