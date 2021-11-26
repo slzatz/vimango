@@ -178,7 +178,7 @@ func BufferSetLinesBB(vbuf *C.buf_T, start int, end int, bb [][]byte, count int)
 			view[i] = C.uchar(x)
 			//i += 1
 			//view[len(b)] = 0 //may not be necessary
-			fmt.Printf("i = %d -> %v\n", i, view[i])
+			//fmt.Printf("i = %d -> %v\n", i, view[i]) //debugging
 		}
 		/* debugging
 		fmt.Printf("%p\n", p2)
@@ -211,12 +211,11 @@ func BufferSetLinesBBB(vbuf *C.buf_T, bb [][]byte) {
 		i := 0
 		for _, x := range line {
 			view[i] = C.uchar(x)
-			fmt.Printf("i = %d -> %v\n", i, view[i])
+			//fmt.Printf("i = %d -> %v\n", i, view[i]) //debugging
 			i += 1
-			//view[len(b)] = 0 //may not be necessary
 		}
 		view[i] = 0
-		fmt.Printf("i = %d -> %v\n", i, view[i])
+		//fmt.Printf("i = %d -> %v\n", i, view[i]) //debugging
 		/* debugging
 		fmt.Printf("%p\n", p2)
 		fmt.Printf("%v\n", &p1)
@@ -237,17 +236,16 @@ func BufferSetLinesBBBB(vbuf *C.buf_T, bb [][]byte) {
 		p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
 		defer C.free(unsafe.Pointer(p1))
 		//ptrPtr := (**Stream)(unsafe.Pointer(uintptr(unsafe.Pointer(streams)) + i*unsafe.Sizeof(*streams)))
-		*(***C.uchar)(unsafe.Pointer(uintptr(unsafe.Pointer(p2_array)) + uintptr(i)*unsafe.Sizeof(*p2_array)))
+		*(***C.uchar)(unsafe.Pointer(uintptr(unsafe.Pointer(p2_array)) + uintptr(i)*unsafe.Sizeof(*p2_array))) = &p1
 		view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
 		i := 0
 		for _, x := range b {
 			view[i] = C.uchar(x)
-			fmt.Printf("i = %d -> %v\n", i, view[i])
+			//fmt.Printf("i = %d -> %v\n", i, view[i]) //debugging
 			i += 1
-			//view[len(b)] = 0 //may not be necessary
 		}
 		view[i] = 0
-		fmt.Printf("i = %d -> %v\n", i, view[i])
+		//fmt.Printf("i = %d -> %v\n", i, view[i]) //debugging
 	}
 	C.vimBufferSetLines(vbuf, C.long(0), C.long(-1), p2_array, C.int(len(bb)))
 }
