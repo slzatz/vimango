@@ -69,7 +69,7 @@ func synchronize(reportOnly bool) (log string) {
 	defer func() {
 		log = lg.String()
 		if reportOnly {
-			log = "### Testing wihtout Syncing\n\n" + log
+			log = "### Testing without Syncing\n\n" + log
 			return
 		}
 		if success {
