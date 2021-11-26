@@ -16,8 +16,7 @@ type Editor struct {
 	left_margin_offset int // 0 if no line numbers
 	top_margin         int
 	code               string    //used by lsp thread and intended to avoid unnecessary calls to editorRowsToString
-	vb_highlight       [2][4]int // holds various visual modes highlight coordinates
-	highlight          [2][2]int // new streamlined highlight coordinates
+	highlight          [2][2]int // [line col][line col] -> note line is 1-based not zero-based
 	mode               Mode
 	command_line       string //for commands on the command line; string doesn't include ':'
 	command            string // right now includes normal mode commands and command line commands
@@ -28,7 +27,6 @@ type Editor struct {
 	redraw             bool
 	id                 int //db id of entry
 	output             *Output
-	//vbuf               nvim.Buffer
 	vbuf               vim.Buffer
 	bb                 [][]byte
 	searchPrefix       string

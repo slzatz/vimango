@@ -232,14 +232,14 @@ func (e *Editor) decorateWordVisual(c int) {
 		return
 	}
 
-	if e.vb_highlight[0][1] != e.vb_highlight[1][1] {
+	if e.highlight[0][0] != e.highlight[1][0] {
 		sess.showEdMessage("The text must all be in the same row")
 		return
 	}
 
 	//row := e.bb[e.fr]
-	row := e.bb[e.vb_highlight[0][1]-1]
-	beg, end := e.vb_highlight[0][2]-1, e.vb_highlight[1][2]
+	row := e.bb[e.highlight[0][0]-1]
+	beg, end := e.highlight[0][1]-1, e.highlight[1][1]
 
 	var undo bool
 	s := string(row[beg:end])
