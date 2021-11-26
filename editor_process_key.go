@@ -30,7 +30,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
-		vim.Input("\x1b")
+		//vim.Input("\x1b")
+		vim.Key("<esc>")
 		p.command = ""
 		p.command_line = ""
 
@@ -111,7 +112,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				p.command_line = ""
 				return true
 			}
-			vim.Input("ciw" + p.suggestions[num] + "\x1b")
+			vim.Input2("ciw" + p.suggestions[num] + "\x1b")
 			//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
 			p.bb = vim.BufferLines(p.vbuf)
 			//pos, _ := v.WindowCursor(w) //screen cx and cy set from pos
@@ -309,7 +310,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	if z, found := termcodes[c]; found {
 		//v.FeedKeys(z, "t", true)
 		vim.Input(z)
-		// if c is a control character we don't want to send to nvim 07012021
+		// Most control characters we don't want to send to nvim 07012021
 		// except we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
 		// escape is dealt with first thing
 		//} else if c < 32 && !(c == 13 || c == 22) {

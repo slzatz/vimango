@@ -262,7 +262,7 @@ func (e *Editor) decorateWordVisual(c int) {
 			v.SetBufferText(e.vbuf, e.fr, beg, e.fr, end, [][]byte{word})
 			v.SetWindowCursor(w, [2]int{e.fr + 1, beg}) //set screen cx and cy from pos
 		*/
-		vim.Input("xi" + s + "\x1b")
+		vim.Input2("xi" + s + "\x1b")
 		return
 	}
 
@@ -275,7 +275,7 @@ func (e *Editor) decorateWordVisual(c int) {
 		s = fmt.Sprintf("`%s`", s)
 	}
 
-	vim.Input("xi" + s + "\x1b")
+	vim.Input2("xi" + s + "\x1b")
 	/*
 		v.SetBufferText(e.vbuf, e.fr, beg, e.fr, end, [][]byte{[]byte(newText)})
 		v.SetWindowCursor(w, [2]int{e.fr + 1, beg}) //set screen cx and cy from pos
@@ -314,7 +314,7 @@ func (e *Editor) decorateWord(c int) {
 	}
 	w = strings.Trim(w, "*`")
 	if undo {
-		vim.Input("ciw" + w + "\x1b")
+		vim.Input2("ciw" + w + "\x1b")
 		return
 	}
 

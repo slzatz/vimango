@@ -613,10 +613,8 @@ func (e *Editor) goFormat() {
 	e.bb = bb
 
 	vim.BufferSetLines(e.vbuf, e.bb)
-	//v.Input("gg0")
 	pos := vim.CursorGetPosition()
 	e.fr = pos[0] - 1
-	//p.fc = pos[1]
 	e.fc = utf8.RuneCount(e.bb[e.fr][:pos[1]])
 	e.scroll()
 	e.drawText()

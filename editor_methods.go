@@ -472,7 +472,7 @@ func (e *Editor) applyWorkspaceEdit(wse protocol.WorkspaceEdit) {
 			row := string(e.bb[line])
 			row = row[:startChar] + edit.NewText + row[endChar:]
 			//v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
-			vim.Input(fmt.Sprintf("%dgg%dlc%dl%s\x1b", line, startChar, endChar-startChar, edit.NewText))
+			vim.Input2(fmt.Sprintf("%dgg%dlc%dl%s\x1b", line, startChar, endChar-startChar, edit.NewText))
 			//e.bb, _ = v.BufferLines(e.vbuf, 0, -1, true) //reading updated buffer
 			e.bb = vim.BufferLines(e.vbuf) //reading updated buffer
 			e.drawText()
@@ -872,8 +872,7 @@ func (e *Editor) highlightMispelledWords() {
 	curPos := vim.CursorGetPosition()
 	//v.Command("set spell")
 	vim.Execute("set spell")
-	vim.Input("gg")
-	vim.Input("]s")
+	vim.Input2("gg]s")
 	//first, _ := v.WindowCursor(w)
 	first := vim.CursorGetPosition()
 	rowNum = first[0] - 1
@@ -885,7 +884,7 @@ func (e *Editor) highlightMispelledWords() {
 	e.highlightPositions = append(e.highlightPositions, Position{rowNum, start, end})
 	var pos [2]int
 	for {
-		vim.Input("]s")
+		vim.Input2("]s")
 		pos = vim.CursorGetPosition()
 		//pos, _ = v.WindowCursor(w)
 		if pos == first {
