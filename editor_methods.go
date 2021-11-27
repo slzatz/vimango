@@ -20,168 +20,48 @@ func (e *Editor) highlightInfo() { // [2][4]int {
 	e.highlight = vim.VisualGetRange() //[]line col []line col
 }
 
-//'automatically' happens in NORMAL and INSERT mode
-//return true -> redraw; false -> don't redraw
-func (e *Editor) findMatchForLeftBrace(leftBrace byte, back bool) bool {
-	r := e.fr
-	c := e.fc + 1
-	count := 1
-	max := len(e.bb)
-	var b int
-	if back {
-		b = 1
-	}
-
-	m := map[byte]byte{'{': '}', '(': ')', '[': ']'}
-	rightBrace := m[leftBrace]
-
-	for {
-
-		row := e.bb[r]
-
-		// need >= because brace could be at end of line and in INSERT mode
-		// fc could be row.size() [ie beyond the last char in the line
-		// and so doing fc + 1 above leads to c > row.size()
-		if c >= len(row) {
-			r++
-			if r == max {
-				sess.showEdMessage("Couldn't find matching brace")
-				return false
-			}
-			c = 0
-			continue
-		}
-
-		if row[c] == rightBrace {
-			count -= 1
-			if count == 0 {
-				break
-			}
-		} else if row[c] == leftBrace {
-			count += 1
-		}
-
-		c++
-	}
-	y := e.getScreenYFromRowColWW(r, c) - e.lineOffset
-	if y >= e.screenlines {
-		return false
-	}
-
-	x := e.getScreenXFromRowColWW(r, c) + e.left_margin + e.left_margin_offset + 1
-	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s", y+e.top_margin, x, string(rightBrace))
-
-	x = e.getScreenXFromRowColWW(e.fr, e.fc-b) + e.left_margin + e.left_margin_offset + 1
-	y = e.getScreenYFromRowColWW(e.fr, e.fc-b) + e.top_margin - e.lineOffset // added line offset 12-25-2019
-	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s\x1b[0m", y, x, string(leftBrace))
-	//sess.showEdMessage("r = %d   c = %d", r, c)
-	return true
-}
-
-//'automatically' happens in NORMAL and INSERT mode
-func (e *Editor) findMatchForRightBrace(rightBrace byte, back bool) bool {
-	var b int
-	if back {
-		b = 1
-	}
-	r := e.fr
-	c := e.fc - 1 - b
-	count := 1
-
-	row := e.bb[r]
-
-	m := map[byte]byte{'}': '{', ')': '(', ']': '['}
-	leftBrace := m[rightBrace]
-
-	for {
-
-		if c == -1 { //fc + 1 can be greater than row.size on first pass from INSERT if { at end of line
-			r--
-			if r == -1 {
-				sess.showEdMessage("Couldn't find matching brace")
-				return false
-			}
-			row = e.bb[r]
-			c = len(row) - 1
-			continue
-		}
-
-		if row[c] == leftBrace {
-			count -= 1
-			if count == 0 {
-				break
-			}
-		} else if row[c] == rightBrace {
-			count += 1
-		}
-
-		c--
-	}
-
-	y := e.getScreenYFromRowColWW(r, c) - e.lineOffset
-	if y < 0 {
-		return false
-	}
-
-	x := e.getScreenXFromRowColWW(r, c) + e.left_margin + e.left_margin_offset + 1
-	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s", y+e.top_margin, x, string(leftBrace))
-
-	x = e.getScreenXFromRowColWW(e.fr, e.fc-b) + e.left_margin + e.left_margin_offset + 1
-	y = e.getScreenYFromRowColWW(e.fr, e.fc-b) + e.top_margin - e.lineOffset // added line offset 12-25-2019
-	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s\x1b[0m", y, x, string(rightBrace))
-	sess.showEdMessage("r = %d   c = %d", r, c)
-	return true
-}
-
+// highlight matched braces in NORMAL and INSERT modes
 func (e *Editor) drawHighlightedBraces() {
 
-	// this guard is necessary
 	if len(e.bb) == 0 || len(e.bb[e.fr]) == 0 {
 		return
 	}
 
-	braces := "{}()" //? intentionally exclusing [] from auto drawing
-	var c byte
-	var back bool
+	var b byte
+	var back int
 	//if below handles case when in insert mode and brace is last char
 	//in a row and cursor is beyond that last char (which is a brace)
 	if e.fc == len(e.bb[e.fr]) {
-		c = e.bb[e.fr][e.fc-1]
-		back = true
+		b = e.bb[e.fr][e.fc-1]
+		back = 1
 	} else {
-		c = e.bb[e.fr][e.fc]
-		back = false
+		b = e.bb[e.fr][e.fc]
+		back = 0
 	}
-	pos := strings.Index(braces, string(c))
-	if pos != -1 {
-		switch c {
-		case '{', '(':
-			e.findMatchForLeftBrace(c, back)
-			return
-		case '}', ')':
-			e.findMatchForRightBrace(c, back)
-			return
-		//case '(':
-		default: //should not need this
-			return
-		}
-	} else if e.fc > 0 && e.mode == INSERT {
-		c := e.bb[e.fr][e.fc-1]
-		pos := strings.Index(braces, string(c))
-		if pos != -1 {
-			switch e.bb[e.fr][e.fc-1] {
-			case '{', '(':
-				e.findMatchForLeftBrace(c, true)
-				return
-			case '}', ')':
-				e.findMatchForRightBrace(c, true)
-				return
-			//case '(':
-			default: //should not need this
-				return
-			}
-		}
+
+	if !bytes.ContainsAny([]byte{b}, "{}()") {
+		return
 	}
+
+	pos := vim.SearchGetMatchingPair()
+	if pos == [2]int{0, 0} {
+		return
+	}
+
+	y := e.getScreenYFromRowColWW(pos[0]-1, pos[1]) - e.lineOffset
+	if y >= e.screenlines {
+		return
+	}
+
+	match := e.bb[pos[0]-1][pos[1]]
+
+	x := e.getScreenXFromRowColWW(pos[0]-1, pos[1]) + e.left_margin + e.left_margin_offset + 1
+	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s", y+e.top_margin, x, string(match))
+
+	x = e.getScreenXFromRowColWW(e.fr, e.fc-back) + e.left_margin + e.left_margin_offset + 1
+	y = e.getScreenYFromRowColWW(e.fr, e.fc-back) + e.top_margin - e.lineOffset // added line offset 12-25-2019
+	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s\x1b[0m", y, x, string(b))
+	return
 }
 
 func (e *Editor) setLinesMargins() { //also sets top margin

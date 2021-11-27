@@ -242,3 +242,14 @@ func Eval(s string) string {
 	data := (*C.char)(unsafe.Pointer(r))
 	return C.GoString(data)
 }
+
+func SearchGetMatchingPair() [2]int {
+	var pos [2]int
+	p := C.vimSearchGetMatchingPair(0)
+	if p == nil {
+		return pos
+	}
+	pos[0] = int(p.lnum)
+	pos[1] = int(p.col)
+	return pos
+}
