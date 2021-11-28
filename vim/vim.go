@@ -9,6 +9,19 @@ import (
 #include "src/libvim.h"
 #cgo CFLAGS: -Iproto -DHAVE_CONFIG_H
 #cgo LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
+char_u lastMessage[8192];
+typedef void (*voidFunc) (char_u *title, char_u *msg, msgPriority_T priority);
+typedef void (*voidFunc2) (MessageCallback m);
+void bridge_func(voidFunc2 f, voidFunc m) {
+	return f(m);
+}
+void onMessage(char_u *title, char_u *msg, msgPriority_T priority) {
+	//printf("onMessage - title: |%s| contents: |%s|", title, msg);
+	printf("************************\n");
+	printf("%s\n", msg);
+	printf("++++++++++++++++++++++++\n");
+	strcpy(lastMessage, msg);
+}
 */
 import "C"
 
@@ -18,6 +31,19 @@ func ucharP(s string) *C.uchar {
 	var bb = []byte(s)
 	bb = append(bb, 0)
 	return (*C.uchar)(&bb[0])
+}
+
+func GetLastMessage() string {
+	/*
+		var bb [200]byte
+		for i := range bb {
+			bb[i] = byte(C.lastMessage[i])
+		}
+	*/
+
+	//data := (*C.char)(unsafe.Pointer(line))
+	s := C.GoString((*C.char)(unsafe.Pointer(&C.lastMessage[0])))
+	return s
 }
 
 //void vimInit(int argc, char **argv);
@@ -76,6 +102,7 @@ func Key(s string) {
 //char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
 //typedef long linenr_T;
 //buf_T -> file_buffer is a complicated struct
+//lineNum starts at 1 not zero
 func BufferGetLine(vbuf *C.buf_T, lineNum int) string {
 	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
 	// not sure about casting C.uchar to C.char
@@ -328,4 +355,20 @@ func Eval(s string) string {
 	r := C.vimEval(ucharP(s))
 	data := (*C.char)(unsafe.Pointer(r))
 	return C.GoString(data)
+}
+
+func SearchGetMatchingPair() (pos [2]int) {
+	p := C.vimSearchGetMatchingPair(0)
+	if p == nil {
+		return
+	}
+	pos[0] = int(p.lnum)
+	pos[1] = int(p.col)
+	return
+}
+
+func SetMessageCallback() {
+	m := C.voidFunc(C.onMessage)
+	z := C.voidFunc2(C.vimSetMessageCallback)
+	C.bridge_func(z, m)
 }
