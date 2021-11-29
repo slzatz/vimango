@@ -560,7 +560,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 				continue
 			}
 			if numrows == 1 {
-				pab.Write(row[startCol:endcol])
+				pab.Write(row[startCol : endcol+1])
 			} else if n == 0 {
 				pab.Write(row[startCol:])
 			} else if n < numrows-1 {
@@ -600,7 +600,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			if rowLen < right {
 				pab.Write(row[left:rowLen])
 			} else {
-				pab.Write(row[left:right])
+				pab.Write(row[left : right+1])
 			}
 		}
 	}

@@ -11,6 +11,12 @@ type Position struct {
 	end    int
 }
 
+type Window interface {
+	drawText()
+	drawFrame()
+	drawStatusBar()
+}
+
 type dbConfig struct {
 	Server struct {
 		Host string `json:"host"`

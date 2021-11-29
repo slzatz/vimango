@@ -18,38 +18,17 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-type Window interface {
-	drawText()
-	drawFrame()
-	drawStatusBar()
-}
-
 var sess Session
 var org = Organizer{Session: &sess}
 var p *Editor
-var editors []*Editor
 
-//var windows []interface{}
+//var editors []*Editor
+
 var windows []Window
-
-/*
-var v *nvim.Nvim
-var w nvim.Window
-var messageBuf nvim.Buffer
-*/
 
 var config *dbConfig
 var db *sql.DB
 var fts_db *sql.DB
-
-/*
-func redirectMessages(v *nvim.Nvim) {
-	err := v.FeedKeys("\x1b:redir @a\r", "t", false)
-	if err != nil {
-		fmt.Printf("%v\n", err)
-	}
-}
-*/
 
 // FromFile returns a dbConfig struct parsed from a file.
 func FromFile(path string) (*dbConfig, error) {

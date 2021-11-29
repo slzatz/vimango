@@ -47,7 +47,7 @@ var e_lookup_C = map[string]func(*Editor){
 	"rename": (*Editor).rename, //lsp command
 	"pdf":    (*Editor).createPDF,
 	"print":  (*Editor).printDocument,
-	//	"xx":     (*Editor).test, /*****/
+	//"spell":  (*Editor).spell,
 }
 
 func (e *Editor) saveNoteToFile() {
@@ -382,6 +382,8 @@ func (e *Editor) quitActions() {
 		sess.showEdMessage("No write since last change")
 		return
 	}
+
+	vim.Execute("bw") // wipout the buffer
 	/*
 		deleteBufferOpts := map[string]bool{
 			"force":  true,
