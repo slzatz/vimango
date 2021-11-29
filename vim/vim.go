@@ -9,7 +9,9 @@ import (
 #include "src/libvim.h"
 #cgo CFLAGS: -Iproto -DHAVE_CONFIG_H
 #cgo LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
-char_u lastMessage[8192];
+//char_u lastMessage[8192];
+char_u lastMessage[20][100];
+int I = 0;
 typedef void (*voidFunc) (char_u *title, char_u *msg, msgPriority_T priority);
 typedef void (*voidFunc2) (MessageCallback m);
 void bridge_func(voidFunc2 f, voidFunc m) {
@@ -20,7 +22,9 @@ void onMessage(char_u *title, char_u *msg, msgPriority_T priority) {
 	printf("************************\n");
 	printf("%s\n", msg);
 	printf("++++++++++++++++++++++++\n");
-	strcpy(lastMessage, msg);
+	//strcpy(lastMessage, msg);
+	strcpy(lastMessage[I], msg);
+	I++;
 }
 */
 import "C"
@@ -34,16 +38,18 @@ func ucharP(s string) *C.uchar {
 }
 
 func GetLastMessage() string {
-	/*
-		var bb [200]byte
-		for i := range bb {
-			bb[i] = byte(C.lastMessage[i])
-		}
-	*/
-
-	//data := (*C.char)(unsafe.Pointer(line))
 	s := C.GoString((*C.char)(unsafe.Pointer(&C.lastMessage[0])))
 	return s
+}
+
+func GetLastMessage2() []string {
+	var ss []string
+	for i := 0; i < int(C.I); i++ {
+		s := C.GoString((*C.char)(unsafe.Pointer(&C.lastMessage[C.int(i)])))
+		ss = append(ss, s)
+	}
+	C.I = 0
+	return ss
 }
 
 //void vimInit(int argc, char **argv);
