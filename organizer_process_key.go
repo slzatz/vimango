@@ -217,12 +217,13 @@ func organizerProcessKey(c int) {
 		} else {
 			// < is special since it allows keycodes like <CR>
 			if c == '<' {
-				vim.Key("<LT>")
+				//vim.Key("<LT>")
+				return
 			} else {
-				vim.Input(string(c))
 				if c == 9 {
 					c = 35
 				}
+				vim.Input(string(c))
 				sess.showOrgMessage(string(c)) /// debug
 			}
 		}
@@ -235,6 +236,7 @@ func organizerProcessKey(c int) {
 		row := &org.rows[org.fr]
 		row.dirty = vim.BufferGetModified(org.vbuf)
 		mode := vim.GetMode()
+		org.command = ""
 
 		/* debugging
 		sess.showOrgMessage("blocking: %t; mode: %s", mode.Blocking, mode.Mode)
