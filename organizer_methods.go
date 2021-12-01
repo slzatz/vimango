@@ -2,7 +2,8 @@ package main
 
 import (
 	"strings"
-	"unicode"
+
+	"github.com/slzatz/vimango/vim"
 )
 
 func (o *Organizer) getMode() Mode {
@@ -11,32 +12,6 @@ func (o *Organizer) getMode() Mode {
 	} else {
 		return NO_ROWS
 	}
-}
-
-func (o *Organizer) delWord() {
-	// still needs to deal with possibility of utf8 multi-byte characters (see finding word under cursor)
-	t := &o.rows[o.fr].title
-	delimiters := " ,.;?:()[]{}&#"
-	var beg int
-	if o.fc != 0 {
-		beg = strings.LastIndexAny((*t)[:o.fc], delimiters)
-		if beg == -1 {
-			beg = 0
-		} else {
-			beg++ //i think this is covered:  "#"
-		}
-	}
-
-	end := strings.IndexAny((*t)[o.fc:], delimiters)
-	if end == -1 {
-		end = len(*t) - 1
-	} else {
-		//end = end + fc - 1
-		end = end + o.fc + 1
-	}
-
-	*t = (*t)[:beg] + (*t)[end:]
-	o.rows[o.fr].dirty = true
 }
 
 //Note: outlineMoveCursor worries about moving cursor beyond the size of the row
@@ -48,19 +23,21 @@ func (o *Organizer) moveCursor(key int) {
 	}
 
 	switch key {
-	case ARROW_LEFT, 'h':
-		if o.fc > 0 {
-			o.fc--
-		}
+	/*
+		case ARROW_LEFT, 'h':
+			if o.fc > 0 {
+				o.fc--
+			}
 
-	case ARROW_RIGHT, 'l':
-		o.fc++
-
+		case ARROW_RIGHT, 'l':
+			o.fc++
+	*/
 	case ARROW_UP, 'k':
 		if o.fr > 0 {
 			o.fr--
 		}
 		o.fc, o.coloff = 0, 0
+		vim.CursorSetPosition([2]int{1, 0})
 
 		if o.view == TASK {
 			sess.imagePreview = false /////////////////////////////////
@@ -80,6 +57,7 @@ func (o *Organizer) moveCursor(key int) {
 			o.fr++
 		}
 		o.fc, o.coloff = 0, 0
+		vim.CursorSetPosition([2]int{1, 0})
 		if o.view == TASK {
 			sess.imagePreview = false /////////////////////////////////
 			o.altRowoff = 0
@@ -97,18 +75,21 @@ func (o *Organizer) moveCursor(key int) {
 		//case PAGE_UP:
 	}
 
-	t := &o.rows[o.fr].title
-	if o.fc >= len(*t) {
-		if o.mode != INSERT {
-			o.fc = len(*t) - 1
-		} else {
-			o.fc = len(*t)
+	/*
+		t := &o.rows[o.fr].title
+		if o.fc >= len(*t) {
+			if o.mode != INSERT {
+				o.fc = len(*t) - 1
+			} else {
+				o.fc = len(*t)
+			}
 		}
-	}
-	if *t == "" {
-		o.fc = 0
-	}
+		if *t == "" {
+			o.fc = 0
+		}
+	*/
 }
+
 func (o *Organizer) moveAltCursor(key int) {
 
 	if len(o.altRows) == 0 {
@@ -129,113 +110,6 @@ func (o *Organizer) moveAltCursor(key int) {
 			o.altFr++
 		}
 	}
-}
-
-func (o *Organizer) backspace() {
-	t := &o.rows[o.fr].title
-	//if len(o.rows) == 0 || *t == "" || o.fc == 0 {
-	if *t == "" || o.fc == 0 {
-		return
-	}
-	*t = (*t)[:o.fc-1] + (*t)[o.fc:] // should do with runes
-	o.fc--
-	o.rows[o.fr].dirty = true
-}
-
-func (o *Organizer) delChar() {
-	t := &o.rows[o.fr].title
-	if len(o.rows) == 0 || len(*t) == 0 {
-		return
-	}
-	*t = (*t)[:o.fc] + (*t)[o.fc+1:]
-	if len(*t) == o.fc && o.fc != 0 {
-		o.fc--
-	}
-	o.rows[o.fr].dirty = true
-}
-
-func (o *Organizer) deleteToEndOfLine() {
-	t := &o.rows[o.fr].title
-	*t = (*t)[:o.fc] // or row.chars.erase(row.chars.begin() + O.fc, row.chars.end())
-	o.rows[o.fr].dirty = true
-}
-
-func (o *Organizer) pasteString() {
-	t := &o.rows[o.fr].title
-
-	if len(o.rows) == 0 || o.string_buffer == "" {
-		return
-	}
-
-	*t = (*t)[:o.fc+1] + o.string_buffer + (*t)[o.fc+1:] // how about end of line - works fine
-	o.fc += len(o.string_buffer)
-	o.rows[o.fr].dirty = true
-}
-
-func (o *Organizer) yankString() {
-	t := &o.rows[o.fr].title
-	o.string_buffer = (*t)[o.highlight[0] : o.highlight[1]+1]
-}
-
-func (o *Organizer) moveCursorEOL() {
-	o.fc = len(o.rows[o.fr].title) - 1 //if O.cx > O.titlecols will be adjusted in EditorScroll
-}
-
-func (o *Organizer) moveBeginningWord() {
-	if o.fc == 0 {
-		return
-	}
-	t := &o.rows[o.fr].title
-	delimiters := " ,.;?:()[]{}&#"
-	beg := strings.LastIndexAny((*t)[:o.fc], delimiters)
-	if beg == -1 {
-		o.fc = 0
-	} else {
-		o.fc = beg + 1 //i think this is covered:  "#"
-	}
-}
-
-func (o *Organizer) moveEndWord() {
-	t := &o.rows[o.fr].title
-	delimiters := " ,.;?:()[]{}&#"
-	end := strings.IndexAny((*t)[o.fc:], delimiters)
-	if end == -1 {
-		o.fc = len(*t) - 1
-	} else {
-		//end = end + fc - 1
-		o.fc = end + o.fc + 1
-	}
-}
-
-// needs to handle more corner cases (eg two spaces in a row)
-func (o *Organizer) moveNextWord() {
-	t := &o.rows[o.fr].title
-	end := strings.Index((*t)[o.fc:], " ")
-	if end == -1 {
-		if o.fr < len(o.rows)-1 {
-			o.fr++
-			o.fc = 0
-			return
-		}
-	} else {
-		//end = end + fc - 1
-		if o.fc < len(*t)-1 {
-			o.fc = end + o.fc + 1
-		}
-	}
-}
-
-// not same as 'e' but moves to end of word or stays put if already on end of word
-func (o *Organizer) moveEndWord2() {
-	var j int
-	t := &o.rows[o.fr].title
-
-	for j = o.fc + 1; j < len(*t); j++ {
-		if (*t)[j] < 48 {
-			break
-		}
-	}
-	o.fc = j - 1
 }
 
 func (o *Organizer) getWordUnderCursor() {
@@ -287,6 +161,7 @@ func (o *Organizer) findNextWord() {
 	}
 }
 
+/*
 func (o *Organizer) changeCase() {
 	t := &o.rows[o.fr].title
 	char := rune((*t)[o.fc])
@@ -298,6 +173,7 @@ func (o *Organizer) changeCase() {
 	*t = (*t)[:o.fc] + string(char) + (*t)[o.fc+1:]
 	o.rows[o.fr].dirty = true
 }
+*/
 
 func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, modified string) {
 	/* note since only inserting blank line at top, don't really need at, s and also don't need size_t*/
@@ -405,9 +281,11 @@ func (o *Organizer) writeTitle() {
 
 	sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()
+	/* ? not sure why was doing this 12012021
 	if o.fc > 0 {
 		o.fc--
 	}
+	*/
 }
 
 func (o *Organizer) clearMarkedEntries() {

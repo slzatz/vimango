@@ -192,6 +192,7 @@ func main() {
 		sess.showOrgMessage("No results were returned")
 		org.mode = NO_ROWS
 	}
+	org.readTitleIntoBuffer() /////////////////////////////////////////////
 	org.drawPreview()
 	org.refreshScreen()
 	org.drawStatusBar()

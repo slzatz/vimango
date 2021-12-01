@@ -107,8 +107,8 @@ func (o *Organizer) drawRows() {
 			ab.WriteString(LIGHT_GRAY_BG)
 			ab.WriteString(o.rows[fr].title[o.highlight[j] : o.highlight[k]-o.coloff])
 
-			ab.WriteString(DEFAULT_BG)
-			ab.WriteString(o.rows[fr].title[:o.highlight[k]])
+			ab.WriteString(DARK_GRAY_BG)
+			ab.WriteString(o.rows[fr].title[o.highlight[k]:])
 
 		} else {
 			// current row is only row that is scrolled if org.coloff != 0

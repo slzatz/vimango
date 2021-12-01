@@ -110,7 +110,7 @@ var modeMap = map[string]Mode{
 
 var newModeMap = map[int]Mode{
 	1:  NORMAL,
-	2:  VISUAL_MODE,
+	2:  VISUAL, //VISUAL_MODE,
 	4:  PENDING,
 	8:  SEARCH, // Also COMMAND
 	16: INSERT,

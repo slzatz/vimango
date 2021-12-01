@@ -7,37 +7,12 @@ import (
 )
 
 var n_lookup = map[string]func(){
-	"G":  _G,
-	"gg": _gg,
-	"m":  mark,
-	"*":  _asterisk,
-	"n":  _n,
-	":":  exCmd,
-	/*
-		"i":   _i,
-		"s":   _s,
-		"~":   tilde,
-		"r":   replace,
-		"a":   _a,
-		"A":   _A,
-		"x":   _x,
-		"w":   _w,
-		"caw": _caw,
-		"cw":  _cw,
-		"daw": _daw,
-		"dw":  _dw,
-		"de":  _de,
-		"d$":  _dEnd,
-		"dd":  del,
-		"b":   _b,
-		"e":   _e,
-		"0":   _zero,
-		"$":   _end,
-		"I":   _I,
-		"v":   _v,
-		"p":   _p,
-	*/
-
+	"G":                        _G,
+	"gg":                       _gg,
+	"m":                        mark,
+	"*":                        _asterisk,
+	"n":                        _n,
+	":":                        exCmd,
 	string(ctrlKey('l')):       switchToEditorMode,
 	string([]byte{0x17, 0x17}): switchToEditorMode,
 	string(0x4):                del,           //ctrl-d
@@ -51,125 +26,11 @@ var n_lookup = map[string]func(){
 	" m":                       drawPreviewWithImages,
 }
 
-func _i() {
-	org.mode = INSERT
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
-func _s() {
-	for i := 0; i < org.repeat; i++ {
-		org.delChar()
-	}
-	org.mode = INSERT
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
-func _x() {
-	for i := 0; i < org.repeat; i++ {
-		org.delChar()
-	}
-}
-
-func _daw() {
-	for i := 0; i < org.repeat; i++ {
-		org.delWord()
-	}
-}
-
-func _caw() {
-	for i := 0; i < org.repeat; i++ {
-		org.delWord()
-	}
-	org.mode = INSERT
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
-func _dw() {
-	for j := 0; j < org.repeat; j++ {
-		start := org.fc
-		org.moveEndWord2()
-		end := org.fc
-		org.fc = start
-		t := &org.rows[org.fr].title
-		*t = (*t)[:org.fc] + (*t)[end+1:]
-	}
-}
-
-func _cw() {
-	for j := 0; j < org.repeat; j++ {
-		start := org.fc
-		org.moveEndWord2()
-		end := org.fc
-		org.fc = start
-		t := &org.rows[org.fr].title
-		*t = (*t)[:org.fc] + (*t)[end+1:]
-	}
-	org.mode = INSERT
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
-func _de() {
-	start := org.fc
-	org.moveEndWord() //correct one to use to emulate vim
-	end := org.fc
-	org.fc = start
-	t := &org.rows[org.fr].title
-	*t = (*t)[:org.fc] + (*t)[end:]
-}
-
-func _dEnd() {
-	org.deleteToEndOfLine()
-}
-
-func replace() {
-	org.mode = REPLACE
-}
-
-func tilde() {
-	for i := 0; i < org.repeat; i++ {
-		org.changeCase()
-	}
-}
-
-func _a() {
-	org.mode = INSERT //this has to go here for MoveCursor to work right at EOLs
-	org.moveCursor(ARROW_RIGHT)
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
-func _A() {
-	org.moveCursorEOL()
-	org.mode = INSERT //needs to be here for movecursor to work at EOLs
-	org.moveCursor(ARROW_RIGHT)
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
-func _b() {
-	org.moveBeginningWord()
-}
-
-func _e() {
-	org.moveEndWord()
-}
-
-func _zero() {
-	org.fc = 0 // this was commented out - not sure why but might be interfering with O.repeat
-}
-
-func _end() {
-	org.moveCursorEOL()
-}
-
-func _I() {
-	org.fc = 0
-	org.mode = INSERT
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-}
-
 func _gg() {
 	org.fc = 0
+	org.fr = 0
 	org.rowoff = 0
-	org.fr = org.repeat - 1 //this needs to take into account O.rowoff
+	//org.fr = org.repeat - 1 //this needs to take into account O.rowoff
 	if org.view == TASK {
 		org.altRowoff = 0
 		sess.imagePreview = false
@@ -190,6 +51,7 @@ func _G() {
 	if org.view == TASK {
 		org.altRowoff = 0
 		sess.imagePreview = false
+		org.readTitleIntoBuffer() /////////////////////////////////////////////
 		org.drawPreview()
 	} else {
 		c := getContainerInfo(org.rows[org.fr].id)
@@ -207,6 +69,7 @@ func exCmd() {
 	org.mode = COMMAND_LINE
 }
 
+/*
 func _v() {
 	org.mode = VISUAL
 	org.highlight[0] = org.fc
@@ -219,6 +82,7 @@ func _p() {
 		org.pasteString()
 	}
 }
+*/
 
 func _asterisk() {
 	org.getWordUnderCursor()
@@ -253,10 +117,6 @@ func starEntry() {
 
 func completeEntry() {
 	toggleCompleted()
-}
-
-func _w() {
-	org.moveNextWord()
 }
 
 func entryInfo() {

@@ -38,6 +38,12 @@ func organizerProcessKey(c int) {
 			org.command = ""
 		case 'i', 'I', 'a', 'A', 's':
 			org.insertRow(0, "", true, false, false, BASE_DATE)
+			vim.BufferSetLine(org.vbuf, []byte(""))
+			vim.Execute("w")
+			s := vim.BufferLinesS(org.vbuf)[0]
+			vim.Key("<esc>")
+			vim.Input("i")
+			sess.showOrgMessage(s)
 			org.mode = INSERT
 			org.command = ""
 		}
@@ -56,16 +62,15 @@ func organizerProcessKey(c int) {
 
 	case INSERT:
 		switch c {
-		case '\r': //also does in effect an escape into NORMAL mode
-			// org.writeTitle sets org.mode to NORMAL
+		case '\r':
 			org.writeTitle()
 			vim.Key("<esc>")
 			org.mode = NORMAL
 			row := &org.rows[org.fr]
 			row.dirty = false
-		//case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, PAGE_UP, PAGE_DOWN:
 		case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
-			org.moveCursor(c)
+			//org.moveCursor(c)
+			sess.showOrgMessage("Can't leave row while in INSERT mode")
 		case '\x1b':
 			org.command = ""
 			org.mode = NORMAL
@@ -73,26 +78,18 @@ func organizerProcessKey(c int) {
 			pos := vim.CursorGetPosition()
 			org.fc = pos[1]
 			sess.showOrgMessage("")
-			/*
-				case HOME_KEY:
-					org.fc = 0
-				case END_KEY:
-					org.fc = len(org.rows[org.fr].title)
-				case BACKSPACE:
-					org.backspace()
-				case DEL_KEY:
-					org.delChar()
-				case '\t':
-					//do nothing
-				default:
-					org.insertChar(c)
-			*/
 		default:
-			vim.Input(string(c))
+			if c < 32 {
+				return
+			}
+			if z, found := termcodes[c]; found {
+				vim.Input(z)
+			} else {
+				vim.Input(string(c))
+			}
 			s := vim.BufferLinesS(org.vbuf)[0]
 			org.rows[org.fr].title = s
 			pos := vim.CursorGetPosition()
-			//org.fr = pos[0] - 1
 			org.fc = pos[1]
 			row := &org.rows[org.fr]
 			row.dirty = vim.BufferGetModified(org.vbuf)
@@ -110,6 +107,7 @@ func organizerProcessKey(c int) {
 			sess.showOrgMessage("")
 			org.command = ""
 			vim.Key("<esc>")
+			// shouldn't need to check cursor position
 			return
 		}
 
@@ -118,23 +116,25 @@ func organizerProcessKey(c int) {
 			sess.eraseRightScreen()
 		}
 
-		if c == '\r' { //also does escape into NORMAL mode
-			org.writeTitle()
-			vim.Execute("w")
-			row := &org.rows[org.fr]
-			row.dirty = false
+		if c == '\r' {
 
+			org.command = ""
 			switch org.view {
+			case TASK:
+				org.writeTitle()
+				vim.Execute("w")
+				row := &org.rows[org.fr]
+				row.dirty = false
+				return
 			case CONTEXT:
 				org.taskview = BY_CONTEXT
 			case FOLDER:
 				org.taskview = BY_FOLDER
 			case KEYWORD:
 				org.taskview = BY_KEYWORD
-			default: //org.view == TASK
-				return
 			}
 
+			row := &org.rows[org.fr]
 			org.filter = row.title
 			sess.showOrgMessage("'%s' will be opened", org.filter)
 
@@ -147,7 +147,6 @@ func organizerProcessKey(c int) {
 				sess.showOrgMessage("No results were returned")
 				org.mode = NO_ROWS
 			}
-			//org.drawPreviewWindow()
 			org.drawPreview()
 			return
 		}
@@ -159,7 +158,6 @@ func organizerProcessKey(c int) {
 			} else {
 				org.altRowoff = 0
 			}
-			//org.readTitleIntoBuffer() /////////////////////////////////////////////
 			org.drawPreview()
 		}
 
@@ -171,7 +169,6 @@ func organizerProcessKey(c int) {
 					org.altRowoff += org.textLines
 				}
 			}
-			//org.readTitleIntoBuffer() /////////////////////////////////////////////
 			org.drawPreview()
 		}
 
@@ -182,6 +179,7 @@ func organizerProcessKey(c int) {
 		}
 
 		org.command += string(c)
+		sess.showEdMessage(org.command)
 
 		if cmd, found := n_lookup[org.command]; found {
 			cmd()
@@ -189,61 +187,27 @@ func organizerProcessKey(c int) {
 			return
 		}
 
-		/*
-			if (c > 47 && c < 58) && len(org.command) == 0 {
+		if c < 33 || c == 79 || c == 86 || c == 111 || c == 103 {
+			return
+		}
 
-				if org.repeat == 0 && c == 48 {
-				} else if org.repeat == 0 {
-					org.repeat = c - 48
-					return
-				} else {
-					org.repeat = org.repeat*10 + c - 48
-					return
-				}
-			}
-
-			if org.repeat == 0 {
-				org.repeat = 1
-			}
-		*/
+		// We don't want control characters
+		// escape is dealt with above
 		if z, found := termcodes[c]; found {
 			vim.Input(z)
-			// Most control characters we don't want to send to nvim 07012021
-			// except we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
-			// escape is dealt with first thing
-			//} else if c < 32 && !(c == 13 || c == 22) {
-		} else if c < 32 {
-			return
 		} else {
-			// < is special since it allows keycodes like <CR>
-			if c == '<' {
-				//vim.Key("<LT>")
-				return
-			} else {
-				if c == 9 {
-					c = 35
-				}
-				vim.Input(string(c))
-				sess.showOrgMessage(string(c)) /// debug
-			}
+			vim.Input(string(c))
 		}
-		//vim.Input(string(c))
+		//sess.showOrgMessage(string(c)) /// debug
+
 		s := vim.BufferLinesS(org.vbuf)[0]
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
-		//org.fr = pos[0] - 1
 		org.fc = pos[1]
 		row := &org.rows[org.fr]
 		row.dirty = vim.BufferGetModified(org.vbuf)
 		mode := vim.GetMode()
 		org.command = ""
-
-		/* debugging
-		sess.showOrgMessage("blocking: %t; mode: %s", mode.Blocking, mode.Mode)
-		Example of input that blocks is entering a number (eg, 4x) in NORMAL mode
-		If blocked = true you can't retrieve buffer with v.BufferLines -
-		app just locks up
-		*/
 
 		//if mode.Blocking {
 		if mode == 4 { //OP_PENDING
@@ -251,44 +215,64 @@ func organizerProcessKey(c int) {
 		}
 		// the only way to get into EX_COMMAND or SEARCH
 		//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
-		if mode == 16 && org.mode != INSERT {
+		if org.mode == 16 && org.mode != INSERT {
 			sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
 		}
-
-		if mode == 2 { //VISUAL_MODE
-			vmode := vim.VisualGetType()
-			org.mode = visualModeMap[vmode]
-		} else {
-			org.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		org.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		if org.mode == VISUAL {
+			pos := vim.VisualGetRange()
+			org.highlight[1] = pos[1][1] + 1
+			org.highlight[0] = pos[0][1]
 		}
-		/////
 		sess.showOrgMessage(s)
 
 		// end of case NORMAL
 
-		/*
-			case REPLACE:
-				if org.repeat == 0 {
-					org.repeat = 1
-				}
-				if c == '\x1b' {
-					org.command = ""
-					org.repeat = 0
-					org.mode = NORMAL
-					return
-				}
+	case VISUAL:
 
-				for i := 0; i < org.repeat; i++ {
-					org.delChar()
-					org.insertChar(c)
-				}
+		// escape, return, ctrl-l [in one circumstance], PAGE_DOWN, PAGE_UP
 
-				org.repeat = 0
-				org.command = ""
-				org.mode = NORMAL
+		if c == '\x1b' {
+			if org.view == TASK {
+				sess.imagePreview = false
+				org.drawPreview()
+			}
+			sess.showOrgMessage("")
+			org.command = ""
+			org.mode = NORMAL
+			vim.Key("<esc>")
+			// shouldn't need to check cursor position
+			return
+		}
 
-				return
-		*/
+		if c < 33 {
+			return
+		}
+
+		// We don't want control characters
+		// escape is dealt with above
+		if z, found := termcodes[c]; found {
+			vim.Input(z)
+		} else {
+			vim.Input(string(c))
+		}
+		//sess.showOrgMessage(string(c)) /// debug
+
+		s := vim.BufferLinesS(org.vbuf)[0]
+		org.rows[org.fr].title = s
+		pos := vim.CursorGetPosition()
+		org.fc = pos[1]
+		row := &org.rows[org.fr]
+		row.dirty = vim.BufferGetModified(org.vbuf)
+		mode := vim.GetMode()
+		org.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		org.command = ""
+		visPos := vim.VisualGetRange()
+		org.highlight[1] = visPos[1][1] + 1
+		org.highlight[0] = visPos[0][1]
+		sess.showOrgMessage("visual %s; %d %d", s, org.highlight[0], org.highlight[1])
+
+		// end of case VISUAL
 
 	case ADD_CHANGE_FILTER:
 
