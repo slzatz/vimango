@@ -7,34 +7,36 @@ import (
 )
 
 var n_lookup = map[string]func(){
-	"i":   _i,
-	"s":   _s,
-	"~":   tilde,
-	"r":   replace,
-	"a":   _a,
-	"A":   _A,
-	"x":   _x,
-	"w":   _w,
-	"caw": _caw,
-	"cw":  _cw,
-	"daw": _daw,
-	"dw":  _dw,
-	"de":  _de,
-	"d$":  _dEnd,
-	"dd":  del,
-	"gg":  _gg,
-	"b":   _b,
-	"e":   _e,
-	"0":   _zero,
-	"$":   _end,
-	"I":   _I,
-	"G":   _G,
-	":":   exCmd,
-	"v":   _v,
-	"p":   _p,
-	"*":   _asterisk,
-	"m":   mark,
-	"n":   _n,
+	"G":  _G,
+	"gg": _gg,
+	"m":  mark,
+	"*":  _asterisk,
+	"n":  _n,
+	":":  exCmd,
+	/*
+		"i":   _i,
+		"s":   _s,
+		"~":   tilde,
+		"r":   replace,
+		"a":   _a,
+		"A":   _A,
+		"x":   _x,
+		"w":   _w,
+		"caw": _caw,
+		"cw":  _cw,
+		"daw": _daw,
+		"dw":  _dw,
+		"de":  _de,
+		"d$":  _dEnd,
+		"dd":  del,
+		"b":   _b,
+		"e":   _e,
+		"0":   _zero,
+		"$":   _end,
+		"I":   _I,
+		"v":   _v,
+		"p":   _p,
+	*/
 
 	string(ctrlKey('l')):       switchToEditorMode,
 	string([]byte{0x17, 0x17}): switchToEditorMode,
@@ -169,8 +171,9 @@ func _gg() {
 	org.rowoff = 0
 	org.fr = org.repeat - 1 //this needs to take into account O.rowoff
 	if org.view == TASK {
-		org.altRowoff = 0         ///////////////////////
-		sess.imagePreview = false /////////////////////////////////
+		org.altRowoff = 0
+		sess.imagePreview = false
+		org.readTitleIntoBuffer() /////////////////////////////////////////////
 		org.drawPreview()
 	} else {
 		c := getContainerInfo(org.rows[org.fr].id)
@@ -185,8 +188,8 @@ func _G() {
 	org.fc = 0
 	org.fr = len(org.rows) - 1
 	if org.view == TASK {
-		org.altRowoff = 0         ///////////////////////
-		sess.imagePreview = false /////////////////////////////////
+		org.altRowoff = 0
+		sess.imagePreview = false
 		org.drawPreview()
 	} else {
 		c := getContainerInfo(org.rows[org.fr].id)

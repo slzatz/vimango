@@ -161,8 +161,10 @@ func (e *Editor) controlH() {
 			moveDividerPct(80)
 		}
 
-		sess.editorMode = false //needs to be here
+		sess.editorMode = false        //needs to be here
+		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
 
+		//org.readTitleIntoBuffer() // shouldn't be necessary
 		org.drawPreview()
 		org.mode = NORMAL
 		sess.returnCursor()
@@ -192,8 +194,10 @@ func (e *Editor) controlH() {
 			moveDividerPct(80)
 		}
 
-		sess.editorMode = false //needs to be here
+		sess.editorMode = false        //needs to be here
+		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
 
+		//org.readTitleIntoBuffer() // shouldn't be necessary
 		org.drawPreview()
 		org.mode = NORMAL
 		sess.returnCursor()

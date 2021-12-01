@@ -65,6 +65,7 @@ func (o *Organizer) moveCursor(key int) {
 		if o.view == TASK {
 			sess.imagePreview = false /////////////////////////////////
 			o.altRowoff = 0
+			o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.drawPreview()
 		} else {
 			c := getContainerInfo(o.rows[o.fr].id)
@@ -82,6 +83,7 @@ func (o *Organizer) moveCursor(key int) {
 		if o.view == TASK {
 			sess.imagePreview = false /////////////////////////////////
 			o.altRowoff = 0
+			o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.drawPreview()
 		} else {
 			c := getContainerInfo(o.rows[o.fr].id)
@@ -400,8 +402,6 @@ func (o *Organizer) writeTitle() {
 	}
 
 	o.command = ""
-	o.mode = NORMAL
-	row.dirty = false
 
 	sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()

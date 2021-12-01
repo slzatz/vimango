@@ -1,5 +1,7 @@
 package main
 
+import "github.com/slzatz/vimango/vim"
+
 type Organizer struct {
 	mode      Mode
 	last_mode Mode
@@ -32,16 +34,15 @@ type Organizer struct {
 	string_buffer   string
 
 	context_map map[string]int
-	//idToContext map[int]string
-	folder_map map[string]int
-	//idToFolder  map[int]string
-	sort_map   map[string]int
-	keywordMap map[string]int
+	folder_map  map[string]int
+	sort_map    map[string]int
+	keywordMap  map[string]int
 
 	marked_entries map[int]struct{} // map instead of list makes toggling a row easier
 
 	title_search_string string
 	highlight           [2]int
+	vbuf                vim.Buffer
 
 	*Session
 }

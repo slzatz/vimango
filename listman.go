@@ -167,15 +167,15 @@ func main() {
 	org.command = ""
 	org.command_line = ""
 	org.repeat = 0 //number of times to repeat commands like x,s,yy ? also used for visual line mode x,y
-
 	org.view = TASK
 	org.taskview = BY_FOLDER
 	org.filter = "todo"
-	//org.filter = "No Folder"
 	org.context_map = make(map[string]int)
 	org.folder_map = make(map[string]int)
 	org.marked_entries = make(map[int]struct{})
 	org.keywordMap = make(map[string]int)
+	org.vbuf = vim.BufferNew(0)    ///////////////////////////////////////////////////////
+	vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////
 
 	// ? where this should be.  Also in signal.
 	sess.textLines = sess.screenLines - 2 - TOP_MARGIN // -2 for status bar and message bar
@@ -207,6 +207,7 @@ func main() {
 	if err != nil {
 		sess.showOrgMessage("Error creating temp directory: %v", err)
 	}
+	vim.Execute("w temp/title")
 
 	for sess.run {
 

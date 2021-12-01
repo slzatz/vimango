@@ -85,7 +85,6 @@ func BufferGetLine(vbuf *C.buf_T, lineNum int) string {
 }
 
 //char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
-// I think nvim brings back bytes
 func BufferGetLine2(vbuf *C.buf_T, lineNum int) []byte {
 	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
 	// need to cast to *C.char to use strlen
@@ -164,6 +163,25 @@ func BufferSetLines(vbuf *C.buf_T, bb [][]byte) {
 		view[i] = 0
 		C.vimBufferSetLines(vbuf, C.long(start), C.long(start-1), p2, C.int(1))
 	}
+	C.free(unsafe.Pointer(p1))
+	//C.free(unsafe.Pointer(p2)) //panics
+}
+
+func BufferSetLine(vbuf *C.buf_T, b []byte) {
+	// size is the length of the longest line + 1 for null terminator
+	size := len(b) + 1
+
+	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
+	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
+	p2 = &p1
+
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
+	i := 0
+	for i = 0; i < size-1; i++ {
+		view[i] = C.uchar(b[i])
+	}
+	view[size-1] = 0
+	C.vimBufferSetLines(vbuf, C.long(0), C.long(-1), p2, C.int(1))
 	C.free(unsafe.Pointer(p1))
 	//C.free(unsafe.Pointer(p2)) //panics
 }

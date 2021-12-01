@@ -12,6 +12,7 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
+/*
 var termcodes = map[int]string{
 	ARROW_UP:    "\x80ku",
 	ARROW_DOWN:  "\x80kd",
@@ -23,6 +24,7 @@ var termcodes = map[int]string{
 	PAGE_UP:     "\x80kP",
 	PAGE_DOWN:   "\x80kN",
 }
+*/
 
 //note that bool returned is whether to redraw which will freeze program
 //in BufferLines if mode is blocking

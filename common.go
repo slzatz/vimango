@@ -57,6 +57,18 @@ var Lsps = map[string]string{
 	"py":  "python-language-server",
 }
 
+var termcodes = map[int]string{
+	ARROW_UP:    "\x80ku",
+	ARROW_DOWN:  "\x80kd",
+	ARROW_RIGHT: "\x80kr",
+	ARROW_LEFT:  "\x80kl",
+	BACKSPACE:   "\x80kb", //? also works "\x08"
+	HOME_KEY:    "\x80kh",
+	DEL_KEY:     "\x80kD",
+	PAGE_UP:     "\x80kP",
+	PAGE_DOWN:   "\x80kN",
+}
+
 type Mode int
 
 const (

@@ -463,12 +463,47 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	if err != nil {
 		return
 	}
-
 	e.bb = bytes.Split([]byte(note), []byte("\n")) // yes, you need to do it this way
 	e.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(e.vbuf)
 	vim.BufferSetLines(e.vbuf, e.bb)
 	vim.Execute(fmt.Sprintf("w temp/buf%d", vim.BufferGetId(e.vbuf)))
+}
+
+func (o *Organizer) readTitleIntoBuffer() {
+	id := o.rows[org.fr].id
+	var table string
+	var column string
+
+	switch o.view {
+	case TASK:
+		table = "task"
+		column = "title"
+	case CONTEXT:
+		table = "context"
+		column = "title"
+	case FOLDER:
+		table = "folder"
+		column = "title"
+	case KEYWORD:
+		table = "keyword"
+		column = "name"
+	default:
+		sess.showOrgMessage("Somehow you are in a view I can't handle")
+		return
+	}
+	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", column, table)
+	row := db.QueryRow(stmt, id)
+	var title string
+	err := row.Scan(&title)
+	if err != nil {
+		sess.showOrgMessage("error: %v", err)
+		return
+	}
+	vim.BufferSetLine(o.vbuf, []byte(title))
+	vim.Execute("w")
+	s := vim.BufferLinesS(o.vbuf)[0]
+	sess.showOrgMessage(s)
 }
 
 func readSyncLogIntoAltRows(id int) {
@@ -486,7 +521,6 @@ func readSyncLogIntoAltRows(id int) {
 	}
 
 }
-
 func readSyncLog(id int) string {
 	row := db.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
 	var note string
@@ -573,7 +607,6 @@ func getContextTid(id int) int {
 	return tid
 }
 
-// used in Editor.cpp
 func getTitle(id int) string {
 	row := db.QueryRow("SELECT title FROM task WHERE id=?;", id)
 	var title string
@@ -1366,6 +1399,7 @@ func moveDividerPct(pct int) {
 		sess.eraseRightScreen() //erases editor area + statusbar + msg
 		sess.drawRightScreen()
 	} else if org.view == TASK && org.mode != NO_ROWS {
+		//org.readTitleIntoBuffer() // don't think its necessary here
 		org.drawPreview()
 	}
 	sess.showOrgMessage("rows: %d  cols: %d  divider: %d", sess.screenLines, sess.screenCols, sess.divider)
@@ -1394,6 +1428,7 @@ func moveDividerAbs(num int) {
 		sess.eraseRightScreen() //erases editor area + statusbar + msg
 		sess.drawRightScreen()
 	} else if org.view == TASK && org.mode != NO_ROWS {
+		//org.readTitleIntoBuffer() // don't think its necessary here
 		org.drawPreview()
 	}
 	sess.showOrgMessage("rows: %d  cols: %d  divider: %d", sess.screenLines, sess.screenCols, sess.divider)

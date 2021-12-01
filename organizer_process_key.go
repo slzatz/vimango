@@ -4,17 +4,19 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/slzatz/vimango/vim"
 )
 
 var navigation = map[int]struct{}{
-	ARROW_UP:    z0,
-	ARROW_DOWN:  z0,
-	ARROW_LEFT:  z0,
-	ARROW_RIGHT: z0,
-	'h':         z0,
-	'j':         z0,
-	'k':         z0,
-	'l':         z0,
+	ARROW_UP:   z0,
+	ARROW_DOWN: z0,
+	//ARROW_LEFT:  z0,
+	//ARROW_RIGHT: z0,
+	//'h':         z0,
+	'j': z0,
+	'k': z0,
+	//'l':         z0,
 	//PAGE_UP:     z0, // navigate right pane
 	//PAGE_DOWN:   z0, // navigate right pane
 }
@@ -34,12 +36,10 @@ func organizerProcessKey(c int) {
 			exCmd()
 		case '\x1b':
 			org.command = ""
-			org.repeat = 0
 		case 'i', 'I', 'a', 'A', 's':
 			org.insertRow(0, "", true, false, false, BASE_DATE)
 			org.mode = INSERT
 			org.command = ""
-			org.repeat = 0
 		}
 
 	case FIND:
@@ -57,28 +57,45 @@ func organizerProcessKey(c int) {
 	case INSERT:
 		switch c {
 		case '\r': //also does in effect an escape into NORMAL mode
+			// org.writeTitle sets org.mode to NORMAL
 			org.writeTitle()
-		case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, PAGE_UP, PAGE_DOWN:
+			vim.Key("<esc>")
+			org.mode = NORMAL
+			row := &org.rows[org.fr]
+			row.dirty = false
+		//case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT, PAGE_UP, PAGE_DOWN:
+		case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
 			org.moveCursor(c)
 		case '\x1b':
 			org.command = ""
 			org.mode = NORMAL
-			if org.fc > 0 {
-				org.fc--
-			}
+			vim.Key("<esc>")
+			pos := vim.CursorGetPosition()
+			org.fc = pos[1]
 			sess.showOrgMessage("")
-		case HOME_KEY:
-			org.fc = 0
-		case END_KEY:
-			org.fc = len(org.rows[org.fr].title)
-		case BACKSPACE:
-			org.backspace()
-		case DEL_KEY:
-			org.delChar()
-		case '\t':
-			//do nothing
+			/*
+				case HOME_KEY:
+					org.fc = 0
+				case END_KEY:
+					org.fc = len(org.rows[org.fr].title)
+				case BACKSPACE:
+					org.backspace()
+				case DEL_KEY:
+					org.delChar()
+				case '\t':
+					//do nothing
+				default:
+					org.insertChar(c)
+			*/
 		default:
-			org.insertChar(c)
+			vim.Input(string(c))
+			s := vim.BufferLinesS(org.vbuf)[0]
+			org.rows[org.fr].title = s
+			pos := vim.CursorGetPosition()
+			//org.fr = pos[0] - 1
+			org.fc = pos[1]
+			row := &org.rows[org.fr]
+			row.dirty = vim.BufferGetModified(org.vbuf)
 		}
 
 	case NORMAL:
@@ -92,7 +109,7 @@ func organizerProcessKey(c int) {
 			}
 			sess.showOrgMessage("")
 			org.command = ""
-			org.repeat = 0
+			vim.Key("<esc>")
 			return
 		}
 
@@ -102,11 +119,11 @@ func organizerProcessKey(c int) {
 		}
 
 		if c == '\r' { //also does escape into NORMAL mode
+			org.writeTitle()
+			vim.Execute("w")
 			row := &org.rows[org.fr]
-			if row.dirty {
-				org.writeTitle()
-				return
-			}
+			row.dirty = false
+
 			switch org.view {
 			case CONTEXT:
 				org.taskview = BY_CONTEXT
@@ -142,6 +159,7 @@ func organizerProcessKey(c int) {
 			} else {
 				org.altRowoff = 0
 			}
+			//org.readTitleIntoBuffer() /////////////////////////////////////////////
 			org.drawPreview()
 		}
 
@@ -153,73 +171,122 @@ func organizerProcessKey(c int) {
 					org.altRowoff += org.textLines
 				}
 			}
+			//org.readTitleIntoBuffer() /////////////////////////////////////////////
 			org.drawPreview()
 		}
 
-		/*leading digit is a multiplier*/
-
-		if (c > 47 && c < 58) && len(org.command) == 0 {
-
-			if org.repeat == 0 && c == 48 {
-			} else if org.repeat == 0 {
-				org.repeat = c - 48
-				return
-			} else {
-				org.repeat = org.repeat*10 + c - 48
-				return
-			}
+		if _, found := navigation[c]; found {
+			org.moveCursor(c)
+			org.command = ""
+			return
 		}
 
-		if org.repeat == 0 {
-			org.repeat = 1
-		}
-
-		/* ? needs to be before navigation  - if supporting commands line 'dh' */
 		org.command += string(c)
 
 		if cmd, found := n_lookup[org.command]; found {
 			cmd()
 			org.command = ""
-			org.repeat = 0
 			return
 		}
 
-		// any key sequence ending in a navigation key will
-		// be true if not caught by above
+		/*
+			if (c > 47 && c < 58) && len(org.command) == 0 {
 
-		//arrow keys + h,j,k,l
-		if _, found := navigation[c]; found {
-			for j := 0; j < org.repeat; j++ {
-				org.moveCursor(c)
+				if org.repeat == 0 && c == 48 {
+				} else if org.repeat == 0 {
+					org.repeat = c - 48
+					return
+				} else {
+					org.repeat = org.repeat*10 + c - 48
+					return
+				}
 			}
-			org.command = ""
-			org.repeat = 0
+
+			if org.repeat == 0 {
+				org.repeat = 1
+			}
+		*/
+		if z, found := termcodes[c]; found {
+			vim.Input(z)
+			// Most control characters we don't want to send to nvim 07012021
+			// except we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
+			// escape is dealt with first thing
+			//} else if c < 32 && !(c == 13 || c == 22) {
+		} else if c < 32 {
 			return
+		} else {
+			// < is special since it allows keycodes like <CR>
+			if c == '<' {
+				vim.Key("<LT>")
+			} else {
+				vim.Input(string(c))
+				if c == 9 {
+					c = 35
+				}
+				sess.showOrgMessage(string(c)) /// debug
+			}
 		}
+		//vim.Input(string(c))
+		s := vim.BufferLinesS(org.vbuf)[0]
+		org.rows[org.fr].title = s
+		pos := vim.CursorGetPosition()
+		//org.fr = pos[0] - 1
+		org.fc = pos[1]
+		row := &org.rows[org.fr]
+		row.dirty = vim.BufferGetModified(org.vbuf)
+		mode := vim.GetMode()
+
+		/* debugging
+		sess.showOrgMessage("blocking: %t; mode: %s", mode.Blocking, mode.Mode)
+		Example of input that blocks is entering a number (eg, 4x) in NORMAL mode
+		If blocked = true you can't retrieve buffer with v.BufferLines -
+		app just locks up
+		*/
+
+		//if mode.Blocking {
+		if mode == 4 { //OP_PENDING
+			return // don't draw rows - which calls v.BufferLines
+		}
+		// the only way to get into EX_COMMAND or SEARCH
+		//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
+		if mode == 16 && org.mode != INSERT {
+			sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
+		}
+
+		if mode == 2 { //VISUAL_MODE
+			vmode := vim.VisualGetType()
+			org.mode = visualModeMap[vmode]
+		} else {
+			org.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		}
+		/////
+		sess.showOrgMessage(s)
 
 		// end of case NORMAL
 
-	case REPLACE:
-		if org.repeat == 0 {
-			org.repeat = 1
-		}
-		if c == '\x1b' {
-			org.command = ""
-			org.repeat = 0
-			org.mode = NORMAL
-			return
-		}
+		/*
+			case REPLACE:
+				if org.repeat == 0 {
+					org.repeat = 1
+				}
+				if c == '\x1b' {
+					org.command = ""
+					org.repeat = 0
+					org.mode = NORMAL
+					return
+				}
 
-		for i := 0; i < org.repeat; i++ {
-			org.delChar()
-			org.insertChar(c)
-		}
+				for i := 0; i < org.repeat; i++ {
+					org.delChar()
+					org.insertChar(c)
+				}
 
-		org.repeat = 0
-		org.command = ""
-		org.mode = NORMAL
+				org.repeat = 0
+				org.command = ""
+				org.mode = NORMAL
 
-		return
+				return
+		*/
 
 	case ADD_CHANGE_FILTER:
 
@@ -430,6 +497,7 @@ func organizerProcessKey(c int) {
 			org.mode = org.getMode()
 			org.command_line = ""
 			org.repeat = 0
+			//org.readTitleIntoBuffer() //not necessary here
 			org.drawPreview()
 		case ':':
 			exCmd()
