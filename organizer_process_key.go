@@ -215,10 +215,10 @@ func organizerProcessKey(c int) {
 		}
 		// the only way to get into EX_COMMAND or SEARCH
 		//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
-		if org.mode == 16 && org.mode != INSERT {
+		if mode == 16 && org.mode != INSERT {
 			sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
 		}
-		org.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		org.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		if org.mode == VISUAL {
 			pos := vim.VisualGetRange()
 			org.highlight[1] = pos[1][1] + 1
@@ -265,7 +265,7 @@ func organizerProcessKey(c int) {
 		row := &org.rows[org.fr]
 		row.dirty = vim.BufferGetModified(org.vbuf)
 		mode := vim.GetMode()
-		org.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		org.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		org.command = ""
 		visPos := vim.VisualGetRange()
 		org.highlight[1] = visPos[1][1] + 1

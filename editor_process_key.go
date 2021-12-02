@@ -371,12 +371,11 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		sess.showEdMessage("\x1b[1m-- INSERT --\x1b[0m")
 	}
 
-	p.mode = newModeMap[mode] //note that "c" => SEARCH
-	if mode == 2 {            //VISUAL_MODE
+	if mode == 2 { //VISUAL_MODE
 		vmode := vim.VisualGetType()
 		p.mode = visualModeMap[vmode]
 	} else {
-		p.mode = newModeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		p.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 	}
 	switch p.mode {
 	//case INSERT, REPLACE, NORMAL:

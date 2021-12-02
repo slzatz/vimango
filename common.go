@@ -95,20 +95,7 @@ const (
 	VISUAL_MODE
 )
 
-// these are p.nvimModes some of which overlap
-// with p.modes but some don't
-var modeMap = map[string]Mode{
-	"n":  NORMAL,
-	"no": PENDING,
-	"c":  SEARCH, // catching c elsewhere for EX_COMMAND
-	//"R":    REPLACE
-	"i":    INSERT,
-	"v":    VISUAL,
-	"V":    VISUAL_LINE,
-	"\x16": VISUAL_BLOCK,
-}
-
-var newModeMap = map[int]Mode{
+var modeMap = map[int]Mode{
 	1:  NORMAL,
 	2:  VISUAL, //VISUAL_MODE,
 	4:  PENDING,
