@@ -597,7 +597,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 				continue
 			}
 
-			if rowLen < right {
+			if rowLen < right+1 {
 				pab.Write(row[left:rowLen])
 			} else {
 				pab.Write(row[left : right+1])

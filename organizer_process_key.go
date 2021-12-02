@@ -28,14 +28,39 @@ var tabCompletion struct {
 
 func organizerProcessKey(c int) {
 
+	if c == '\x1b' {
+		if org.mode == NO_ROWS {
+			org.command = ""
+			return
+		}
+		sess.showOrgMessage("")
+		org.command = ""
+		vim.Key("<esc>")
+		org.last_mode = org.mode // not sure this is necessary
+		org.mode = NORMAL
+		pos := vim.CursorGetPosition()
+		org.fc = pos[1]
+		tabCompletion.idx = 0
+		tabCompletion.list = nil
+		if org.view == TASK && sess.imagePreview {
+			sess.imagePreview = false
+			org.drawPreview()
+		}
+		return
+	}
+
+	if c < 32 && c != 13 {
+		return
+	}
+
 	switch org.mode {
 
 	case NO_ROWS:
 		switch c {
 		case ':':
 			exCmd()
-		case '\x1b':
-			org.command = ""
+		//case '\x1b':
+		//	org.command = ""
 		case 'i', 'I', 'a', 'A', 's':
 			org.insertRow(0, "", true, false, false, BASE_DATE)
 			vim.BufferSetLine(org.vbuf, []byte(""))
@@ -71,13 +96,15 @@ func organizerProcessKey(c int) {
 		case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
 			//org.moveCursor(c)
 			sess.showOrgMessage("Can't leave row while in INSERT mode")
-		case '\x1b':
-			org.command = ""
-			org.mode = NORMAL
-			vim.Key("<esc>")
-			pos := vim.CursorGetPosition()
-			org.fc = pos[1]
-			sess.showOrgMessage("")
+			/*
+				case '\x1b':
+					org.command = ""
+					org.mode = NORMAL
+					vim.Key("<esc>")
+					pos := vim.CursorGetPosition()
+					org.fc = pos[1]
+					sess.showOrgMessage("")
+			*/
 		default:
 			if c < 32 {
 				return
@@ -99,17 +126,19 @@ func organizerProcessKey(c int) {
 
 		// escape, return, ctrl-l [in one circumstance], PAGE_DOWN, PAGE_UP
 
-		if c == '\x1b' {
-			if org.view == TASK {
-				sess.imagePreview = false
-				org.drawPreview()
+		/*
+			if c == '\x1b' {
+				if org.view == TASK {
+					sess.imagePreview = false
+					org.drawPreview()
+				}
+				sess.showOrgMessage("")
+				org.command = ""
+				vim.Key("<esc>")
+				// shouldn't need to check cursor position
+				return
 			}
-			sess.showOrgMessage("")
-			org.command = ""
-			vim.Key("<esc>")
-			// shouldn't need to check cursor position
-			return
-		}
+		*/
 
 		if c == ctrlKey('l') && org.last_mode == ADD_CHANGE_FILTER {
 			org.mode = ADD_CHANGE_FILTER
@@ -187,18 +216,17 @@ func organizerProcessKey(c int) {
 			return
 		}
 
-		if c < 33 || c == 79 || c == 86 || c == 111 || c == 103 {
+		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o', 'g'
+		if c == 32 || c == 79 || c == 86 || c == 111 || c == 103 {
 			return
 		}
 
-		// We don't want control characters
-		// escape is dealt with above
+		// Process the key
 		if z, found := termcodes[c]; found {
 			vim.Input(z)
 		} else {
 			vim.Input(string(c))
 		}
-		//sess.showOrgMessage(string(c)) /// debug
 
 		s := vim.BufferLinesS(org.vbuf)[0]
 		org.rows[org.fr].title = s
@@ -209,9 +237,8 @@ func organizerProcessKey(c int) {
 		mode := vim.GetMode()
 		org.command = ""
 
-		//if mode.Blocking {
 		if mode == 4 { //OP_PENDING
-			return // don't draw rows - which calls v.BufferLines
+			return
 		}
 		// the only way to get into EX_COMMAND or SEARCH
 		//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
@@ -232,22 +259,24 @@ func organizerProcessKey(c int) {
 
 		// escape, return, ctrl-l [in one circumstance], PAGE_DOWN, PAGE_UP
 
-		if c == '\x1b' {
-			if org.view == TASK {
-				sess.imagePreview = false
-				org.drawPreview()
+		/*
+			if c == '\x1b' {
+				if org.view == TASK {
+					sess.imagePreview = false
+					org.drawPreview()
+				}
+				sess.showOrgMessage("")
+				org.command = ""
+				org.mode = NORMAL
+				vim.Key("<esc>")
+				// shouldn't need to check cursor position
+				return
 			}
-			sess.showOrgMessage("")
-			org.command = ""
-			org.mode = NORMAL
-			vim.Key("<esc>")
-			// shouldn't need to check cursor position
-			return
-		}
 
-		if c < 33 {
-			return
-		}
+			if c < 33 {
+				return
+			}
+		*/
 
 		// We don't want control characters
 		// escape is dealt with above
@@ -256,7 +285,6 @@ func organizerProcessKey(c int) {
 		} else {
 			vim.Input(string(c))
 		}
-		//sess.showOrgMessage(string(c)) /// debug
 
 		s := vim.BufferLinesS(org.vbuf)[0]
 		org.rows[org.fr].title = s
@@ -264,7 +292,7 @@ func organizerProcessKey(c int) {
 		org.fc = pos[1]
 		row := &org.rows[org.fr]
 		row.dirty = vim.BufferGetModified(org.vbuf)
-		mode := vim.GetMode()
+		mode := vim.GetMode()    // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
 		org.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		org.command = ""
 		visPos := vim.VisualGetRange()
@@ -278,12 +306,14 @@ func organizerProcessKey(c int) {
 
 		switch c {
 
-		case '\x1b':
-			org.mode = NORMAL
-			org.last_mode = ADD_CHANGE_FILTER
-			org.command = ""
-			org.command_line = ""
-			org.repeat = 0
+		/*
+			case '\x1b':
+				org.mode = NORMAL
+				org.last_mode = ADD_CHANGE_FILTER
+				org.command = ""
+				org.command_line = ""
+				org.repeat = 0
+		*/
 
 		case ARROW_UP, ARROW_DOWN, 'j', 'k':
 			org.moveAltCursor(c)
@@ -320,14 +350,15 @@ func organizerProcessKey(c int) {
 		}
 
 	case COMMAND_LINE:
-		if c == '\x1b' {
-			//org.mode = NORMAL
-			org.mode = org.last_mode
-			sess.showOrgMessage("")
-			tabCompletion.idx = 0
-			tabCompletion.list = nil
-			return
-		}
+		/*
+			if c == '\x1b' {
+				org.mode = org.last_mode
+				sess.showOrgMessage("")
+				tabCompletion.idx = 0
+				tabCompletion.list = nil
+				return
+			}
+		*/
 
 		if c == '\r' {
 			pos := strings.LastIndex(org.command_line, " ")
@@ -478,13 +509,14 @@ func organizerProcessKey(c int) {
 	// The log that appears when you sync
 	case PREVIEW_SYNC_LOG:
 		switch c {
-		case '\x1b':
-			//org.mode = org.last_mode // pickup NO_ROWS
-			org.mode = org.getMode()
-			org.command_line = ""
-			org.repeat = 0
-			//org.readTitleIntoBuffer() //not necessary here
-			org.drawPreview()
+		/*
+			case '\x1b':
+				//org.mode = org.last_mode // pickup NO_ROWS
+				org.mode = org.getMode()
+				org.command_line = ""
+				org.repeat = 0
+				org.drawPreview()
+		*/
 		case ':':
 			exCmd()
 			/*
@@ -526,11 +558,13 @@ func organizerProcessKey(c int) {
 			org.drawPreviewWithoutImages()
 		}
 	case LINKS:
-		if c == '\x1b' {
-			org.command = ""
-			org.mode = NORMAL
-			return
-		}
+		/*
+			if c == '\x1b' {
+				org.command = ""
+				org.mode = NORMAL
+				return
+			}
+		*/
 
 		if c < 49 || c > 57 {
 			sess.showOrgMessage("That's not a number between 1 and 9")

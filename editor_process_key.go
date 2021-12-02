@@ -5,29 +5,13 @@ import (
 	"io/ioutil"
 	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/slzatz/vimango/vim"
 )
 
-/*
-var termcodes = map[int]string{
-	ARROW_UP:    "\x80ku",
-	ARROW_DOWN:  "\x80kd",
-	ARROW_RIGHT: "\x80kr",
-	ARROW_LEFT:  "\x80kl",
-	BACKSPACE:   "\x80kb", //? also works "\x08"
-	HOME_KEY:    "\x80kh",
-	DEL_KEY:     "\x80kD",
-	PAGE_UP:     "\x80kP",
-	PAGE_DOWN:   "\x80kN",
-}
-*/
-
-//note that bool returned is whether to redraw which will freeze program
-//in BufferLines if mode is blocking
+//note that bool returned is whether to redraw
 func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
@@ -37,8 +21,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		p.command_line = ""
 
 		if p.mode == PREVIEW {
-			// don't need to check WindowCursor - no change in pos
-			//delete any images
+			// don't need to call CursorGetPosition - no change in pos
+			// delete any images
 			fmt.Print("\x1b_Ga=d\x1b\\")
 			sess.showEdMessage("")
 			p.mode = NORMAL
@@ -53,30 +37,20 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			 note you could fall through to getting pos but that recalcs rows which is unnecessary
 		*/
 
-		//pos, _ := v.WindowCursor(w) //set screen cx and cy from pos
 		pos := vim.CursorGetPosition() //set screen cx and cy from pos
 		p.fr = pos[0] - 1
-		//p.fc = pos[1]
 		p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 		sess.showEdMessage("")
 		return true
 	}
-	/*
-		 there are a set of commands like ctrl-w that we are intercepting
-		note any command that changes the UI like splits or tabs doesn't make sense
-		Also note that the if below falls through if p.command is "" and the character isn't
-		one of the one that starts a command
-	*/
 
-	// the switch below deals with intercepting c before sending the char to nvim
+	// the switch below deals with intercepting c before sending the char to vim
 	switch p.mode {
 
 	case PREVIEW:
 		switch c {
-		//case PAGE_DOWN, ARROW_DOWN, 'j':
 		case ARROW_DOWN, ctrlKey('j'):
 			p.previewLineOffset++
-		//case PAGE_UP, ARROW_UP, 'k':
 		case ARROW_UP, ctrlKey('k'):
 			if p.previewLineOffset > 0 {
 				p.previewLineOffset--
@@ -85,7 +59,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		p.drawPreview()
 		return false
 
-	case SPELLING, VIEW_LOG:
+	//case SPELLING, VIEW_LOG:
+	case VIEW_LOG:
 		switch c {
 		case PAGE_DOWN, ARROW_DOWN, 'j':
 			p.previewLineOffset++
@@ -99,32 +74,32 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			}
 		}
 		// enter a number and that's the selected replacement for a mispelling
-		if c == '\r' && p.mode == SPELLING {
-			num, err := strconv.Atoi(p.command_line)
-			if err != nil {
-				sess.showEdMessage("That wasn't a number!")
+		/*
+			if c == '\r' && p.mode == SPELLING {
+				num, err := strconv.Atoi(p.command_line)
+				if err != nil {
+					sess.showEdMessage("That wasn't a number!")
+					p.mode = NORMAL
+					p.command_line = ""
+					return true
+				}
+				if num < 0 || num > len(p.suggestions)-1 {
+					sess.showEdMessage("%d not in appropriate range", num)
+					p.mode = NORMAL
+					p.command_line = ""
+					return true
+				}
+				vim.Input2("ciw" + p.suggestions[num] + "\x1b")
+				p.bb = vim.BufferLines(p.vbuf)
+				pos := vim.CursorGetPosition() //set screen cx and cy from pos
+				p.fr = pos[0] - 1
+				p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 				p.mode = NORMAL
-				p.command_line = ""
+				sess.showOrgMessage(p.command_line)
+				p.command_line = "" // necessary
 				return true
 			}
-			if num < 0 || num > len(p.suggestions)-1 {
-				sess.showEdMessage("%d not in appropriate range", num)
-				p.mode = NORMAL
-				p.command_line = ""
-				return true
-			}
-			vim.Input2("ciw" + p.suggestions[num] + "\x1b")
-			//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
-			p.bb = vim.BufferLines(p.vbuf)
-			//pos, _ := v.WindowCursor(w) //screen cx and cy set from pos
-			pos := vim.CursorGetPosition() //set screen cx and cy from pos
-			p.fr = pos[0] - 1
-			p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
-			p.mode = NORMAL
-			sess.showOrgMessage(p.command_line)
-			p.command_line = "" // necessary
-			return true
-		}
+		*/
 		if c == DEL_KEY || c == BACKSPACE {
 			if len(p.command_line) > 0 {
 				p.command_line = p.command_line[:len(p.command_line)-1]
@@ -135,6 +110,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		return false
 
 	case NORMAL:
+		// characters below make up first char of non-vim commands
 		if len(p.command) == 0 {
 			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b z") != -1 {
 				p.command = string(c)
@@ -156,21 +132,19 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 					cmd(p)
 				}
 				// seems to be necessary at least for certain commands
-				vim.Input("\x1b")
+				//vim.Input("\x1b")
+				vim.Key("<esc>")
 				//keep tripping over this
-				//command should return a redraw bool
+				//these commands should return a redraw bool = false
 				if strings.Index(" m l c d xz= su", p.command) != -1 {
 					p.command = ""
 					return false
 				}
 
 				p.command = ""
-				//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
 				p.bb = vim.BufferLines(p.vbuf)
-				//pos, _ := v.WindowCursor(w) //screen cx and cy set from pos
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
-				//p.fc = pos[1]
 				p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 				return true
 			} else {
@@ -179,19 +153,16 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		}
 
 	case VISUAL:
-		if strings.IndexAny(string(c), "\x02\x05\x09") != -1 { //ctrl-b,e,i
+		// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
+		if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
 			p.decorateWordVisual(c)
-
 			// switch from VISUAl to NORMAL
-			vim.Input("\x1b")
+			vim.Key("<esc>")
 			p.mode = NORMAL
 			p.command = ""
-			//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
 			p.bb = vim.BufferLines(p.vbuf)
-			//pos, _ := v.WindowCursor(w)                  //screen cx and cy set from pos
 			pos := vim.CursorGetPosition() //set screen cx and cy from pos
 			p.fr = pos[0] - 1
-			//p.fc = pos[1]
 			p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 			return true
 		}
@@ -212,12 +183,9 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				vim.Input(":" + p.command_line + "\r")
 				p.mode = NORMAL
 				p.command = ""
-				//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
-				//pos, _ := v.WindowCursor(w)                  //screen cx and cy set from pos
 				p.bb = vim.BufferLines(p.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
-				//p.fc = pos[1]
 				p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 				sess.showOrgMessage("search and replace: %s", p.command_line)
 				return true
@@ -304,15 +272,28 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 		sess.showEdMessage(":%s", p.command_line)
 		return false //end EX_COMMAND
+
+	case SEARCH:
+		if c == DEL_KEY || c == BACKSPACE {
+			if len(p.command_line) > 0 {
+				p.command_line = p.command_line[:len(p.command_line)-1]
+			}
+		} else {
+			p.command_line += string(c)
+		}
+		sess.showEdMessage("%s%s", p.searchPrefix, p.command_line)
+		//return false //end SEARCH
 	} //end switch
 
 	// Most control characters we don't want to send to vim
 	// however, we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
 	// escape is dealt with first thing
+	// could we put this at the top
 	if c < 32 && !(c == 13 || c == 22 || c == 9) {
 		return false
 	}
 
+	// Process the key
 	if z, found := termcodes[c]; found {
 		vim.Input(z)
 	} else {
@@ -322,10 +303,9 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	mode := vim.GetMode()
 
 	if mode == 4 { //OP_PENDING
-		return false // don't draw rows - which calls v.BufferLines
+		return false // don't draw rows
 	}
-	// the only way to get into EX_COMMAND or SEARCH
-	//if mode.Mode == 8 && p.mode != SEARCH { //note that 8 => SEARCH
+	// the only way to get into EX_COMMAND or SEARCH; 8 => SEARCH
 	if mode == 8 && p.mode != SEARCH {
 		p.command_line = ""
 		p.command = ""
@@ -351,16 +331,19 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	if mode == 2 { //VISUAL_MODE
 		vmode := vim.VisualGetType()
 		p.mode = visualModeMap[vmode]
+		p.highlightInfo()
 	} else {
 		p.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 	}
-	switch p.mode {
+
+	// this is the 'new' p.mode based on vim processing input
+	//switch p.mode {
 	//case INSERT, REPLACE, NORMAL:
-	case VISUAL, VISUAL_LINE, VISUAL_BLOCK:
-		p.highlightInfo()
-	//	p.highlight = vim.VisualGetRange() //[]line col []line col
-	case SEARCH:
-		// return puts nvim into normal mode so don't need to catch return
+	//case VISUAL, VISUAL_LINE, VISUAL_BLOCK:
+	//	p.highlightInfo()
+	//case SEARCH:
+	// return puts vim into normal mode so don't need to catch return
+	/*
 		if c == DEL_KEY || c == BACKSPACE {
 			if len(p.command_line) > 0 {
 				p.command_line = p.command_line[:len(p.command_line)-1]
@@ -371,26 +354,21 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 		sess.showEdMessage("%s%s", p.searchPrefix, p.command_line)
 		return false
-	} // end switch p.mode
+	*/
+	//} // end switch p.mode
 
 	//below is done for everything except SEARCH and EX_COMMAND
-	//p.bb, _ = v.BufferLines(p.vbuf, 0, -1, true) //reading updated buffer
-	//pos, _ := v.WindowCursor(w)                  //set screen cx and cy from pos
 	p.bb = vim.BufferLines(p.vbuf)
 	pos := vim.CursorGetPosition() //set screen cx and cy from pos
 	p.fr = pos[0] - 1
-	//p.fc = pos[1]
 	p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 
 	/*
-		if (c == 'u' || c == '\x12') && p.mode == NORMAL {
-			showLastVimMessage()
+		if p.mode == PENDING { // -> operator pending (eg. typed 'd')
+			return false
+		} else {
+			return true
 		}
 	*/
-
-	if p.mode == PENDING { // -> operator pending (eg. typed 'd')
-		return false
-	} else {
-		return true
-	}
+	return true
 }
