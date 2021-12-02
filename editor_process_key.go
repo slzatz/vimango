@@ -32,7 +32,6 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
-		//vim.Input("\x1b")
 		vim.Key("<esc>")
 		p.command = ""
 		p.command_line = ""
@@ -307,54 +306,34 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		return false //end EX_COMMAND
 	} //end switch
 
-	/////////////////below keycode sent to nvim///////////////////////////////////
-
-	if z, found := termcodes[c]; found {
-		//v.FeedKeys(z, "t", true)
-		vim.Input(z)
-		// Most control characters we don't want to send to nvim 07012021
-		// except we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
-		// escape is dealt with first thing
-		//} else if c < 32 && !(c == 13 || c == 22) {
-	} else if c < 32 && !(c == 13 || c == 22 || c == 9) {
+	// Most control characters we don't want to send to vim
+	// however, we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
+	// escape is dealt with first thing
+	if c < 32 && !(c == 13 || c == 22 || c == 9) {
 		return false
-	} else {
-		// < is special since it allows keycodes like <CR>
-		if c == '<' {
-			vim.Key("<LT>")
-		} else {
-			vim.Input(string(c))
-			if c == 9 {
-				c = 35
-			}
-			sess.showOrgMessage(string(c)) /// debug
-		}
 	}
 
-	//mode, _ := v.Mode()
+	if z, found := termcodes[c]; found {
+		vim.Input(z)
+	} else {
+		vim.Input(string(c))
+	}
+
 	mode := vim.GetMode()
 
-	/* debugging
-	sess.showOrgMessage("blocking: %t; mode: %s", mode.Blocking, mode.Mode)
-	Example of input that blocks is entering a number (eg, 4x) in NORMAL mode
-	If blocked = true you can't retrieve buffer with v.BufferLines -
-	app just locks up
-	*/
-
-	//if mode.Blocking {
 	if mode == 4 { //OP_PENDING
 		return false // don't draw rows - which calls v.BufferLines
 	}
 	// the only way to get into EX_COMMAND or SEARCH
-	//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
-	if mode == 8 && p.mode != SEARCH { //note that "c" => SEARCH
+	//if mode.Mode == 8 && p.mode != SEARCH { //note that 8 => SEARCH
+	if mode == 8 && p.mode != SEARCH {
 		p.command_line = ""
 		p.command = ""
 		if c == ':' {
 			p.mode = EX_COMMAND
 			/*
 			 below will put nvim back in NORMAL mode but listmango will be
-			 in COMMAND_LINE mode, ie 'park' nvim in NORMAL mode
+			 in COMMAND_LINE mode, ie 'park' vim in NORMAL mode
 			 and don't feed it any keys while in listmango COMMAND_LINE mode
 			*/
 			vim.Input("\x1b")
@@ -364,9 +343,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			p.searchPrefix = string(c)
 			sess.showEdMessage(p.searchPrefix)
 		}
-
 		return false
-		//} else if mode.Mode == "i" && p.mode != INSERT {
 	} else if mode == 16 && p.mode != INSERT {
 		sess.showEdMessage("\x1b[1m-- INSERT --\x1b[0m")
 	}
