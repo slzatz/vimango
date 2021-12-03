@@ -43,6 +43,7 @@ type Organizer struct {
 	title_search_string string
 	highlight           [2]int
 	vbuf                vim.Buffer
+	bufferTick          int
 
 	*Session
 }

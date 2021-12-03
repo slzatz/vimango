@@ -271,3 +271,8 @@ func SearchGetMatchingPair() [2]int {
 	pos[1] = int(p.col)
 	return pos
 }
+
+func BufferGetLastChangedTick(vbuf *C.buf_T) int {
+	tick := C.vimBufferGetLastChangedTick(vbuf)
+	return int(tick)
+}

@@ -192,7 +192,9 @@ func main() {
 		sess.showOrgMessage("No results were returned")
 		org.mode = NO_ROWS
 	}
-	org.readTitleIntoBuffer() /////////////////////////////////////////////
+	//org.readTitleIntoBuffer() /////////////////////////////////////////////
+	org.readRowsIntoBuffer() /////////////////////////////////////////////
+	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 	org.drawPreview()
 	org.refreshScreen()
 	org.drawStatusBar()

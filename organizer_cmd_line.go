@@ -140,7 +140,9 @@ func (o *Organizer) open(pos int) {
 		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
-	o.readTitleIntoBuffer() /////////////////////////////////////////////
+	//o.readTitleIntoBuffer() /////////////////////////////////////////////
+	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 	o.drawPreview()
 	return
 }
@@ -185,7 +187,9 @@ func (o *Organizer) openContext(pos int) {
 		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
-	o.readTitleIntoBuffer() /////////////////////////////////////////////
+	//o.readTitleIntoBuffer() /////////////////////////////////////////////
+	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 	o.drawPreview()
 	return
 }
@@ -228,7 +232,9 @@ func (o *Organizer) openFolder(pos int) {
 		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
-	o.readTitleIntoBuffer() /////////////////////////////////////////////
+	//o.readTitleIntoBuffer() /////////////////////////////////////////////
+	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 	o.drawPreview()
 	return
 }
@@ -262,7 +268,9 @@ func (o *Organizer) openKeyword(pos int) {
 		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
-	o.readTitleIntoBuffer() /////////////////////////////////////////////
+	//o.readTitleIntoBuffer() /////////////////////////////////////////////
+	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 	o.drawPreview()
 	return
 }
@@ -433,7 +441,8 @@ func (o *Organizer) refresh(unused int) {
 				}
 			*/
 			sess.imagePreview = false
-			o.readTitleIntoBuffer() /////////////////////////////////////////////
+			//o.readTitleIntoBuffer() /////////////////////////////////////////////
+			o.readRowsIntoBuffer() ////////////////////////////////////////////
 			o.drawPreview()
 		} else {
 			o.mode = o.last_mode
@@ -449,7 +458,8 @@ func (o *Organizer) refresh(unused int) {
 			}
 			*/
 			sess.imagePreview = false
-			o.readTitleIntoBuffer() /////////////////////////////////////////////
+			//o.readTitleIntoBuffer() /////////////////////////////////////////////
+			o.readRowsIntoBuffer() ////////////////////////////////////////////
 			o.drawPreview()
 		}
 		//sess.showOrgMessage("Entries will be refreshed")
@@ -493,7 +503,8 @@ func (o *Organizer) find(pos int) {
 		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
-	o.readTitleIntoBuffer() /////////////////////////////////////////////
+	//o.readTitleIntoBuffer() /////////////////////////////////////////////
+	o.readRowsIntoBuffer() ////////////////////////////////////////////
 	o.drawPreview()
 }
 
@@ -681,7 +692,8 @@ func (o *Organizer) recent(unused int) {
 		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
-	o.readTitleIntoBuffer() /////////////////////////////////////////////
+	//o.readTitleIntoBuffer() /////////////////////////////////////////////
+	o.readRowsIntoBuffer() ////////////////////////////////////////////
 	o.drawPreview()
 }
 

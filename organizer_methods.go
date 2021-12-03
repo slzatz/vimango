@@ -16,7 +16,7 @@ func (o *Organizer) getMode() Mode {
 
 //Note: outlineMoveCursor worries about moving cursor beyond the size of the row
 //OutlineScroll worries about moving cursor beyond the screen
-func (o *Organizer) moveCursor(key int) {
+func (o *Organizer) moveCursor______(key int) {
 
 	if len(o.rows) == 0 {
 		return

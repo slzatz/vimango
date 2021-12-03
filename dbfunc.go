@@ -314,6 +314,19 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 	return orgRows
 }
 
+func (o *Organizer) readRowsIntoBuffer() {
+	var bb [][]byte
+	for _, row := range o.rows {
+		bb = append(bb, []byte(row.title))
+	}
+	//o.vbuf = vim.BufferNew(0) // if/when we decide to have multiple buffers
+	vim.BufferSetCurrent(o.vbuf) // not sure why but must come before SetLines???
+	vim.BufferSetLines(o.vbuf, bb)
+	vim.Execute("w")
+	//o.vbuf = vbuf
+	sess.showOrgMessage("%d %d", len(bb), vim.BufferGetLineCount(o.vbuf))
+}
+
 func updateTitle() {
 
 	// needs to be a pointer because may send to insertRow

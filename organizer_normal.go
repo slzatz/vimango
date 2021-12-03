@@ -7,8 +7,9 @@ import (
 )
 
 var n_lookup = map[string]func(){
-	"G":                        _G,
-	"gg":                       _gg,
+	//	"G":                        _G,
+	//	"gg":                       _gg,
+	"dd":                       noop,
 	"m":                        mark,
 	"*":                        _asterisk,
 	"n":                        _n,
@@ -26,42 +27,6 @@ var n_lookup = map[string]func(){
 	" m":                       drawPreviewWithImages,
 }
 
-func _gg() {
-	org.fc = 0
-	org.fr = 0
-	org.rowoff = 0
-	//org.fr = org.repeat - 1 //this needs to take into account O.rowoff
-	if org.view == TASK {
-		org.altRowoff = 0
-		sess.imagePreview = false
-		org.readTitleIntoBuffer() /////////////////////////////////////////////
-		org.drawPreview()
-	} else {
-		c := getContainerInfo(org.rows[org.fr].id)
-		if c.id != 0 {
-			sess.displayContainerInfo(&c)
-			sess.drawPreviewBox()
-		}
-	}
-}
-
-func _G() {
-	org.fc = 0
-	org.fr = len(org.rows) - 1
-	if org.view == TASK {
-		org.altRowoff = 0
-		sess.imagePreview = false
-		org.readTitleIntoBuffer() /////////////////////////////////////////////
-		org.drawPreview()
-	} else {
-		c := getContainerInfo(org.rows[org.fr].id)
-		if c.id != 0 {
-			sess.displayContainerInfo(&c)
-			sess.drawPreviewBox()
-		}
-	}
-}
-
 func exCmd() {
 	sess.showOrgMessage(":")
 	org.command_line = ""
@@ -69,20 +34,9 @@ func exCmd() {
 	org.mode = COMMAND_LINE
 }
 
-/*
-func _v() {
-	org.mode = VISUAL
-	org.highlight[0] = org.fc
-	org.highlight[1] = org.fc
-	sess.showOrgMessage("\x1b[1m-- VISUAL --\x1b[0m")
+func noop() {
+	return
 }
-
-func _p() {
-	if len(org.string_buffer) > 0 {
-		org.pasteString()
-	}
-}
-*/
 
 func _asterisk() {
 	org.getWordUnderCursor()
