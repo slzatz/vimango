@@ -136,13 +136,15 @@ func (o *Organizer) open(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		o.mode = NO_ROWS
+		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
-	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 	return
 }
@@ -183,8 +185,10 @@ func (o *Organizer) openContext(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		o.mode = NO_ROWS
+		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -228,8 +232,10 @@ func (o *Organizer) openFolder(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		o.mode = NO_ROWS
+		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -264,8 +270,10 @@ func (o *Organizer) openKeyword(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		o.mode = NO_ROWS
+		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -301,11 +309,13 @@ func (o *Organizer) quitApp(_ int) {
 
 func (o *Organizer) editNote(id int) {
 
-	if o.last_mode == NO_ROWS {
-		o.mode = o.last_mode
-		sess.showOrgMessage("There is nothing to edit")
-		return
-	}
+	/*
+		//if o.last_mode == NO_ROWS {
+			o.mode = o.last_mode
+			sess.showOrgMessage("There is nothing to edit")
+			return
+		}
+	*/
 
 	if o.view != TASK {
 		o.command = ""
@@ -432,8 +442,10 @@ func (o *Organizer) refresh(unused int) {
 			o.fc, o.fr, o.rowoff = 0, 0, 0
 			o.rows = searchEntries(sess.fts_search_terms, o.show_deleted, false)
 			if len(o.rows) == 0 {
+				o.insertRow(0, "", true, false, false, BASE_DATE)
+				o.rows[0].dirty = false
 				sess.showOrgMessage("No results were returned")
-				o.mode = NO_ROWS
+				//o.mode = NO_ROWS
 			}
 			/*
 				if unused != -1 { //complete kluge has to do with refreshing when syncing
@@ -443,23 +455,22 @@ func (o *Organizer) refresh(unused int) {
 			sess.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.readRowsIntoBuffer() ////////////////////////////////////////////
+			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
 		} else {
 			o.mode = o.last_mode
 			o.fc, o.fr, o.rowoff = 0, 0, 0
 			o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 			if len(o.rows) == 0 {
+				o.insertRow(0, "", true, false, false, BASE_DATE)
+				o.rows[0].dirty = false
 				sess.showOrgMessage("No results were returned")
-				o.mode = NO_ROWS
+				//o.mode = NO_ROWS
 			}
-			/* not sure why this was here
-			if unused != -1 { //complete kluge has to do with refreshing when syncing
-				o.drawPreview()
-			}
-			*/
 			sess.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.readRowsIntoBuffer() ////////////////////////////////////////////
+			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
 		}
 		//sess.showOrgMessage("Entries will be refreshed")
@@ -499,12 +510,15 @@ func (o *Organizer) find(pos int) {
 	o.mode = FIND
 	o.rows = searchEntries(searchTerms, o.show_deleted, false)
 	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		o.mode = NO_ROWS
+		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 }
 

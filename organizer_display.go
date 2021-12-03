@@ -423,7 +423,8 @@ func (o *Organizer) drawSearchRows() {
 }
 
 func (o *Organizer) drawPreview() {
-	if o.mode == NO_ROWS {
+	//if o.mode == NO_ROWS {
+	if len(o.rows) == 0 {
 		sess.eraseRightScreen()
 		return
 	}

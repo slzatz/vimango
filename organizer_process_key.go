@@ -9,19 +9,6 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-var navigation = map[int]struct{}{
-	ARROW_UP:   z0,
-	ARROW_DOWN: z0,
-	//ARROW_LEFT:  z0,
-	//ARROW_RIGHT: z0,
-	//'h':         z0,
-	'j': z0,
-	'k': z0,
-	//'l':         z0,
-	//PAGE_UP:     z0, // navigate right pane
-	//PAGE_DOWN:   z0, // navigate right pane
-}
-
 var tabCompletion struct {
 	idx  int
 	list []string
@@ -30,10 +17,6 @@ var tabCompletion struct {
 func organizerProcessKey(c int) {
 
 	if c == '\x1b' {
-		if org.mode == NO_ROWS {
-			org.command = ""
-			return
-		}
 		sess.showOrgMessage("")
 		org.command = ""
 		vim.Key("<esc>")
@@ -58,29 +41,19 @@ func organizerProcessKey(c int) {
 
 	switch org.mode {
 
-	case NO_ROWS:
-		switch c {
-		case ':':
-			exCmd()
-		//case '\x1b':
-		//	org.command = ""
-		case 'i', 'I', 'a', 'A', 's':
-			org.insertRow(0, "", true, false, false, BASE_DATE)
-			vim.BufferSetLine(org.vbuf, []byte(""))
-			vim.Execute("w")
-			s := vim.BufferLinesS(org.vbuf)[org.fr]
-			vim.Key("<esc>")
-			vim.Input("i")
-			sess.showOrgMessage(s)
-			org.mode = INSERT
-			org.command = ""
-		}
-
 	case FIND:
 		switch c {
 		case ':':
 			exCmd()
-		case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
+			//case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
+		case ARROW_UP, ARROW_DOWN, 'j', 'k', 'g', 'G':
+			if z, found := termcodes[c]; found {
+				vim.Input(z)
+			} else {
+				vim.Input(string(c))
+			}
+			pos := vim.CursorGetPosition()
+			org.fr = pos[0] - 1
 			//org.moveCursor(c)
 		default:
 			org.mode = NORMAL
@@ -101,15 +74,6 @@ func organizerProcessKey(c int) {
 		case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
 			//org.moveCursor(c)
 			sess.showOrgMessage("Can't leave row while in INSERT mode")
-			/*
-				case '\x1b':
-					org.command = ""
-					org.mode = NORMAL
-					vim.Key("<esc>")
-					pos := vim.CursorGetPosition()
-					org.fc = pos[1]
-					sess.showOrgMessage("")
-			*/
 		default:
 			if c < 32 {
 				return
@@ -123,7 +87,7 @@ func organizerProcessKey(c int) {
 			org.rows[org.fr].title = s
 			pos := vim.CursorGetPosition()
 			org.fc = pos[1]
-			org.fr = pos[0] - 1
+			//org.fr = pos[0] - 1 // shouldn't change on insert
 			row := &org.rows[org.fr]
 			//row.dirty = vim.BufferGetModified(org.vbuf)
 			tick := vim.BufferGetLastChangedTick(org.vbuf)
