@@ -205,6 +205,7 @@ func organizerProcessKey(c int) {
 		if cmd, found := n_lookup[org.command]; found {
 			cmd()
 			org.command = ""
+			vim.Key("<esc>")
 			return
 		}
 
@@ -239,6 +240,7 @@ func organizerProcessKey(c int) {
 		if mode == 4 { //OP_PENDING
 			return
 		}
+		org.command = ""
 		// the only way to get into EX_COMMAND or SEARCH
 		//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
 		if mode == 16 && org.mode != INSERT {
