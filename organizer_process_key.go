@@ -35,18 +35,24 @@ func organizerProcessKey(c int) {
 		return
 	}
 
-	if c < 32 && c != 13 {
+	if c < 32 && !(c == 13 || c == ctrlKey('j') || c == ctrlKey('k')) {
 		return
 	}
 
 	switch org.mode {
 
 	case FIND:
-		switch c {
-		case ':':
+		if c == ':' {
 			exCmd()
-			//case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
-		case ARROW_UP, ARROW_DOWN, 'j', 'k', 'g', 'G':
+			return
+		}
+
+		if c >= '0' && c <= '9' {
+			vim.Input(string(c))
+			return
+		}
+
+		if _, found := navKeys[c]; found {
 			if z, found := termcodes[c]; found {
 				vim.Input(z)
 			} else {
@@ -54,47 +60,77 @@ func organizerProcessKey(c int) {
 			}
 			pos := vim.CursorGetPosition()
 			org.fr = pos[0] - 1
-			//org.moveCursor(c)
-		default:
+			return
+		} else {
 			org.mode = NORMAL
 			org.command = ""
 			organizerProcessKey(c)
 		}
 
 	case INSERT:
-		switch c {
-		case '\r':
+		/*
+			switch c {
+			case '\r':
+				org.writeTitle()
+				vim.Key("<esc>")
+				org.mode = NORMAL
+				row := &org.rows[org.fr]
+				row.dirty = false
+				//vim.Execute("w") // really no reason to do this
+				org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+			case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
+				//org.moveCursor(c)
+				sess.showOrgMessage("Can't leave row while in INSERT mode")
+			default:
+				if c < 32 {
+					return
+				}
+				if z, found := termcodes[c]; found {
+					vim.Input(z)
+				} else {
+					vim.Input(string(c))
+				}
+				s := vim.BufferLinesS(org.vbuf)[org.fr]
+				org.rows[org.fr].title = s
+				pos := vim.CursorGetPosition()
+				org.fc = pos[1]
+				//org.fr = pos[0] - 1 // shouldn't change on insert
+				row := &org.rows[org.fr]
+				//row.dirty = vim.BufferGetModified(org.vbuf)
+				tick := vim.BufferGetLastChangedTick(org.vbuf)
+				if tick > org.bufferTick {
+					row.dirty = true
+					org.bufferTick = tick
+				}
+			}
+		*/
+
+		if c == '\r' {
 			org.writeTitle()
 			vim.Key("<esc>")
 			org.mode = NORMAL
 			row := &org.rows[org.fr]
 			row.dirty = false
-			//vim.Execute("w") // really no reason to do this
 			org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
-		case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
-			//org.moveCursor(c)
-			sess.showOrgMessage("Can't leave row while in INSERT mode")
-		default:
-			if c < 32 {
-				return
-			}
-			if z, found := termcodes[c]; found {
-				vim.Input(z)
-			} else {
-				vim.Input(string(c))
-			}
-			s := vim.BufferLinesS(org.vbuf)[org.fr]
-			org.rows[org.fr].title = s
-			pos := vim.CursorGetPosition()
-			org.fc = pos[1]
-			//org.fr = pos[0] - 1 // shouldn't change on insert
-			row := &org.rows[org.fr]
-			//row.dirty = vim.BufferGetModified(org.vbuf)
-			tick := vim.BufferGetLastChangedTick(org.vbuf)
-			if tick > org.bufferTick {
-				row.dirty = true
-				org.bufferTick = tick
-			}
+			org.command = ""
+			return
+		}
+
+		if z, found := termcodes[c]; found {
+			vim.Input(z)
+		} else {
+			vim.Input(string(c))
+		}
+		s := vim.BufferLinesS(org.vbuf)[org.fr]
+		org.rows[org.fr].title = s
+		pos := vim.CursorGetPosition()
+		org.fc = pos[1]
+		//org.fr = pos[0] - 1 // shouldn't change on insert
+		row := &org.rows[org.fr]
+		tick := vim.BufferGetLastChangedTick(org.vbuf)
+		if tick > org.bufferTick {
+			row.dirty = true
+			org.bufferTick = tick
 		}
 
 	case NORMAL:
@@ -110,7 +146,7 @@ func organizerProcessKey(c int) {
 			switch org.view {
 			case TASK:
 				org.writeTitle()
-				vim.Execute("w") // really no reason to do this
+				vim.Key("<esc>")
 				row := &org.rows[org.fr]
 				row.dirty = false
 				org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
@@ -133,37 +169,22 @@ func organizerProcessKey(c int) {
 			org.fc, org.fr, org.rowoff = 0, 0, 0
 			org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
 			if len(org.rows) == 0 {
+				org.insertRow(0, "", true, false, false, BASE_DATE)
+				org.rows[0].dirty = false
 				sess.showOrgMessage("No results were returned")
-				org.mode = NO_ROWS
+				//org.mode = NO_ROWS
 			}
+			sess.imagePreview = false
+			//o.readTitleIntoBuffer() /////////////////////////////////////////////
+			org.readRowsIntoBuffer() ////////////////////////////////////////////
+			org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 			org.drawPreview()
 			return
 		}
 
-		// these navigate the preview in org.view == TASK
-		if c == PAGE_UP {
-			if org.altRowoff > org.textLines {
-				org.altRowoff -= org.textLines
-			} else {
-				org.altRowoff = 0
-			}
-			org.drawPreview()
-		}
-
-		if c == PAGE_DOWN {
-			if len(org.note) > org.altRowoff+org.textLines {
-				if len(org.note) < org.altRowoff+2*org.textLines {
-					org.altRowoff = len(org.note) - org.textLines
-				} else {
-					org.altRowoff += org.textLines
-				}
-			}
-			org.drawPreview()
-		}
-
 		if _, err := strconv.Atoi(string(c)); err != nil {
 			org.command += string(c)
-			sess.showEdMessage(org.command)
+			//sess.showEdMessage(org.command)
 		}
 
 		if cmd, found := n_lookup[org.command]; found {
@@ -174,32 +195,33 @@ func organizerProcessKey(c int) {
 		}
 
 		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o', //'g'
-		if c == 32 || c == 79 || c == 86 || c == 111 { //103
+		if c == 32 || c == 79 || c == 86 || c == 111 || c == 'J' { //103
 			return
 		}
 
-		// Process the key
+		// Send the keystroke to vim
 		if z, found := termcodes[c]; found {
 			vim.Input(z)
 		} else {
 			vim.Input(string(c))
 		}
 
-		pos := vim.CursorGetPosition()
-		org.fc = pos[1]
-		org.fr = pos[0] - 1
 		s := vim.BufferLinesS(org.vbuf)[org.fr]
 		org.rows[org.fr].title = s
+		pos := vim.CursorGetPosition()
+		org.fc = pos[1]
+		if org.fr != pos[0]-1 {
+			org.fr = pos[0] - 1
+			org.drawPreview()
+		}
+		org.fr = pos[0] - 1
 		row := &org.rows[org.fr]
-		//row.dirty = vim.BufferGetModified(org.vbuf)
 		tick := vim.BufferGetLastChangedTick(org.vbuf)
 		if tick > org.bufferTick {
 			row.dirty = true
 			org.bufferTick = tick
 		}
 		mode := vim.GetMode()
-		//org.command = ""
-		//sess.showEdMessage("%d, %d", org.fr, org.fc)
 
 		if mode == 4 { //OP_PENDING
 			return
@@ -222,29 +244,10 @@ func organizerProcessKey(c int) {
 
 	case VISUAL:
 
-		// escape, return, ctrl-l [in one circumstance], PAGE_DOWN, PAGE_UP
+		if c == 'j' || c == 'k' || c == 'J' || c == 'V' || c == 'g' || c == 'G' {
+			return
+		}
 
-		/*
-			if c == '\x1b' {
-				if org.view == TASK {
-					sess.imagePreview = false
-					org.drawPreview()
-				}
-				sess.showOrgMessage("")
-				org.command = ""
-				org.mode = NORMAL
-				vim.Key("<esc>")
-				// shouldn't need to check cursor position
-				return
-			}
-
-			if c < 33 {
-				return
-			}
-		*/
-
-		// We don't want control characters
-		// escape is dealt with above
 		if z, found := termcodes[c]; found {
 			vim.Input(z)
 		} else {
@@ -255,9 +258,8 @@ func organizerProcessKey(c int) {
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
-		org.fr = pos[0] - 1
+		//org.fr = pos[0] - 1 //should not be able to change lines so prob need to block j and k
 		row := &org.rows[org.fr]
-		//row.dirty = vim.BufferGetModified(org.vbuf)
 		tick := vim.BufferGetLastChangedTick(org.vbuf)
 		if tick > org.bufferTick {
 			row.dirty = true
@@ -276,15 +278,6 @@ func organizerProcessKey(c int) {
 	case ADD_CHANGE_FILTER:
 
 		switch c {
-
-		/*
-			case '\x1b':
-				org.mode = NORMAL
-				org.last_mode = ADD_CHANGE_FILTER
-				org.command = ""
-				org.command_line = ""
-				org.repeat = 0
-		*/
 
 		case ARROW_UP, ARROW_DOWN, 'j', 'k':
 			org.moveAltCursor(c)
@@ -321,16 +314,6 @@ func organizerProcessKey(c int) {
 		}
 
 	case COMMAND_LINE:
-		/*
-			if c == '\x1b' {
-				org.mode = org.last_mode
-				sess.showOrgMessage("")
-				tabCompletion.idx = 0
-				tabCompletion.list = nil
-				return
-			}
-		*/
-
 		if c == '\r' {
 			pos := strings.LastIndex(org.command_line, " ")
 			var s string

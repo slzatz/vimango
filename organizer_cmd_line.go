@@ -144,6 +144,7 @@ func (o *Organizer) open(pos int) {
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	vim.CursorSetPosition([2]int{1, 0})
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 	return
@@ -470,6 +471,7 @@ func (o *Organizer) refresh(unused int) {
 			sess.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.readRowsIntoBuffer() ////////////////////////////////////////////
+			vim.CursorSetPosition([2]int{1, 0})
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
 		}

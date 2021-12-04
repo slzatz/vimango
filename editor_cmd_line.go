@@ -384,18 +384,6 @@ func (e *Editor) quitActions() {
 	}
 
 	vim.Execute("bw") // wipout the buffer
-	/*
-		deleteBufferOpts := map[string]bool{
-			"force":  true,
-			"unload": false,
-		}
-		err := v.DeleteBuffer(e.vbuf, deleteBufferOpts)
-		if err != nil {
-			sess.showOrgMessage("DeleteBuffer error %v", err)
-		} else {
-			sess.showOrgMessage("DeleteBuffer successful")
-		}
-	*/
 
 	index := -1
 	for i, w := range windows {
@@ -468,26 +456,11 @@ func (e *Editor) writeAll() {
 
 func (e *Editor) quitAll() {
 
-	/*
-		deleteBufferOpts := map[string]bool{
-			"force":  true,
-			"unload": false,
-		}
-	*/
-
 	for _, w := range windows {
 		if ed, ok := w.(*Editor); ok {
 			if ed.isModified() {
 				continue
 			} else {
-				/*
-					err := v.DeleteBuffer(ed.vbuf, deleteBufferOpts)
-					if err != nil {
-						sess.showOrgMessage("DeleteBuffer error %v", err)
-					} else {
-						sess.showOrgMessage("DeleteBuffer successful")
-					}
-				*/
 				index := -1
 				for i, w := range windows {
 					if w == ed {

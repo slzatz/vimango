@@ -51,6 +51,15 @@ var Languages = map[string]string{
 	"python": "python",
 }
 
+var navKeys = map[int]struct{}{
+	ARROW_UP:   z0,
+	ARROW_DOWN: z0,
+	'j':        z0,
+	'k':        z0,
+	'g':        z0,
+	'G':        z0,
+}
+
 var Lsps = map[string]string{
 	"go":  "gopls",
 	"cpp": "clangd",
@@ -330,12 +339,6 @@ func getStringInBetween(str string, start string, end string) (result string) {
 }
 
 /*
-type ChangedtickEvent struct {
-	Buffer nvim.Buffer
-	//Changetick int64
-	Changetick interface{}
-}
-
 type BufLinesEvent struct {
 	Buffer nvim.Buffer
 	//Changetick  int64
