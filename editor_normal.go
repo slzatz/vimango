@@ -157,7 +157,7 @@ func (e *Editor) controlH() {
 	if sess.numberOfEditors() == 1 {
 
 		if sess.divider < 10 {
-			sess.cfg.ed_pct = 80
+			sess.edPct = 80
 			moveDividerPct(80)
 		}
 
@@ -190,7 +190,7 @@ func (e *Editor) controlH() {
 	} else {
 
 		if sess.divider < 10 {
-			sess.cfg.ed_pct = 80
+			sess.edPct = 80
 			moveDividerPct(80)
 		}
 

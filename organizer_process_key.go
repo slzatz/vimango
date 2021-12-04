@@ -143,13 +143,17 @@ func organizerProcessKey(c int) {
 		if c == '\r' {
 
 			org.command = ""
-			switch org.view {
-			case TASK:
+			row := &org.rows[org.fr]
+			if row.dirty {
 				org.writeTitle()
 				vim.Key("<esc>")
-				row := &org.rows[org.fr]
 				row.dirty = false
 				org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+				return
+			}
+			// if not row.dirty nothing happens in TASK but if in a CONTAINER view open the entries with that container
+			switch org.view {
+			case TASK:
 				return
 			case CONTEXT:
 				org.taskview = BY_CONTEXT
@@ -159,7 +163,6 @@ func organizerProcessKey(c int) {
 				org.taskview = BY_KEYWORD
 			}
 
-			row := &org.rows[org.fr]
 			org.filter = row.title
 			sess.showOrgMessage("'%s' will be opened", org.filter)
 
@@ -210,9 +213,14 @@ func organizerProcessKey(c int) {
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
+		// drawing task note preview or container info
 		if org.fr != pos[0]-1 {
 			org.fr = pos[0] - 1
-			org.drawPreview()
+			if org.view == TASK {
+				org.drawPreview()
+			} else {
+				sess.displayContainerInfo()
+			}
 		}
 		org.fr = pos[0] - 1
 		row := &org.rows[org.fr]

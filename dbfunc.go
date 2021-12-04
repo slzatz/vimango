@@ -322,19 +322,18 @@ func (o *Organizer) readRowsIntoBuffer() {
 	//o.vbuf = vim.BufferNew(0) // if/when we decide to have multiple buffers
 	vim.BufferSetCurrent(o.vbuf) // not sure why but must come before SetLines???
 	vim.BufferSetLines(o.vbuf, bb)
-	vim.Execute("w")
-	//o.vbuf = vbuf
+	//vim.Execute("w")
 	sess.showOrgMessage("%d %d", len(bb), vim.BufferGetLineCount(o.vbuf))
 }
 
 func updateTitle() {
 
-	// needs to be a pointer because may send to insertRow
+	// needs to be a pointer because may send to insertRowInDB
 	row := &org.rows[org.fr]
 
 	if row.id == -1 {
-		// want to send pointer to insertRow
-		insertRow(row)
+		// want to send pointer to insertRowinDB
+		insertRowInDB(row)
 		return
 	}
 
@@ -362,7 +361,7 @@ func updateRows() {
 		}
 
 		if row.id == -1 {
-			id := insertRow(&row)
+			id := insertRowInDB(&row)
 			updated_rows = append(updated_rows, id)
 			row.dirty = false
 			continue
@@ -385,7 +384,7 @@ func updateRows() {
 	sess.showOrgMessage("These ids were updated: %v", updated_rows)
 }
 
-func insertRow(row *Row) int {
+func insertRowInDB(row *Row) int {
 
 	folder_tid := 1
 	context_tid := 1
@@ -421,7 +420,7 @@ func insertRow(row *Row) int {
 
 	row_id, err := res.LastInsertId()
 	if err != nil {
-		sess.showOrgMessage("Error in insertRow for %s: %v", row.title, err)
+		sess.showOrgMessage("Error in insertRowInDB for %s: %v", row.title, err)
 		return -1
 	}
 	row.id = int(row_id)
@@ -432,7 +431,7 @@ func insertRow(row *Row) int {
 	//_, err = fts_db.Exec("INSERT INTO fts (title, lm_id) VALUES (?, ?);", row.title, row.id)
 	_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, lm_id) VALUES (?, ?, ?, ?);", row.title, "", "", row.id)
 	if err != nil {
-		sess.showOrgMessage("Error in insertRow inserting into fts for %s: %v", row.title, err)
+		sess.showOrgMessage("Error in insertRowInDB inserting into fts for %s: %v", row.title, err)
 		return row.id
 	}
 
@@ -1411,7 +1410,7 @@ func moveDividerPct(pct int) {
 		sess.positionWindows()
 		sess.eraseRightScreen() //erases editor area + statusbar + msg
 		sess.drawRightScreen()
-	} else if org.view == TASK && org.mode != NO_ROWS {
+	} else if org.view == TASK { //&& org.mode != NO_ROWS {
 		//org.readTitleIntoBuffer() // don't think its necessary here
 		org.drawPreview()
 	}
@@ -1428,6 +1427,8 @@ func moveDividerAbs(num int) {
 	} else {
 		sess.divider = sess.screenCols - num
 	}
+
+	sess.edPct = 100 - 100*sess.divider/sess.screenCols
 	sess.totaleditorcols = sess.screenCols - sess.divider - 2
 	sess.eraseScreenRedrawLines()
 
@@ -1444,7 +1445,7 @@ func moveDividerAbs(num int) {
 		//org.readTitleIntoBuffer() // don't think its necessary here
 		org.drawPreview()
 	}
-	sess.showOrgMessage("rows: %d  cols: %d  divider: %d", sess.screenLines, sess.screenCols, sess.divider)
+	sess.showOrgMessage("rows: %d  cols: %d  divider: %d edPct: %d", sess.screenLines, sess.screenCols, sess.divider, sess.edPct)
 
 	sess.returnCursor()
 }

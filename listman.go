@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -69,70 +68,10 @@ func main() {
 		}
 	}()
 	// parse config flags & parameters
-	flag.Parse()
-
-	// initialize neovim server
-	/*
-		ctx := context.Background()
-		opts := []nvim.ChildProcessOption{
-
-			// -u NONE is no vimrc and -n is no swap file
-			nvim.ChildProcessArgs("-u", "NONE", "-n", "--embed", "--headless", "--noplugin"),
-
-			//without headless nothing happens but should be OK once ui attached.
-			//nvim.ChildProcessArgs("-u", "NONE", "-n", "--embed", "--noplugin"),
-
-			nvim.ChildProcessContext(ctx),
-			nvim.ChildProcessLogf(log.Printf),
-		}
-
-		os.Setenv("VIMRUNTIME", "/home/slzatz/neovim/runtime")
-		opts = append(opts, nvim.ChildProcessCommand("/home/slzatz/neovim/build/bin/nvim"))
-
-		//var err error
-		v, err = nvim.NewChildProcess(opts...)
-		if err != nil {
-			log.Fatal(err)
-		}
-	*/
-
-	// Cleanup on return.
-	/*
-		defer v.Close()
-
-		wins, err := v.Windows()
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
-		w = wins[0]
-	*/
-
-	// this allows you to change current buffer without saving
-	// isModified still works when hidden is true
-	/*
-		err = v.SetOption("hidden", true)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting all buffers to hidden: %v", err)
-			os.Exit(1)
-		}
-	*/
+	//flag.Parse()
 
 	vim.Execute("set iskeyword+=*")
-	/*
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error in set iskeyword: %v", err)
-			os.Exit(1)
-		}
-	*/
 	vim.Execute("set iskeyword+=`")
-	/*
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error in set iskeyword: %v", err)
-				os.Exit(1)
-			}
-		redirectMessages(v)
-		messageBuf, _ = v.CreateBuffer(true, true)
-	*/
 
 	// enable raw mode
 	origCfg, err := rawmode.Enable()
@@ -180,7 +119,9 @@ func main() {
 	// ? where this should be.  Also in signal.
 	sess.textLines = sess.screenLines - 2 - TOP_MARGIN // -2 for status bar and message bar
 	//sess.divider = sess.screencols - sess.cfg.ed_pct * sess.screencols/100
-	sess.divider = sess.screenCols - (60 * sess.screenCols / 100)
+	sess.edPct = 60
+	moveDividerPct(sess.edPct) // sets sess.divider
+	//sess.divider = sess.screenCols - (60 * sess.screenCols / 100)
 	sess.totaleditorcols = sess.screenCols - sess.divider - 1 // was 2
 
 	generateContextMap()

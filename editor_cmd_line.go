@@ -431,7 +431,7 @@ func (e *Editor) quitActions() {
 		sess.eraseRightScreen()
 
 		if sess.divider < 10 {
-			sess.cfg.ed_pct = 80
+			sess.edPct = 80
 			moveDividerPct(80)
 		}
 
@@ -506,7 +506,7 @@ func (e *Editor) quitAll() {
 		sess.eraseRightScreen()
 
 		if sess.divider < 10 {
-			sess.cfg.ed_pct = 80
+			sess.edPct = 80
 			moveDividerPct(80)
 		}
 

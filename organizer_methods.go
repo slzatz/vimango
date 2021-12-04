@@ -2,8 +2,6 @@ package main
 
 import (
 	"strings"
-
-	"github.com/slzatz/vimango/vim"
 )
 
 func (o *Organizer) getMode() Mode {
@@ -12,82 +10,6 @@ func (o *Organizer) getMode() Mode {
 	} else {
 		return NO_ROWS
 	}
-}
-
-//Note: outlineMoveCursor worries about moving cursor beyond the size of the row
-//OutlineScroll worries about moving cursor beyond the screen
-func (o *Organizer) moveCursor______(key int) {
-
-	if len(o.rows) == 0 {
-		return
-	}
-
-	switch key {
-	/*
-		case ARROW_LEFT, 'h':
-			if o.fc > 0 {
-				o.fc--
-			}
-
-		case ARROW_RIGHT, 'l':
-			o.fc++
-	*/
-	case ARROW_UP, 'k':
-		if o.fr > 0 {
-			o.fr--
-		}
-		o.fc, o.coloff = 0, 0
-		vim.CursorSetPosition([2]int{1, 0})
-
-		if o.view == TASK {
-			sess.imagePreview = false /////////////////////////////////
-			o.altRowoff = 0
-			o.readTitleIntoBuffer() /////////////////////////////////////////////
-			o.drawPreview()
-		} else {
-			c := getContainerInfo(o.rows[o.fr].id)
-			if c.id != 0 {
-				sess.displayContainerInfo(&c)
-				sess.drawPreviewBox()
-			}
-		}
-
-	case ARROW_DOWN, 'j':
-		if o.fr < len(o.rows)-1 {
-			o.fr++
-		}
-		o.fc, o.coloff = 0, 0
-		vim.CursorSetPosition([2]int{1, 0})
-		if o.view == TASK {
-			sess.imagePreview = false /////////////////////////////////
-			o.altRowoff = 0
-			o.readTitleIntoBuffer() /////////////////////////////////////////////
-			o.drawPreview()
-		} else {
-			c := getContainerInfo(o.rows[o.fr].id)
-			if c.id != 0 {
-				sess.displayContainerInfo(&c)
-				sess.drawPreviewBox()
-			}
-		}
-
-		//case PAGE_DOWN:
-		//case PAGE_UP:
-	}
-
-	/*
-		t := &o.rows[o.fr].title
-		if o.fc >= len(*t) {
-			if o.mode != INSERT {
-				o.fc = len(*t) - 1
-			} else {
-				o.fc = len(*t)
-			}
-		}
-		if *t == "" {
-			o.fc = 0
-		}
-	*/
 }
 
 func (o *Organizer) moveAltCursor(key int) {
@@ -281,11 +203,6 @@ func (o *Organizer) writeTitle() {
 
 	sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()
-	/* ? not sure why was doing this 12012021
-	if o.fc > 0 {
-		o.fc--
-	}
-	*/
 }
 
 func (o *Organizer) clearMarkedEntries() {

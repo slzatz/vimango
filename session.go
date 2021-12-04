@@ -25,30 +25,24 @@ type Session struct {
 	imgSizeY         int
 	fts_search_terms string
 	origTermCfg      []byte //from GoKilo
-	cfg              Config
-	style            [7]string
-	styleIndex       int
-	ws               unix.Winsize //Row,Col,Xpixel,Ypixel unint16
+	//cfg              Config
+	edPct      int // percent that editor space takes up of whole horiz screen real estate
+	style      [7]string
+	styleIndex int
+	ws         unix.Winsize //Row,Col,Xpixel,Ypixel unint16
 	//images           map[string]*image.Image
 }
 
+/*
 type Config struct {
-	user     string
-	password string
-	dbname   string
-	hostaddr string
-	port     int
-	ed_pct   int
+		user     string
+		password string
+		dbname   string
+		hostaddr string
+		port     int
+	ed_pct int
 }
-
-func contains___(s []int, x int) bool {
-	for _, y := range s {
-		if x == y {
-			return true
-		}
-	}
-	return false
-}
+*/
 
 func (s *Session) numberOfEditors() int {
 	i := 0
@@ -409,7 +403,7 @@ func (s *Session) drawPreviewBox() {
 	fmt.Print(ab.String())
 }
 
-func (s *Session) displayContainerInfo(c *Container) {
+func (s *Session) displayContainerInfo() {
 
 	/*
 		type Container struct {
@@ -423,6 +417,11 @@ func (s *Session) displayContainerInfo(c *Container) {
 			count    int
 		}
 	*/
+	c := getContainerInfo(org.rows[org.fr].id)
+
+	if c.id == 0 {
+		return
+	}
 
 	var ab strings.Builder
 	width := s.totaleditorcols - 10
@@ -466,6 +465,7 @@ func (s *Session) displayContainerInfo(c *Container) {
 	fmt.Fprintf(&ab, "entry count: %d%s", c.count, lf_ret)
 
 	fmt.Print(ab.String())
+	sess.drawPreviewBox()
 }
 
 func (s *Session) quitApp() {
@@ -485,16 +485,10 @@ func (s *Session) quitApp() {
 }
 
 func (s *Session) signalHandler() {
-	//s.GetWindowSize()
-	//var err error
-	//s.screenLines, s.screenCols, err = rawmode.GetWindowSize()
 	err := s.GetWindowSize()
 	if err != nil {
 		//SafeExit(fmt.Errorf("couldn't get window size: %v", err))
 		os.Exit(1)
 	}
-	//that percentage should be in session
-	// so right now this reverts back if it was changed during session
-	//s.moveDivider(s.cfg.ed_pct)
-	moveDividerPct(60)
+	moveDividerPct(s.edPct)
 }

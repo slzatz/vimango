@@ -393,10 +393,11 @@ func (o *Organizer) verticalResize(pos int) {
 		return
 	}
 	moveDividerAbs(width)
-	//o.mode = NORMAL
+	//sess.cfg.ed_pct = 100 * width / sess.screenCols // in moveDividerAbs
 	o.mode = o.last_mode
 }
 
+/*
 func (o *Organizer) verticalResize__(pos int) {
 	if pos == -1 {
 		sess.showOrgMessage("You need to provide a number 0 - 100")
@@ -413,6 +414,7 @@ func (o *Organizer) verticalResize__(pos int) {
 	//o.mode = NORMAL
 	o.mode = o.last_mode
 }
+*/
 
 func (o *Organizer) newEntry(unused int) {
 	row := Row{
@@ -479,10 +481,17 @@ func (o *Organizer) refresh(unused int) {
 	} else {
 		o.mode = o.last_mode
 		getContainers()
-		if org.mode != NO_ROWS && unused != -1 {
-			c := getContainerInfo(o.rows[o.fr].id)
-			sess.displayContainerInfo(&c)
-			sess.drawPreviewBox()
+		if len(o.rows) == 0 {
+			o.insertRow(0, "", true, false, false, BASE_DATE)
+			o.rows[0].dirty = false
+			sess.showOrgMessage("No results were returned")
+			//o.mode = NO_ROWS
+		}
+		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		vim.CursorSetPosition([2]int{1, 0})
+		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		if unused != -1 {
+			sess.displayContainerInfo()
 		}
 		sess.showOrgMessage("view refreshed")
 	}
@@ -560,12 +569,17 @@ func (o *Organizer) contexts(pos int) {
 		sess.eraseRightScreen()
 		o.view = CONTEXT
 		getContainers()
-		if o.mode != NO_ROWS {
-			c := getContainerInfo(o.rows[0].id)
-			sess.displayContainerInfo(&c)
-			sess.drawPreviewBox()
-			sess.showOrgMessage("Retrieved contexts")
+		if len(o.rows) == 0 {
+			o.insertRow(0, "", true, false, false, BASE_DATE)
+			o.rows[0].dirty = false
+			sess.showOrgMessage("No results were returned")
+			//o.mode = NO_ROWS
 		}
+		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		vim.CursorSetPosition([2]int{1, 0})
+		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		sess.displayContainerInfo()
+		sess.showOrgMessage("Retrieved contexts")
 		return
 	}
 
@@ -609,13 +623,18 @@ func (o *Organizer) folders(pos int) {
 		sess.eraseRightScreen()
 		o.view = FOLDER
 		getContainers()
-		if o.mode != NO_ROWS {
-			// two lines below show first folder's info
-			c := getContainerInfo(o.rows[0].id)
-			sess.displayContainerInfo(&c)
-			sess.drawPreviewBox()
-			sess.showOrgMessage("Retrieved folders")
+
+		if len(o.rows) == 0 {
+			o.insertRow(0, "", true, false, false, BASE_DATE)
+			o.rows[0].dirty = false
+			sess.showOrgMessage("No results were returned")
+			//o.mode = NO_ROWS
 		}
+		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		vim.CursorSetPosition([2]int{1, 0})
+		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		sess.displayContainerInfo()
+		sess.showOrgMessage("Retrieved contexts")
 		return
 	}
 
@@ -660,13 +679,18 @@ func (o *Organizer) keywords(pos int) {
 		sess.eraseRightScreen()
 		o.view = KEYWORD
 		getContainers()
-		if o.mode != NO_ROWS {
-			// two lines below show first keyword's info
-			c := getContainerInfo(o.rows[0].id)
-			sess.displayContainerInfo(&c)
-			sess.drawPreviewBox()
-			sess.showOrgMessage("Retrieved keywords")
+
+		if len(o.rows) == 0 {
+			o.insertRow(0, "", true, false, false, BASE_DATE)
+			o.rows[0].dirty = false
+			sess.showOrgMessage("No results were returned")
+			//o.mode = NO_ROWS
 		}
+		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		vim.CursorSetPosition([2]int{1, 0})
+		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		sess.displayContainerInfo()
+		sess.showOrgMessage("Retrieved keywords")
 		return
 	}
 
