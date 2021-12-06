@@ -35,9 +35,11 @@ func organizerProcessKey(c int) {
 		return
 	}
 
-	if c < 32 && !(c == 13 || c == ctrlKey('j') || c == ctrlKey('k')) {
+	/* not sure this is necessary
+	if c < 32 && !(c == 13 || c == ctrlKey('j') || c == ctrlKey('k') || c == ctrlKey('x') || c == ctrlKey('d')) {
 		return
 	}
+	*/
 
 	switch org.mode {
 
@@ -54,7 +56,8 @@ func organizerProcessKey(c int) {
 
 		if _, found := navKeys[c]; found {
 			if z, found := termcodes[c]; found {
-				vim.Input(z)
+				vim.Key(z)
+				//vim.Input(z)
 			} else {
 				vim.Input(string(c))
 			}
@@ -68,42 +71,6 @@ func organizerProcessKey(c int) {
 		}
 
 	case INSERT:
-		/*
-			switch c {
-			case '\r':
-				org.writeTitle()
-				vim.Key("<esc>")
-				org.mode = NORMAL
-				row := &org.rows[org.fr]
-				row.dirty = false
-				//vim.Execute("w") // really no reason to do this
-				org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
-			case ARROW_UP, ARROW_DOWN, PAGE_UP, PAGE_DOWN:
-				//org.moveCursor(c)
-				sess.showOrgMessage("Can't leave row while in INSERT mode")
-			default:
-				if c < 32 {
-					return
-				}
-				if z, found := termcodes[c]; found {
-					vim.Input(z)
-				} else {
-					vim.Input(string(c))
-				}
-				s := vim.BufferLinesS(org.vbuf)[org.fr]
-				org.rows[org.fr].title = s
-				pos := vim.CursorGetPosition()
-				org.fc = pos[1]
-				//org.fr = pos[0] - 1 // shouldn't change on insert
-				row := &org.rows[org.fr]
-				//row.dirty = vim.BufferGetModified(org.vbuf)
-				tick := vim.BufferGetLastChangedTick(org.vbuf)
-				if tick > org.bufferTick {
-					row.dirty = true
-					org.bufferTick = tick
-				}
-			}
-		*/
 
 		if c == '\r' {
 			org.writeTitle()
@@ -204,13 +171,13 @@ func organizerProcessKey(c int) {
 
 		// Send the keystroke to vim
 		if z, found := termcodes[c]; found {
-			vim.Input(z)
+			//vim.Input(z)
+			vim.Key(z)
+			sess.showEdMessage("%s", z)
 		} else {
 			vim.Input(string(c))
 		}
 
-		s := vim.BufferLinesS(org.vbuf)[org.fr]
-		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
 		// drawing task note preview or container info
@@ -222,7 +189,10 @@ func organizerProcessKey(c int) {
 				sess.displayContainerInfo()
 			}
 		}
-		org.fr = pos[0] - 1
+		s := vim.BufferLinesS(org.vbuf)[org.fr]
+		org.rows[org.fr].title = s
+		//firstLine := vim.WindowGetTopLine() // doesn't seem to work
+		//org.fr = pos[0] - 1
 		row := &org.rows[org.fr]
 		tick := vim.BufferGetLastChangedTick(org.vbuf)
 		if tick > org.bufferTick {
@@ -246,7 +216,8 @@ func organizerProcessKey(c int) {
 			org.highlight[1] = pos[1][1] + 1
 			org.highlight[0] = pos[0][1]
 		}
-		sess.showOrgMessage(s)
+		//sess.showOrgMessage("%d: %s", firstLine, s)
+		sess.showOrgMessage("%s", s)
 
 		// end of case NORMAL
 
@@ -257,7 +228,8 @@ func organizerProcessKey(c int) {
 		}
 
 		if z, found := termcodes[c]; found {
-			vim.Input(z)
+			vim.Key(z)
+			//vim.Input(z)
 		} else {
 			vim.Input(string(c))
 		}

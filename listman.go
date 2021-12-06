@@ -139,6 +139,11 @@ func main() {
 	org.drawPreview()
 	org.refreshScreen()
 	org.drawStatusBar()
+	//vim.WindowSetHeight(sess.textLines)
+	/*
+		sess.showOrgMessage("rows: %d  columns: %d; win height %d win width %d",
+			sess.screenLines, sess.screenCols, vim.WindowGetHeight(), vim.WindowGetWidth())
+	*/
 	sess.showOrgMessage("rows: %d  columns: %d", sess.screenLines, sess.screenCols)
 	sess.returnCursor()
 	sess.run = true

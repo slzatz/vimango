@@ -7,24 +7,22 @@ import (
 )
 
 var n_lookup = map[string]func(){
-	//	"G":                        _G,
-	//	"gg":                       _gg,
-	"dd": noop,
-	"m":  mark,
-	//"*":                        _asterisk,
-	//"n":                        _n,
+	//"dd": noop,
+	"dd":                       del,
+	"m":                        mark,
 	":":                        exCmd,
 	string(ctrlKey('l')):       switchToEditorMode,
 	string([]byte{0x17, 0x17}): switchToEditorMode,
-	string(0x4):                del,           //ctrl-d
-	string(0x2):                starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
-	string(0x18):               completeEntry, //ctrl-x
-	string(ctrlKey('i')):       entryInfo,     //{{0x9}}
-	string(ctrlKey('j')):       controlJ,
-	string(ctrlKey('k')):       controlK,
-	string(ctrlKey('z')):       controlZ,
-	string(ctrlKey('n')):       drawPreviewWithImages,
-	" m":                       drawPreviewWithImages,
+	string(0x4):                del, //ctrl-d
+	//string(0x2):                starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
+	string(0x1):          starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
+	string(0x18):         completeEntry, //ctrl-x
+	string(ctrlKey('i')): entryInfo,     //{{0x9}}
+	string(ctrlKey('j')): controlJ,
+	string(ctrlKey('k')): controlK,
+	string(ctrlKey('z')): controlZ,
+	string(ctrlKey('n')): drawPreviewWithImages,
+	" m":                 drawPreviewWithImages,
 }
 
 func exCmd() {

@@ -66,8 +66,9 @@ var Lsps = map[string]string{
 	"py":  "python-language-server",
 }
 
+/*
 var termcodes = map[int]string{
-	ARROW_UP:    "\x80ku",
+	ARROW_UP:    "\x80ku", // could also do with vimKey as <Right>, <Left>, <Up>, <Down>
 	ARROW_DOWN:  "\x80kd",
 	ARROW_RIGHT: "\x80kr",
 	ARROW_LEFT:  "\x80kl",
@@ -76,6 +77,21 @@ var termcodes = map[int]string{
 	DEL_KEY:     "\x80kD",
 	PAGE_UP:     "\x80kP",
 	PAGE_DOWN:   "\x80kN",
+}
+*/
+
+var termcodes = map[int]string{
+	ARROW_UP:    "<up>", // could also do with vimKey as <Right>, <Left>, <Up>, <Down>
+	ARROW_DOWN:  "<down>",
+	ARROW_RIGHT: "<right>",
+	ARROW_LEFT:  "<left>",
+	BACKSPACE:   "<bs>", //? also works "\x08"
+	HOME_KEY:    "<home>",
+	DEL_KEY:     "<del>",
+	PAGE_UP:     "<pageup>",
+	PAGE_DOWN:   "<pagedown>",
+	//0x6:         "<c-f>",
+	//<end> <tab> <insert> <cr> or <enter> <f1> ... <f12>
 }
 
 type Mode int

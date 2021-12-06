@@ -276,3 +276,28 @@ func BufferGetLastChangedTick(vbuf *C.buf_T) int {
 	tick := C.vimBufferGetLastChangedTick(vbuf)
 	return int(tick)
 }
+
+/* topline doesn't seem to work so no need for the below
+func WindowGetTopLine() int {
+	t := C.vimWindowGetTopLine()
+	return int(t)
+}
+
+func WindowGetWidth() int {
+	w := C.vimWindowGetWidth()
+	return int(w)
+}
+
+func WindowGetHeight() int {
+	w := C.vimWindowGetHeight()
+	return int(w)
+}
+
+func WindowSetWidth(w int) {
+	C.vimWindowSetWidth(C.int(w))
+}
+
+func WindowSetHeight(h int) {
+	C.vimWindowSetHeight(C.int(h))
+}
+*/
