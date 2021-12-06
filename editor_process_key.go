@@ -295,7 +295,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	// Process the key
 	if z, found := termcodes[c]; found {
-		vim.Input(z)
+		vim.Key(z)
+		//vim.Input(z)
 	} else {
 		vim.Input(string(c))
 	}

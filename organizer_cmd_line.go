@@ -365,6 +365,7 @@ func (o *Organizer) editNote(id int) {
 			windows = append(windows, p.output)
 		}
 		readNoteIntoBuffer(p, id)
+		p.bufferTick = vim.BufferGetLastChangedTick(p.vbuf)
 
 	}
 

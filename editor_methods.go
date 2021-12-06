@@ -1174,5 +1174,12 @@ func (e *Editor) drawOverlay() {
 // this func is reason that we are writing notes to file
 // allows easy testing if a file is modified with BufferOption
 func (e *Editor) isModified() bool {
-	return vim.BufferGetModified(e.vbuf)
+	//return vim.BufferGetModified(e.vbuf)
+
+	tick := vim.BufferGetLastChangedTick(e.vbuf)
+	if tick > e.bufferTick {
+		//e.bufferTick = tick
+		return true
+	}
+	return false
 }

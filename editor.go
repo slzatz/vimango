@@ -35,6 +35,7 @@ type Editor struct {
 	overlay            []string // for suggest, showVimMessageLog
 	highlightPositions []Position
 	suggestions        []string //spelling suggestions
+	bufferTick         int
 }
 
 func NewEditor() *Editor {

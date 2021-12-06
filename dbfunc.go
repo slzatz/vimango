@@ -482,6 +482,7 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	vim.Execute(fmt.Sprintf("w temp/buf%d", vim.BufferGetId(e.vbuf)))
 }
 
+/*
 func (o *Organizer) readTitleIntoBuffer() {
 	id := o.rows[org.fr].id
 	var table string
@@ -517,6 +518,7 @@ func (o *Organizer) readTitleIntoBuffer() {
 	s := vim.BufferLinesS(o.vbuf)[0]
 	sess.showOrgMessage(s)
 }
+*/
 
 func readSyncLogIntoAltRows(id int) {
 	row := db.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)

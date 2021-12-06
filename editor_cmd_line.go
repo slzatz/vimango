@@ -86,7 +86,8 @@ func (e *Editor) writeNote() {
 	updateNote(e.id, text)
 
 	//explicitly writes note to set isModified to false
-	vim.Execute("w")
+	//vim.Execute("w")
+	e.bufferTick = vim.BufferGetLastChangedTick(e.vbuf)
 
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 	sess.showEdMessage("isModified = %t", e.isModified())
