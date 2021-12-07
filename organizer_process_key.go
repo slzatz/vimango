@@ -43,33 +43,6 @@ func organizerProcessKey(c int) {
 
 	switch org.mode {
 
-	case FIND:
-		if c == ':' {
-			exCmd()
-			return
-		}
-
-		if c >= '0' && c <= '9' {
-			vim.Input(string(c))
-			return
-		}
-
-		if _, found := navKeys[c]; found {
-			if z, found := termcodes[c]; found {
-				vim.Key(z)
-				//vim.Input(z)
-			} else {
-				vim.Input(string(c))
-			}
-			pos := vim.CursorGetPosition()
-			org.fr = pos[0] - 1
-			return
-		} else {
-			org.mode = NORMAL
-			org.command = ""
-			organizerProcessKey(c)
-		}
-
 	case INSERT:
 
 		if c == '\r' {
@@ -135,14 +108,13 @@ func organizerProcessKey(c int) {
 
 			org.clearMarkedEntries()
 			org.view = TASK
-			org.mode = NORMAL // can be changed to NO_ROWS below
+			//org.mode = NORMAL // already in NORMAL
 			org.fc, org.fr, org.rowoff = 0, 0, 0
 			org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
 			if len(org.rows) == 0 {
 				org.insertRow(0, "", true, false, false, BASE_DATE)
 				org.rows[0].dirty = false
 				sess.showOrgMessage("No results were returned")
-				//org.mode = NO_ROWS
 			}
 			sess.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -164,8 +136,8 @@ func organizerProcessKey(c int) {
 			return
 		}
 
-		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o', //'g'
-		if c == 32 || c == 79 || c == 86 || c == 111 || c == 'J' { //103
+		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o'
+		if c == ' ' || c == 'O' || c == 'V' || c == 'o' || c == 'J' {
 			return
 		}
 
@@ -206,7 +178,8 @@ func organizerProcessKey(c int) {
 		}
 		org.command = ""
 		// the only way to get into EX_COMMAND or SEARCH
-		//if mode.Mode == "c" && p.mode != SEARCH { //note that "c" => SEARCH
+		//if mode.Mode == "c" && p.mode != SEARCH  //note that "c" => SEARCH
+		//if mode == 8 && org.mode != SEARCH  //note that 8 => SEARCH
 		if mode == 16 && org.mode != INSERT {
 			sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
 		}
@@ -219,7 +192,7 @@ func organizerProcessKey(c int) {
 		//sess.showOrgMessage("%d: %s", firstLine, s)
 		sess.showOrgMessage("%s", s)
 
-		// end of case NORMAL
+		// end case NORMAL
 
 	case VISUAL:
 
@@ -253,47 +226,10 @@ func organizerProcessKey(c int) {
 		org.highlight[0] = visPos[0][1]
 		sess.showOrgMessage("visual %s; %d %d", s, org.highlight[0], org.highlight[1])
 
-		// end of case VISUAL
-
-	case ADD_CHANGE_FILTER:
-
-		switch c {
-
-		case ARROW_UP, ARROW_DOWN, 'j', 'k':
-			org.moveAltCursor(c)
-
-		case '\r':
-			altRow := &org.altRows[org.altFr] //currently highlighted container row
-			row := &org.rows[org.fr]          //currently highlighted entry row
-			if len(org.marked_entries) == 0 {
-				switch org.altView {
-				case KEYWORD:
-					addTaskKeyword(altRow.id, row.id, true)
-					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
-				case FOLDER:
-					updateTaskFolder(altRow.title, row.id)
-					sess.showOrgMessage("Current entry folder changed to %s", altRow.title)
-				case CONTEXT:
-					updateTaskContext(altRow.title, row.id)
-					sess.showOrgMessage("Current entry had context changed to %s", altRow.title)
-				}
-			} else {
-				for id := range org.marked_entries {
-					switch org.altView {
-					case KEYWORD:
-						addTaskKeyword(altRow.id, id, true)
-					case FOLDER:
-						updateTaskFolder(altRow.title, id)
-					case CONTEXT:
-						updateTaskContext(altRow.title, id)
-
-					}
-					sess.showOrgMessage("Marked entries' %d changed/added to %s", org.altView, altRow.title)
-				}
-			}
-		}
+		// end case VISUAL
 
 	case COMMAND_LINE:
+
 		if c == '\r' {
 			pos := strings.LastIndex(org.command_line, " ")
 			var s string
@@ -365,7 +301,71 @@ func organizerProcessKey(c int) {
 
 		sess.showOrgMessage(":%s", org.command_line)
 
-		//end of case COMMAND_LINE
+		//end case COMMAND_LINE
+
+	case ADD_CHANGE_FILTER:
+
+		switch c {
+
+		case ARROW_UP, ARROW_DOWN, 'j', 'k':
+			org.moveAltCursor(c)
+
+		case '\r':
+			altRow := &org.altRows[org.altFr] //currently highlighted container row
+			row := &org.rows[org.fr]          //currently highlighted entry row
+			if len(org.marked_entries) == 0 {
+				switch org.altView {
+				case KEYWORD:
+					addTaskKeyword(altRow.id, row.id, true)
+					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
+				case FOLDER:
+					updateTaskFolder(altRow.title, row.id)
+					sess.showOrgMessage("Current entry folder changed to %s", altRow.title)
+				case CONTEXT:
+					updateTaskContext(altRow.title, row.id)
+					sess.showOrgMessage("Current entry had context changed to %s", altRow.title)
+				}
+			} else {
+				for id := range org.marked_entries {
+					switch org.altView {
+					case KEYWORD:
+						addTaskKeyword(altRow.id, id, true)
+					case FOLDER:
+						updateTaskFolder(altRow.title, id)
+					case CONTEXT:
+						updateTaskContext(altRow.title, id)
+					}
+					sess.showOrgMessage("Marked entries' %d changed/added to %s", org.altView, altRow.title)
+				}
+			}
+		}
+
+	case FIND:
+		if c == ':' {
+			exCmd()
+			return
+		}
+
+		if c >= '0' && c <= '9' {
+			vim.Input(string(c))
+			return
+		}
+
+		if _, found := navKeys[c]; found {
+			if z, found := termcodes[c]; found {
+				vim.Key(z)
+				//vim.Input(z)
+			} else {
+				vim.Input(string(c))
+			}
+			pos := vim.CursorGetPosition()
+			org.fr = pos[0] - 1
+			return
+		} else {
+			org.mode = NORMAL
+			org.command = ""
+			organizerProcessKey(c)
+		}
 
 		//probably should be a org.view not org.mode but
 		// for the moment this kluge works
@@ -440,27 +440,12 @@ func organizerProcessKey(c int) {
 		case 'm':
 			mark()
 		}
-	// The log that appears when you sync
+
 	case PREVIEW_SYNC_LOG:
+
 		switch c {
-		/*
-			case '\x1b':
-				//org.mode = org.last_mode // pickup NO_ROWS
-				org.mode = org.getMode()
-				org.command_line = ""
-				org.repeat = 0
-				org.drawPreview()
-		*/
 		case ':':
 			exCmd()
-			/*
-				sess.showOrgMessage(":")
-				org.command_line = ""
-				org.last_mode = org.mode
-				org.mode = COMMAND_LINE
-			*/
-
-		//case ARROW_DOWN, 'j':
 		case ctrlKey('j'):
 			org.altRowoff++
 			sess.eraseRightScreen()
@@ -491,27 +476,19 @@ func organizerProcessKey(c int) {
 			sess.eraseRightScreen()
 			org.drawPreviewWithoutImages()
 		}
+
 	case LINKS:
-		/*
-			if c == '\x1b' {
-				org.command = ""
-				org.mode = NORMAL
-				return
-			}
-		*/
 
 		if c < 49 || c > 57 {
 			sess.showOrgMessage("That's not a number between 1 and 9")
 			org.mode = NORMAL
 			return
 		}
-		//if c > 48 && c < 58 {
 		linkNum := c - 48
 		var found string
 		pre := fmt.Sprintf("[%d]", linkNum)
 		for _, line := range org.note {
 
-			//if strings.HasPrefix(line, pre) { //not at beginning of line
 			idx := strings.Index(line, pre)
 			if idx != -1 {
 				found = line
@@ -523,7 +500,6 @@ func organizerProcessKey(c int) {
 			org.mode = NORMAL
 			return
 		}
-		//sess.showOrgMessage("length = %d, string = %s", len(found), strings.TrimSpace(found[80:140]))
 		beg := strings.Index(found, "http")
 		end := strings.Index(found, "\x1b\\")
 		url := found[beg:end]

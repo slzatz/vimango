@@ -132,14 +132,13 @@ func (o *Organizer) open(pos int) {
 
 	o.clearMarkedEntries()
 	org.view = TASK
-	o.mode = NORMAL // can be changed to NO_ROWS below
+	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -182,14 +181,13 @@ func (o *Organizer) openContext(pos int) {
 	//o.keyword = ""
 	o.taskview = BY_CONTEXT
 	org.view = TASK
-	o.mode = NORMAL // can be changed to NO_ROWS below
+	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -229,14 +227,13 @@ func (o *Organizer) openFolder(pos int) {
 	o.clearMarkedEntries()
 	o.taskview = BY_FOLDER
 	org.view = TASK
-	o.mode = NORMAL // can be changed to NO_ROWS below
+	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -267,14 +264,13 @@ func (o *Organizer) openKeyword(pos int) {
 	o.clearMarkedEntries()
 	o.taskview = BY_KEYWORD
 	org.view = TASK
-	o.mode = NORMAL // can be changed to NO_ROWS below
+	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -310,17 +306,8 @@ func (o *Organizer) quitApp(_ int) {
 
 func (o *Organizer) editNote(id int) {
 
-	/*
-		//if o.last_mode == NO_ROWS {
-			o.mode = o.last_mode
-			sess.showOrgMessage("There is nothing to edit")
-			return
-		}
-	*/
-
 	if o.view != TASK {
 		o.command = ""
-		//o.mode = NORMAL //should prob be o.mode = o.last_mode; not tested
 		o.mode = o.last_mode
 		sess.showOrgMessage("Only entries have notes to edit!")
 		return
@@ -333,7 +320,6 @@ func (o *Organizer) editNote(id int) {
 	if id == -1 {
 		sess.showOrgMessage("You need to save item before you can create a note")
 		o.command = ""
-		//o.mode = NORMAL //should prob be o.mode = o.last_mode; not tested
 		o.mode = o.last_mode
 		return
 	}
@@ -440,8 +426,6 @@ func (o *Organizer) newEntry(unused int) {
 func (o *Organizer) refresh(unused int) {
 	if o.view == TASK {
 		if o.taskview == BY_FIND {
-			// if the view was BY_FIND put the mode back to FIND
-			//o.last_mode = FIND
 			o.mode = FIND
 			o.fc, o.fr, o.rowoff = 0, 0, 0
 			o.rows = searchEntries(sess.fts_search_terms, o.show_deleted, false)
@@ -449,7 +433,6 @@ func (o *Organizer) refresh(unused int) {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
 				sess.showOrgMessage("No results were returned")
-				//o.mode = NO_ROWS
 			}
 			/*
 				if unused != -1 { //complete kluge has to do with refreshing when syncing
@@ -469,7 +452,6 @@ func (o *Organizer) refresh(unused int) {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
 				sess.showOrgMessage("No results were returned")
-				//o.mode = NO_ROWS
 			}
 			sess.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -486,7 +468,6 @@ func (o *Organizer) refresh(unused int) {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
-			//o.mode = NO_ROWS
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
 		vim.CursorSetPosition([2]int{1, 0})
@@ -525,7 +506,6 @@ func (o *Organizer) find(pos int) {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		//o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -574,7 +554,6 @@ func (o *Organizer) contexts(pos int) {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
-			//o.mode = NO_ROWS
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
 		vim.CursorSetPosition([2]int{1, 0})
@@ -629,7 +608,6 @@ func (o *Organizer) folders(pos int) {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
-			//o.mode = NO_ROWS
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
 		vim.CursorSetPosition([2]int{1, 0})
@@ -685,7 +663,6 @@ func (o *Organizer) keywords(pos int) {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
-			//o.mode = NO_ROWS
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
 		vim.CursorSetPosition([2]int{1, 0})
@@ -718,19 +695,16 @@ func (o *Organizer) keywords(pos int) {
 func (o *Organizer) recent(unused int) {
 	sess.showOrgMessage("Will retrieve recent items")
 	o.clearMarkedEntries()
-	// should just be o.filter
-	//o.context = ""
-	//o.folder = ""
-	//o.keyword = ""
 	o.filter = ""
 	o.taskview = BY_RECENT
 	org.view = TASK
-	o.mode = NORMAL // can be changed to NO_ROWS below
+	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
 	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		o.mode = NO_ROWS
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
@@ -781,10 +755,6 @@ func (o *Organizer) updateContainer(unused int) {
 }
 
 func (o *Organizer) deleteMarks(unused int) {
-	if o.last_mode == NO_ROWS {
-		o.mode = NO_ROWS
-		return
-	}
 	o.clearMarkedEntries()
 	o.mode = NORMAL
 	o.command_line = ""
@@ -792,10 +762,6 @@ func (o *Organizer) deleteMarks(unused int) {
 }
 
 func (o *Organizer) copyEntry(unused int) {
-	if o.last_mode == NO_ROWS {
-		o.mode = NO_ROWS
-		return
-	}
 	copyEntry()
 	o.mode = NORMAL
 	o.command_line = ""

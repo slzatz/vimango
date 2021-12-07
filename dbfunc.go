@@ -319,11 +319,9 @@ func (o *Organizer) readRowsIntoBuffer() {
 	for _, row := range o.rows {
 		bb = append(bb, []byte(row.title))
 	}
-	//o.vbuf = vim.BufferNew(0) // if/when we decide to have multiple buffers
-	vim.BufferSetCurrent(o.vbuf) // not sure why but must come before SetLines???
 	vim.BufferSetLines(o.vbuf, bb)
-	//vim.Execute("w")
-	sess.showOrgMessage("%d %d", len(bb), vim.BufferGetLineCount(o.vbuf))
+	vim.BufferSetCurrent(o.vbuf)
+	//sess.showOrgMessage("%d %d", len(bb), vim.BufferGetLineCount(o.vbuf))
 }
 
 func updateTitle() {
