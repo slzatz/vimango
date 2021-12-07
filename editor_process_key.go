@@ -47,6 +47,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	// the switch below deals with intercepting c before sending the char to vim
 	switch p.mode {
 
+	// in PREVIEW and VIEW_LOG don't send keys to vim
 	case PREVIEW:
 		switch c {
 		case ARROW_DOWN, ctrlKey('j'):
@@ -59,7 +60,6 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		p.drawPreview()
 		return false
 
-	//case SPELLING, VIEW_LOG:
 	case VIEW_LOG:
 		switch c {
 		case PAGE_DOWN, ARROW_DOWN, 'j':
@@ -73,33 +73,6 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				return false
 			}
 		}
-		// enter a number and that's the selected replacement for a mispelling
-		/*
-			if c == '\r' && p.mode == SPELLING {
-				num, err := strconv.Atoi(p.command_line)
-				if err != nil {
-					sess.showEdMessage("That wasn't a number!")
-					p.mode = NORMAL
-					p.command_line = ""
-					return true
-				}
-				if num < 0 || num > len(p.suggestions)-1 {
-					sess.showEdMessage("%d not in appropriate range", num)
-					p.mode = NORMAL
-					p.command_line = ""
-					return true
-				}
-				vim.Input2("ciw" + p.suggestions[num] + "\x1b")
-				p.bb = vim.BufferLines(p.vbuf)
-				pos := vim.CursorGetPosition() //set screen cx and cy from pos
-				p.fr = pos[0] - 1
-				p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
-				p.mode = NORMAL
-				sess.showOrgMessage(p.command_line)
-				p.command_line = "" // necessary
-				return true
-			}
-		*/
 		if c == DEL_KEY || c == BACKSPACE {
 			if len(p.command_line) > 0 {
 				p.command_line = p.command_line[:len(p.command_line)-1]
@@ -108,6 +81,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			p.command_line += string(c)
 		}
 		return false
+		// end case VIEW_LOG
 
 	case NORMAL:
 		// characters below make up first char of non-vim commands
@@ -131,8 +105,6 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				case func(*Editor) bool:
 					cmd(p)
 				}
-				// seems to be necessary at least for certain commands
-				//vim.Input("\x1b")
 				vim.Key("<esc>")
 				//keep tripping over this
 				//these commands should return a redraw bool = false
@@ -151,12 +123,12 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				return false
 			}
 		}
+		// end case NORMAL
 
 	case VISUAL:
 		// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
 		if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
 			p.decorateWordVisual(c)
-			// switch from VISUAl to NORMAL
 			vim.Key("<esc>")
 			p.mode = NORMAL
 			p.command = ""
@@ -167,12 +139,13 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			return true
 		}
 
+		// end case VISUAL
 	case EX_COMMAND:
 		if c == '\r' {
 			// Index doesn't work for vert resize
 			// and LastIndex doesn't work for run
 			// so total kluge below
-			//if p.command_line[0] == '%' {
+			//if p.command_line[0] == '%'
 			if strings.Index(p.command_line, "s/") != -1 {
 				if strings.LastIndex(p.command_line, "/") < strings.LastIndex(p.command_line, "c") {
 					sess.showEdMessage("We don't support [c]onfirm")
@@ -259,6 +232,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			return false
 		}
 
+		// process the key typed in COMMAND_LINE mode
 		if c == DEL_KEY || c == BACKSPACE {
 			if len(p.command_line) > 0 {
 				p.command_line = p.command_line[:len(p.command_line)-1]
@@ -271,7 +245,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		tabCompletion.list = nil
 
 		sess.showEdMessage(":%s", p.command_line)
-		return false //end EX_COMMAND
+		return false
+		//end case EX_COMMAND
 
 	case SEARCH:
 		if c == DEL_KEY || c == BACKSPACE {
@@ -282,29 +257,33 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			p.command_line += string(c)
 		}
 		sess.showEdMessage("%s%s", p.searchPrefix, p.command_line)
-		//return false //end SEARCH
+		//process the key in vim below so no return
+		//end SEARCH
 	} //end switch
 
 	// Most control characters we don't want to send to vim
 	// however, we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
 	// escape is dealt with first thing
 	// could we put this at the top
-	if c < 32 && !(c == 13 || c == 22 || c == 9) {
-		return false
-	}
+	// is it really necessary?
+	/*
+		if c < 32 && !(c == 13 || c == 22 || c == 9) {
+			return false
+		}
+	*/
 
 	// Process the key
 	if z, found := termcodes[c]; found {
 		vim.Key(z)
-		//vim.Input(z)
 	} else {
 		vim.Input(string(c))
 	}
 
 	mode := vim.GetMode()
 
-	if mode == 4 { //OP_PENDING
-		return false // don't draw rows
+	//OP_PENDING
+	if mode == 4 {
+		return false
 	}
 	// the only way to get into EX_COMMAND or SEARCH; 8 => SEARCH
 	if mode == 8 && p.mode != SEARCH {
@@ -312,12 +291,8 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		p.command = ""
 		if c == ':' {
 			p.mode = EX_COMMAND
-			/*
-			 below will put nvim back in NORMAL mode but listmango will be
-			 in COMMAND_LINE mode, ie 'park' vim in NORMAL mode
-			 and don't feed it any keys while in listmango COMMAND_LINE mode
-			*/
-			vim.Input("\x1b")
+			// 'park' vim in NORMAL mode and don't feed it keys
+			vim.Key("<esc>")
 			sess.showEdMessage(":")
 		} else {
 			p.mode = SEARCH
@@ -337,39 +312,11 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		p.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 	}
 
-	// this is the 'new' p.mode based on vim processing input
-	//switch p.mode {
-	//case INSERT, REPLACE, NORMAL:
-	//case VISUAL, VISUAL_LINE, VISUAL_BLOCK:
-	//	p.highlightInfo()
-	//case SEARCH:
-	// return puts vim into normal mode so don't need to catch return
-	/*
-		if c == DEL_KEY || c == BACKSPACE {
-			if len(p.command_line) > 0 {
-				p.command_line = p.command_line[:len(p.command_line)-1]
-			}
-		} else {
-			p.command_line += string(c)
-		}
-
-		sess.showEdMessage("%s%s", p.searchPrefix, p.command_line)
-		return false
-	*/
-	//} // end switch p.mode
-
 	//below is done for everything except SEARCH and EX_COMMAND
 	p.bb = vim.BufferLines(p.vbuf)
 	pos := vim.CursorGetPosition() //set screen cx and cy from pos
 	p.fr = pos[0] - 1
 	p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
 
-	/*
-		if p.mode == PENDING { // -> operator pending (eg. typed 'd')
-			return false
-		} else {
-			return true
-		}
-	*/
 	return true
 }
