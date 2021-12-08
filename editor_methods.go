@@ -782,7 +782,7 @@ func (e *Editor) highlightMispelledWords() {
 		e.highlightPositions = append(e.highlightPositions, Position{rowNum, start, end})
 	}
 	//v.SetWindowCursor(w, curPos) //return cursor to where it was
-	vim.CursorSetPosition(curPos) //return cursor to where it was
+	vim.CursorSetPosition(curPos[0], curPos[1]) //return cursor to where it was
 
 	// done here because no need to redraw text
 	/*

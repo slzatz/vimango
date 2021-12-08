@@ -216,10 +216,18 @@ func CursorGetPosition() [2]int {
 }
 
 //void vimCursorSetPosition(pos_T pos);
-func CursorSetPosition(pos [2]int) {
+func CursorSetPosition_old(pos [2]int) {
 	var p C.pos_T
 	p.lnum = C.long(pos[0])
 	p.col = C.int(pos[1])
+	C.vimCursorSetPosition(p)
+}
+
+//void vimCursorSetPosition(pos_T pos);
+func CursorSetPosition(r, c int) {
+	var p C.pos_T
+	p.lnum = C.long(r)
+	p.col = C.int(c)
 	C.vimCursorSetPosition(p)
 }
 

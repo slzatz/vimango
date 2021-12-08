@@ -143,7 +143,7 @@ func (o *Organizer) open(pos int) {
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
-	vim.CursorSetPosition([2]int{1, 0})
+	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 	return
@@ -423,7 +423,7 @@ func (o *Organizer) newEntry(unused int) {
 	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
 	sess.eraseRightScreen() //erases the note area
 	o.mode = INSERT
-	vim.CursorSetPosition([2]int{1, 0})
+	vim.CursorSetPosition(1, 0)
 	vim.Input("i")
 }
 
@@ -460,7 +460,7 @@ func (o *Organizer) refresh(unused int) {
 			sess.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.readRowsIntoBuffer() ////////////////////////////////////////////
-			vim.CursorSetPosition([2]int{1, 0})
+			vim.CursorSetPosition(1, 0)
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
 		}
@@ -474,7 +474,7 @@ func (o *Organizer) refresh(unused int) {
 			sess.showOrgMessage("No results were returned")
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
-		vim.CursorSetPosition([2]int{1, 0})
+		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		if unused != -1 {
 			sess.displayContainerInfo()
@@ -560,7 +560,7 @@ func (o *Organizer) contexts(pos int) {
 			sess.showOrgMessage("No results were returned")
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
-		vim.CursorSetPosition([2]int{1, 0})
+		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
 		sess.showOrgMessage("Retrieved contexts")
@@ -614,7 +614,7 @@ func (o *Organizer) folders(pos int) {
 			sess.showOrgMessage("No results were returned")
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
-		vim.CursorSetPosition([2]int{1, 0})
+		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
 		sess.showOrgMessage("Retrieved contexts")
@@ -669,7 +669,7 @@ func (o *Organizer) keywords(pos int) {
 			sess.showOrgMessage("No results were returned")
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
-		vim.CursorSetPosition([2]int{1, 0})
+		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
 		sess.showOrgMessage("Retrieved keywords")

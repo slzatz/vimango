@@ -67,7 +67,7 @@ func organizerProcessKey(c int) {
 		org.fc = pos[1]
 		// can change in insert mode if, for instance, an up or down arrow is pressed
 		if org.fr != pos[0]-1 {
-			vim.CursorSetPosition([2]int{org.fr + 1, org.fc})
+			vim.CursorSetPosition(org.fr+1, org.fc)
 		}
 		//org.fr = pos[0] - 1 // shouldn't change on insert
 		row := &org.rows[org.fr]
@@ -156,9 +156,12 @@ func organizerProcessKey(c int) {
 
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
-		// drawing task note preview or container info
+		// drawing task note preview or container info if on new organizer line
+		// and setting cursor back to beginning of line
 		if org.fr != pos[0]-1 {
 			org.fr = pos[0] - 1
+			org.fc = 0
+			vim.CursorSetPosition(org.fr+1, 0)
 			if org.view == TASK {
 				org.drawPreview()
 			} else {
