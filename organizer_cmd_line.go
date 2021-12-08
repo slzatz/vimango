@@ -405,12 +405,14 @@ func (o *Organizer) verticalResize__(pos int) {
 
 func (o *Organizer) newEntry(unused int) {
 	row := Row{
-		id:       -1,
+		id: -1,
+		//title:    " ",
 		star:     true,
 		dirty:    true,
 		modified: time.Now().Format("3:04:05 pm"),
 	}
 
+	vim.BufferSetLine(o.vbuf, 0, []byte(""))
 	o.rows = append(o.rows, Row{})
 	copy(o.rows[1:], o.rows[0:])
 	o.rows[0] = row
@@ -421,6 +423,8 @@ func (o *Organizer) newEntry(unused int) {
 	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
 	sess.eraseRightScreen() //erases the note area
 	o.mode = INSERT
+	vim.CursorSetPosition([2]int{1, 0})
+	vim.Input("i")
 }
 
 func (o *Organizer) refresh(unused int) {

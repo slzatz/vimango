@@ -57,7 +57,7 @@ func organizerProcessKey(c int) {
 		}
 
 		if z, found := termcodes[c]; found {
-			vim.Input(z)
+			vim.Key(z)
 		} else {
 			vim.Input(string(c))
 		}
@@ -65,6 +65,10 @@ func organizerProcessKey(c int) {
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
+		// can change in insert mode if, for instance, an up or down arrow is pressed
+		if org.fr != pos[0]-1 {
+			vim.CursorSetPosition([2]int{org.fr + 1, org.fc})
+		}
 		//org.fr = pos[0] - 1 // shouldn't change on insert
 		row := &org.rows[org.fr]
 		tick := vim.BufferGetLastChangedTick(org.vbuf)

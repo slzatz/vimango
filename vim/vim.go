@@ -167,7 +167,26 @@ func BufferSetLines(vbuf *C.buf_T, bb [][]byte) {
 	//C.free(unsafe.Pointer(p2)) //panics
 }
 
-func BufferSetLine(vbuf *C.buf_T, b []byte) {
+func BufferSetLine(vbuf *C.buf_T, line int, b []byte) {
+	// size is the length of the longest line + 1 for null terminator
+	size := len(b) + 1
+
+	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
+	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
+	p2 = &p1
+
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
+	i := 0
+	for i = 0; i < size-1; i++ {
+		view[i] = C.uchar(b[i])
+	}
+	view[size-1] = 0
+	C.vimBufferSetLines(vbuf, C.long(line), C.long(line), p2, C.int(1))
+	C.free(unsafe.Pointer(p1))
+	//C.free(unsafe.Pointer(p2)) //panics
+}
+
+func BufferSetLine__(vbuf *C.buf_T, b []byte) {
 	// size is the length of the longest line + 1 for null terminator
 	size := len(b) + 1
 
