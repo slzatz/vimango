@@ -65,11 +65,10 @@ func organizerProcessKey(c int) {
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
-		// can change in insert mode if, for instance, an up or down arrow is pressed
+		// need to prevent row from changing in INSERT mode; for instance, an when an up or down arrow is pressed
 		if org.fr != pos[0]-1 {
 			vim.CursorSetPosition(org.fr+1, org.fc)
 		}
-		//org.fr = pos[0] - 1 // shouldn't change on insert
 		row := &org.rows[org.fr]
 		tick := vim.BufferGetLastChangedTick(org.vbuf)
 		if tick > org.bufferTick {
@@ -121,8 +120,7 @@ func organizerProcessKey(c int) {
 				sess.showOrgMessage("No results were returned")
 			}
 			sess.imagePreview = false
-			//o.readTitleIntoBuffer() /////////////////////////////////////////////
-			org.readRowsIntoBuffer() ////////////////////////////////////////////
+			org.readRowsIntoBuffer()
 			org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 			org.drawPreview()
 			return
@@ -141,13 +139,13 @@ func organizerProcessKey(c int) {
 		}
 
 		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o'
+		// being passed to vim
 		if c == ' ' || c == 'O' || c == 'V' || c == 'o' || c == 'J' {
 			return
 		}
 
 		// Send the keystroke to vim
 		if z, found := termcodes[c]; found {
-			//vim.Input(z)
 			vim.Key(z)
 			sess.showEdMessage("%s", z)
 		} else {
@@ -156,8 +154,8 @@ func organizerProcessKey(c int) {
 
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
-		// drawing task note preview or container info if on new organizer line
-		// and setting cursor back to beginning of line
+		// if move to a new row then draw task note preview or container info
+		// and set cursor back to beginning of line
 		if org.fr != pos[0]-1 {
 			org.fr = pos[0] - 1
 			org.fc = 0
@@ -171,7 +169,6 @@ func organizerProcessKey(c int) {
 		s := vim.BufferLinesS(org.vbuf)[org.fr]
 		org.rows[org.fr].title = s
 		//firstLine := vim.WindowGetTopLine() // doesn't seem to work
-		//org.fr = pos[0] - 1
 		row := &org.rows[org.fr]
 		tick := vim.BufferGetLastChangedTick(org.vbuf)
 		if tick > org.bufferTick {
@@ -180,7 +177,8 @@ func organizerProcessKey(c int) {
 		}
 		mode := vim.GetMode()
 
-		if mode == 4 { //OP_PENDING
+		// OP_PENDING like 4da
+		if mode == 4 {
 			return
 		}
 		org.command = ""
@@ -196,7 +194,6 @@ func organizerProcessKey(c int) {
 			org.highlight[1] = pos[1][1] + 1
 			org.highlight[0] = pos[0][1]
 		}
-		//sess.showOrgMessage("%d: %s", firstLine, s)
 		sess.showOrgMessage("%s", s)
 
 		// end case NORMAL
@@ -209,7 +206,6 @@ func organizerProcessKey(c int) {
 
 		if z, found := termcodes[c]; found {
 			vim.Key(z)
-			//vim.Input(z)
 		} else {
 			vim.Input(string(c))
 		}
@@ -218,7 +214,11 @@ func organizerProcessKey(c int) {
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
-		//org.fr = pos[0] - 1 //should not be able to change lines so prob need to block j and k
+		// need to prevent row from changing in INSERT mode; for instance, an when an up or down arrow is pressed
+		// note can probably remove j,k,g,G from the above
+		if org.fr != pos[0]-1 {
+			vim.CursorSetPosition(org.fr+1, org.fc)
+		}
 		row := &org.rows[org.fr]
 		tick := vim.BufferGetLastChangedTick(org.vbuf)
 		if tick > org.bufferTick {
@@ -361,18 +361,23 @@ func organizerProcessKey(c int) {
 		if _, found := navKeys[c]; found {
 			if z, found := termcodes[c]; found {
 				vim.Key(z)
-				//vim.Input(z)
 			} else {
 				vim.Input(string(c))
 			}
 			pos := vim.CursorGetPosition()
-			org.fr = pos[0] - 1
-			return
+			org.fc = pos[1]
+			if org.fr != pos[0]-1 {
+				org.fr = pos[0] - 1
+				org.fc = 0
+				vim.CursorSetPosition(org.fr+1, 0)
+				org.drawPreview()
+			}
 		} else {
 			org.mode = NORMAL
 			org.command = ""
 			organizerProcessKey(c)
 		}
+		sess.showOrgMessage("Find: fr %d fc %d", org.fr, org.fc)
 
 		//probably should be a org.view not org.mode but
 		// for the moment this kluge works

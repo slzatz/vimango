@@ -52,12 +52,16 @@ var Languages = map[string]string{
 }
 
 var navKeys = map[int]struct{}{
-	ARROW_UP:   z0,
-	ARROW_DOWN: z0,
-	'j':        z0,
-	'k':        z0,
-	'g':        z0,
-	'G':        z0,
+	ARROW_UP:    z0,
+	ARROW_DOWN:  z0,
+	ARROW_LEFT:  z0,
+	ARROW_RIGHT: z0,
+	'j':         z0,
+	'k':         z0,
+	'h':         z0,
+	'l':         z0,
+	'g':         z0,
+	'G':         z0,
 }
 
 var Lsps = map[string]string{
