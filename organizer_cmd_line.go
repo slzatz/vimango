@@ -26,6 +26,7 @@ var cmd_lookup = map[string]func(*Organizer, int){
 	"ok":              (*Organizer).openKeyword,
 	"quit":            (*Organizer).quitApp,
 	"q":               (*Organizer).quitApp,
+	"q!":              (*Organizer).quitApp,
 	"e":               (*Organizer).editNote,
 	"vertical resize": (*Organizer).verticalResize,
 	"vert res":        (*Organizer).verticalResize,
@@ -289,6 +290,10 @@ func (o *Organizer) write(pos int) {
 }
 
 func (o *Organizer) quitApp(_ int) {
+	if o.command_line == "q!" {
+		sess.run = false
+		return
+	}
 	unsaved_changes := false
 	for _, r := range o.rows {
 		if r.dirty {
