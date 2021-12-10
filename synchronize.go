@@ -978,17 +978,17 @@ func synchronize(reportOnly bool) (log string) {
 		// I think the task changes may not be necessary because only a previous client sync can delete server context
 		res, err := pdb.Exec("Update task SET context_id=1, modified=now() WHERE context_id=$1;", c.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error trying to change server/postgres entry context to 'No Context' for a deleted context: %v\n", err)
+			fmt.Fprintf(&lg, "Error trying to change server/postgres entry context to 'none' for a deleted context: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of server entries that were changed to 'No Context' (might be zero): **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of server entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
 		res, err = db.Exec("Update task SET context_tid=1, modified=datetime('now') WHERE context_tid=?;", c.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change client/sqlite entry contexts for a deleted context: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of client entries that were changed to 'No Context' (might be zero): **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of client entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
 
 		_, err = db.Exec("DELETE FROM context WHERE tid=?", c.id)
@@ -1006,14 +1006,14 @@ func synchronize(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry contexts for a deleted context: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of server entries that were changed to No Context: **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of server entries that were changed to 'none': **%d**\n", rowsAffected)
 		}
 		res, err = db.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=?;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change client/sqlite entry contexts for a deleted context: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of client entries that were changed to No Context: **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of client entries that were changed to 'none': **%d**\n", rowsAffected)
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
@@ -1033,20 +1033,20 @@ func synchronize(reportOnly bool) (log string) {
 	//server_deleted_folders
 	for _, c := range server_deleted_folders {
 		// I think the task changes may not be necessary because only a previous client sync can delete server context
-		// and that previous client sync should have changed the relevant tasks to 'No Folder'
+		// and that previous client sync should have changed the relevant tasks to 'none'
 		res, err := pdb.Exec("Update task SET folder_id=1, modified=now() WHERE folder_id=$1;", c.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error trying to change server/postgres entry folder to 'No Folder' for a deleted folder: %v\n", err)
+			fmt.Fprintf(&lg, "Error trying to change server/postgres entry folder to 'none' for a deleted folder: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of server entries that were changed to 'No Folder' (might be zero): **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of server entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
 		res, err = db.Exec("Update task SET folder_tid=1, modified=datetime('now') WHERE folder_tid=?;", c.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change client/sqlite entry folders for a deleted folder: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of client entries that were changed to 'No Folder' (might be zero): **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of client entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
 
 		_, err = db.Exec("DELETE FROM folder WHERE tid=?", c.id)
@@ -1065,14 +1065,14 @@ func synchronize(reportOnly bool) (log string) {
 			continue
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of server entries that were changed to No Folder: **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of server entries that were changed to 'none': **%d**\n", rowsAffected)
 		}
 		res, err = db.Exec("Update task SET folder_tid=1, modified=now() WHERE folder_tid=?;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change client/sqlite entry folders for a deleted folder: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(&lg, "The number of client entries that were changed to No Folder: **%d**\n", rowsAffected)
+			fmt.Fprintf(&lg, "The number of client entries that were changed to 'none': **%d**\n", rowsAffected)
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
