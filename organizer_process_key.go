@@ -111,7 +111,6 @@ func organizerProcessKey(c int) {
 
 			org.clearMarkedEntries()
 			org.view = TASK
-			//org.mode = NORMAL // already in NORMAL
 			org.fc, org.fr, org.rowoff = 0, 0, 0
 			org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
 			if len(org.rows) == 0 {
@@ -138,9 +137,12 @@ func organizerProcessKey(c int) {
 			return
 		}
 
-		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o'
+		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o' ctrl-V (22)
 		// being passed to vim
-		if c == ' ' || c == 'O' || c == 'V' || c == 'o' || c == 'J' {
+		if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
+			if c != int([]byte(leader)[0]) {
+				sess.showOrgMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
+			}
 			return
 		}
 
@@ -200,7 +202,8 @@ func organizerProcessKey(c int) {
 
 	case VISUAL:
 
-		if c == 'j' || c == 'k' || c == 'J' || c == 'V' || c == 'g' || c == 'G' {
+		if c == 'j' || c == 'k' || c == 'J' || c == 'V' || c == ctrlKey('v') || c == 'g' || c == 'G' {
+			sess.showOrgMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
 			return
 		}
 
