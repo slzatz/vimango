@@ -63,6 +63,9 @@ func generateContextMap() {
 
 		err = rows.Scan(&tid, &title)
 		org.context_map[title] = tid
+		if title == "No Context" {
+			org.context_map["None"] = tid
+		}
 	}
 }
 
@@ -80,6 +83,9 @@ func generateFolderMap() {
 
 		err = rows.Scan(&tid, &title)
 		org.folder_map[title] = tid
+		if title == "No Folder" {
+			org.folder_map["None"] = tid
+		}
 	}
 }
 
