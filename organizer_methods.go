@@ -201,7 +201,7 @@ func (o *Organizer) writeTitle() {
 
 	o.command = ""
 
-	sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
+	//sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()
 }
 

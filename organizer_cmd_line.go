@@ -424,7 +424,7 @@ func (o *Organizer) newEntry(unused int) {
 
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.command = ""
-	o.repeat = 0
+	//o.repeat = 0
 	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
 	sess.eraseRightScreen() //erases the note area
 	o.mode = INSERT

@@ -10,8 +10,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	//"github.com/neovim/go-client/nvim"
-
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
@@ -50,12 +48,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	db, _ = sql.Open("sqlite3", config.Sqlite3.DB)
-	fts_db, _ = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
 
+	if _, err := os.Stat(config.Sqlite3.DB); err == nil {
+		db, _ = sql.Open("sqlite3", config.Sqlite3.DB)
+	} else {
+		log.Fatal(err)
+	}
+
+	if _, err := os.Stat(config.Sqlite3.DB); err == nil {
+		fts_db, _ = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
+	} else {
+		log.Fatal(err)
+	}
+
+	//rand.Seed(time.Now().UnixNano())
 	sess.style = [7]string{"dracula", "fruity", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"} //vim is dark but unusable
 	sess.styleIndex = 2
-	sess.imagePreview = false //image preview
+	sess.imagePreview = false
 	sess.imgSizeY = 800
 
 	signal_chan := make(chan os.Signal, 1)
@@ -103,12 +112,17 @@ func main() {
 	org.highlight[0], org.highlight[1] = -1, -1
 	org.mode = NORMAL
 	org.last_mode = NORMAL
-	org.command = ""
-	org.command_line = ""
-	org.repeat = 0 //number of times to repeat commands like x,s,yy ? also used for visual line mode x,y
+	//org.command = ""
+	//org.command_line = ""
+	//org.repeat = 0 //number of times to repeat commands like x,s,yy ? also used for visual line mode x,y
 	org.view = TASK
-	org.taskview = BY_FOLDER
-	org.filter = "todo"
+	if config.Options.Type == "folder" {
+		org.taskview = BY_FOLDER
+	} else {
+		org.taskview = BY_CONTEXT
+	}
+	//org.filter = "todo"
+	org.filter = config.Options.Title
 	org.context_map = make(map[string]int)
 	org.folder_map = make(map[string]int)
 	org.marked_entries = make(map[int]struct{})
@@ -130,6 +144,8 @@ func main() {
 	sess.eraseScreenRedrawLines()
 	org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
 	if len(org.rows) == 0 {
+		org.insertRow(0, "", true, false, false, BASE_DATE)
+		org.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
 		//org.mode = NO_ROWS
 	}
@@ -147,18 +163,6 @@ func main() {
 	sess.showOrgMessage("rows: %d  columns: %d", sess.screenLines, sess.screenCols)
 	sess.returnCursor()
 	sess.run = true
-
-	/*
-		err = os.RemoveAll("temp")
-		if err != nil {
-			sess.showOrgMessage("Error deleting temp directory: %v", err)
-		}
-		err = os.Mkdir("temp", 0700)
-		if err != nil {
-			sess.showOrgMessage("Error creating temp directory: %v", err)
-		}
-		//vim.Execute("w temp/title")
-	*/
 
 	for sess.run {
 

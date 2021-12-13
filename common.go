@@ -18,10 +18,6 @@ type Window interface {
 }
 
 type dbConfig struct {
-	Server struct {
-		Host string `json:"host"`
-		Port string `json:"port"`
-	} `json:"server"`
 	Postgres struct {
 		Host     string `json:"host"`
 		Port     string `json:"port"`
@@ -37,7 +33,8 @@ type dbConfig struct {
 	} `json:"sqlite3"`
 
 	Options struct {
-		Prefix string `json:"prefix"`
+		Type  string `json:"type"`
+		Title string `json:"title"`
 	} `json:"options"`
 }
 

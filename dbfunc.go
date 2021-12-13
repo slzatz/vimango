@@ -327,11 +327,11 @@ func (o *Organizer) readRowsIntoBuffer() {
 func updateTitle() {
 
 	// needs to be a pointer because may send to insertRowInDB
-	row := &org.rows[org.fr]
+	row := org.rows[org.fr]
 
 	if row.id == -1 {
 		// want to send pointer to insertRowinDB
-		insertRowInDB(row)
+		insertRowInDB(&row)
 		return
 	}
 
@@ -399,8 +399,10 @@ func insertRowInDB(row *Row) int {
 	res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
 		"VALUES (0, ?, ?, ?, True, date(), '', False, "+
+		//"VALUES (?, ?, ?, ?, True, date(), '', False, "+
 		"date(), datetime('now'));",
 		row.title, folder_tid, context_tid)
+	//rand.Int(), row.title, folder_tid, context_tid)
 
 	/*
 	   not used:
@@ -413,6 +415,7 @@ func insertRowInDB(row *Row) int {
 	   remind
 	*/
 	if err != nil {
+		sess.showOrgMessage("Error inserting into DB: %v", err)
 		return -1
 	}
 
@@ -433,7 +436,7 @@ func insertRowInDB(row *Row) int {
 		return row.id
 	}
 
-	sess.showOrgMessage("Successfully inserted new row with id {} and indexed it (new vesrsion)", row.id)
+	sess.showOrgMessage("Successfully inserted new row with id %d and indexed it (new version)", row.id)
 
 	return row.id
 }
