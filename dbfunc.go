@@ -329,8 +329,8 @@ func updateTitle() {
 	row := org.rows[org.fr]
 
 	if row.id == -1 {
-		// send pointer to insertRowinDB because updating row with new id
-		insertRowInDB(&row)
+		// send pointer to insertRowinDB because updating row struct with new id
+		insertRowInDB(&org.rows[org.fr])
 		return
 	}
 
@@ -352,13 +352,14 @@ func updateTitle() {
 func updateRows() {
 	var updated_rows []int
 
-	for _, row := range org.rows {
+	for fr, row := range org.rows {
 		if !row.dirty {
 			continue
 		}
 
 		if row.id == -1 {
-			id := insertRowInDB(&row)
+			// send pointer to insertRowinDB because updating row struct with new id
+			id := insertRowInDB(&org.rows[fr])
 			updated_rows = append(updated_rows, id)
 			row.dirty = false
 			continue
