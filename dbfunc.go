@@ -326,11 +326,10 @@ func (o *Organizer) readRowsIntoBuffer() {
 
 func updateTitle() {
 
-	// needs to be a pointer because may send to insertRowInDB
 	row := org.rows[org.fr]
 
 	if row.id == -1 {
-		// want to send pointer to insertRowinDB
+		// send pointer to insertRowinDB because updating row with new id
 		insertRowInDB(&row)
 		return
 	}
@@ -402,11 +401,11 @@ func insertRowInDB(row *Row) int {
 		//"VALUES (?, ?, ?, ?, True, date(), '', False, "+
 		"date(), datetime('now'));",
 		row.title, folder_tid, context_tid)
-	//rand.Int(), row.title, folder_tid, context_tid)
+	//tempTid, row.title, folder_tid, context_tid)
 
 	/*
 	   not used:
-	   tid,
+	   tid, (temp)
 	   tag,
 	   duetime,
 	   completed,
