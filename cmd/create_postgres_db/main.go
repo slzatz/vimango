@@ -82,15 +82,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//createPostgresDB() // need password
+	createPostgresDB() // need password
 }
 
 func createPostgresDB() {
-	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s sslmode=disable",
+	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		config.Postgres.Host,
 		config.Postgres.Port,
 		config.Postgres.User,
 		config.Postgres.Password,
+		config.Postgres.DB,
 	)
 
 	pdb, err := sql.Open("postgres", connect)
@@ -98,10 +99,13 @@ func createPostgresDB() {
 		log.Fatal(err)
 	}
 
+	/* Right now creating db prior to running script via
+	[postgres]$ createdb vimango
 	_, err = pdb.Exec("CREATE DATABASE " + config.Postgres.DB)
 	if err != nil {
 		log.Fatal(err)
 	}
+	*/
 
 	path := "postgres_init.sql"
 	b, err := ioutil.ReadFile(path)
@@ -113,15 +117,15 @@ func createPostgresDB() {
 		log.Fatal(err)
 	}
 	stmt := "INSERT INTO context (title, star, deleted, created, modified) "
-	stmt += "VALUES (?, True, False, datetime('now'), datetime('now'));"
-	_, err = pdb.Exec(stmt, "No Context")
+	stmt += "VALUES ($1, true, false, now(), now());"
+	_, err = pdb.Exec(stmt, "none")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	stmt = "INSERT INTO folder (title, star, deleted, created, modified) "
-	stmt += "VALUES (?, True, False, datetime('now'), datetime('now'));"
-	_, err = pdb.Exec(stmt, "No Folder")
+	stmt += "VALUES ($1, true, false, now(), now());"
+	_, err = pdb.Exec(stmt, "none")
 	if err != nil {
 		log.Fatal(err)
 	}

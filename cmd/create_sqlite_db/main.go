@@ -82,6 +82,11 @@ func createSqliteDB() {
 		log.Fatal(err)
 	}
 
+	/*
+		note we're creating the tid = 1 to match postgres id
+		alternative is not to create the 'none' context or folder
+		on the server and let the first sync create it
+	*/
 	stmt := "INSERT INTO context (title, star, deleted, created, modified, tid) "
 	stmt += "VALUES (?, True, False, datetime('now'), datetime('now'), 1);"
 	_, err = db.Exec(stmt, "none")
@@ -110,11 +115,11 @@ func createSqliteDB() {
 			return
 		}
 	*/
-	_, err = db.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='server';")
+	_, err = db.Exec("INSERT INTO sync (machine, timestamp) VALUES ('server', datetime('now'));")
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = db.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
+	_, err = db.Exec("INSERT INTO sync (machine, timestamp) VALUES ('client', datetime('now'));")
 	if err != nil {
 		log.Fatal(err)
 	}

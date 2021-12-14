@@ -61,6 +61,161 @@ CREATE SEQUENCE public.task_id_seq
 ALTER TABLE public.task_id_seq OWNER TO slzatz;
 
 --
+-- Name: context; Type: TABLE; Schema: public; Owner: slzatz
+--
+
+CREATE TABLE public.context (
+    id integer NOT NULL,
+    title character varying(32) NOT NULL,
+    star boolean,
+    created timestamp without time zone,
+    deleted boolean,
+    modified timestamp without time zone
+);
+
+
+ALTER TABLE public.context OWNER TO slzatz;
+
+--
+-- Name: context_id_seq; Type: SEQUENCE; Schema: public; Owner: slzatz
+--
+
+CREATE SEQUENCE public.context_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.context_id_seq OWNER TO slzatz;
+
+--
+-- Name: context_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: slzatz
+--
+
+ALTER SEQUENCE public.context_id_seq OWNED BY public.context.id;
+
+--
+-- Name: context id; Type: DEFAULT; Schema: public; Owner: slzatz
+--
+
+ALTER TABLE ONLY public.context ALTER COLUMN id SET DEFAULT nextval('public.context_id_seq'::regclass);
+
+--
+-- Name: context context_pkey; Type: CONSTRAINT; Schema: public; Owner: slzatz
+--
+
+ALTER TABLE ONLY public.context
+    ADD CONSTRAINT context_pkey PRIMARY KEY (id);
+
+--
+-- Name: context context_title_key; Type: CONSTRAINT; Schema: public; Owner: slzatz
+--
+
+ALTER TABLE ONLY public.context
+    ADD CONSTRAINT context_title_key UNIQUE (title);
+
+--
+-- Name: folder; Type: TABLE; Schema: public; Owner: slzatz
+--
+
+CREATE TABLE public.folder (
+    id integer NOT NULL,
+    title character varying(32) NOT NULL,
+    star boolean,
+    archived boolean,
+    created timestamp without time zone,
+    deleted boolean,
+    modified timestamp without time zone
+);
+
+
+ALTER TABLE public.folder OWNER TO slzatz;
+
+--
+-- Name: folder_id_seq; Type: SEQUENCE; Schema: public; Owner: slzatz
+--
+
+CREATE SEQUENCE public.folder_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.folder_id_seq OWNER TO slzatz;
+
+
+--
+-- Name: folder_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: slzatz
+--
+
+ALTER SEQUENCE public.folder_id_seq OWNED BY public.folder.id;
+
+--
+-- Name: folder id; Type: DEFAULT; Schema: public; Owner: slzatz
+--
+
+ALTER TABLE ONLY public.folder ALTER COLUMN id SET DEFAULT nextval('public.folder_id_seq'::regclass);
+
+--
+-- Name: folder folder_pkey; Type: CONSTRAINT; Schema: public; Owner: slzatz
+--
+
+ALTER TABLE ONLY public.folder
+    ADD CONSTRAINT folder_pkey PRIMARY KEY (id);
+
+--
+-- Name: folder folder_title_key; Type: CONSTRAINT; Schema: public; Owner: slzatz
+--
+
+ALTER TABLE ONLY public.folder
+    ADD CONSTRAINT folder_title_key UNIQUE (title);
+
+--
+-- Name: keyword; Type: TABLE; Schema: public; Owner: slzatz
+--
+
+CREATE TABLE public.keyword (
+    id integer NOT NULL,
+    name character varying(25) NOT NULL,
+    star boolean,
+    modified timestamp without time zone,
+    deleted boolean
+);
+
+
+ALTER TABLE public.keyword OWNER TO slzatz;
+
+--
+-- Name: keyword_id_seq; Type: SEQUENCE; Schema: public; Owner: slzatz
+--
+
+CREATE SEQUENCE public.keyword_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.keyword_id_seq OWNER TO slzatz;
+
+--
+-- Name: task_keyword; Type: TABLE; Schema: public; Owner: slzatz
+--
+
+CREATE TABLE public.task_keyword (
+    task_id integer NOT NULL,
+    keyword_id integer NOT NULL
+);
+
+
+ALTER TABLE public.task_keyword OWNER TO slzatz;
+
+--
 -- Name: task_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: slzatz
 --
 
@@ -97,149 +252,6 @@ ALTER TABLE ONLY public.task
 ALTER TABLE ONLY public.task
     ADD CONSTRAINT task_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES public.folder(id);
 
-
---
--- Name: context; Type: TABLE; Schema: public; Owner: slzatz
---
-
-CREATE TABLE public.context (
-    id integer NOT NULL,
-    title character varying(32) NOT NULL,
-    star boolean,
-    created timestamp without time zone,
-    deleted boolean,
-    modified timestamp without time zone
-);
-
-
-ALTER TABLE public.context OWNER TO slzatz;
-
---
--- Name: context_id_seq; Type: SEQUENCE; Schema: public; Owner: slzatz
---
-
-CREATE SEQUENCE public.context_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.context_id_seq OWNER TO slzatz;
-
---
--- Name: context_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: slzatz
---
-
-ALTER SEQUENCE public.context_id_seq OWNED BY public.context.id;
-
-
---
--- Name: context id; Type: DEFAULT; Schema: public; Owner: slzatz
---
-
-ALTER TABLE ONLY public.context ALTER COLUMN id SET DEFAULT nextval('public.context_id_seq'::regclass);
-
-
---
--- Name: context context_pkey; Type: CONSTRAINT; Schema: public; Owner: slzatz
---
-
-ALTER TABLE ONLY public.context
-    ADD CONSTRAINT context_pkey PRIMARY KEY (id);
-
-
---
--- Name: context context_title_key; Type: CONSTRAINT; Schema: public; Owner: slzatz
---
-
-ALTER TABLE ONLY public.context
-    ADD CONSTRAINT context_title_key UNIQUE (title);
-
-
---
--- Name: folder; Type: TABLE; Schema: public; Owner: slzatz
---
-
-CREATE TABLE public.folder (
-    id integer NOT NULL,
-    title character varying(32) NOT NULL,
-    star boolean,
-    archived boolean,
-    created timestamp without time zone,
-    deleted boolean,
-    modified timestamp without time zone
-);
-
-
-ALTER TABLE public.folder OWNER TO slzatz;
-
---
--- Name: folder_id_seq; Type: SEQUENCE; Schema: public; Owner: slzatz
---
-
-CREATE SEQUENCE public.folder_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.folder_id_seq OWNER TO slzatz;
-
---
--- Name: folder_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: slzatz
---
-
-ALTER SEQUENCE public.folder_id_seq OWNED BY public.folder.id;
-
-
---
--- Name: folder id; Type: DEFAULT; Schema: public; Owner: slzatz
---
-
-ALTER TABLE ONLY public.folder ALTER COLUMN id SET DEFAULT nextval('public.folder_id_seq'::regclass);
-
-
---
--- Name: folder folder_pkey; Type: CONSTRAINT; Schema: public; Owner: slzatz
---
-
-ALTER TABLE ONLY public.folder
-    ADD CONSTRAINT folder_pkey PRIMARY KEY (id);
-
-
---
--- Name: keyword; Type: TABLE; Schema: public; Owner: slzatz
---
-
-CREATE TABLE public.keyword (
-    id integer NOT NULL,
-    name character varying(25) NOT NULL,
-    star boolean,
-    modified timestamp without time zone,
-    deleted boolean
-);
-
-
-ALTER TABLE public.keyword OWNER TO slzatz;
-
---
--- Name: keyword_id_seq; Type: SEQUENCE; Schema: public; Owner: slzatz
---
-
-CREATE SEQUENCE public.keyword_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.keyword_id_seq OWNER TO slzatz;
-
 --
 -- Name: keyword_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: slzatz
 --
@@ -269,18 +281,6 @@ ALTER TABLE ONLY public.keyword
 ALTER TABLE ONLY public.keyword
     ADD CONSTRAINT keyword_pkey PRIMARY KEY (id);
 
-
---
--- Name: task_keyword; Type: TABLE; Schema: public; Owner: slzatz
---
-
-CREATE TABLE public.task_keyword (
-    task_id integer NOT NULL,
-    keyword_id integer NOT NULL
-);
-
-
-ALTER TABLE public.task_keyword OWNER TO slzatz;
 
 --
 -- Name: task_keyword task_keyword_pkey; Type: CONSTRAINT; Schema: public; Owner: slzatz
