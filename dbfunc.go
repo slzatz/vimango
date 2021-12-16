@@ -1402,8 +1402,7 @@ func moveDividerPct(pct int) {
 		sess.positionWindows()
 		sess.eraseRightScreen() //erases editor area + statusbar + msg
 		sess.drawRightScreen()
-	} else if org.view == TASK { //&& org.mode != NO_ROWS {
-		//org.readTitleIntoBuffer() // don't think its necessary here
+	} else if org.view == TASK {
 		org.drawPreview()
 	}
 	sess.showOrgMessage("rows: %d  cols: %d  divider: %d", sess.screenLines, sess.screenCols, sess.divider)
@@ -1433,8 +1432,7 @@ func moveDividerAbs(num int) {
 		sess.positionWindows()
 		sess.eraseRightScreen() //erases editor area + statusbar + msg
 		sess.drawRightScreen()
-	} else if org.view == TASK && org.mode != NO_ROWS {
-		//org.readTitleIntoBuffer() // don't think its necessary here
+	} else if org.view == TASK {
 		org.drawPreview()
 	}
 	sess.showOrgMessage("rows: %d  cols: %d  divider: %d edPct: %d", sess.screenLines, sess.screenCols, sess.divider, sess.edPct)
@@ -1443,13 +1441,12 @@ func moveDividerAbs(num int) {
 }
 
 func tempTid(table string) int {
-	//("SELECT min(tid) FROM ?;", col)
 	var tid int
 	err := db.QueryRow(fmt.Sprintf("SELECT MIN(tid) FROM %s;", table)).Scan(&tid)
 	if err != nil {
 		sess.showEdMessage("error in tid from %s: %v", table, err)
 		return 0
 	}
-	sess.showEdMessage("The minimum tid is: %d", tid)
+	//sess.showEdMessage("The minimum tid is: %d", tid)
 	return tid - 1
 }
