@@ -24,7 +24,7 @@ type Organizer struct {
 	show_deleted        bool
 	show_completed      bool
 	view                View
-	altView             int
+	altView             View //int
 	taskview            int
 	current_task_id     int
 	string_buffer       string

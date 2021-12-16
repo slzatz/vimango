@@ -18,7 +18,7 @@ CREATE TABLE task (
         PRIMARY KEY (id), 
         FOREIGN KEY(folder_tid) REFERENCES folder (tid), 
         FOREIGN KEY(context_tid) REFERENCES context (tid), 
-        /*UNIQUE (tid),*/ 
+        UNIQUE (tid), 
         CHECK (star IN (0, 1)), 
         CHECK (deleted IN (0, 1))
 );

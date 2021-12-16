@@ -314,7 +314,7 @@ func (m Mode) String() string {
 type View int
 
 const (
-	TASK = iota
+	TASK View = iota
 	CONTEXT
 	FOLDER
 	KEYWORD

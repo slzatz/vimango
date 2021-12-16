@@ -398,11 +398,11 @@ func insertRowInDB(row *Row) int {
 
 	res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
-		"VALUES (0, ?, ?, ?, True, date(), '', False, "+
-		//"VALUES (?, ?, ?, ?, True, date(), '', False, "+
+		//"VALUES (0, ?, ?, ?, True, date(), '', False, "+
+		"VALUES (?, ?, ?, ?, True, date(), '', False, "+
 		"date(), datetime('now'));",
-		row.title, folder_tid, context_tid)
-	//tempTid, row.title, folder_tid, context_tid)
+		//row.title, folder_tid, context_tid)
+		tempTid("task"), row.title, folder_tid, context_tid)
 
 	/*
 	   not used:
@@ -428,8 +428,6 @@ func insertRowInDB(row *Row) int {
 	row.dirty = false
 
 	/***************fts virtual table update*********************/
-
-	//_, err = fts_db.Exec("INSERT INTO fts (title, lm_id) VALUES (?, ?);", row.title, row.id)
 	_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, lm_id) VALUES (?, ?, ?, ?);", row.title, "", "", row.id)
 	if err != nil {
 		sess.showOrgMessage("Error in insertRowInDB inserting into fts for %s: %v", row.title, err)
@@ -476,11 +474,11 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	if err != nil {
 		return
 	}
-	e.bb = bytes.Split([]byte(note), []byte("\n")) // yes, you need to do it this way
+	e.bb = bytes.Split([]byte(note), []byte("\n"))
 	e.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(e.vbuf)
 	vim.BufferSetLines(e.vbuf, e.bb)
-	vim.Execute(fmt.Sprintf("w temp/buf%d", vim.BufferGetId(e.vbuf)))
+	//vim.Execute(fmt.Sprintf("w temp/buf%d", vim.BufferGetId(e.vbuf)))
 }
 
 /*
@@ -1072,29 +1070,19 @@ func updateContainerTitle() {
 
 func insertContainer(row *Row) int {
 	var stmt string
-	if org.view != KEYWORD {
-		var table string
-		switch org.view {
-		case CONTEXT:
-			table = "context"
-		case FOLDER:
-			table = "folder"
-		default:
-			sess.showOrgMessage("Somehow that's a container I don't recognize")
-			return -1
-		}
-
-		stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified, tid) ",
-			table)
-
-		stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), 0);"
-	} else {
-
+	table := fmt.Sprintf("%s", org.view)
+	switch org.view {
+	case CONTEXT, FOLDER:
+		stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified, tid) ", table)
+		//stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), 0);"
+		stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), ?);"
+	case KEYWORD:
 		stmt = "INSERT INTO keyword (name, star, deleted, modified, tid) " +
-			"VALUES (?, ?, False, datetime('now'), 0);"
+			//"VALUES (?, ?, False, datetime('now'), 0);"
+			"VALUES (?, ?, False, datetime('now'), ?);"
 	}
-
-	res, err := db.Exec(stmt, row.title, row.star)
+	//res, err := db.Exec(stmt, row.title, row.star)
+	res, err := db.Exec(stmt, row.title, row.star, tempTid(table))
 	if err != nil {
 		sess.showOrgMessage("Error in insertContainer: %v", err)
 		return -1
@@ -1136,6 +1124,7 @@ func deleteKeywords(id int) int {
 }
 
 func copyEntry() {
+	// ? needs temp tid
 	id := getId()
 	row := db.QueryRow("SELECT title, star, note, context_tid, folder_tid FROM task WHERE id=?;", id)
 	var e Entry
@@ -1451,4 +1440,16 @@ func moveDividerAbs(num int) {
 	sess.showOrgMessage("rows: %d  cols: %d  divider: %d edPct: %d", sess.screenLines, sess.screenCols, sess.divider, sess.edPct)
 
 	sess.returnCursor()
+}
+
+func tempTid(table string) int {
+	//("SELECT min(tid) FROM ?;", col)
+	var tid int
+	err := db.QueryRow(fmt.Sprintf("SELECT MIN(tid) FROM %s;", table)).Scan(&tid)
+	if err != nil {
+		sess.showEdMessage("error in tid from %s: %v", table, err)
+		return 0
+	}
+	sess.showEdMessage("The minimum tid is: %d", tid)
+	return tid - 1
 }
