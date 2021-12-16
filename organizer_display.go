@@ -423,7 +423,6 @@ func (o *Organizer) drawSearchRows() {
 }
 
 func (o *Organizer) drawPreview() {
-	//if o.mode == NO_ROWS {
 	if len(o.rows) == 0 {
 		sess.eraseRightScreen()
 		return
@@ -437,14 +436,6 @@ func (o *Organizer) drawPreview() {
 	}
 	note = generateWWString(note, o.totaleditorcols)
 	sess.eraseRightScreen() //includes erasing images 11062021
-
-	/* below old way - a lot of extra processing
-	   so that word wrap doesn't have extra letters
-		if o.mode == FIND {
-			wp := getNoteSearchPositions(id)
-			note = highlightTerms(note, wp)
-		}
-	*/
 
 	var lang string
 	if taskFolder(id) == "code" {
@@ -465,7 +456,8 @@ func (o *Organizer) drawPreview() {
 		note, _ = r.Render(note)
 		// glamour seems to add a '\n' at the start
 		note = strings.TrimSpace(note)
-		note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n") //headings seem to place \x1b[0m after the return
+		//headings seem to place \x1b[0m after the return
+		note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
 		note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 	} else {
 		var buf bytes.Buffer

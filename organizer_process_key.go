@@ -28,8 +28,8 @@ func organizerProcessKey(c int) {
 		//org.fc = utf8.RuneCount(p.bb[org.fr][:pos[1]])
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
-		if org.view == TASK && sess.imagePreview {
-			sess.imagePreview = false
+		sess.imagePreview = false
+		if org.view == TASK {
 			org.drawPreview()
 		}
 		return
