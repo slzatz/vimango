@@ -370,6 +370,9 @@ func synchronize(reportOnly bool) (log string) {
 	} else {
 		lg.WriteString("- No `Contexts` updated.\n")
 	}
+	for _, c := range client_updated_contexts {
+		fmt.Fprintf(&lg, "    - id: %d; tid: %d %q; modified: %v\n", c.id, c.tid, tc(c.title, 15, true), tc(c.modified, 19, false))
+	}
 
 	//client deleted contexts
 	rows, err = db.Query("SELECT id, tid, title FROM context WHERE substr(context.modified, 1, 19) > $1 AND context.deleted = $2;", client_t, true)
@@ -423,6 +426,9 @@ func synchronize(reportOnly bool) (log string) {
 	} else {
 		lg.WriteString("- No `Folders` updated.\n")
 	}
+	for _, c := range client_updated_folders {
+		fmt.Fprintf(&lg, "    - id: %d; tid: %d %q; modified: %v\n", c.id, c.tid, tc(c.title, 15, true), tc(c.modified, 19, false))
+	}
 
 	//client deleted folders
 	rows, err = db.Query("SELECT id, tid, title FROM folder WHERE substr(folder.modified, 1, 19) > $1 AND folder.deleted = $2;", client_t, true)
@@ -475,6 +481,9 @@ func synchronize(reportOnly bool) (log string) {
 	} else {
 		lg.WriteString("- No `Keywords` updated.\n")
 	}
+	for _, c := range client_updated_keywords {
+		fmt.Fprintf(&lg, "    - id: %d; tid: %d %q; modified: %v\n", c.id, c.tid, tc(c.title, 15, true), tc(c.modified, 19, false))
+	}
 
 	//client deleted keywords
 	rows, err = db.Query("SELECT id, tid, name FROM keyword WHERE substr(keyword.modified, 1, 19) > $1 AND keyword.deleted = $2;", client_t, true)
@@ -511,10 +520,12 @@ func synchronize(reportOnly bool) (log string) {
 	for rows.Next() {
 		var e Entry
 		// right now tid not being set on new entries so need this
-		var tid sql.NullInt64
+		// no longer true as of ~ 12/15/2021
+		//var tid sql.NullInt64
 		rows.Scan(
 			&e.id,
-			&tid,
+			//&tid,
+			&e.tid,
 			&e.title,
 			&e.star,
 			&e.note,
@@ -525,11 +536,13 @@ func synchronize(reportOnly bool) (log string) {
 			&e.context_tid,
 			&e.folder_tid,
 		)
-		if tid.Valid {
-			e.tid = int(tid.Int64)
-		} else {
-			e.tid = 0
-		}
+		/*
+			if tid.Valid {
+				e.tid = int(tid.Int64)
+			} else {
+				e.tid = 0
+			}
+		*/
 
 		client_updated_entries = append(client_updated_entries, e)
 	}
@@ -634,7 +647,7 @@ func synchronize(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error setting tid for new client context %q with id %d to %d: %v\n", truncate(c.title, 15), c.id, tid, err2)
 				break
 			}
-			fmt.Fprintf(&lg, "Set value of tid for client context with id: %v to tid = %v\n", c.id, tid)
+			fmt.Fprintf(&lg, "Set value of tid for new client context %q with id: %d to tid = %d\n", c.title, c.id, tid)
 		case err != nil:
 			fmt.Fprintf(&lg, "Error querying postgres for a context with id: %v: %v\n", c.tid, err)
 		default:
@@ -642,7 +655,7 @@ func synchronize(reportOnly bool) (log string) {
 			if err3 != nil {
 				fmt.Fprintf(&lg, "Error updating postgres for context %q with id %d: %v\n", truncate(c.title, 15), c.tid, err3)
 			} else {
-				fmt.Fprintf(&lg, "Updated server/postgres context: %v with id: %v\n", c.title, c.tid)
+				fmt.Fprintf(&lg, "Updated server/postgres context: *%q* with id: **%d**\n", c.title, c.tid)
 			}
 		}
 	}
@@ -699,7 +712,7 @@ func synchronize(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error setting tid to %d for new client folder %q with id %d: %v\n", tid, truncate(c.title, 15), c.id, err2)
 				break
 			}
-			fmt.Fprintf(&lg, "Set value of tid for client folder with id: %v to tid = %v\n", c.id, tid)
+			fmt.Fprintf(&lg, "Set value of tid for new client folder *%q* with id: **%d** to tid = %d\n", c.title, c.id, tid)
 		case err != nil:
 			fmt.Fprintf(&lg, "Error querying postgres for a folder with id: %v: %v\n", c.tid, err)
 		default:
@@ -707,7 +720,7 @@ func synchronize(reportOnly bool) (log string) {
 			if err3 != nil {
 				fmt.Fprintf(&lg, "Error updating postgres for folder %q with id %d: %v\n", truncate(c.title, 15), c.tid, err3)
 			} else {
-				fmt.Fprintf(&lg, "Updated server/postgres folder %q with id %d\n", truncate(c.title, 15), c.tid)
+				fmt.Fprintf(&lg, "Updated server/postgres folder *%q* with id **%d**\n", truncate(c.title, 15), c.tid)
 			}
 		}
 	}
@@ -725,7 +738,7 @@ func synchronize(reportOnly bool) (log string) {
 				break
 			}
 			lastId, _ := res.LastInsertId()
-			fmt.Fprintf(&lg, "Created new local keyword %q with local id %d and tid: %d\n", truncate(c.title, 15), lastId, c.id)
+			fmt.Fprintf(&lg, "Created new local keyword *%q* with local id **%d** and tid: **%d**\n", truncate(c.title, 15), lastId, c.id)
 		case err != nil:
 			fmt.Fprintf(&lg, "Error querying sqlite for a keyword with tid: %v: %w\n", c.id, err)
 		default:
@@ -764,7 +777,7 @@ func synchronize(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error setting new client keyword's tid: %v; id: %v\n", tid, c.id, err2)
 				break
 			}
-			fmt.Fprintf(&lg, "Set value of tid for client keyword with id: %v to tid = %v\n", c.id, tid)
+			fmt.Fprintf(&lg, "Set value of tid for new client keyword %q with id: %d to tid = %d\n", c.title, c.id, tid)
 		case err != nil:
 			fmt.Fprintf(&lg, "Error querying postgres for a keyword with id: %v: %v\n", c.tid, err)
 		default:
@@ -772,7 +785,7 @@ func synchronize(reportOnly bool) (log string) {
 			if err3 != nil {
 				fmt.Fprintf(&lg, "Error updating postgres for a keyword with id: %v: %w\n", c.tid, err3)
 			} else {
-				fmt.Fprintf(&lg, "Updated server/postgres keyword: %v with id: %v\n", c.title, c.tid)
+				fmt.Fprintf(&lg, "Updated server/postgres keyword: *%q* with id: **%d**\n", c.title, c.tid)
 			}
 		}
 	}
@@ -864,7 +877,7 @@ func synchronize(reportOnly bool) (log string) {
 			if err3 != nil {
 				fmt.Fprintf(&lg, "Error updating server entry %q with id %d: %v", truncate(e.title, 15), e.tid, err3)
 			} else {
-				fmt.Fprintf(&lg, "Updated server entry *%q* with id **%d**.\n", truncate(e.title, 15), e.tid)
+				fmt.Fprintf(&lg, "Updated server entry *%q* with id **%d**\n", truncate(e.title, 15), e.tid)
 			}
 			server_id = e.tid // needed below for keywords
 		case !exists:
@@ -962,7 +975,7 @@ func synchronize(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Error setting server entry with id %d to deleted: %v\n", e.tid, err)
 			continue
 		}
-		fmt.Fprintf(&lg, "Updated server entry %q with id %d to deleted = true\n", truncate(e.title, 15), e.tid)
+		fmt.Fprintf(&lg, "Updated server entry %q with id %d to **deleted = true**\n", truncate(e.title, 15), e.tid)
 
 		_, err = pdb.Exec("DELETE FROM task_keyword WHERE task_id=$1;", e.tid)
 		if err != nil {
