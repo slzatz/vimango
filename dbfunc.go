@@ -551,10 +551,10 @@ func getEntryInfo(id int) Entry {
 	row := db.QueryRow("SELECT id, tid, title, created, folder_tid, context_tid, star, added, completed, deleted, modified FROM task WHERE id=?;", id)
 
 	var e Entry
-	var tid sql.NullInt64
+	//var tid sql.NullInt64
 	err := row.Scan(
 		&e.id,
-		&tid,
+		&e.tid,
 		&e.title,
 		&e.created,
 		&e.folder_tid,
@@ -569,11 +569,13 @@ func getEntryInfo(id int) Entry {
 		sess.showOrgMessage("Error in getEntryInfo for id %d: %v", id, err)
 		return Entry{}
 	}
-	if tid.Valid {
-		e.tid = int(tid.Int64)
-	} else {
-		e.tid = 0
-	}
+	/*
+		if tid.Valid {
+			e.tid = int(tid.Int64)
+		} else {
+			e.tid = 0
+		}
+	*/
 	return e
 }
 
@@ -932,11 +934,11 @@ func getContainerInfo(id int) Container {
 
 	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", columns, table)
 	row = db.QueryRow(stmt, id)
-	var tid sql.NullInt64
+	//var tid sql.NullInt64
 	if org.view == KEYWORD {
 		err = row.Scan(
 			&c.id,
-			&tid,
+			&c.tid,
 			&c.title,
 			&c.star,
 			&c.deleted,
@@ -945,7 +947,7 @@ func getContainerInfo(id int) Container {
 	} else {
 		err = row.Scan(
 			&c.id,
-			&tid,
+			&c.tid,
 			&c.title,
 			&c.star,
 			&c.created,
@@ -958,11 +960,13 @@ func getContainerInfo(id int) Container {
 		return Container{}
 	}
 
-	if tid.Valid {
-		c.tid = int(tid.Int64)
-	} else {
-		c.tid = 0
-	}
+	/*
+		if tid.Valid {
+			c.tid = int(tid.Int64)
+		} else {
+			c.tid = 0
+		}
+	*/
 
 	return c
 }
