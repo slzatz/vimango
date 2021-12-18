@@ -50,16 +50,30 @@ func main() {
 	}
 
 	if _, err := os.Stat(config.Sqlite3.DB); err == nil {
-		db, _ = sql.Open("sqlite3", config.Sqlite3.DB)
+		db, err = sql.Open("sqlite3", config.Sqlite3.DB)
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		log.Fatal(err)
 	}
+	defer db.Close()
+	_, err = db.Exec("PRAGMA foreign_keys=ON;")
+	if err != nil {
+		log.Fatalf("PRAGMA foreign_keys=ON: %v", err)
+	}
+	//PRAGMA busy_timeout=5000
+	//PRAGMA journal_mode=WAL
 
 	if _, err := os.Stat(config.Sqlite3.DB); err == nil {
-		fts_db, _ = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
+		fts_db, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		log.Fatal(err)
 	}
+	defer fts_db.Close()
 
 	//rand.Seed(time.Now().UnixNano())
 	sess.style = [7]string{"dracula", "fruity", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"} //vim is dark but unusable

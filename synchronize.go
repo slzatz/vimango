@@ -85,6 +85,7 @@ func synchronize(reportOnly bool) (log string) {
 		fmt.Fprintf(&lg, "Error opening postgres db: %v", err)
 		return
 	}
+	defer pdb.Close()
 
 	// Ping to connection
 	err = pdb.Ping()

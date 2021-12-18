@@ -63,8 +63,18 @@ func main() {
 	config.Sqlite3.FTS_DB = "fts5_" + res
 	config.Options.Type = "context"
 	config.Options.Title = "none"
-	db, _ = sql.Open("sqlite3", config.Sqlite3.DB)
-	fts_db, _ = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
+	db, err = sql.Open("sqlite3", config.Sqlite3.DB)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	fts_db, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fts_db.Close()
+
 	createSqliteDB()
 
 	//reader := bufio.NewReader(os.Stdin)
