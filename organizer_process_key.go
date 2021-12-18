@@ -120,6 +120,7 @@ func organizerProcessKey(c int) {
 			}
 			sess.imagePreview = false
 			org.readRowsIntoBuffer()
+			vim.CursorSetPosition(1, 0)
 			org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 			org.drawPreview()
 			return

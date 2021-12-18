@@ -145,8 +145,7 @@ func (o *Organizer) open(pos int) {
 		sess.showOrgMessage("No results were returned")
 	}
 	sess.imagePreview = false
-	//o.readTitleIntoBuffer() /////////////////////////////////////////////
-	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
