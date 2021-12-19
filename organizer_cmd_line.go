@@ -135,7 +135,7 @@ func (o *Organizer) open(pos int) {
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
-	org.view = TASK
+	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
@@ -183,7 +183,7 @@ func (o *Organizer) openContext(pos int) {
 	//o.folder = ""
 	//o.keyword = ""
 	o.taskview = BY_CONTEXT
-	org.view = TASK
+	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
@@ -195,7 +195,7 @@ func (o *Organizer) openContext(pos int) {
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
-	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 	return
 }
@@ -229,7 +229,7 @@ func (o *Organizer) openFolder(pos int) {
 
 	o.clearMarkedEntries()
 	o.taskview = BY_FOLDER
-	org.view = TASK
+	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
@@ -239,9 +239,9 @@ func (o *Organizer) openFolder(pos int) {
 		sess.showOrgMessage("No results were returned")
 	}
 	sess.imagePreview = false
-	//o.readTitleIntoBuffer() /////////////////////////////////////////////
-	o.readRowsIntoBuffer() ////////////////////////////////////////////
-	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+	o.readRowsIntoBuffer()
+	vim.CursorSetPosition(1, 0)
+	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 	return
 }
@@ -266,7 +266,7 @@ func (o *Organizer) openKeyword(pos int) {
 
 	o.clearMarkedEntries()
 	o.taskview = BY_KEYWORD
-	org.view = TASK
+	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
@@ -276,9 +276,9 @@ func (o *Organizer) openKeyword(pos int) {
 		sess.showOrgMessage("No results were returned")
 	}
 	sess.imagePreview = false
-	//o.readTitleIntoBuffer() /////////////////////////////////////////////
-	o.readRowsIntoBuffer() ////////////////////////////////////////////
-	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+	o.readRowsIntoBuffer()
+	vim.CursorSetPosition(1, 0)
+	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
 	return
 }
@@ -541,7 +541,7 @@ func (o *Organizer) sync(unused int) {
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
-	note := generateWWString(log, org.totaleditorcols)
+	note := generateWWString(log, o.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
@@ -713,7 +713,7 @@ func (o *Organizer) recent(unused int) {
 	o.clearMarkedEntries()
 	o.filter = ""
 	o.taskview = BY_RECENT
-	org.view = TASK
+	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
@@ -764,7 +764,7 @@ func (o *Organizer) updateContainer(unused int) {
 		o.altView = KEYWORD
 	}
 	getAltContainers() //O.mode = NORMAL is in get_containers
-	if len(org.altRows) != 0 {
+	if len(o.altRows) != 0 {
 		o.mode = ADD_CHANGE_FILTER //this needs to change to somthing like UPDATE_TASK_MODIFIERS
 		sess.showOrgMessage("Select context to add to marked or current entry")
 	}
