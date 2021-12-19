@@ -314,7 +314,7 @@ func synchronize(reportOnly bool) (log string) {
 		lg.WriteString("- No `Entries` updated.\n")
 	}
 	for _, e := range server_updated_entries {
-		fmt.Fprintf(&lg, "    - id: %d %q; modified: %v\n", e.id, truncate(e.title, 15), tc(e.modified, 19, false))
+		fmt.Fprintf(&lg, "    - id: %d star: %t *%q* folder_id: %d context_id: %d  modified: %v\n", e.id, e.star, truncate(e.title, 15), e.context_id, e.folder_id, tc(e.modified, 19, false))
 	}
 
 	//server deleted entries
@@ -554,7 +554,8 @@ func synchronize(reportOnly bool) (log string) {
 		lg.WriteString("- No `Entries` updated.\n")
 	}
 	for _, e := range client_updated_entries {
-		fmt.Fprintf(&lg, "    - id: %d; tid: %d %q; modified: %v\n", e.id, e.tid, tc(e.title, 15, true), tc(e.modified, 19, false))
+		//fmt.Fprintf(&lg, "    - id: %d tid: %d %q modified: %v\n", e.id, e.tid, tc(e.title, 15, true), tc(e.modified, 19, false))
+		fmt.Fprintf(&lg, "    - id: %d tid: %d star: %t *%q* folder_tid: %d context_tid: %d  modified: %v\n", e.id, e.tid, e.star, truncate(e.title, 15), e.context_tid, e.folder_tid, tc(e.modified, 19, false))
 	}
 
 	//client deleted entries
@@ -823,7 +824,7 @@ func synchronize(reportOnly bool) (log string) {
 			_, err3 := db.Exec("UPDATE task SET title=?, star=?, context_tid=?, folder_tid=?, note=?, completed=?,  modified=datetime('now') WHERE tid=?;",
 				e.title, e.star, e.context_id, e.folder_id, e.note, e.completed, e.id)
 			if err3 != nil {
-				fmt.Fprintf(&lg, "Error updating sqlite for an entry with tid: %d: %v\n", e.id, err3)
+				fmt.Fprintf(&lg, "Error updating sqlite for an entry with tid: %d context_tid: %d folder_tid: %d - %v\n", e.id, e.context_id, e.folder_id, err3)
 				continue
 			}
 			fmt.Fprintf(&lg, "Updated local entry *%q* with id **%d** and tid **%d**\n", truncate(e.title, 15), client_id, e.id)

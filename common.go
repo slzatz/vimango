@@ -239,7 +239,7 @@ type Entry struct {
 	context_tid int
 	star        bool
 	note        string
-	added       string
+	added       sql.NullString //string
 	completed   sql.NullTime
 	deleted     bool
 	modified    string
@@ -253,7 +253,7 @@ type serverEntry struct {
 	context_id int
 	star       bool
 	note       string
-	added      string
+	added      sql.NullString //string
 	completed  sql.NullTime
 	deleted    bool
 	modified   string
