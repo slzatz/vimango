@@ -239,8 +239,8 @@ type Entry struct {
 	context_tid int
 	star        bool
 	note        string
-	added       sql.NullString //string
-	completed   sql.NullTime
+	added       sql.NullString //string DATE
+	completed   sql.NullString //sql.NullTime since sqlite doesn't have datetime type
 	deleted     bool
 	modified    string
 }
@@ -253,8 +253,8 @@ type serverEntry struct {
 	context_id int
 	star       bool
 	note       string
-	added      sql.NullString //string
-	completed  sql.NullTime
+	added      sql.NullTime //string
+	completed  sql.NullTime //sql.NullTime since sqlite doesn't have datetime type
 	deleted    bool
 	modified   string
 }

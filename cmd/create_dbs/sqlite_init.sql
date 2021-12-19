@@ -5,16 +5,16 @@ CREATE TABLE task (
         tag VARCHAR(255), 
         folder_tid INTEGER, 
         context_tid INTEGER, 
-        duetime DATETIME, 
+        duetime TEXT, 
         star BOOLEAN, 
-        added DATE, 
-        completed DATE, 
-        duedate DATE, 
+        added TEXT, 
+        completed TEXT, 
+        duedate TEXT, 
         note TEXT, 
         deleted BOOLEAN, 
-        created DATETIME, 
-        modified DATETIME, 
-        startdate DATE, 
+        created TEXT, 
+        modified TEXT, 
+        startdate TEXT, 
         PRIMARY KEY (id), 
         FOREIGN KEY(folder_tid) REFERENCES folder (tid), 
         FOREIGN KEY(context_tid) REFERENCES context (tid), 
@@ -27,9 +27,9 @@ CREATE TABLE context (
         tid INTEGER NOT NULL, 
         title VARCHAR(32) NOT NULL, 
         star BOOLEAN, 
-        created DATETIME, 
+        created TEXT, 
         deleted BOOLEAN, 
-        modified DATETIME, 
+        modified TEXT, 
         PRIMARY KEY (id), 
         UNIQUE (tid), 
         UNIQUE (title), 
@@ -42,9 +42,9 @@ CREATE TABLE folder (
         title VARCHAR(32) NOT NULL, 
         star BOOLEAN, 
         archived BOOLEAN, 
-        created DATETIME, 
+        created TEXT, 
         deleted BOOLEAN, 
-        modified DATETIME, 
+        modified TEXT, 
         PRIMARY KEY (id), 
         UNIQUE (tid), 
         UNIQUE (title), 
@@ -56,7 +56,7 @@ CREATE TABLE keyword (
         name VARCHAR(255) NOT NULL,
         tid INTEGER NOT NULL,
         star BOOLEAN,
-        modified DATETIME,
+        modified TEXT,
         deleted BOOLEAN, 
         PRIMARY KEY (id), 
         UNIQUE (name)
@@ -66,7 +66,7 @@ CREATE TABLE keyword (
 );
 CREATE TABLE sync (
         machine VARCHAR(255) NOT NULL, 
-        timestamp DATETIME, 
+        timestamp TEXT, 
         PRIMARY KEY (machine)
 );
 CREATE TABLE task_keyword (
@@ -79,7 +79,7 @@ CREATE TABLE task_keyword (
 CREATE TABLE sync_log (
 id INTEGER NOT NULL,
 title TEXT,
-modified DATETIME,
+modified TEXT,
 note TEXT,
 PRIMARY KEY (id)
 );
