@@ -925,17 +925,24 @@ func synchronize(reportOnly bool) (log string) {
 	// server deleted entries
 	for _, e := range server_deleted_entries {
 		var id int
-		err := db.QueryRow("SELECT id FROM task WHERE tid=?;", e.id).Scan(&id)
+		err := db.QueryRow("DELETE FROM task WHERE tid=? RETURNING id;", e.id).Scan(&id) //appears mattn doesn't support RETURNING - now it does
 		if err != nil {
-			fmt.Fprintf(&lg, "Error selecting id for client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.id, err)
+			fmt.Fprintf(&lg, "Error deleting client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.id, err)
 			continue
 		}
-		//err := db.QueryRow("DELETE FROM task WHERE tid=? RETURNING id;", e.id).Scan(&id) //appears mattn doesn't support RETURNING
-		_, err = db.Exec("DELETE FROM task WHERE id=?;", id) //appears mattn doesn't support RETURNING
-		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting client entry %q with id %d and tid %d: %v\n", tc(e.title, 15, true), id, e.id, err)
-			continue
-		}
+
+		/*
+			err := db.QueryRow("SELECT id FROM task WHERE tid=?;", e.id).Scan(&id)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error selecting id for client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.id, err)
+				continue
+			}
+			_, err = db.Exec("DELETE FROM task WHERE id=?;", id)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error deleting client entry %q with id %d and tid %d: %v\n", tc(e.title, 15, true), id, e.id, err)
+				continue
+			}
+		*/
 		fmt.Fprintf(&lg, "Deleted client entry %q with id %d and tid %d\n", truncate(e.title, 15), id, e.id)
 
 		_, err = db.Exec("DELETE FROM task_keyword WHERE task_id=?;", id)
@@ -1005,6 +1012,7 @@ func synchronize(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "The number of client entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
 
+		// could use returning to get the id of the context that was deleted - would just be for log
 		_, err = db.Exec("DELETE FROM context WHERE tid=?", c.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Problem deleting local context with tid = %v", c.id)
@@ -1063,6 +1071,7 @@ func synchronize(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "The number of client entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
 
+		// could use returning to get the id of the folder that was deleted - would just be for log
 		_, err = db.Exec("DELETE FROM folder WHERE tid=?", c.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Problem deleting local folder with tid = %v", c.id)

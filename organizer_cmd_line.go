@@ -509,10 +509,11 @@ func (o *Organizer) find(pos int) {
 
 	o.filter = ""
 	o.taskview = BY_FIND
+	o.view = TASK
+	o.mode = FIND
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
 	sess.showOrgMessage("Searching for '%s'", searchTerms)
-	o.mode = FIND
 	o.rows = searchEntries(searchTerms, o.show_deleted, false)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
