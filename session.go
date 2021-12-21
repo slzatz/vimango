@@ -324,7 +324,7 @@ func (s *Session) displayEntryInfo(e *Entry) {
 	fmt.Fprintf(&ab, "%s%s", title, lf_ret)
 
 	var context string
-	for k, v := range org.context_map {
+	for k, v := range org.contextMap {
 		if v == e.context_tid {
 			context = k
 			break
@@ -333,7 +333,7 @@ func (s *Session) displayEntryInfo(e *Entry) {
 	fmt.Fprintf(&ab, "context: %s%s", context, lf_ret)
 
 	var folder string
-	for k, v := range org.folder_map {
+	for k, v := range org.folderMap {
 		if v == e.folder_tid {
 			folder = k
 			break

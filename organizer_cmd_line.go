@@ -103,7 +103,7 @@ func (o *Organizer) open(pos int) {
 
 	cl := o.command_line
 	var success bool
-	for k, _ := range o.context_map {
+	for k, _ := range o.contextMap {
 		// has prefix is problem if you have work and work_old
 		//if strings.HasPrefix(k, cl[pos+1:]) {
 		if k == cl[pos+1:] {
@@ -115,7 +115,7 @@ func (o *Organizer) open(pos int) {
 	}
 
 	if !success {
-		for k, _ := range o.folder_map {
+		for k, _ := range o.folderMap {
 			//if strings.HasPrefix(k, cl[pos+1:]) {
 			if k == cl[pos+1:] {
 				o.filter = k
@@ -162,7 +162,7 @@ func (o *Organizer) openContext(pos int) {
 
 	cl := o.command_line
 	var success bool
-	for k, _ := range o.context_map {
+	for k, _ := range o.contextMap {
 		//if strings.HasPrefix(k, cl[pos+1:]) {
 		if k == cl[pos+1:] {
 			o.filter = k
@@ -210,7 +210,7 @@ func (o *Organizer) openFolder(pos int) {
 
 	cl := o.command_line
 	var success bool
-	for k, _ := range o.folder_map {
+	for k, _ := range o.folderMap {
 		//if strings.HasPrefix(k, cl[pos+1:]) {
 		if k == cl[pos+1:] {
 			o.filter = k
@@ -588,7 +588,7 @@ func (o *Organizer) contexts(pos int) {
 		return
 	}
 
-	for k, _ := range o.context_map {
+	for k, _ := range o.contextMap {
 		//if strings.HasPrefix(k, input) {
 		if k == input {
 			context = k
@@ -643,7 +643,7 @@ func (o *Organizer) folders(pos int) {
 		return
 	}
 
-	for k, _ := range o.folder_map {
+	for k, _ := range o.folderMap {
 		//if strings.HasPrefix(k, input) {
 		if k == input {
 			folder = k

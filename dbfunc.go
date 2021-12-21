@@ -62,7 +62,7 @@ func generateContextMap() {
 		var title string
 
 		err = rows.Scan(&tid, &title)
-		org.context_map[title] = tid
+		org.contextMap[title] = tid
 	}
 }
 
@@ -79,7 +79,7 @@ func generateFolderMap() {
 		var title string
 
 		err = rows.Scan(&tid, &title)
-		org.folder_map[title] = tid
+		org.folderMap[title] = tid
 	}
 }
 
@@ -150,7 +150,7 @@ func toggleCompleted() {
 }
 
 func updateTaskContext(new_context string, id int) {
-	context_tid := org.context_map[new_context]
+	context_tid := org.contextMap[new_context]
 	if context_tid == 0 {
 		sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", new_context)
 		return
@@ -166,7 +166,7 @@ func updateTaskContext(new_context string, id int) {
 }
 
 func updateTaskFolder(new_folder string, id int) {
-	folder_tid := org.folder_map[new_folder]
+	folder_tid := org.folderMap[new_folder]
 	if folder_tid == 0 {
 		sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", new_folder)
 		return
@@ -270,7 +270,6 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 		s += " AND task.completed IS NULL AND task.deleted=false"
 	}
 	s += fmt.Sprintf(" ORDER BY task.star DESC, task.%s DESC LIMIT %d;", sort, max)
-	//int sortcolnum = org.sort_map[org.sort] //cpp
 	var rows *sql.Rows
 	var err error
 	if filter == "" { //Recent
@@ -396,9 +395,9 @@ func insertRowInDB(row *Row) int {
 
 	switch org.taskview {
 	case BY_CONTEXT:
-		context_tid = org.context_map[org.filter]
+		context_tid = org.contextMap[org.filter]
 	case BY_FOLDER:
-		folder_tid = org.folder_map[org.filter]
+		folder_tid = org.folderMap[org.filter]
 		//case BY_KEYWORD:
 		//case BY_RECENT:
 	}

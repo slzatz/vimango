@@ -137,8 +137,8 @@ func main() {
 	}
 	//org.filter = "todo"
 	org.filter = config.Options.Title
-	org.context_map = make(map[string]int)
-	org.folder_map = make(map[string]int)
+	org.contextMap = make(map[string]int)
+	org.folderMap = make(map[string]int)
 	org.marked_entries = make(map[int]struct{})
 	org.keywordMap = make(map[string]int)
 	org.vbuf = vim.BufferNew(0)    ///////////////////////////////////////////////////////

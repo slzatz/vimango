@@ -264,47 +264,47 @@ func organizerProcessKey(c int) {
 
 		if c == '\t' {
 			pos := strings.Index(org.command_line, " ")
-			if tabCompletion.list == nil {
-				sess.showEdMessage("tab")
-				var s string
-				if pos != -1 {
-					s = org.command_line[:pos]
-					cl := org.command_line
-					var filterMap = make(map[string]int)
-					switch s {
-					case "o", "oc", "c":
-						filterMap = org.context_map
-					case "of", "f":
-						filterMap = org.folder_map
-					case "ok", "k":
-						filterMap = org.keywordMap
-					case "sort":
-						filterMap = map[string]int{"added": 0, "created": 0, "modified": 0}
-					default:
-						return
-					}
-
-					for k, _ := range filterMap {
-						if strings.HasPrefix(k, cl[pos+1:]) {
-							tabCompletion.list = append(tabCompletion.list, k)
-						}
-					}
-				}
-				if len(tabCompletion.list) == 0 {
-					return
-				} else {
-					sort.Strings(tabCompletion.list)
-				}
-			} else {
+			if pos == -1 {
+				return
+			}
+			if tabCompletion.list != nil {
 				tabCompletion.idx++
 				if tabCompletion.idx > len(tabCompletion.list)-1 {
 					tabCompletion.idx = 0
 				}
+			} else {
+				sess.showEdMessage("tab")
+				cmd := org.command_line[:pos]
+				option := org.command_line[pos+1:]
+				var filterMap = make(map[string]int)
+				switch cmd {
+				case "o", "oc", "c":
+					filterMap = org.contextMap
+				case "of", "f":
+					filterMap = org.folderMap
+				case "ok", "k":
+					filterMap = org.keywordMap
+				case "sort":
+					filterMap = map[string]int{"added": 0, "created": 0, "modified": 0}
+				default:
+					return
+				}
+
+				for k, _ := range filterMap {
+					if strings.HasPrefix(k, option) {
+						tabCompletion.list = append(tabCompletion.list, k)
+					}
+				}
+				if len(tabCompletion.list) == 0 {
+					return
+				}
+				sort.Strings(tabCompletion.list)
 			}
+
 			org.command_line = org.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
 			sess.showOrgMessage(":%s", org.command_line)
 			return
-		}
+		} //end tab
 
 		if c == DEL_KEY || c == BACKSPACE {
 			length := len(org.command_line)
