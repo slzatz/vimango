@@ -128,7 +128,8 @@ func (o *Organizer) drawRows() {
 
 		// believe the +2 is just to give some space from the end of long titles
 		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, o.divider-TIME_COL_WIDTH+2)
-		ab.WriteString(o.rows[fr].modified)
+		//ab.WriteString(o.rows[fr].modified)
+		ab.WriteString(o.rows[fr].sort)
 		ab.WriteString(RESET)
 		ab.WriteString(lf_ret)
 	}
@@ -416,7 +417,8 @@ func (o *Organizer) drawSearchRows() {
 
 		ab.WriteString("\x1b[0m") // return background to normal
 		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+2, o.divider-TIME_COL_WIDTH+2)
-		ab.WriteString(o.rows[fr].modified)
+		//ab.WriteString(o.rows[fr].modified)
+		ab.WriteString(o.rows[fr].sort)
 		ab.WriteString(lf_ret)
 	}
 	fmt.Print(ab.String())

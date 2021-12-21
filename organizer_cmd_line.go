@@ -73,6 +73,7 @@ var cmd_lookup = map[string]func(*Organizer, int){
 	"pl":              (*Organizer).printList2,
 	"lsp":             (*Organizer).launchLsp,
 	"shutdown":        (*Organizer).shutdownLsp,
+	"sort":            (*Organizer).sortEntries,
 }
 
 func (o *Organizer) log(unused int) {
@@ -414,9 +415,10 @@ func (o *Organizer) newEntry(unused int) {
 	row := Row{
 		id: -1,
 		//title:    " ",
-		star:     true,
-		dirty:    true,
-		modified: time.Now().Format("3:04:05 pm"),
+		star:  true,
+		dirty: true,
+		//modified: time.Now().Format("3:04:05 pm"),
+		sort: time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
 	}
 
 	vim.BufferSetLine(o.vbuf, 0, []byte(""))
@@ -973,4 +975,31 @@ func (o *Organizer) shutdownLsp(unused int) {
 	shutdownLsp()
 	o.mode = o.last_mode
 	o.command_line = ""
+}
+
+func (o *Organizer) sortEntries(pos int) {
+	if pos == -1 {
+		sess.showOrgMessage("You need to provide a column to sort by")
+		return
+	}
+	if _, OK := sortColumns[o.command_line[pos+1:]]; OK {
+		o.sort = o.command_line[pos+1:]
+	} else {
+		sess.showOrgMessage("The sort columns are modified, added and created")
+		return
+	}
+	o.refresh(0)
+	/*
+		o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+		if len(o.rows) == 0 {
+			o.insertRow(0, "", true, false, false, BASE_DATE)
+			o.rows[0].dirty = false
+			sess.showOrgMessage("No results were returned")
+		}
+		sess.imagePreview = false
+		o.readRowsIntoBuffer()
+		vim.CursorSetPosition(1, 0)
+		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		o.drawPreview()
+	*/
 }

@@ -803,8 +803,8 @@ func synchronize(reportOnly bool) (log string) {
 		switch {
 		case err == sql.ErrNoRows:
 			res, err1 := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
-				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), false);",
-				e.id, e.title, e.star, e.created, e.added, e.completed, e.context_id, e.folder_id, e.note)
+				"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false);",
+				e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
 			if err1 != nil {
 				fmt.Fprintf(&lg, "Error inserting new entry for %q into sqlite: %v\n", truncate(e.title, 15), err1)
 				break
@@ -884,8 +884,8 @@ func synchronize(reportOnly bool) (log string) {
 			server_id = e.tid // needed below for keywords
 		case !exists:
 			err1 := pdb.QueryRow("INSERT INTO task (title, star, created, added, completed, context_id, folder_id, note, modified, deleted) "+
-				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), false) RETURNING id;",
-				e.title, e.star, e.created, e.added, e.completed, e.context_tid, e.folder_tid, e.note).Scan(&server_id)
+				"VALUES ($1, $2, now(), $4, $5, $6, $7, $8, now(), false) RETURNING id;",
+				e.title, e.star, e.added, e.completed, e.context_tid, e.folder_tid, e.note).Scan(&server_id)
 			if err1 != nil {
 				fmt.Fprintf(&lg, "Error inserting new server entry for client entry %s with id %d into postgres: %v\n", truncate(e.title, 15), e.id, err1)
 				break

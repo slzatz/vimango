@@ -203,7 +203,7 @@ func updateNote(id int, text string) {
 }
 
 func getSyncItems(max int) {
-	rows, err := db.Query(fmt.Sprintf("SELECT id, title, modified FROM sync_log ORDER BY modified DESC LIMIT %d", max))
+	rows, err := db.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
 	if err != nil {
 		sess.showOrgMessage("Error in getSyncItems: %v", err)
 		return
@@ -214,11 +214,13 @@ func getSyncItems(max int) {
 	org.rows = nil
 	for rows.Next() {
 		var row Row
-		var modified string
+		//var modified string
+		var sort string
 
 		err = rows.Scan(&row.id,
 			&row.title,
-			&modified,
+			//&modified,
+			&sort,
 		)
 
 		if err != nil {
@@ -226,7 +228,8 @@ func getSyncItems(max int) {
 			return
 		}
 
-		row.modified = timeDelta(modified)
+		//row.modified = timeDelta(modified)
+		row.sort = timeDelta(sort)
 		org.rows = append(org.rows, row)
 
 	}
@@ -243,7 +246,8 @@ func deleteSyncItem(id int) {
 
 func filterEntries(taskView int, filter string, showDeleted bool, sort string, max int) []Row {
 
-	s := "SELECT task.id, task.title, task.star, task.deleted, task.completed, task.modified FROM task "
+	//s := "SELECT task.id, task.title, task.star, task.deleted, task.completed, task.modified FROM task "
+	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.completed, task.%s FROM task ", sort)
 
 	switch taskView {
 	case BY_CONTEXT:
@@ -285,14 +289,16 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 	for rows.Next() {
 		var row Row
 		var completed sql.NullTime
-		var modified string
+		//var modified string
+		var sort string
 
 		err = rows.Scan(&row.id,
 			&row.title,
 			&row.star,
 			&row.deleted,
 			&completed,
-			&modified,
+			//&modified,
+			&sort,
 		)
 
 		if err != nil {
@@ -306,7 +312,8 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 			row.completed = false
 		}
 
-		row.modified = timeDelta(modified)
+		//row.modified = timeDelta(modified)
+		row.sort = timeDelta(sort)
 
 		orgRows = append(orgRows, row)
 
@@ -399,8 +406,8 @@ func insertRowInDB(row *Row) int {
 	res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
 		//"VALUES (0, ?, ?, ?, True, date(), '', False, "+
-		"VALUES (?, ?, ?, ?, True, date(), '', False, "+
-		"date(), datetime('now'));",
+		"VALUES (?, ?, ?, ?, True, datetime('now'), '', False, "+
+		"datetime('now'), datetime('now'));",
 		//row.title, folder_tid, context_tid)
 		tempTid("task"), row.title, folder_tid, context_tid)
 
@@ -707,13 +714,12 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 		return []Row{}
 	}
 
-	var stmt string
-
 	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
+	stmt := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.completed, task.%s FROM task WHERE ", org.sort)
 	if help {
-		stmt = "SELECT task.id, task.title, task.star, task.deleted, task.completed, task.modified FROM task WHERE task.context_tid = 16 and task.id IN ("
+		stmt += "task.context_tid = 16 and task.id IN ("
 	} else {
-		stmt = "SELECT task.id, task.title, task.star, task.deleted, task.completed, task.modified FROM task WHERE task.id IN ("
+		stmt += "task.id IN ("
 	}
 
 	max := len(ftsIds) - 1
@@ -738,7 +744,8 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 	for rows.Next() {
 		var row Row
 		var completed sql.NullString
-		var modified string
+		//var modified string
+		var sort string
 
 		err = rows.Scan(
 			&row.id,
@@ -746,7 +753,8 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 			&row.star,
 			&row.deleted,
 			&completed,
-			&modified,
+			//&modified,
+			&sort,
 		)
 
 		if err != nil {
@@ -760,7 +768,8 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 			row.completed = false
 		}
 
-		row.modified = timeDelta(modified)
+		//row.modified = timeDelta(modified)
+		row.sort = timeDelta(sort)
 		row.ftsTitle = ftsTitles[row.id]
 
 		orgRows = append(orgRows, row)
@@ -770,6 +779,7 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 
 func getContainers() {
 	org.rows = nil
+	org.sort = "modified" //only time column that all containers have
 
 	var table string
 	var columns string
@@ -802,16 +812,19 @@ func getContainers() {
 	defer rows.Close()
 	for rows.Next() {
 		var r Row
-		var modified string
+		//var modified string
+		var sort string
 		rows.Scan(
 			&r.id,
 			&r.title,
 			&r.star,
 			&r.deleted,
-			&modified,
+			//&modified,
+			&sort,
 		)
 
-		r.modified = timeDelta(modified)
+		//r.modified = timeDelta(modified)
+		r.sort = timeDelta(sort)
 		org.rows = append(org.rows, r)
 	}
 	if len(org.rows) == 0 {

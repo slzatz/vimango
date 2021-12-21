@@ -48,6 +48,12 @@ var Languages = map[string]string{
 	"python": "python",
 }
 
+var sortColumns = map[string]struct{}{
+	"added":    z0,
+	"modified": z0,
+	"created":  z0,
+}
+
 var navKeys = map[int]struct{}{
 	ARROW_UP:    z0,
 	ARROW_DOWN:  z0,
@@ -216,7 +222,8 @@ type Row struct {
 	star      bool
 	deleted   bool
 	completed bool
-	modified  string
+	//modified  string
+	sort string
 
 	// below not in db
 	dirty  bool
