@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -270,15 +271,19 @@ func organizerProcessKey(c int) {
 					s = org.command_line[:pos]
 					cl := org.command_line
 					var filterMap = make(map[string]int)
-					if s == "o" || s == "oc" || s == "c" {
+					switch s {
+					case "o", "oc", "c":
 						filterMap = org.context_map
-					} else if s == "of" || s == "f" {
+					case "of", "f":
 						filterMap = org.folder_map
-					} else if s == "ok" || s == "k" {
+					case "ok", "k":
 						filterMap = org.keywordMap
-					} else {
+					case "sort":
+						filterMap = map[string]int{"added": 0, "created": 0, "modified": 0}
+					default:
 						return
 					}
+
 					for k, _ := range filterMap {
 						if strings.HasPrefix(k, cl[pos+1:]) {
 							tabCompletion.list = append(tabCompletion.list, k)
@@ -286,7 +291,9 @@ func organizerProcessKey(c int) {
 					}
 				}
 				if len(tabCompletion.list) == 0 {
-					return // don't want to hit if below
+					return
+				} else {
+					sort.Strings(tabCompletion.list)
 				}
 			} else {
 				tabCompletion.idx++
@@ -296,7 +303,7 @@ func organizerProcessKey(c int) {
 			}
 			org.command_line = org.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
 			sess.showOrgMessage(":%s", org.command_line)
-			return // don't want to hit if below
+			return
 		}
 
 		if c == DEL_KEY || c == BACKSPACE {
@@ -307,7 +314,7 @@ func organizerProcessKey(c int) {
 		} else {
 			org.command_line += string(c)
 		}
-		tabCompletion.idx = 0
+		tabCompletion.idx = 0 //0
 		tabCompletion.list = nil
 
 		sess.showOrgMessage(":%s", org.command_line)
