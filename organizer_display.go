@@ -301,13 +301,6 @@ func (o *Organizer) drawStatusBar() {
 			str = "Other"
 		}
 
-		/*
-			var id int
-			var title string
-			var keywords string
-			if len(o.rows) > 0 {
-		*/
-
 		row := &o.rows[o.fr]
 
 		if len(row.title) > 16 {
@@ -331,19 +324,19 @@ func (o *Organizer) drawStatusBar() {
 	// 7m - reverses video
 	// because video is reversted [42 sets text to green and 49 undoes it
 	// also [0;35;7m -> because of 7m it reverses background and foreground
-	// I think the [0;7m is revert text to normal and reverse video
-	status := fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s \x1b[0;35;7m%s\x1b[0;7m %d %d/%d \x1b[1;42m%s\x1b[49m",
-		str, title, keywords, id, o.fr+1, len(o.rows), o.mode)
+	// [0;7m is revert text to normal and reverse video
+	status := fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s \x1b[0;35;7m%s\x1b[0;7m %d %d/%d \x1b[1;42m%%s\x1b[0;7m sort: %s ",
+		str, title, keywords, id, o.fr+1, len(o.rows), o.sort)
 
 	// klugy way of finding length of string without the escape characters
-	plain := fmt.Sprintf("%s %s %s %d %d/%d %s",
-		str, title, keywords, id, o.fr+1, len(o.rows), o.mode)
+	plain := fmt.Sprintf("%s %s %s %d %d/%d   sort: %s ",
+		str, title, keywords, id, o.fr+1, len(o.rows), o.sort)
 	length := len(plain)
 
-	if length < o.divider {
-		// need to do the below because the escapes make string
-		// longer than it actually prints so pad separately
-		fmt.Fprintf(&ab, "%s%-*s", status, o.divider-length, " ")
+	if length+len(fmt.Sprintf("%s", o.mode)) <= o.divider {
+		s := fmt.Sprintf("%%-%ds", o.divider-length) // produces "%-25s"
+		t := fmt.Sprintf(s, o.mode)
+		fmt.Fprintf(&ab, status, t)
 	} else {
 		status = fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s \x1b[0;35;7m%s\x1b[0;7m %d %d/%d\x1b[49m",
 			str, title, keywords, id, o.fr+1, len(o.rows))
