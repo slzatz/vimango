@@ -242,7 +242,9 @@ func organizerProcessKey(c int) {
 
 	case COMMAND_LINE:
 
-		if c == '\r' {
+		switch c {
+
+		case '\r':
 			pos := strings.LastIndex(org.command_line, " ")
 			var s string
 			if pos != -1 {
@@ -260,9 +262,8 @@ func organizerProcessKey(c int) {
 			sess.showOrgMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
 			org.mode = org.last_mode
 			return
-		}
 
-		if c == '\t' {
+		case '\t':
 			pos := strings.Index(org.command_line, " ")
 			if pos == -1 {
 				return
@@ -304,17 +305,18 @@ func organizerProcessKey(c int) {
 			org.command_line = org.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
 			sess.showOrgMessage(":%s", org.command_line)
 			return
-		} //end tab
 
-		if c == DEL_KEY || c == BACKSPACE {
+		case DEL_KEY, BACKSPACE:
 			length := len(org.command_line)
 			if length > 0 {
 				org.command_line = org.command_line[:length-1]
 			}
-		} else {
+
+		default:
 			org.command_line += string(c)
-		}
-		tabCompletion.idx = 0 //0
+		} // end switch c in COMMAND_LINE
+
+		tabCompletion.idx = 0
 		tabCompletion.list = nil
 
 		sess.showOrgMessage(":%s", org.command_line)
@@ -393,7 +395,9 @@ func organizerProcessKey(c int) {
 		//probably should be a org.view not org.mode but
 		// for the moment this kluge works
 	case SYNC_LOG:
+
 		switch c {
+
 		case ARROW_UP, 'k':
 			if org.fr == 0 {
 				return
