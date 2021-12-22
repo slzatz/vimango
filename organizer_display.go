@@ -334,9 +334,12 @@ func (o *Organizer) drawStatusBar() {
 	length := len(plain)
 
 	if length+len(fmt.Sprintf("%s", o.mode)) <= o.divider {
-		s := fmt.Sprintf("%%-%ds", o.divider-length) // produces "%-25s"
-		t := fmt.Sprintf(s, o.mode)
-		fmt.Fprintf(&ab, status, t)
+		/*
+			s := fmt.Sprintf("%%-%ds", o.divider-length) // produces "%-25s"
+			t := fmt.Sprintf(s, o.mode)
+			fmt.Fprintf(&ab, status, t)
+		*/
+		fmt.Fprintf(&ab, status, fmt.Sprintf(fmt.Sprintf("%%-%ds", o.divider-length), o.mode))
 	} else {
 		status = fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s \x1b[0;35;7m%s\x1b[0;7m %d %d/%d\x1b[49m",
 			str, title, keywords, id, o.fr+1, len(o.rows))
