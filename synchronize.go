@@ -884,10 +884,10 @@ func synchronize(reportOnly bool) (log string) {
 			server_id = e.tid // needed below for keywords
 		case !exists:
 			err1 := pdb.QueryRow("INSERT INTO task (title, star, created, added, completed, context_id, folder_id, note, modified, deleted) "+
-				"VALUES ($1, $2, now(), $4, $5, $6, $7, $8, now(), false) RETURNING id;",
+				"VALUES ($1, $2, now(), $3, $4, $5, $6, $7, now(), false) RETURNING id;",
 				e.title, e.star, e.added, e.completed, e.context_tid, e.folder_tid, e.note).Scan(&server_id)
 			if err1 != nil {
-				fmt.Fprintf(&lg, "Error inserting new server entry for client entry %s with id %d into postgres: %v\n", truncate(e.title, 15), e.id, err1)
+				fmt.Fprintf(&lg, "Error inserting new server entry for client entry *%q* with id %d into postgres: %v\n", truncate(e.title, 15), e.id, err1)
 				break
 			}
 			_, err2 := db.Exec("UPDATE task SET tid=? WHERE id=?;", server_id, e.id)
