@@ -138,7 +138,7 @@ func Execute(s string) {
 
 //void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
 func BufferSetLines(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
-	p := (*C.uchar)(C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0)))))
+	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(unsafe.Pointer(p))
 	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count]
 
@@ -147,7 +147,9 @@ func BufferSetLines(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
 		view[i] = (*C.uchar)(C.CBytes(b))
 		defer C.free(unsafe.Pointer(view[i]))
 	}
-	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), &view[0], C.int(count))
+	/* Either of the below work */
+	//C.vimBufferSetLines(vbuf, C.long(start), C.long(end), &view[0], C.int(count))
+	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
 }
 
 //v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
