@@ -421,7 +421,7 @@ func (o *Organizer) newEntry(unused int) {
 		sort: time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
 	}
 
-	vim.BufferSetLine(o.vbuf, 0, []byte(""))
+	vim.BufferSetLines(o.vbuf, 0, 0, [][]byte{[]byte("")}, 1)
 	o.rows = append(o.rows, Row{})
 	copy(o.rows[1:], o.rows[0:])
 	o.rows[0] = row
@@ -901,7 +901,7 @@ func (o *Organizer) printList(unused int) {
 		bb = append(bb, []byte(fmt.Sprintf("%2d. %s", i+1, row.title)))
 	}
 	tempBuf := vim.BufferNew(0)
-	vim.BufferSetLines(tempBuf, bb)
+	vim.BufferSetLines(tempBuf, 0, -1, bb, len(bb))
 	vim.BufferSetCurrent(tempBuf)
 	vim.Execute("ha")
 

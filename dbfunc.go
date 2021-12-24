@@ -325,7 +325,7 @@ func (o *Organizer) readRowsIntoBuffer() {
 	for _, row := range o.rows {
 		bb = append(bb, []byte(row.title))
 	}
-	vim.BufferSetLines(o.vbuf, bb)
+	vim.BufferSetLines(o.vbuf, 0, -1, bb, len(bb))
 	vim.BufferSetCurrent(o.vbuf)
 	//sess.showOrgMessage("%d %d", len(bb), vim.BufferGetLineCount(o.vbuf))
 }
@@ -483,47 +483,8 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	e.bb = bytes.Split([]byte(note), []byte("\n"))
 	e.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(e.vbuf)
-	vim.BufferSetLines(e.vbuf, e.bb)
-	//vim.Execute(fmt.Sprintf("w temp/buf%d", vim.BufferGetId(e.vbuf)))
+	vim.BufferSetLines(e.vbuf, 0, -1, e.bb, len(e.bb))
 }
-
-/*
-func (o *Organizer) readTitleIntoBuffer() {
-	id := o.rows[org.fr].id
-	var table string
-	var column string
-
-	switch o.view {
-	case TASK:
-		table = "task"
-		column = "title"
-	case CONTEXT:
-		table = "context"
-		column = "title"
-	case FOLDER:
-		table = "folder"
-		column = "title"
-	case KEYWORD:
-		table = "keyword"
-		column = "name"
-	default:
-		sess.showOrgMessage("Somehow you are in a view I can't handle")
-		return
-	}
-	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", column, table)
-	row := db.QueryRow(stmt, id)
-	var title string
-	err := row.Scan(&title)
-	if err != nil {
-		sess.showOrgMessage("error: %v", err)
-		return
-	}
-	vim.BufferSetLine(o.vbuf, []byte(title))
-	vim.Execute("w")
-	s := vim.BufferLinesS(o.vbuf)[0]
-	sess.showOrgMessage(s)
-}
-*/
 
 func readSyncLogIntoAltRows(id int) {
 	row := db.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)

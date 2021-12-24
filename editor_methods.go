@@ -1068,8 +1068,7 @@ func (e *Editor) readFileIntoNote(filename string) error {
 		return fmt.Errorf("Error opening file %s: %w", filename, err)
 	}
 	e.bb = bytes.Split(b, []byte("\n"))
-	vim.BufferSetLines(e.vbuf, e.bb)
-	//e.bb = vim.BufferLines(e.vbuf)
+	vim.BufferSetLines(e.vbuf, 0, -1, e.bb, len(e.bb))
 
 	e.fr, e.fc, e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0, 0, 0
 
