@@ -167,6 +167,20 @@ func BufferSetLines(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
 	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
 }
 
+func BufferSetLinesS(vbuf *C.buf_T, start, end int, ss []string, count int) {
+	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
+	defer C.free(unsafe.Pointer(p))
+	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count]
+
+	for i, s := range ss {
+		view[i] = (*C.uchar)(unsafe.Pointer(C.CString(s)))
+		defer C.free(unsafe.Pointer(view[i]))
+	}
+	/* Either of the below work */
+	//C.vimBufferSetLines(vbuf, C.long(start), C.long(end), &view[0], C.int(count))
+	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
+}
+
 //v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
 //pos_T vimCursorGetPosition(void);
 func CursorGetPosition() [2]int {
