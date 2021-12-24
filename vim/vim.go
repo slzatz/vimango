@@ -55,14 +55,29 @@ func BufferGetCurrent() *C.buf_T {
 }
 
 //void vimInput(char_u *input);
+// intended for strings with one character (could be multi-byte)
+// no error if string has more than one char
 func Input(s string) {
-	// can't use C.CString because wants uchar
 	C.vimInput(ucharP(s))
+
+	/* this should also work
+	z := unsafe.Pointer(C.CString(s))
+	defer C.free(z)
+	C.vimInput((*C.uchar)(z))
+	*/
 }
 
+// intended for strings of more than one character
 func Input2(s string) {
-	for _, b := range []byte(s) {
-		C.vimInput((*C.uchar)(&b))
+	/*
+		// previous code - note sure it was ever correct
+		for _, b := range []byte(s) {
+			C.vimInput((*C.uchar)(&b))
+		}
+	*/
+	// I think the below is correct but untested
+	for _, x := range s {
+		C.vimInput(ucharP(string(x)))
 	}
 }
 
