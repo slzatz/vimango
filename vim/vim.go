@@ -139,7 +139,7 @@ func Execute(s string) {
 //void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
 // to avoid pointer arithmetic this repeatedly call C.vimBufferSetLines
 // with one line - might be possible to address this
-func BufferSetLines(vbuf *C.buf_T, bb [][]byte) {
+func BufferSetLines__(vbuf *C.buf_T, bb [][]byte) {
 	// size is the length of the longest line + 1 for null terminator
 	size := 0
 	for _, b := range bb {
@@ -149,11 +149,9 @@ func BufferSetLines(vbuf *C.buf_T, bb [][]byte) {
 	}
 	size += 1 //for trailing null for longest line(s)
 
-	p1 := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
-	p2 := (**C.uchar)(C.malloc(C.sizeof_uint))
-	p2 = &p1
+	p := (*C.uchar)(C.malloc(C.sizeof_uchar * C.ulong(size)))
 
-	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p1))[0:size]
+	view := (*[1 << 30]C.uchar)(unsafe.Pointer(p))[0:size]
 	for start, line := range bb {
 		i := 0
 		for _, x := range line {
@@ -161,10 +159,26 @@ func BufferSetLines(vbuf *C.buf_T, bb [][]byte) {
 			i += 1
 		}
 		view[i] = 0
-		C.vimBufferSetLines(vbuf, C.long(start), C.long(start-1), p2, C.int(1))
+		C.vimBufferSetLines(vbuf, C.long(start), C.long(start-1), &p, C.int(1))
 	}
-	C.free(unsafe.Pointer(p1))
-	//C.free(unsafe.Pointer(p2)) //panics
+	C.free(unsafe.Pointer(p))
+}
+
+//void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
+//func BufferSetLinesNew(vbuf *C.buf_T, start int, end int, bb [][]byte, count int) {
+func BufferSetLines(vbuf *C.buf_T, bb [][]byte) {
+	start := 0
+	end := -1
+	count := len(bb)
+	p := (*C.uchar)(C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0)))))
+	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count]
+
+	for i, b := range bb {
+		b = append(b, 0)
+		view[i] = (*C.uchar)(C.CBytes(b))
+		defer C.free(unsafe.Pointer(view[i]))
+	}
+	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), &view[0], C.int(count))
 }
 
 func BufferSetLine(vbuf *C.buf_T, line int, b []byte) {
