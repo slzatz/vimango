@@ -64,7 +64,7 @@ func (e *Editor) saveNoteToFile() {
 	}
 	defer f.Close()
 
-	_, err = f.Write(bytes.Join(e.bb, []byte("\n")))
+	_, err = f.WriteString(strings.Join(e.ss, "\n"))
 	if err != nil {
 		sess.showEdMessage("Error writing file %s: %v", filename, err)
 		return
@@ -549,7 +549,7 @@ func (e *Editor) number() {
 }
 
 func (e *Editor) goFormat() {
-	bb := [][]byte{}
+	ss := []string{}
 	//cmd := exec.Command("gofmt")
 	cmd := exec.Command("goimports")
 	stdout, err := cmd.StdoutPipe()
@@ -570,13 +570,13 @@ func (e *Editor) goFormat() {
 		return
 	}
 
-	for _, row := range e.bb {
-		io.WriteString(stdin, string(row)+"\n")
+	for _, row := range e.ss {
+		io.WriteString(stdin, row+"\n")
 	}
 	stdin.Close()
 
 	for {
-		bytes, err := buf_out.ReadBytes('\n')
+		s, err := buf_out.ReadString('\n')
 
 		if err == io.EOF {
 			break
@@ -588,14 +588,14 @@ func (e *Editor) goFormat() {
 			}
 		*/
 
-		bb = append(bb, bytes[:len(bytes)-1])
+		ss = append(ss, s[:len(s)-1])
 	}
-	e.bb = bb
+	e.ss = ss
 
-	vim.BufferSetLines(e.vbuf, 0, -1, e.bb, len(e.bb))
+	vim.BufferSetLinesS(e.vbuf, 0, -1, e.ss, len(e.ss))
 	pos := vim.CursorGetPosition()
 	e.fr = pos[0] - 1
-	e.fc = utf8.RuneCount(e.bb[e.fr][:pos[1]])
+	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 	e.scroll()
 	e.drawText()
 	sess.returnCursor()
@@ -625,7 +625,6 @@ func (e *Editor) createPDF() {
 		return
 	}
 	filename := e.command_line[pos+1:]
-	content := bytes.Join(e.bb, []byte("\n"))
 	pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log")
 	/*
 		pf.Pdf.SetSubject("How to convert markdown to PDF", true)
@@ -638,7 +637,8 @@ func (e *Editor) createPDF() {
 		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
 
-	err := pf.Process(content)
+	content := strings.Join(e.ss, "\n")
+	err := pf.Process([]byte(content))
 	if err != nil {
 		sess.showEdMessage("pdf error:%v", err)
 	}
@@ -677,13 +677,13 @@ func (e *Editor) printDocument() {
 			sess.showEdMessage("Error creating pdf from code: %v", err)
 		}
 	} else {
-		content := bytes.Join(e.bb, []byte("\n"))
+		content := strings.Join(e.ss, "\n")
 		pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log")
 		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
 			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
 
-		err := pf.Process(content)
+		err := pf.Process([]byte(content))
 		if err != nil {
 			sess.showEdMessage("pdf error:%v", err)
 		}

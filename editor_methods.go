@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -23,7 +22,7 @@ func (e *Editor) highlightInfo() { // [2][4]int {
 // highlight matched braces in NORMAL and INSERT modes
 func (e *Editor) drawHighlightedBraces() {
 
-	if len(e.bb) == 0 || len(e.bb[e.fr]) == 0 {
+	if len(e.ss) == 0 || len(e.ss[e.fr]) == 0 {
 		return
 	}
 
@@ -31,15 +30,15 @@ func (e *Editor) drawHighlightedBraces() {
 	var back int
 	//if below handles case when in insert mode and brace is last char
 	//in a row and cursor is beyond that last char (which is a brace)
-	if e.fc == len(e.bb[e.fr]) {
-		b = e.bb[e.fr][e.fc-1]
+	if e.fc == len(e.ss[e.fr]) {
+		b = e.ss[e.fr][e.fc-1]
 		back = 1
 	} else {
-		b = e.bb[e.fr][e.fc]
+		b = e.ss[e.fr][e.fc]
 		back = 0
 	}
 
-	if !bytes.ContainsAny([]byte{b}, "{}()") {
+	if !strings.ContainsAny(string(b), "{}()") {
 		return
 	}
 
@@ -53,7 +52,7 @@ func (e *Editor) drawHighlightedBraces() {
 		return
 	}
 
-	match := e.bb[pos[0]-1][pos[1]]
+	match := e.ss[pos[0]-1][pos[1]]
 
 	x := e.getScreenXFromRowColWW(pos[0]-1, pos[1]) + e.left_margin + e.left_margin_offset + 1
 	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s", y+e.top_margin, x, string(match))
@@ -82,25 +81,13 @@ func (e *Editor) setLinesMargins() { //also sets top margin
 
 // used by updateNote
 func (e *Editor) bufferToString() string {
-
-	numRows := len(e.bb)
-	if numRows == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-	for i := 0; i < numRows-1; i++ {
-		sb.Write(e.bb[i])
-		sb.Write([]byte("\n"))
-	}
-	sb.Write(e.bb[numRows-1])
-	return sb.String()
+	return strings.Join(e.ss, "\n")
 }
 
 func (e *Editor) getScreenXFromRowColWW(r, c int) int {
-	row := e.bb[r]
-	row = bytes.ReplaceAll(row, []byte("\t"), []byte("$$$$")) ////////////
-	tabCount := bytes.Count(e.bb[r][:c], []byte("\t"))
+	row := e.ss[r]
+	row = strings.ReplaceAll(row, "\t", "$$$$")
+	tabCount := strings.Count(e.ss[r][:c], "\t")
 	c = c + 3*tabCount
 	width := e.screencols - e.left_margin_offset
 	if width >= len(row) {
@@ -112,7 +99,7 @@ func (e *Editor) getScreenXFromRowColWW(r, c int) int {
 		if width >= len(row[start:]) {
 			break
 		}
-		pos := bytes.LastIndex(row[start:start+width], []byte(" "))
+		pos := strings.LastIndex(row[start:start+width], " ")
 		if pos == -1 {
 			end = start + width - 1
 		} else {
@@ -138,8 +125,8 @@ func (e *Editor) getScreenYFromRowColWW(r, c int) int {
 }
 
 func (e *Editor) getLinesInRowWW(r int) int {
-	row := e.bb[r]
-	row = bytes.ReplaceAll(row, []byte("\t"), []byte("$$$$")) ////////////
+	row := e.ss[r]
+	row = strings.ReplaceAll(row, "\t", "$$$$")
 	width := e.screencols - e.left_margin_offset
 	if width >= len(row) {
 		return 1
@@ -153,7 +140,7 @@ func (e *Editor) getLinesInRowWW(r int) int {
 			lines++
 			break
 		}
-		pos := bytes.LastIndex(row[start:start+width], []byte(" "))
+		pos := strings.LastIndex(row[start:start+width], " ")
 		if pos == -1 {
 			end = start + width - 1
 		} else {
@@ -166,8 +153,8 @@ func (e *Editor) getLinesInRowWW(r int) int {
 }
 
 func (e *Editor) getLineInRowWW(r, c int) int {
-	row := e.bb[r]
-	row = bytes.ReplaceAll(row, []byte("\t"), []byte("$$$$")) ////////////
+	row := e.ss[r]
+	row = strings.ReplaceAll(row, "\t", "$$$$")
 	width := e.screencols - e.left_margin_offset
 	if width >= len(row) {
 		return 1
@@ -180,7 +167,7 @@ func (e *Editor) getLineInRowWW(r, c int) int {
 			lines++
 			break
 		}
-		pos := bytes.LastIndex(row[start:start+width], []byte(" "))
+		pos := strings.LastIndex(row[start:start+width], " ")
 		if pos == -1 {
 			end = start + width - 1
 		} else {
@@ -251,10 +238,6 @@ func (e *Editor) drawDiagnostics() {
 			x := e.left_margin + 1
 			ab.WriteString("\x1b[48;5;244m")
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", y, x)
-			/*
-				row := e.bb[startRow]
-				ab.Write(row[startCol-1 : endCol])
-			*/
 			fmt.Fprintf(&ab, "%*d", 3, startRow+1)
 			ab.WriteString(RESET)
 			break
@@ -349,12 +332,11 @@ func (e *Editor) applyWorkspaceEdit(wse protocol.WorkspaceEdit) {
 			line := int(edit.Range.Start.Line)
 			startChar := int(edit.Range.Start.Character)
 			endChar := int(edit.Range.End.Character)
-			row := string(e.bb[line])
+			row := e.ss[line]
 			row = row[:startChar] + edit.NewText + row[endChar:]
 			//v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
 			vim.Input2(fmt.Sprintf("%dgg%dlc%dl%s\x1b", line, startChar, endChar-startChar, edit.NewText))
-			//e.bb, _ = v.BufferLines(e.vbuf, 0, -1, true) //reading updated buffer
-			e.bb = vim.BufferLines(e.vbuf) //reading updated buffer
+			e.ss = vim.BufferLinesS(e.vbuf) //reading updated buffer
 			e.drawText()
 		}
 	}
@@ -524,8 +506,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 					break //out for should be done (theoretically) - 1
 				}
 				line_char_count := e.getLineCharCountWW(rowNum, line)
-				//pab.Write(e.bb[rowNum][pos : pos+line_char_count])
-				pab.Write(bytes.ReplaceAll(e.bb[rowNum][pos:pos+line_char_count], []byte("\t"), []byte("    ")))
+				pab.WriteString(strings.ReplaceAll(e.ss[rowNum][pos:pos+line_char_count], "\t", "    "))
 				pab.WriteString(lf_ret)
 				y += 1
 				pos += line_char_count
@@ -551,25 +532,25 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			} else {
 				fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, 1+e.left_margin+e.left_margin_offset)
 			}
-			row := e.bb[startRow+n]
+			row := e.ss[startRow+n]
 
 			// I do not know why this works!!
-			row = bytes.ReplaceAll(row, []byte("\t"), []byte(" "))
+			row = strings.ReplaceAll(row, "\t", " ")
 
 			if len(row) == 0 {
 				continue
 			}
 			if numrows == 1 {
-				pab.Write(row[startCol : endcol+1])
+				pab.WriteString(row[startCol : endcol+1])
 			} else if n == 0 {
-				pab.Write(row[startCol:])
+				pab.WriteString(row[startCol:])
 			} else if n < numrows-1 {
-				pab.Write(row)
+				pab.WriteString(row)
 			} else {
 				if len(row) < endcol {
-					pab.Write(row)
+					pab.WriteString(row)
 				} else {
-					pab.Write(row[:endcol])
+					pab.WriteString(row[:endcol])
 				}
 			}
 		}
@@ -590,7 +571,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 		pab.WriteString("\x1b[48;5;237m")
 		for n := 0; n < (e.highlight[1][0] - e.highlight[0][0] + 1); n++ {
 			fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, x)
-			row := e.bb[e.highlight[0][0]+n-1]
+			row := e.ss[e.highlight[0][0]+n-1]
 			rowLen := len(row)
 
 			if rowLen == 0 || rowLen < left {
@@ -598,9 +579,9 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			}
 
 			if rowLen < right+1 {
-				pab.Write(row[left:rowLen])
+				pab.WriteString(row[left:rowLen])
 			} else {
-				pab.Write(row[left : right+1])
+				pab.WriteString(row[left : right+1])
 			}
 		}
 	}
@@ -609,7 +590,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 }
 
 func (e *Editor) getLineCharCountWW(r, line int) int {
-	row := e.bb[r]
+	row := e.ss[r]
 
 	width := e.screencols - e.left_margin_offset
 
@@ -627,7 +608,7 @@ func (e *Editor) getLineCharCountWW(r, line int) int {
 			return len(row[prev_pos:])
 		}
 
-		pos = bytes.LastIndex(row[prev_pos:pos+width], []byte(" "))
+		pos = strings.LastIndex(row[prev_pos:pos+width], " ")
 
 		if pos == -1 {
 			pos = prev_pos + width - 1
@@ -802,9 +783,9 @@ func (e *Editor) drawHighlights(pab *strings.Builder) {
 		return
 	}
 	for _, p := range e.highlightPositions {
-		row := e.bb[p.rowNum]
+		row := e.ss[p.rowNum]
 		chars := "\x1b[48;5;31m" + string(row[p.start:p.end]) + "\x1b[0m"
-		start := utf8.RuneCount(row[:p.start])
+		start := utf8.RuneCountInString(row[:p.start])
 		y := e.getScreenYFromRowColWW(p.rowNum, start) + e.top_margin - e.lineOffset          // - 1
 		x := e.getScreenXFromRowColWW(p.rowNum, start) + e.left_margin + e.left_margin_offset // - 1
 		if y >= e.top_margin && y <= e.screenlines {
@@ -822,7 +803,7 @@ func (e *Editor) drawHighlights(pab *strings.Builder) {
 * we don't have to handle word-wrapped lines in a special way
  */
 func (e *Editor) generateWWStringFromBuffer2() string {
-	numRows := len(e.bb)
+	numRows := len(e.ss)
 	if numRows == 0 {
 		return ""
 	}
@@ -838,10 +819,10 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 			return ab.String()
 		}
 
-		row := e.bb[filerow]
+		row := e.ss[filerow]
 
 		if len(row) == 0 {
-			ab.Write([]byte("\n"))
+			ab.WriteString("\n")
 			filerow++
 			y++
 			continue
@@ -852,22 +833,22 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 		for {
 			// if remainder of line is less than screen width
 			if start+width > len(row)-1 {
-				ab.Write(row[start:])
-				ab.Write([]byte("\n"))
+				ab.WriteString(row[start:])
+				ab.WriteString("\n")
 				y++
 				filerow++
 				break
 			}
 
-			pos := bytes.LastIndex(row[start:start+width], []byte(" "))
+			pos := strings.LastIndex(row[start:start+width], " ")
 			if pos == -1 {
 				end = start + width - 1
 			} else {
 				end = start + pos
 			}
 
-			ab.Write(row[start : end+1])
-			ab.Write([]byte("\n"))
+			ab.WriteString(row[start : end+1])
+			ab.WriteString("\n")
 			y++
 			start = end + 1
 		}
@@ -886,7 +867,7 @@ func (e *Editor) generateWWStringFromBuffer2() string {
  * and deals with the issue of multi-line comments
  */
 func (e *Editor) generateWWStringFromBuffer() string {
-	numRows := len(e.bb)
+	numRows := len(e.ss)
 	if numRows == 0 {
 		return ""
 	}
@@ -901,12 +882,10 @@ func (e *Editor) generateWWStringFromBuffer() string {
 			return ab.String()[:ab.Len()-1] // delete last \n
 		}
 
-		//row := e.bb[filerow]
-
-		row := bytes.ReplaceAll(e.bb[filerow], []byte("\t"), []byte("    ")) ////////////
+		row := strings.ReplaceAll(e.ss[filerow], "\t", "    ")
 
 		if len(row) == 0 {
-			ab.Write([]byte("\n"))
+			ab.WriteString("\n")
 			filerow++
 			y++
 			continue
@@ -917,25 +896,25 @@ func (e *Editor) generateWWStringFromBuffer() string {
 		for {
 			// if remainder of line is less than screen width
 			if start+width > len(row)-1 {
-				ab.Write(row[start:])
-				ab.Write([]byte("\n"))
+				ab.WriteString(row[start:])
+				ab.WriteString("\n")
 				y++
 				filerow++
 				break
 			}
 
-			pos := bytes.LastIndex(row[start:start+width], []byte(" "))
+			pos := strings.LastIndex(row[start:start+width], " ")
 			if pos == -1 {
 				end = start + width - 1
 			} else {
 				end = start + pos
 			}
 
-			ab.Write(row[start : end+1])
+			ab.WriteString(row[start : end+1])
 			if y == e.screenlines+e.lineOffset-1 {
 				return ab.String()
 			}
-			ab.Write([]byte("\t"))
+			ab.WriteString("\t")
 			y++
 			start = end + 1
 		}
@@ -1063,12 +1042,13 @@ func (e *Editor) adjustFirstVisibleRow() {
 
 func (e *Editor) readFileIntoNote(filename string) error {
 
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("Error opening file %s: %w", filename, err)
 	}
-	e.bb = bytes.Split(b, []byte("\n"))
-	vim.BufferSetLines(e.vbuf, 0, -1, e.bb, len(e.bb))
+	//e.bb = bytes.Split(b, []byte("\n"))
+	e.ss = strings.Split(string(b), "\n")
+	vim.BufferSetLinesS(e.vbuf, 0, -1, e.ss, len(e.ss))
 
 	e.fr, e.fc, e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0, 0, 0
 

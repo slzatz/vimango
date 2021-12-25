@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
 	"log"
@@ -480,10 +479,10 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	if err != nil {
 		return
 	}
-	e.bb = bytes.Split([]byte(note), []byte("\n"))
+	e.ss = strings.Split(note, "\n")
 	e.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(e.vbuf)
-	vim.BufferSetLines(e.vbuf, 0, -1, e.bb, len(e.bb))
+	vim.BufferSetLinesS(e.vbuf, 0, -1, e.ss, len(e.ss))
 }
 
 func readSyncLogIntoAltRows(id int) {

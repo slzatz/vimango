@@ -123,7 +123,6 @@ func BufferLines(vbuf *C.buf_T) [][]byte {
 
 // returns []string
 func BufferLinesS(vbuf *C.buf_T) []string {
-	// should probably use string builder
 	// line count starts from 1
 	var ss []string
 	lc := BufferGetLineCount(vbuf)

@@ -28,7 +28,8 @@ type Editor struct {
 	id                 int //db id of entry
 	output             *Output
 	vbuf               vim.Buffer
-	bb                 [][]byte
+	//bb                 [][]byte
+	ss                 []string
 	searchPrefix       string
 	renderedNote       string
 	previewLineOffset  int

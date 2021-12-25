@@ -232,7 +232,7 @@ func controlL() {
 
 // for VISUAL mode
 func (e *Editor) decorateWordVisual(c int) {
-	if len(e.bb) == 0 {
+	if len(e.ss) == 0 {
 		return
 	}
 
@@ -241,12 +241,11 @@ func (e *Editor) decorateWordVisual(c int) {
 		return
 	}
 
-	//row := e.bb[e.fr]
-	row := e.bb[e.highlight[0][0]-1]
+	row := e.ss[e.highlight[0][0]-1]
 	beg, end := e.highlight[0][1]-1, e.highlight[1][1]
 
 	var undo bool
-	s := string(row[beg:end])
+	s := row[beg:end]
 	if strings.HasPrefix(s, "**") {
 		if c == ctrlKey('b') {
 			undo = true
@@ -287,11 +286,11 @@ func (e *Editor) decorateWordVisual(c int) {
 }
 
 func (e *Editor) decorateWord(c int) {
-	if len(e.bb) == 0 {
+	if len(e.ss) == 0 {
 		return
 	}
 
-	if e.bb[e.fr][e.fc] == ' ' {
+	if e.ss[e.fr][e.fc] == ' ' {
 		return
 	}
 
@@ -396,7 +395,7 @@ func showWindows() {
 */
 
 func (e *Editor) showMarkdownPreview() {
-	if len(e.bb) == 0 {
+	if len(e.ss) == 0 {
 		return
 	}
 

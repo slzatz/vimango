@@ -39,7 +39,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 		pos := vim.CursorGetPosition() //set screen cx and cy from pos
 		p.fr = pos[0] - 1
-		p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
+		p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
 		sess.showEdMessage("")
 		return true
 	}
@@ -114,10 +114,10 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				}
 
 				p.command = ""
-				p.bb = vim.BufferLines(p.vbuf)
+				p.ss = vim.BufferLinesS(p.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
-				p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
+				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
 				return true
 			} else {
 				return false
@@ -132,10 +132,10 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			vim.Key("<esc>")
 			p.mode = NORMAL
 			p.command = ""
-			p.bb = vim.BufferLines(p.vbuf)
+			p.ss = vim.BufferLinesS(p.vbuf)
 			pos := vim.CursorGetPosition() //set screen cx and cy from pos
 			p.fr = pos[0] - 1
-			p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
+			p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
 			return true
 		}
 
@@ -156,10 +156,10 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				vim.Input(":" + p.command_line + "\r")
 				p.mode = NORMAL
 				p.command = ""
-				p.bb = vim.BufferLines(p.vbuf)
+				p.ss = vim.BufferLinesS(p.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
-				p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
+				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
 				sess.showOrgMessage("search and replace: %s", p.command_line)
 				return true
 			}
@@ -313,10 +313,10 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	}
 
 	//below is done for everything except SEARCH and EX_COMMAND
-	p.bb = vim.BufferLines(p.vbuf)
+	p.ss = vim.BufferLinesS(p.vbuf)
 	pos := vim.CursorGetPosition() //set screen cx and cy from pos
 	p.fr = pos[0] - 1
-	p.fc = utf8.RuneCount(p.bb[p.fr][:pos[1]])
+	p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
 
 	return true
 }
