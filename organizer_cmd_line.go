@@ -149,6 +149,7 @@ func (o *Organizer) open(pos int) {
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	o.altRowoff = 0
 	o.drawPreview()
 	return
 }
@@ -197,6 +198,7 @@ func (o *Organizer) openContext(pos int) {
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	o.altRowoff = 0
 	o.drawPreview()
 	return
 }
@@ -243,6 +245,7 @@ func (o *Organizer) openFolder(pos int) {
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	o.altRowoff = 0
 	o.drawPreview()
 	return
 }
@@ -280,6 +283,7 @@ func (o *Organizer) openKeyword(pos int) {
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	o.altRowoff = 0
 	o.drawPreview()
 	return
 }

@@ -164,6 +164,7 @@ func organizerProcessKey(c int) {
 			org.fr = pos[0] - 1
 			org.fc = 0
 			vim.CursorSetPosition(org.fr+1, 0)
+			org.altRowoff = 0
 			if org.view == TASK {
 				org.drawPreview()
 			} else {
