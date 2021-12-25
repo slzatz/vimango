@@ -833,8 +833,9 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 		for {
 			// if remainder of line is less than screen width
 			if start+width > len(row)-1 {
-				ab.WriteString(row[start:])
-				ab.WriteString("\n")
+				//ab.WriteString(row[start:])
+				//ab.WriteString("\n")
+				fmt.Fprintf(&ab, "%s%s", row[start:], "\n")
 				y++
 				filerow++
 				break
@@ -847,8 +848,9 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 				end = start + pos
 			}
 
-			ab.WriteString(row[start : end+1])
-			ab.WriteString("\n")
+			//ab.WriteString(row[start : end+1])
+			//ab.WriteString("\n")
+			fmt.Fprintf(&ab, "%s%s", row[start:end+1], "\n")
 			y++
 			start = end + 1
 		}
@@ -896,8 +898,9 @@ func (e *Editor) generateWWStringFromBuffer() string {
 		for {
 			// if remainder of line is less than screen width
 			if start+width > len(row)-1 {
-				ab.WriteString(row[start:])
-				ab.WriteString("\n")
+				//ab.WriteString(row[start:])
+				//ab.WriteString("\n")
+				fmt.Fprintf(&ab, "%s%s", row[start:], "\n")
 				y++
 				filerow++
 				break
