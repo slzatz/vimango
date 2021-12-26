@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/slzatz/vimango/hunspell"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -543,17 +544,13 @@ func (e *Editor) spellingCheck() {
 }
 
 func (e *Editor) spellSuggest() {
-	vim.Execute("let sug = spellsuggest(expand('<cword>'))")
-	sug := vim.Eval("string(sug)")
-	e.suggestions, e.overlay = nil, nil
-	for i, s := range strings.Split(sug, ",") {
-		e.suggestions = append(e.suggestions, s)
-		e.overlay = append(e.overlay, fmt.Sprintf("%2d. %v", i, s))
+	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
+	vim.Execute("let cword = expand('<cword>')")
+	w := vim.Eval("cword")
+	if ok := h.Spell(w); ok {
+		sess.showEdMessage("%q is spelled correctly", w)
+		return
 	}
-	e.mode = SPELLING
-	e.previewLineOffset = 0
-	e.drawOverlay()
-
-	//.VVar("statusmsg", &s)
-	//sess.showOrgMessage("ss = %+v", suggestions)
+	s := h.Suggest(w)
+	sess.showEdMessage("%q -> %s", w, strings.Join(s, "|"))
 }
