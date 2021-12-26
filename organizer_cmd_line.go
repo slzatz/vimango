@@ -197,6 +197,7 @@ func (o *Organizer) openContext(pos int) {
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.altRowoff = 0
 	o.drawPreview()
