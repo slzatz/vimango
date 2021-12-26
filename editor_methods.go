@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/slzatz/vimango/hunspell"
 	"github.com/slzatz/vimango/vim"
 	"go.lsp.dev/protocol"
 )
@@ -725,53 +725,25 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 }
 
 func (e *Editor) highlightMispelledWords() {
+	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
 	e.highlightPositions = nil
-	var rowNum int
-	var start int
-	var end int
-	//curPos, _ := v.WindowCursor(w)
 	curPos := vim.CursorGetPosition()
-	//v.Command("set spell")
-	vim.Execute("set spell")
-	vim.Input2("gg]s")
-	//first, _ := v.WindowCursor(w)
-	first := vim.CursorGetPosition()
-	rowNum = first[0] - 1
-	start = first[1]
-	vim.Execute("let length = strlen(expand('<cword>'))")
-	ln_s := vim.Eval("length")
-	ln, _ := strconv.Atoi(ln_s)
-	end = start + ln
-	e.highlightPositions = append(e.highlightPositions, Position{rowNum, start, end})
-	var pos [2]int
+	vim.Input2("gg^")
+	var pos, prevPos [2]int
 	for {
-		vim.Input2("]s")
+		vim.Input("w")
+		prevPos = pos
 		pos = vim.CursorGetPosition()
-		//pos, _ = v.WindowCursor(w)
-		if pos == first {
+		if pos == prevPos {
 			break
 		}
-		rowNum = pos[0] - 1
-		// adjustment is made in drawHighlights
-		//start = utf8.RuneCount(p.bb[rowNum][:pos[1]])
-		start = pos[1]
-		vim.Execute("let length = strlen(expand('<cword>'))")
-		ln_s := vim.Eval("length")
-		ln, _ := strconv.Atoi(ln_s)
-		end = start + ln
-
-		e.highlightPositions = append(e.highlightPositions, Position{rowNum, start, end})
+		w := vim.Eval("expand('<cword>')")
+		if ok := h.Spell(w); ok {
+			continue
+		}
+		e.highlightPositions = append(e.highlightPositions, Position{pos[0] - 1, pos[1], pos[1] + len(w)})
 	}
-	//v.SetWindowCursor(w, curPos) //return cursor to where it was
 	vim.CursorSetPosition(curPos[0], curPos[1]) //return cursor to where it was
-
-	// done here because no need to redraw text
-	/*
-		var ab strings.Builder
-		e.drawHighlights(&ab)
-		fmt.Print(ab.String())
-		sess.showEdMessage("e.highlightPositions = %=v", e.highlightPositions)
-	*/
 }
 
 func (e *Editor) drawHighlights(pab *strings.Builder) {

@@ -536,6 +536,7 @@ func (e *Editor) reference() {
 }
 
 func (e *Editor) spellingCheck() {
+	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
 	if e.isModified() {
 		sess.showEdMessage("%sYou need to write the note before highlighting text%s", RED_BG, RESET)
 		return
@@ -545,8 +546,7 @@ func (e *Editor) spellingCheck() {
 
 func (e *Editor) spellSuggest() {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
-	vim.Execute("let cword = expand('<cword>')")
-	w := vim.Eval("cword")
+	w := vim.Eval("expand('<cword>')")
 	if ok := h.Spell(w); ok {
 		sess.showEdMessage("%q is spelled correctly", w)
 		return
