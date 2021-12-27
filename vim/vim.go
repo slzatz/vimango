@@ -100,7 +100,7 @@ func BufferGetLine(vbuf *C.buf_T, lineNum int) string {
 }
 
 //char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
-func BufferGetLine2(vbuf *C.buf_T, lineNum int) []byte {
+func BufferGetLineB(vbuf *C.buf_T, lineNum int) []byte {
 	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
 	// need to cast to *C.char to use strlen
 	// in vim.h: #define STRLEN(s) strlen((char *)(s))
@@ -111,18 +111,18 @@ func BufferGetLine2(vbuf *C.buf_T, lineNum int) []byte {
 }
 
 // returns [][]byte
-func BufferLines(vbuf *C.buf_T) [][]byte {
+func BufferLinesB(vbuf *C.buf_T) [][]byte {
 	var bbb [][]byte
 	lc := BufferGetLineCount(vbuf)
 	for i := 1; i <= lc; i++ {
-		bb := BufferGetLine2(vbuf, i)
+		bb := BufferGetLineB(vbuf, i)
 		bbb = append(bbb, bb)
 	}
 	return bbb
 }
 
 // returns []string
-func BufferLinesS(vbuf *C.buf_T) []string {
+func BufferLines(vbuf *C.buf_T) []string {
 	// line count starts from 1
 	var ss []string
 	lc := BufferGetLineCount(vbuf)
@@ -151,10 +151,10 @@ func Execute(s string) {
 }
 
 //void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
-func BufferSetLines(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
+func BufferSetLinesB(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
 	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(unsafe.Pointer(p))
-	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count]
+	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count:count]
 
 	for i, b := range bb {
 		b = append(b, 0) // make sure c-string will be zero-terminated
@@ -166,10 +166,11 @@ func BufferSetLines(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
 	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
 }
 
-func BufferSetLinesS(vbuf *C.buf_T, start, end int, ss []string, count int) {
+//void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
+func BufferSetLines(vbuf *C.buf_T, start, end int, ss []string, count int) {
 	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(unsafe.Pointer(p))
-	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count]
+	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count:count]
 
 	for i, s := range ss {
 		view[i] = (*C.uchar)(unsafe.Pointer(C.CString(s)))

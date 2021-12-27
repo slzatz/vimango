@@ -43,26 +43,11 @@ func Hunspell(affpath string, dpath string) *Hunhandle {
 	return h
 }
 
-func CArrayToString(c **C.char, l int) []string {
-
+func CArrayToString(c **C.char, length int) []string {
 	s := []string{}
-
-	/*
-		hdr := reflect.SliceHeader{
-			Data: uintptr(unsafe.Pointer(c)),
-			Len:  l,
-			Cap:  l,
-		}
-
-		for _, v := range *(*[]*C.char)(unsafe.Pointer(&hdr)) {
-			s = append(s, C.GoString(v))
-		}
-	*/
-
-	for _, x := range (*[1<<30 - 1]*C.char)(unsafe.Pointer(c))[:l:l] {
+	for _, x := range (*[1<<30 - 1]*C.char)(unsafe.Pointer(c))[:length:length] {
 		s = append(s, C.GoString(x))
 	}
-
 	return s
 }
 

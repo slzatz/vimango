@@ -592,7 +592,7 @@ func (e *Editor) goFormat() {
 	}
 	e.ss = ss
 
-	vim.BufferSetLinesS(e.vbuf, 0, -1, e.ss, len(e.ss))
+	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 	pos := vim.CursorGetPosition()
 	e.fr = pos[0] - 1
 	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])

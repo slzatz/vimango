@@ -320,13 +320,12 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 }
 
 func (o *Organizer) readRowsIntoBuffer() {
-	var bb [][]byte
+	var ss []string
 	for _, row := range o.rows {
-		bb = append(bb, []byte(row.title))
+		ss = append(ss, row.title)
 	}
-	vim.BufferSetLines(o.vbuf, 0, -1, bb, len(bb))
+	vim.BufferSetLines(o.vbuf, 0, -1, ss, len(ss))
 	vim.BufferSetCurrent(o.vbuf)
-	//sess.showOrgMessage("%d %d", len(bb), vim.BufferGetLineCount(o.vbuf))
 }
 
 func updateTitle() {
@@ -482,7 +481,7 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	e.ss = strings.Split(note, "\n")
 	e.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(e.vbuf)
-	vim.BufferSetLinesS(e.vbuf, 0, -1, e.ss, len(e.ss))
+	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 }
 
 func readSyncLogIntoAltRows(id int) {

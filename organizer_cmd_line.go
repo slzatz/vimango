@@ -426,7 +426,7 @@ func (o *Organizer) newEntry(unused int) {
 		sort: time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
 	}
 
-	vim.BufferSetLines(o.vbuf, 0, 0, [][]byte{[]byte("")}, 1)
+	vim.BufferSetLines(o.vbuf, 0, 0, []string{""}, 1)
 	o.rows = append(o.rows, Row{})
 	copy(o.rows[1:], o.rows[0:])
 	o.rows[0] = row
@@ -819,7 +819,6 @@ func (o *Organizer) save(pos int) {
 	}
 	defer f.Close()
 
-	//_, err = f.Write(bytes.Join(e.bb, []byte("\n")))
 	_, err = f.WriteString(strings.Join(o.note, "\n"))
 	if err != nil {
 		sess.showOrgMessage("Error writing file %s: %v", filename, err)
@@ -901,12 +900,12 @@ func (o *Organizer) printDocument(unused int) {
 }
 
 func (o *Organizer) printList(unused int) {
-	var bb [][]byte
+	var ss []string
 	for i, row := range o.rows {
-		bb = append(bb, []byte(fmt.Sprintf("%2d. %s", i+1, row.title)))
+		ss = append(ss, fmt.Sprintf("%2d. %s", i+1, row.title))
 	}
 	tempBuf := vim.BufferNew(0)
-	vim.BufferSetLines(tempBuf, 0, -1, bb, len(bb))
+	vim.BufferSetLines(tempBuf, 0, -1, ss, len(ss))
 	vim.BufferSetCurrent(tempBuf)
 	vim.Execute("ha")
 

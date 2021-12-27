@@ -336,7 +336,7 @@ func (e *Editor) applyWorkspaceEdit(wse protocol.WorkspaceEdit) {
 			row = row[:startChar] + edit.NewText + row[endChar:]
 			//v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
 			vim.Input2(fmt.Sprintf("%dgg%dlc%dl%s\x1b", line, startChar, endChar-startChar, edit.NewText))
-			e.ss = vim.BufferLinesS(e.vbuf) //reading updated buffer
+			e.ss = vim.BufferLines(e.vbuf) //reading updated buffer
 			e.drawText()
 		}
 	}
@@ -1021,9 +1021,8 @@ func (e *Editor) readFileIntoNote(filename string) error {
 	if err != nil {
 		return fmt.Errorf("Error opening file %s: %w", filename, err)
 	}
-	//e.bb = bytes.Split(b, []byte("\n"))
 	e.ss = strings.Split(string(b), "\n")
-	vim.BufferSetLinesS(e.vbuf, 0, -1, e.ss, len(e.ss))
+	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 
 	e.fr, e.fc, e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0, 0, 0
 

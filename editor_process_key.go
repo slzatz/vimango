@@ -114,7 +114,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				}
 
 				p.command = ""
-				p.ss = vim.BufferLinesS(p.vbuf)
+				p.ss = vim.BufferLines(p.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
 				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
@@ -132,7 +132,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			vim.Key("<esc>")
 			p.mode = NORMAL
 			p.command = ""
-			p.ss = vim.BufferLinesS(p.vbuf)
+			p.ss = vim.BufferLines(p.vbuf)
 			pos := vim.CursorGetPosition() //set screen cx and cy from pos
 			p.fr = pos[0] - 1
 			p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
@@ -156,7 +156,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				vim.Input(":" + p.command_line + "\r")
 				p.mode = NORMAL
 				p.command = ""
-				p.ss = vim.BufferLinesS(p.vbuf)
+				p.ss = vim.BufferLines(p.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
 				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
@@ -313,7 +313,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	}
 
 	//below is done for everything except SEARCH and EX_COMMAND
-	p.ss = vim.BufferLinesS(p.vbuf)
+	p.ss = vim.BufferLines(p.vbuf)
 	pos := vim.CursorGetPosition() //set screen cx and cy from pos
 	p.fr = pos[0] - 1
 	p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])

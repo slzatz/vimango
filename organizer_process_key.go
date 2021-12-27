@@ -26,7 +26,7 @@ func organizerProcessKey(c int) {
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
 		org.fr = pos[0] - 1
-		//org.fc = utf8.RuneCount(p.bb[org.fr][:pos[1]])
+		//org.fc = utf8.RuneCount(p.ss[org.fr][:pos[1]])
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
 		sess.imagePreview = false
@@ -62,7 +62,7 @@ func organizerProcessKey(c int) {
 		} else {
 			vim.Input(string(c))
 		}
-		s := vim.BufferLinesS(org.vbuf)[org.fr]
+		s := vim.BufferLines(org.vbuf)[org.fr]
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
@@ -171,7 +171,7 @@ func organizerProcessKey(c int) {
 				sess.displayContainerInfo()
 			}
 		}
-		s := vim.BufferLinesS(org.vbuf)[org.fr]
+		s := vim.BufferLines(org.vbuf)[org.fr]
 		org.rows[org.fr].title = s
 		//firstLine := vim.WindowGetTopLine() // doesn't seem to work
 		row := &org.rows[org.fr]
@@ -216,7 +216,7 @@ func organizerProcessKey(c int) {
 			vim.Input(string(c))
 		}
 
-		s := vim.BufferLinesS(org.vbuf)[org.fr]
+		s := vim.BufferLines(org.vbuf)[org.fr]
 		org.rows[org.fr].title = s
 		pos := vim.CursorGetPosition()
 		org.fc = pos[1]
