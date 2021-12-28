@@ -40,7 +40,7 @@ var e_lookup2 = map[string]interface{}{
 	leader + "sp": (*Editor).spellingCheck,
 	leader + "su": (*Editor).spellSuggest,
 	//leader + "xx": (*Editor).test,
-	"z=": (*Editor).spellSuggest,
+	//"z=": (*Editor).spellSuggest,
 }
 
 func (e *Editor) changeSplit(flag int) {

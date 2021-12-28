@@ -86,7 +86,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 	case NORMAL:
 		// characters below make up first char of non-vim commands
 		if len(p.command) == 0 {
-			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b z") != -1 {
+			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
 				p.command = string(c)
 			}
 		} else {
@@ -260,17 +260,6 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		//process the key in vim below so no return
 		//end SEARCH
 	} //end switch
-
-	// Most control characters we don't want to send to vim
-	// however, we do want to send carriage return (13), ctrl-v (22), tab (9) and escape (27)
-	// escape is dealt with first thing
-	// could we put this at the top
-	// is it really necessary?
-	/*
-		if c < 32 && !(c == 13 || c == 22 || c == 9) {
-			return false
-		}
-	*/
 
 	// Process the key
 	if z, found := termcodes[c]; found {

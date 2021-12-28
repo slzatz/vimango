@@ -225,6 +225,36 @@ func GetMode() int {
 	return int(m)
 }
 
+/* There are some modal input experiences that aren't considered
+full-fledged modes, but are nevertheless a modal input state.
+Examples include insert-literal (C-V, C-G), search w/ confirmation, etc.
+*/
+//subMode_T vimGetSubMode(void);
+// not in use
+func GetSubmode() C.subMode_T {
+	return C.vimGetSubMode()
+}
+
+type pendingOp_T struct {
+	op_type int
+	regname int
+	count   int
+}
+
+//vimGetPendingOperator(pendingOp_T *pendingOp);
+// unfortunately not very useful - does catch commands like 'd', 'c', 'Nd', 'Nc'
+// not in use
+func GetPendingOperator() (int, pendingOp_T) {
+	var pendingOp C.pendingOp_T
+	x := C.vimGetPendingOperator(&pendingOp)
+	y := pendingOp_T{
+		op_type: int(pendingOp.op_type),
+		regname: int(pendingOp.regname),
+		count:   int(pendingOp.count),
+	}
+	return int(x), y
+}
+
 //int vimBufferGetModified(buf_T *buf);
 func BufferGetModified(vbuf *C.buf_T) bool {
 	b := C.vimBufferGetModified(vbuf)
