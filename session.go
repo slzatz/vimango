@@ -352,9 +352,17 @@ func (s *Session) displayEntryInfo(e *Entry) {
 		completed = false
 	}
 
+	var added string
+	// may be NULL
+	if e.added.Valid {
+		added = e.added.String
+	} else {
+		completed = false
+		added = "null"
+	}
 	fmt.Fprintf(&ab, "completed: %t%s", completed, lf_ret)
 	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
-	fmt.Fprintf(&ab, "added: %s%s", e.added, lf_ret)
+	fmt.Fprintf(&ab, "added: %s%s", added, lf_ret)
 
 	fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(getId()), lf_ret)
 

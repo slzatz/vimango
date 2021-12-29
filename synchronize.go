@@ -226,7 +226,7 @@ func synchronize(reportOnly bool) (log string) {
 	}
 	if len(server_deleted_folders) > 0 {
 		nn += len(server_deleted_folders)
-		fmt.Fprintf(&lg, "- Deleted `Folders`: %d\n", len(server_updated_folders))
+		fmt.Fprintf(&lg, "- Deleted `Folders`: %d\n", len(server_deleted_folders))
 	} else {
 		lg.WriteString("- No `Folders` deleted.\n")
 	}
@@ -278,7 +278,7 @@ func synchronize(reportOnly bool) (log string) {
 	}
 	if len(server_deleted_keywords) > 0 {
 		nn += len(server_deleted_keywords)
-		fmt.Fprintf(&lg, "- Deleted server `Keywords`: %d\n", len(server_updated_keywords))
+		fmt.Fprintf(&lg, "- Deleted server `Keywords`: %d\n", len(server_deleted_keywords))
 	} else {
 		lg.WriteString("- No `Keywords` deleted.\n")
 	}
@@ -313,8 +313,10 @@ func synchronize(reportOnly bool) (log string) {
 	} else {
 		lg.WriteString("- No `Entries` updated.\n")
 	}
-	for _, e := range server_updated_entries {
-		fmt.Fprintf(&lg, "    - id: %d star: %t *%q* folder_id: %d context_id: %d  modified: %v\n", e.id, e.star, truncate(e.title, 15), e.context_id, e.folder_id, tc(e.modified, 19, false))
+	if len(server_updated_entries) < 100 {
+		for _, e := range server_updated_entries {
+			fmt.Fprintf(&lg, "    - id: %d star: %t *%q* folder_id: %d context_id: %d  modified: %v\n", e.id, e.star, truncate(e.title, 15), e.context_id, e.folder_id, tc(e.modified, 19, false))
+		}
 	}
 
 	//server deleted entries
@@ -816,7 +818,9 @@ func synchronize(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error inserting into fts_db for entry with id %d: %v\n", client_id, err2)
 				break
 			}
-			fmt.Fprintf(&lg, "Created new local entry *%q* with id **%d** and tid **%d**\n", truncate(e.title, 15), client_id, e.id)
+			if len(server_updated_entries) < 100 {
+				fmt.Fprintf(&lg, "Created new local entry *%q* with id **%d** and tid **%d**\n", truncate(e.title, 15), client_id, e.id)
+			}
 		case err != nil:
 			fmt.Fprintf(&lg, "Error querying sqlite for a entry with tid: %v: %w\n", e.id, err)
 			continue
@@ -1115,7 +1119,7 @@ func synchronize(reportOnly bool) (log string) {
 
 	//server_deleted_keywords
 	for _, c := range server_deleted_keywords {
-		pdb.Exec("DELETE FROM task_keyword WHERE keyword_id=$1;", c.id)
+		//pdb.Exec("DELETE FROM task_keyword WHERE keyword_id=$1;", c.id) //Dec 29, 2021
 		row = db.QueryRow("SELECT id FROM keyword WHERE keyword.tid=?", c.id)
 		var id int
 		err = row.Scan(&id)
