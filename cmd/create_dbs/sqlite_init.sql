@@ -77,10 +77,10 @@ CREATE TABLE task_keyword (
         FOREIGN KEY(keyword_id) REFERENCES keyword (id)
 );
 CREATE TABLE sync_log (
-id INTEGER NOT NULL,
-title TEXT,
-modified TEXT,
-note TEXT,
-PRIMARY KEY (id)
+        id INTEGER NOT NULL,
+        title TEXT,
+        modified TEXT,
+        note TEXT,
+        PRIMARY KEY (id)
 );
 
