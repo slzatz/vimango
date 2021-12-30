@@ -799,20 +799,18 @@ func synchronize(reportOnly bool) (log string) {
 	for _, e := range server_updated_entries {
 		// below is for server always wins
 		server_updated_entries_ids[e.id] = struct{}{}
-		row := db.QueryRow("SELECT id from task WHERE tid=?", e.id)
+		//row := db.QueryRow("SELECT id from task WHERE tid=?", e.id)
 		var client_id int
-		err := row.Scan(&client_id)
+		err := db.QueryRow("SELECT id from task WHERE tid=?", e.id).Scan(&client_id)
 		switch {
 		case err == sql.ErrNoRows:
-			res, err1 := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
-				"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false);",
-				e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
+			err1 := db.QueryRow("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
+				"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) RETURNING id;",
+				e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note).Scan(&client_id)
 			if err1 != nil {
 				fmt.Fprintf(&lg, "Error inserting new entry for %q into sqlite: %v\n", truncate(e.title, 15), err1)
 				break
 			}
-			id, _ := res.LastInsertId()
-			client_id = int(id)
 			_, err2 := fts_db.Exec("INSERT INTO fts (title, note, lm_id) VALUES (?, ?, ?);", e.title, e.note, client_id)
 			if err2 != nil {
 				fmt.Fprintf(&lg, "Error inserting into fts_db for entry with id %d: %v\n", client_id, err2)
