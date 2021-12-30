@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -91,18 +92,28 @@ func firstSync(reportOnly bool) (log string) {
 		return
 	}
 
+	t0 := time.Now()
+	fmt.Fprintf(&lg, "Starting initial sync at %v\n", t0)
+
+	var count int
+
 	//server contexts
-	rows, err := pdb.Query("SELECT id, title, star, created, modified FROM context WHERE context.deleted = FALSE ORDER BY id;")
+	err = pdb.QueryRow("SELECT COUNT(*) from context WHERE deleted = FALSE;").Scan(&count)
 	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_updated_contexts: %v", err)
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_contexts: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Contexts`: %d\n", count)
+
+	rows, err := pdb.Query("SELECT id, title, star, created, modified FROM context WHERE deleted = FALSE ORDER BY id;")
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in SELECT for server_contexts: %v", err)
 		return
 	}
 
 	defer rows.Close()
 
-	fmt.Fprint(&lg, "## Server Changes\n")
-
-	var server_contexts []Container
+	server_contexts := make([]Container, 0, count)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
@@ -114,16 +125,21 @@ func firstSync(reportOnly bool) (log string) {
 		)
 		server_contexts = append(server_contexts, c)
 	}
-	fmt.Fprintf(&lg, "- `Contexts`: **%d**\n", len(server_contexts))
 
 	//server folders
-	rows, err = pdb.Query("SELECT id, title, star, created, modified FROM folder WHERE folder.deleted = FALSE ORDER BY id;")
+	err = pdb.QueryRow("SELECT COUNT(*) from folder WHERE deleted = FALSE;").Scan(&count)
 	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_updated_folders: %v", err)
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_folders: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Folders`: %d\n", count)
+	rows, err = pdb.Query("SELECT id, title, star, created, modified FROM folder WHERE deleted = FALSE ORDER BY id;")
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in SELECT for server_folders: %v", err)
 		return
 	}
 
-	var server_folders []Container
+	server_folders := make([]Container, 0, count)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
@@ -135,16 +151,21 @@ func firstSync(reportOnly bool) (log string) {
 		)
 		server_folders = append(server_folders, c)
 	}
-	fmt.Fprintf(&lg, "- `Folders`: %d\n", len(server_folders))
 
 	//server keywords
-	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE keyword.deleted = FALSE;")
+	err = pdb.QueryRow("SELECT COUNT(*) from keyword WHERE deleted = FALSE;").Scan(&count)
 	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_updated_keywords: %v", err)
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_keywords: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Keywords`: %d\n", count)
+	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted = FALSE;")
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in SELECT for server_keywords: %v", err)
 		return
 	}
 
-	var server_keywords []Container
+	server_keywords := make([]Container, 0, count)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
@@ -155,16 +176,23 @@ func firstSync(reportOnly bool) (log string) {
 		)
 		server_keywords = append(server_keywords, c)
 	}
-	fmt.Fprintf(&lg, "- `Keywords`: %d\n", len(server_keywords))
 
 	//server entries
+	err = pdb.QueryRow("SELECT COUNT(*) from task WHERE deleted = FALSE;").Scan(&count)
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_entries: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Entries`: %d\n", count)
+
 	rows, err = pdb.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted = False ORDER By id;")
 	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_updated_entries: %v", err)
+		fmt.Fprintf(&lg, "Error in SELECT for server_entries: %v", err)
 		return
 	}
 
-	var server_entries []serverEntry
+	//var server_entries []serverEntry
+	server_entries := make([]serverEntry, 0, count)
 	for rows.Next() {
 		var e serverEntry
 		rows.Scan(
@@ -181,7 +209,6 @@ func firstSync(reportOnly bool) (log string) {
 		)
 		server_entries = append(server_entries, e)
 	}
-	fmt.Fprintf(&lg, "- `Entries`: %d\n", len(server_entries))
 
 	if reportOnly {
 		// note there is a defer log.String()
@@ -229,9 +256,10 @@ func firstSync(reportOnly bool) (log string) {
 		}
 	}
 
-	/**********should come before container deletes to change tasks here*****************/
-	//i := 0
-	for _, e := range server_entries {
+	for i, e := range server_entries {
+		if i%200 == 0 {
+			sess.showEdMessage("%d entries processed", i)
+		}
 		res, err := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
 			"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false);",
 			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
@@ -290,7 +318,10 @@ func firstSync(reportOnly bool) (log string) {
 		return
 	}
 	fmt.Fprintf(&lg, "\nClient UTC timestamp: %s\n", client_ts)
-	fmt.Fprintf(&lg, "Server UTC timestamp: %s", strings.Replace(tc(server_ts, 19, false), "T", " ", 1))
+	fmt.Fprintf(&lg, "Server UTC timestamp: %s\n", strings.Replace(tc(server_ts, 19, false), "T", " ", 1))
+
+	fmt.Fprintf(&lg, "Initial sync took %v seconds\n", int(time.Since(t0)/1000000000))
+
 	success = true
 
 	return

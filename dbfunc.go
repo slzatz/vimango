@@ -18,14 +18,13 @@ func getId() int {
 }
 
 func timeDelta(t string) string {
-	var t1 time.Time
+	var t0 time.Time
 	if strings.Contains(t, "T") {
-		t1, _ = time.Parse("2006-01-02T15:04:05Z", t)
+		t0, _ = time.Parse("2006-01-02T15:04:05Z", t)
 	} else {
-		t1, _ = time.Parse("2006-01-02 15:04:05", t)
+		t0, _ = time.Parse("2006-01-02 15:04:05", t)
 	}
-	t0 := time.Now()
-	diff := t0.Sub(t1)
+	diff := time.Since(t0)
 
 	diff = diff / 1000000000
 	if diff <= 120 {
