@@ -76,16 +76,15 @@ func main() {
 	}
 	defer fts_db.Close()
 
-	//createSqliteDB()
+	createSqliteDB()
 
 	//reader := bufio.NewReader(os.Stdin)
 	fmt.Println("You can connect your new local db to a remote postgres db (either newly created or an existing remote db")
-	fmt.Println("\n\x1b[1mNote that if you want to create a new remote database you need to have created an empty postgres db already]\x1b[0m.")
+	fmt.Println("\x1b[1mNote that if you want to create a new remote database you need to have created an empty postgres db already]\x1b[0m.")
 	fmt.Println("Do you want to connect your local database to a remote database? (y or N):")
 	res, _ = reader.ReadString('\n')
 	if strings.ToLower(res)[:1] != "y" {
 		writeConfigFile(config)
-		createSqliteDB(false)
 		fmt.Println("exiting ...")
 		return
 	}
@@ -118,22 +117,19 @@ func main() {
 	fmt.Println("Do you want to create the remote database tables (because it is created but empty)? (y or N):")
 	res, _ = reader.ReadString('\n')
 	if strings.ToLower(res)[:1] != "y" {
-		createSqliteDB(true)
 		fmt.Println("exiting ...")
 		return
 	}
 	fmt.Println("Just checking one more time -- do you want to create the necessary tables in the remote database? (y or N):")
 	res, _ = reader.ReadString('\n')
 	if strings.ToLower(res)[:1] != "y" {
-		createSqliteDB(true)
 		fmt.Println("exiting ...")
 		return
 	}
-	createSqliteDB(false)
 	createPostgresDB(config)
 }
 
-func createSqliteDB(remoteExists bool) {
+func createSqliteDB() {
 	path := "sqlite_init.sql"
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -145,42 +141,6 @@ func createSqliteDB(remoteExists bool) {
 		log.Fatal(err)
 	}
 
-	if remoteExists {
-		_, err = db.Exec("INSERT INTO sync (machine, timestamp) VALUES ('server', datetime('now', '-10 years'));")
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, err = db.Exec("INSERT INTO sync (machine, timestamp) VALUES ('client', datetime('now', '-10 years'));")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		stmt := "INSERT INTO context (title, star, deleted, created, modified, tid) "
-		stmt += "VALUES (?, True, False, datetime('now'), datetime('now', '-11 years'), 1);"
-		_, err = db.Exec(stmt, "none")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		stmt = "INSERT INTO folder (title, star, deleted, created, modified, tid) "
-		stmt += "VALUES (?, True, False, datetime('now'), datetime('now', '-11 years'), 1);"
-		_, err = db.Exec(stmt, "none")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, err = fts_db.Exec("CREATE VIRTUAL TABLE fts USING fts5 (title, note, tag, lm_id UNINDEXED);")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		return
-	}
-
-	/*
-		code below works for both no remote at all and new remote
-			When creating a new remote, the remote database is empty when you do the intial sync
-	*/
 	_, err = db.Exec("INSERT INTO sync (machine, timestamp) VALUES ('server', datetime('now', '-5 seconds'));")
 	if err != nil {
 		log.Fatal(err)
@@ -208,17 +168,6 @@ func createSqliteDB(remoteExists bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	/*
-		var server_ts string
-		row = pdb.QueryRow("SELECT now();")
-		err = row.Scan(&server_ts)
-		if err != nil {
-		  sess.showOrgMessage("Error with getting current time from server: %w", err)
-			return
-		}
-	*/
-
 }
 
 func createPostgresDB(config *dbConfig) {

@@ -259,9 +259,9 @@ type serverEntry struct {
 	folder_id  int
 	context_id int
 	star       bool
-	note       string
-	added      sql.NullTime //string
-	completed  sql.NullTime //sql.NullTime since sqlite doesn't have datetime type
+	note       sql.NullString //string
+	added      sql.NullString //string
+	completed  sql.NullString //sql.NullTime since sqlite doesn't have datetime type
 	deleted    bool
 	modified   string
 }

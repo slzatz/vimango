@@ -199,7 +199,7 @@ func synchronize(reportOnly bool) (log string) {
 		server_updated_folders = append(server_updated_folders, c)
 	}
 	if len(server_updated_folders) > 0 {
-		nn += len(server_updated_contexts)
+		nn += len(server_updated_folders)
 		fmt.Fprintf(&lg, "- `Folders` Updated: %d\n", len(server_updated_folders))
 	} else {
 		lg.WriteString("- No `Folders` updated.\n")
@@ -252,7 +252,7 @@ func synchronize(reportOnly bool) (log string) {
 		server_updated_keywords = append(server_updated_keywords, c)
 	}
 	if len(server_updated_keywords) > 0 {
-		nn += len(server_updated_contexts)
+		nn += len(server_updated_keywords)
 		fmt.Fprintf(&lg, "- Updated `Keywords`: %d\n", len(server_updated_keywords))
 	} else {
 		lg.WriteString("- No `Keywords` updated.\n")
