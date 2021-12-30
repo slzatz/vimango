@@ -1,7 +1,5 @@
 package main
 
-/** note that sqlite datetime('now') returns utc **/
-
 import (
 	"database/sql"
 	"fmt"
@@ -85,7 +83,6 @@ func firstSync(reportOnly bool) (log string) {
 	}
 	defer pdb.Close()
 
-	// Ping to connection
 	err = pdb.Ping()
 	if err != nil {
 		fmt.Fprintf(&lg, "postgres ping failure!: %v", err)
@@ -98,14 +95,14 @@ func firstSync(reportOnly bool) (log string) {
 	var count int
 
 	//server contexts
-	err = pdb.QueryRow("SELECT COUNT(*) from context WHERE deleted = FALSE;").Scan(&count)
+	err = pdb.QueryRow("SELECT COUNT(*) FROM context WHERE deleted=false;").Scan(&count)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for server_contexts: %v", err)
 		return
 	}
 	fmt.Fprintf(&lg, "- `Contexts`: %d\n", count)
 
-	rows, err := pdb.Query("SELECT id, title, star, created, modified FROM context WHERE deleted = FALSE ORDER BY id;")
+	rows, err := pdb.Query("SELECT id, title, star, created, modified FROM context WHERE deleted=false ORDER BY id;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_contexts: %v", err)
 		return
@@ -127,13 +124,13 @@ func firstSync(reportOnly bool) (log string) {
 	}
 
 	//server folders
-	err = pdb.QueryRow("SELECT COUNT(*) from folder WHERE deleted = FALSE;").Scan(&count)
+	err = pdb.QueryRow("SELECT COUNT(*) FROM folder WHERE deleted=false;").Scan(&count)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for server_folders: %v", err)
 		return
 	}
 	fmt.Fprintf(&lg, "- `Folders`: %d\n", count)
-	rows, err = pdb.Query("SELECT id, title, star, created, modified FROM folder WHERE deleted = FALSE ORDER BY id;")
+	rows, err = pdb.Query("SELECT id, title, star, created, modified FROM folder WHERE deleted=false ORDER BY id;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_folders: %v", err)
 		return
@@ -153,13 +150,13 @@ func firstSync(reportOnly bool) (log string) {
 	}
 
 	//server keywords
-	err = pdb.QueryRow("SELECT COUNT(*) from keyword WHERE deleted = FALSE;").Scan(&count)
+	err = pdb.QueryRow("SELECT COUNT(*) FROM keyword WHERE deleted=false;").Scan(&count)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for server_keywords: %v", err)
 		return
 	}
 	fmt.Fprintf(&lg, "- `Keywords`: %d\n", count)
-	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted = FALSE;")
+	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted=false;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_keywords: %v", err)
 		return
@@ -178,14 +175,14 @@ func firstSync(reportOnly bool) (log string) {
 	}
 
 	//server entries
-	err = pdb.QueryRow("SELECT COUNT(*) from task WHERE deleted = FALSE;").Scan(&count)
+	err = pdb.QueryRow("SELECT COUNT(*) FROM task WHERE deleted=false;").Scan(&count)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for server_entries: %v", err)
 		return
 	}
 	fmt.Fprintf(&lg, "- `Entries`: %d\n", count)
 
-	rows, err = pdb.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted = False ORDER By id;")
+	rows, err = pdb.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted=false ORDER BY id;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_entries: %v", err)
 		return
@@ -260,27 +257,26 @@ func firstSync(reportOnly bool) (log string) {
 		if i%200 == 0 {
 			sess.showEdMessage("%d entries processed", i)
 		}
-		res, err := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
-			"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false);",
-			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
+		var client_id int
+		err := db.QueryRow("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
+			"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) RETURNING id;",
+			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note).Scan(&client_id)
+
 		if err != nil {
 			fmt.Fprintf(&lg, "%v %v %v %v %v %v %v\n", e.id, e.title, e.star, e.context_id, e.folder_id, e.added, e.completed)
 			fmt.Fprintf(&lg, "Error inserting entry %q into sqlite: %v\n", truncate(e.title, 15), err)
 			continue
 		}
-		id, _ := res.LastInsertId()
-		client_id := int(id)
 		_, err = fts_db.Exec("INSERT INTO fts (title, note, lm_id) VALUES (?, ?, ?);", e.title, e.note, client_id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting into fts_db for entry with id %d: %v\n", client_id, err)
-			//break
 		}
 
 		// Update the client entry's keywords
-		kwns := getTaskKeywordsS0(pdb, &lg, e.id) // returns []string
+		kwns := getTaskKeywordsS0(pdb, &lg, e.id)
 		for _, kwn := range kwns {
 			keyword_id := keywordExistsS0(db, &lg, kwn)
-			if keyword_id != -1 { // ? should create the keyword if it doesn't exist
+			if keyword_id != -1 {
 				addTaskKeywordS0(db, &lg, keyword_id, client_id)
 			}
 		}
@@ -291,7 +287,7 @@ func firstSync(reportOnly bool) (log string) {
 		}
 	}
 
-	/*********************end of sync changes*************************/
+	/*********************end of sync*************************/
 
 	var server_ts string
 	row := pdb.QueryRow("SELECT now();")
