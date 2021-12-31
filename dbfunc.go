@@ -207,6 +207,16 @@ func updateTaskContext(context string, id int) {
 	}
 }
 
+func updateTaskContextByTid(tid, id int) {
+	_, err := db.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
+		tid, id)
+
+	if err != nil {
+		sess.showOrgMessage("Error updating context for entry %d to tid %d: %v", id, tid, err)
+		return
+	}
+}
+
 func updateTaskFolder(folder string, id int) {
 	// have already checked if folder is synced and has tid
 	/*
@@ -223,6 +233,16 @@ func updateTaskFolder(folder string, id int) {
 
 	if err != nil {
 		sess.showOrgMessage("Error updating folder for entry %d to %q (tid: %d): %v", id, folder, tid, err)
+		return
+	}
+}
+
+func updateTaskFolderByTid(tid, id int) {
+	_, err := db.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
+		tid, id)
+
+	if err != nil {
+		sess.showOrgMessage("Error updating folder for entry %d to tid %d: %v", id, tid, err)
 		return
 	}
 }
@@ -994,7 +1014,7 @@ func getContainerInfo(id int) Container {
 	return c
 }
 
-func addTaskKeyword(keyword_id int, keyword_name string, entry_id int, update_fts bool) {
+func addTaskKeyword(keyword_id, entry_id int, update_fts bool) {
 	// have already checked if keyword is synced (might not have to check)
 	/*
 		keyword_tid := org.keywordMap[keyword_name]
@@ -1185,8 +1205,8 @@ func copyEntry() {
 	newId := int(lastId)
 	kwids := getTaskKeywordIds(id)
 	for _, keywordId := range kwids {
-		kwn := keywordName(keywordId)
-		addTaskKeyword(keywordId, kwn, newId, false) // means don't update fts
+		//kwn := keywordName(keywordId)
+		addTaskKeyword(keywordId, newId, false) // means don't update fts
 	}
 	tag := getTaskKeywords(newId) // returns string
 	_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, lm_id) VALUES (?, ?, ?, ?);", e.title, e.note, tag, newId)

@@ -625,7 +625,7 @@ func (o *Organizer) contexts(pos int) {
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
 		}
-		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
@@ -633,29 +633,13 @@ func (o *Organizer) contexts(pos int) {
 		return
 	}
 
-	var context string //new context for the entry
-	success := false
-
 	input := o.command_line[pos+1:]
-	if len(input) < 3 {
-		sess.showOrgMessage("You need to provide at least 3 characters to match existing context")
+	var tid int
+	var ok bool
+	if tid, ok = o.contextMap[input]; !ok {
+		sess.showOrgMessage("%s is not a valid context!", input)
 		return
 	}
-
-	for k, _ := range o.contextMap {
-		//if strings.HasPrefix(k, input) {
-		if k == input {
-			context = k
-			success = true
-			break
-		}
-	}
-
-	if !success {
-		sess.showOrgMessage("What you typed did not match any context")
-		return
-	}
-
 	/*
 		for context, folder, and I think keyword - you need to sync a new context etc first
 		before you can add a task to it or you'll get a FOREIGN KEY constraint error because
@@ -664,20 +648,21 @@ func (o *Organizer) contexts(pos int) {
 	*/
 
 	//if o.contextMap[context] < 1 {
-	if contextTid(context) < 1 {
+	//if contextTid(context) < 1 {
+	if tid < 1 {
 		sess.showOrgMessage("Context is unsynced")
 		return
 	}
 
 	if len(o.marked_entries) > 0 {
 		for entry_id := range o.marked_entries {
-			updateTaskContext(context, entry_id) //true = update fts_dn
+			updateTaskContextByTid(tid, entry_id) //true = update fts_dn
 		}
-		sess.showOrgMessage("Marked entries moved into context %s", context)
+		sess.showOrgMessage("Marked entries moved into context %s", input)
 		return
 	}
-	updateTaskContext(context, o.rows[o.fr].id)
-	sess.showOrgMessage("Moved current entry (since none were marked) into context %s", context)
+	updateTaskContextByTid(tid, o.rows[o.fr].id)
+	sess.showOrgMessage("Moved current entry (since none were marked) into context %s", input)
 }
 
 func (o *Organizer) folders(pos int) {
@@ -697,48 +682,34 @@ func (o *Organizer) folders(pos int) {
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
-		sess.showOrgMessage("Retrieved contexts")
+		sess.showOrgMessage("Retrieved folders")
 		return
 	}
-
-	var folder string //new folder for the entry
-	success := false
 
 	input := o.command_line[pos+1:]
-	if len(input) < 3 {
-		sess.showOrgMessage("You need to provide at least 3 characters to match existing folder")
-		return
-	}
-
-	for k, _ := range o.folderMap {
-		//if strings.HasPrefix(k, input) {
-		if k == input {
-			folder = k
-			success = true
-			break
-		}
-	}
-
-	if !success {
-		sess.showOrgMessage("What you typed did not match any folder")
+	var ok bool
+	var tid int
+	if tid, ok = o.folderMap[input]; !ok {
+		sess.showOrgMessage("%s is not a valid context!", input)
 		return
 	}
 
 	//if o.folderMap[folder] < 1 {
-	if folderTid(folder) < 1 {
+	//if folderTid(folder) < 1 {
+	if tid < 1 {
 		sess.showOrgMessage("Folder is unsynced")
 		return
 	}
-	// shouldn't check here if folder is unsynced??
+
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
-			updateTaskFolder(folder, entry_id)
+			updateTaskFolderByTid(tid, entry_id)
 		}
-		sess.showOrgMessage("Marked entries moved into folder %s", folder)
+		sess.showOrgMessage("Marked entries moved into folder %s", input)
 		return
 	}
-	updateTaskFolder(folder, o.rows[o.fr].id)
-	sess.showOrgMessage("Moved current entry (since none were marked) into folder %s", folder)
+	updateTaskFolderByTid(tid, o.rows[o.fr].id)
+	sess.showOrgMessage("Moved current entry (since none were marked) into folder %s", input)
 }
 
 func (o *Organizer) keywords(pos int) {
@@ -763,29 +734,31 @@ func (o *Organizer) keywords(pos int) {
 		return
 	}
 
-	keyword := o.command_line[pos+1:]
-	keyword_id := keywordExists(keyword)
+	input := o.command_line[pos+1:]
+	keyword_id := keywordExists(input)
 	if keyword_id == -1 {
-		o.mode = o.last_mode
-		sess.showOrgMessage("keyword '%s' does not exist!", keyword)
+		//o.mode = o.last_mode
+		sess.showOrgMessage("keyword '%s' does not exist!", input)
 		return
 	}
 
+	/* I think it's ok to attach a new keyword to a task ??
 	if o.keywordMap[keyword] < 1 {
 		sess.showOrgMessage("Keyword is unsynced")
 		return
 	}
+	*/
 
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
-			addTaskKeyword(keyword_id, keyword, entry_id, true) //true = update fts_dn
+			addTaskKeyword(keyword_id, entry_id, true) //true = update fts_dn
 		}
-		sess.showOrgMessage("Added keyword %s to marked entries", keyword)
+		sess.showOrgMessage("Added keyword %s to marked entries", input)
 		return
 	}
 
-	addTaskKeyword(keyword_id, keyword, o.rows[o.fr].id, true)
-	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", keyword)
+	addTaskKeyword(keyword_id, o.rows[o.fr].id, true)
+	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", input)
 }
 
 func (o *Organizer) recent(unused int) {

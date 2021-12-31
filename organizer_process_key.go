@@ -348,12 +348,14 @@ func organizerProcessKey(c int) {
 			if len(org.marked_entries) == 0 {
 				switch org.altView {
 				case KEYWORD:
-					keyword_tid := org.keywordMap[altRow.title]
-					if keyword_tid < 1 {
-						sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
-						return
-					}
-					addTaskKeyword(altRow.id, altRow.title, row.id, true)
+					/*
+						keyword_tid := org.keywordMap[altRow.title]
+						if keyword_tid < 1 {
+							sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+							return
+						}
+					*/
+					addTaskKeyword(altRow.id, row.id, true)
 					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
 				case FOLDER:
 					//folder_tid := org.folderMap[altRow.title]
@@ -378,7 +380,7 @@ func organizerProcessKey(c int) {
 				for id := range org.marked_entries {
 					switch org.altView {
 					case KEYWORD:
-						addTaskKeyword(altRow.id, altRow.title, id, true)
+						addTaskKeyword(altRow.id, id, true)
 					case FOLDER:
 						updateTaskFolder(altRow.title, id)
 					case CONTEXT:
