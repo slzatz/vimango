@@ -96,17 +96,28 @@ func organizerProcessKey(c int) {
 				return
 			}
 			// if not row.dirty nothing happens in TASK but if in a CONTAINER view open the entries with that container
+			var tid int
 			switch org.view {
 			case TASK:
 				return
 			case CONTEXT:
 				org.taskview = BY_CONTEXT
+				//tid = org.contextMap[row.title]
+				tid = contextTid(row.title)
 			case FOLDER:
 				org.taskview = BY_FOLDER
+				//tid = org.folderMap[row.title]
+				tid = folderTid(row.title)
 			case KEYWORD:
 				org.taskview = BY_KEYWORD
+				tid = org.keywordMap[row.title]
 			}
 
+			// if it's a new context|folder|keyword we can't filter tasks by it
+			if tid < 1 {
+				sess.showOrgMessage("You need to sync before you can use %q", row.title)
+				return
+			}
 			org.filter = row.title
 			sess.showOrgMessage("'%s' will be opened", org.filter)
 
@@ -337,12 +348,29 @@ func organizerProcessKey(c int) {
 			if len(org.marked_entries) == 0 {
 				switch org.altView {
 				case KEYWORD:
-					addTaskKeyword(altRow.id, row.id, true)
+					keyword_tid := org.keywordMap[altRow.title]
+					if keyword_tid < 1 {
+						sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+						return
+					}
+					addTaskKeyword(altRow.id, altRow.title, row.id, true)
 					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
 				case FOLDER:
+					//folder_tid := org.folderMap[altRow.title]
+					folder_tid := folderTid(altRow.title)
+					if folder_tid < 1 {
+						sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+						return
+					}
 					updateTaskFolder(altRow.title, row.id)
 					sess.showOrgMessage("Current entry folder changed to %s", altRow.title)
 				case CONTEXT:
+					//context_tid := org.contextMap[altRow.title]
+					context_tid := contextTid(altRow.title)
+					if context_tid < 1 {
+						sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+						return
+					}
 					updateTaskContext(altRow.title, row.id)
 					sess.showOrgMessage("Current entry had context changed to %s", altRow.title)
 				}
@@ -350,7 +378,7 @@ func organizerProcessKey(c int) {
 				for id := range org.marked_entries {
 					switch org.altView {
 					case KEYWORD:
-						addTaskKeyword(altRow.id, id, true)
+						addTaskKeyword(altRow.id, altRow.title, id, true)
 					case FOLDER:
 						updateTaskFolder(altRow.title, id)
 					case CONTEXT:

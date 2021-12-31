@@ -105,11 +105,12 @@ func (o *Organizer) open(pos int) {
 
 	cl := o.command_line
 	var success bool
+	var filter string
 	for k, _ := range o.contextMap {
 		// has prefix is problem if you have work and work_old
 		//if strings.HasPrefix(k, cl[pos+1:]) {
 		if k == cl[pos+1:] {
-			o.filter = k
+			filter = k
 			success = true
 			o.taskview = BY_CONTEXT
 			break
@@ -120,7 +121,7 @@ func (o *Organizer) open(pos int) {
 		for k, _ := range o.folderMap {
 			//if strings.HasPrefix(k, cl[pos+1:]) {
 			if k == cl[pos+1:] {
-				o.filter = k
+				filter = k
 				success = true
 				o.taskview = BY_FOLDER
 				break
@@ -131,10 +132,26 @@ func (o *Organizer) open(pos int) {
 	if !success {
 		sess.showOrgMessage("%s is not a valid context or folder!", cl[pos+1:])
 		o.mode = o.last_mode
-		//o.mode = NORMAL
 		return
 	}
 
+	if o.taskview == BY_CONTEXT {
+		//if o.contextMap[filter] < 1 {
+		if contextTid(filter) < 1 {
+			sess.showOrgMessage("%q is an unsynced context!", filter)
+			o.mode = o.last_mode
+			return
+		}
+	} else {
+		//if o.folderMap[filter] < 1 {
+		if folderTid(filter) < 1 {
+			sess.showOrgMessage("%q is an unsynced folder!", filter)
+			o.mode = o.last_mode
+			return
+		}
+	}
+
+	o.filter = filter
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
@@ -164,22 +181,21 @@ func (o *Organizer) openContext(pos int) {
 	}
 
 	cl := o.command_line
-	var success bool
-	for k, _ := range o.contextMap {
-		//if strings.HasPrefix(k, cl[pos+1:]) {
-		if k == cl[pos+1:] {
-			o.filter = k
-			success = true
-			break
-		}
-	}
-
-	if !success {
-		sess.showOrgMessage("%s is not a valid  context!", cl[pos+1:])
-		//o.mode = NORMAL
+	//var success bool
+	filter := cl[pos+1:]
+	var ok bool
+	if _, ok = o.contextMap[filter]; !ok {
+		sess.showOrgMessage("%s is not a valid context!", filter)
 		o.mode = o.last_mode
 		return
 	}
+	if contextTid(filter) < 1 {
+		sess.showOrgMessage("%q is an unsynced context!", filter)
+		o.mode = o.last_mode
+		return
+	}
+
+	o.filter = filter
 
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
@@ -197,8 +213,7 @@ func (o *Organizer) openContext(pos int) {
 		sess.showOrgMessage("No results were returned")
 	}
 	sess.imagePreview = false
-	//o.readTitleIntoBuffer() /////////////////////////////////////////////
-	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.altRowoff = 0
@@ -214,22 +229,21 @@ func (o *Organizer) openFolder(pos int) {
 	}
 
 	cl := o.command_line
-	var success bool
-	for k, _ := range o.folderMap {
-		//if strings.HasPrefix(k, cl[pos+1:]) {
-		if k == cl[pos+1:] {
-			o.filter = k
-			success = true
-			break
-		}
-	}
-
-	if !success {
-		sess.showOrgMessage("%s is not a valid  folder!", cl[pos+1:])
-		//o.mode = NORMAL
+	//var success bool
+	filter := cl[pos+1:]
+	var ok bool
+	if _, ok = o.folderMap[filter]; !ok {
+		sess.showOrgMessage("%s is not a valid folder!", filter)
 		o.mode = o.last_mode
 		return
 	}
+	if folderTid(filter) < 1 {
+		sess.showOrgMessage("%q is an unsynced folder!", filter)
+		o.mode = o.last_mode
+		return
+	}
+
+	o.filter = filter
 
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
@@ -256,7 +270,6 @@ func (o *Organizer) openFolder(pos int) {
 func (o *Organizer) openKeyword(pos int) {
 	if pos == -1 {
 		sess.showOrgMessage("You did not provide a keyword!")
-		//o.mode = NORMAL
 		o.mode = o.last_mode
 		return
 	}
@@ -264,6 +277,12 @@ func (o *Organizer) openKeyword(pos int) {
 	if keywordExists(keyword) == -1 {
 		o.mode = o.last_mode
 		sess.showOrgMessage("keyword '%s' does not exist!", keyword)
+		return
+	}
+
+	if o.keywordMap[keyword] < 1 {
+		sess.showOrgMessage("%q is an unsynced keyword!", keyword)
+		o.mode = o.last_mode
 		return
 	}
 
@@ -637,6 +656,19 @@ func (o *Organizer) contexts(pos int) {
 		return
 	}
 
+	/*
+		for context, folder, and I think keyword - you need to sync a new context etc first
+		before you can add a task to it or you'll get a FOREIGN KEY constraint error because
+		the task will have a context_tid of [0, -1 ...] and the context tid will be changed
+		from that number to the server id and now there is not context tid that matches the task's context_tid
+	*/
+
+	//if o.contextMap[context] < 1 {
+	if contextTid(context) < 1 {
+		sess.showOrgMessage("Context is unsynced")
+		return
+	}
+
 	if len(o.marked_entries) > 0 {
 		for entry_id := range o.marked_entries {
 			updateTaskContext(context, entry_id) //true = update fts_dn
@@ -692,6 +724,12 @@ func (o *Organizer) folders(pos int) {
 		return
 	}
 
+	//if o.folderMap[folder] < 1 {
+	if folderTid(folder) < 1 {
+		sess.showOrgMessage("Folder is unsynced")
+		return
+	}
+	// shouldn't check here if folder is unsynced??
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
 			updateTaskFolder(folder, entry_id)
@@ -733,15 +771,20 @@ func (o *Organizer) keywords(pos int) {
 		return
 	}
 
+	if o.keywordMap[keyword] < 1 {
+		sess.showOrgMessage("Keyword is unsynced")
+		return
+	}
+
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
-			addTaskKeyword(keyword_id, entry_id, true) //true = update fts_dn
+			addTaskKeyword(keyword_id, keyword, entry_id, true) //true = update fts_dn
 		}
 		sess.showOrgMessage("Added keyword %s to marked entries", keyword)
 		return
 	}
 
-	addTaskKeyword(keyword_id, o.rows[o.fr].id, true)
+	addTaskKeyword(keyword_id, keyword, o.rows[o.fr].id, true)
 	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", keyword)
 }
 

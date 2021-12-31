@@ -557,7 +557,7 @@ func synchronize(reportOnly bool) (log string) {
 	}
 	for _, e := range client_updated_entries {
 		//fmt.Fprintf(&lg, "    - id: %d tid: %d %q modified: %v\n", e.id, e.tid, tc(e.title, 15, true), tc(e.modified, 19, false))
-		fmt.Fprintf(&lg, "    - id: %d tid: %d star: %t *%q* folder_tid: %d context_tid: %d  modified: %v\n", e.id, e.tid, e.star, truncate(e.title, 15), e.context_tid, e.folder_tid, tc(e.modified, 19, false))
+		fmt.Fprintf(&lg, "    - id: %d tid: %d star: %t *%q* context_tid: %d folder_tid: %d  modified: %v\n", e.id, e.tid, e.star, truncate(e.title, 15), e.context_tid, e.folder_tid, tc(e.modified, 19, false))
 	}
 
 	//client deleted entries

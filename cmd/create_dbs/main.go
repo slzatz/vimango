@@ -23,7 +23,6 @@ type dbConfig struct {
 		User     string `json:"user"`
 		Password string `json:"password"`
 		DB       string `json:"db"`
-		Test     string `json:"test"`
 	} `json:"postgres"`
 
 	Sqlite3 struct {
