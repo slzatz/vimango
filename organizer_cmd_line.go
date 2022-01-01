@@ -103,55 +103,32 @@ func (o *Organizer) open(pos int) {
 		return
 	}
 
-	cl := o.command_line
-	var success bool
-	var filter string
-	for k, _ := range o.contextMap {
-		// has prefix is problem if you have work and work_old
-		//if strings.HasPrefix(k, cl[pos+1:]) {
-		if k == cl[pos+1:] {
-			filter = k
-			success = true
-			o.taskview = BY_CONTEXT
-			break
+	var tid int
+	var ok bool
+	input := o.command_line[pos+1:]
+	if tid, ok = contextExists(input); ok {
+		o.taskview = BY_CONTEXT
+	}
+
+	if !ok {
+		if tid, ok = folderExists(input); ok {
+			o.taskview = BY_FOLDER
 		}
 	}
 
-	if !success {
-		for k, _ := range o.folderMap {
-			//if strings.HasPrefix(k, cl[pos+1:]) {
-			if k == cl[pos+1:] {
-				filter = k
-				success = true
-				o.taskview = BY_FOLDER
-				break
-			}
-		}
-	}
-
-	if !success {
-		sess.showOrgMessage("%s is not a valid context or folder!", cl[pos+1:])
+	if !ok {
+		sess.showOrgMessage("%s is not a valid context or folder!", input)
 		o.mode = o.last_mode
 		return
 	}
 
-	if o.taskview == BY_CONTEXT {
-		//if o.contextMap[filter] < 1 {
-		if contextTid(filter) < 1 {
-			sess.showOrgMessage("%q is an unsynced context!", filter)
-			o.mode = o.last_mode
-			return
-		}
-	} else {
-		//if o.folderMap[filter] < 1 {
-		if folderTid(filter) < 1 {
-			sess.showOrgMessage("%q is an unsynced folder!", filter)
-			o.mode = o.last_mode
-			return
-		}
+	if tid < 1 {
+		sess.showOrgMessage("%q is an unsynced context or folder!", input)
+		o.mode = o.last_mode
+		return
 	}
 
-	o.filter = filter
+	o.filter = input
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
@@ -180,22 +157,21 @@ func (o *Organizer) openContext(pos int) {
 		return
 	}
 
-	cl := o.command_line
-	//var success bool
-	filter := cl[pos+1:]
+	input := o.command_line[pos+1:]
+	var tid int
 	var ok bool
-	if _, ok = o.contextMap[filter]; !ok {
-		sess.showOrgMessage("%s is not a valid context!", filter)
+	if tid, ok = contextExists(input); !ok {
+		sess.showOrgMessage("%s is not a valid context!", input)
 		o.mode = o.last_mode
 		return
 	}
-	if contextTid(filter) < 1 {
-		sess.showOrgMessage("%q is an unsynced context!", filter)
+	if tid < 1 {
+		sess.showOrgMessage("%q is an unsynced context!", input)
 		o.mode = o.last_mode
 		return
 	}
 
-	o.filter = filter
+	o.filter = input
 
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
@@ -228,22 +204,22 @@ func (o *Organizer) openFolder(pos int) {
 		return
 	}
 
-	cl := o.command_line
 	//var success bool
-	filter := cl[pos+1:]
+	input := o.command_line[pos+1:]
 	var ok bool
-	if _, ok = o.folderMap[filter]; !ok {
-		sess.showOrgMessage("%s is not a valid folder!", filter)
+	var tid int
+	if tid, ok = folderExists(input); !ok {
+		sess.showOrgMessage("%s is not a valid folder!", input)
 		o.mode = o.last_mode
 		return
 	}
-	if folderTid(filter) < 1 {
-		sess.showOrgMessage("%q is an unsynced folder!", filter)
+	if tid < 1 {
+		sess.showOrgMessage("%q is an unsynced folder!", input)
 		o.mode = o.last_mode
 		return
 	}
 
-	o.filter = filter
+	o.filter = input
 
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
@@ -273,20 +249,20 @@ func (o *Organizer) openKeyword(pos int) {
 		o.mode = o.last_mode
 		return
 	}
-	keyword := o.command_line[pos+1:]
-	if keywordExists(keyword) == -1 {
+	input := o.command_line[pos+1:]
+	if keywordExists(input) == -1 {
 		o.mode = o.last_mode
-		sess.showOrgMessage("keyword '%s' does not exist!", keyword)
+		sess.showOrgMessage("keyword '%s' does not exist!", input)
 		return
 	}
 
-	if o.keywordMap[keyword] < 1 {
-		sess.showOrgMessage("%q is an unsynced keyword!", keyword)
+	if o.keywordMap[input] < 1 {
+		sess.showOrgMessage("%q is an unsynced keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
 
-	o.filter = keyword
+	o.filter = input
 
 	sess.showOrgMessage("'%s' will be opened", o.filter)
 
@@ -646,9 +622,6 @@ func (o *Organizer) contexts(pos int) {
 		the task will have a context_tid of [0, -1 ...] and the context tid will be changed
 		from that number to the server id and now there is not context tid that matches the task's context_tid
 	*/
-
-	//if o.contextMap[context] < 1 {
-	//if contextTid(context) < 1 {
 	if tid < 1 {
 		sess.showOrgMessage("Context is unsynced")
 		return
@@ -678,7 +651,7 @@ func (o *Organizer) folders(pos int) {
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
 		}
-		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
@@ -694,8 +667,6 @@ func (o *Organizer) folders(pos int) {
 		return
 	}
 
-	//if o.folderMap[folder] < 1 {
-	//if folderTid(folder) < 1 {
 	if tid < 1 {
 		sess.showOrgMessage("Folder is unsynced")
 		return
@@ -726,7 +697,7 @@ func (o *Organizer) keywords(pos int) {
 			o.rows[0].dirty = false
 			sess.showOrgMessage("No results were returned")
 		}
-		o.readRowsIntoBuffer() ////////////////////////////////////////////
+		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		sess.displayContainerInfo()
@@ -818,7 +789,7 @@ func (o *Organizer) updateContainer(unused int) {
 	}
 	getAltContainers() //O.mode = NORMAL is in get_containers
 	if len(o.altRows) != 0 {
-		o.mode = ADD_CHANGE_FILTER //this needs to change to somthing like UPDATE_TASK_MODIFIERS
+		o.mode = ADD_CHANGE_FILTER
 		sess.showOrgMessage("Select context to add to marked or current entry")
 	}
 }

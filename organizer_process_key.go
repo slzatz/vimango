@@ -102,12 +102,10 @@ func organizerProcessKey(c int) {
 				return
 			case CONTEXT:
 				org.taskview = BY_CONTEXT
-				//tid = org.contextMap[row.title]
-				tid = contextTid(row.title)
+				tid, _ = contextExists(row.title)
 			case FOLDER:
 				org.taskview = BY_FOLDER
-				//tid = org.folderMap[row.title]
-				tid = folderTid(row.title)
+				tid, _ = folderExists(row.title)
 			case KEYWORD:
 				org.taskview = BY_KEYWORD
 				tid = org.keywordMap[row.title]
@@ -344,36 +342,33 @@ func organizerProcessKey(c int) {
 
 		case '\r':
 			altRow := &org.altRows[org.altFr] //currently highlighted container row
-			row := &org.rows[org.fr]          //currently highlighted entry row
+			var tid int
+			row := &org.rows[org.fr] //currently highlighted entry row
+			switch org.altView {
+			case KEYWORD:
+			case FOLDER:
+				tid, _ = folderExists(altRow.title)
+				if tid < 1 {
+					sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+					return
+				}
+			case CONTEXT:
+				tid, _ = contextExists(altRow.title)
+				if tid < 1 {
+					sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+					return
+				}
+			}
 			if len(org.marked_entries) == 0 {
 				switch org.altView {
 				case KEYWORD:
-					/*
-						keyword_tid := org.keywordMap[altRow.title]
-						if keyword_tid < 1 {
-							sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
-							return
-						}
-					*/
 					addTaskKeyword(altRow.id, row.id, true)
 					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
 				case FOLDER:
-					//folder_tid := org.folderMap[altRow.title]
-					folder_tid := folderTid(altRow.title)
-					if folder_tid < 1 {
-						sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
-						return
-					}
-					updateTaskFolder(altRow.title, row.id)
+					updateTaskFolderByTid(tid, row.id)
 					sess.showOrgMessage("Current entry folder changed to %s", altRow.title)
 				case CONTEXT:
-					//context_tid := org.contextMap[altRow.title]
-					context_tid := contextTid(altRow.title)
-					if context_tid < 1 {
-						sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
-						return
-					}
-					updateTaskContext(altRow.title, row.id)
+					updateTaskContextByTid(tid, row.id)
 					sess.showOrgMessage("Current entry had context changed to %s", altRow.title)
 				}
 			} else {
@@ -382,9 +377,9 @@ func organizerProcessKey(c int) {
 					case KEYWORD:
 						addTaskKeyword(altRow.id, id, true)
 					case FOLDER:
-						updateTaskFolder(altRow.title, id)
+						updateTaskFolderByTid(tid, id)
 					case CONTEXT:
-						updateTaskContext(altRow.title, id)
+						updateTaskContextByTid(tid, id)
 					}
 					sess.showOrgMessage("Marked entries' %d changed/added to %s", org.altView, altRow.title)
 				}
