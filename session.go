@@ -323,22 +323,10 @@ func (s *Session) displayEntryInfo(e *Entry) {
 	//s.append(fmt::format("{}title:{} {}{}", COLOR_1, "\x1b[m", title, lf_ret));
 	fmt.Fprintf(&ab, "%s%s", title, lf_ret)
 
-	var context string
-	for k, v := range org.contextMap {
-		if v == e.context_tid {
-			context = k
-			break
-		}
-	}
+	context := filterTitle("context", e.context_tid)
 	fmt.Fprintf(&ab, "context: %s%s", context, lf_ret)
 
-	var folder string
-	for k, v := range org.folderMap {
-		if v == e.folder_tid {
-			folder = k
-			break
-		}
-	}
+	folder := filterTitle("folder", e.folder_tid)
 	fmt.Fprintf(&ab, "folder: %s%s", folder, lf_ret)
 
 	fmt.Fprintf(&ab, "star: %t%s", e.star, lf_ret)
@@ -364,7 +352,8 @@ func (s *Session) displayEntryInfo(e *Entry) {
 	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
 	fmt.Fprintf(&ab, "added: %s%s", added, lf_ret)
 
-	fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(getId()), lf_ret)
+	//fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(getId()), lf_ret)
+	fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(e.id), lf_ret)
 
 	fmt.Print(ab.String())
 }

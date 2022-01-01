@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -42,14 +41,19 @@ func timeDelta(t string) string {
 	}
 }
 
-func keywordExists(name string) int {
-	row := db.QueryRow("SELECT id FROM keyword WHERE name=?;", name)
+func keywordId(name string) int {
 	var id int
-	err := row.Scan(&id)
-	if err != nil {
-		return -1
-	}
+	_ = db.QueryRow("SELECT id FROM keyword WHERE name=?;", name).Scan(&id)
 	return id
+}
+
+func keywordExists(name string) (int, bool) {
+	var tid int
+	err := db.QueryRow("SELECT tid FROM keyword WHERE name=?;", name).Scan(&tid)
+	if err != nil {
+		return 0, false
+	}
+	return tid, true
 }
 
 /*
@@ -63,6 +67,16 @@ func keywordName(id int) string {
 	return name
 }
 */
+
+func filterTitle(filter string, tid int) string {
+	row := db.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
+	var title string
+	err := row.Scan(&title)
+	if err != nil {
+		return ""
+	}
+	return title
+}
 
 func contextExists(title string) (int, bool) {
 	var tid int
@@ -82,75 +96,45 @@ func folderExists(title string) (int, bool) {
 	return tid, true
 }
 
-/*
-func folderTid(title string) int {
-	var tid int
-	_ = db.QueryRow("SELECT tid FROM folder WHERE title=?;", title).Scan(&tid)
-	return tid
-}
-*/
-
-func generateContextMap() {
-	// if new client context hasn't been synched - tid =0
-	rows, err := db.Query("SELECT tid, title FROM context;")
-	if err != nil {
-		log.Fatal(err)
-	}
+func contextList() map[string]struct{} {
+	rows, _ := db.Query("SELECT title FROM context;")
 	defer rows.Close()
 
+	contexts := make(map[string]struct{})
 	for rows.Next() {
-		var tid int
 		var title string
-
-		err = rows.Scan(&tid, &title)
-		org.contextMap[title] = tid
+		_ = rows.Scan(&title)
+		contexts[title] = struct{}{}
 	}
+	return contexts
 }
 
-/*
-func folderTid(id int) int {
-	row := db.QueryRow("SELECT folder_tid FROM task WHERE id=?;", id)
-	var tid int
-	err := row.Scan(&tid)
-	if err != nil {
-		return -1
-	}
-	return tid
-}
-*/
-
-func generateFolderMap() {
-	// if new client folder hasn't been synched - tid =0
-	rows, err := db.Query("SELECT tid, title FROM folder;")
-	if err != nil {
-		log.Fatal(err)
-	}
+func folderList() map[string]struct{} {
+	rows, _ := db.Query("SELECT title FROM folder;")
 	defer rows.Close()
 
+	folders := make(map[string]struct{})
 	for rows.Next() {
-		var tid int
 		var title string
-
-		err = rows.Scan(&tid, &title)
-		org.folderMap[title] = tid
+		_ = rows.Scan(&title)
+		folders[title] = struct{}{}
 	}
+	return folders
 }
 
-func generateKeywordMap() {
-	rows, err := db.Query("SELECT tid, name FROM keyword;")
-	if err != nil {
-		log.Fatal(err)
-	}
+func keywordList() map[string]struct{} {
+	rows, _ := db.Query("SELECT name FROM keyword;")
 	defer rows.Close()
 
+	keywords := make(map[string]struct{})
 	for rows.Next() {
-		var tid int
 		var name string
-
-		err = rows.Scan(&tid, &name)
-		org.keywordMap[name] = tid
+		_ = rows.Scan(&name)
+		keywords[name] = struct{}{}
 	}
+	return keywords
 }
+
 func toggleStar() {
 	id := getId()
 
@@ -203,26 +187,6 @@ func toggleCompleted() {
 	sess.showOrgMessage("Toggle completed for entry %d succeeded", id)
 }
 
-/*
-func updateTaskContext(context string, id int) {
-	// have already checked if context is synced and has tid
-	//context_tid := org.contextMap[new_context]
-	tid := contextTid(context)
-//		if context_tid < 1 {
-//			sess.showOrgMessage("UpdateTaskContext: %q has not been synched yet - must do that before adding tasks", context)
-//			return
-//`		}
-
-	_, err := db.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
-		tid, id)
-
-	if err != nil {
-		sess.showOrgMessage("Error updating context for entry %d to %q (tid: %d): %v", id, context, tid, err)
-		return
-	}
-}
-*/
-
 func updateTaskContextByTid(tid, id int) {
 	_, err := db.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
 		tid, id)
@@ -232,21 +196,6 @@ func updateTaskContextByTid(tid, id int) {
 		return
 	}
 }
-
-/*
-func updateTaskFolder(folder string, id int) {
-	// have already checked if folder is synced and has tid
-	tid := folderTid(folder)
-
-	_, err := db.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
-		tid, id)
-
-	if err != nil {
-		sess.showOrgMessage("Error updating folder for entry %d to %q (tid: %d): %v", id, folder, tid, err)
-		return
-	}
-}
-*/
 
 func updateTaskFolderByTid(tid, id int) {
 	_, err := db.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
@@ -468,39 +417,18 @@ func insertRowInDB(row *Row) int {
 
 	folder_tid := 1
 	context_tid := 1
-
-	/*
-		a new context/folder is in context/folder map
-		we don't want a new task to get an unsynced context
-		this check should not be necessary since I believe
-		we prevent attaching an unsynced context/folder
-		to a task
-	*/
+	// if org.taskview is BY_KEYWORD or BY_RECENT then new task gets context none, folder none = 1,1
 	switch org.taskview {
 	case BY_CONTEXT:
-		context_tid = org.contextMap[org.filter]
-		/*
-			if context_tid < 1 {
-				context_tid = 1
-			}
-		*/
+		context_tid, _ = contextExists(org.filter)
 	case BY_FOLDER:
-		folder_tid = org.folderMap[org.filter]
-		/*
-			if folder_tid < 1 {
-				folder_tid = 1
-			}
-		*/
-		//case BY_KEYWORD:
-		//case BY_RECENT:
+		folder_tid, _ = folderExists(org.filter)
 	}
 
 	res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
-		//"VALUES (0, ?, ?, ?, True, date(), '', False, "+
 		"VALUES (?, ?, ?, ?, True, datetime('now'), '', False, "+
 		"datetime('now'), datetime('now'));",
-		//row.title, folder_tid, context_tid)
 		tempTid("task"), row.title, folder_tid, context_tid)
 
 	/*
@@ -1116,14 +1044,6 @@ func updateContainerTitle() {
 	if err != nil {
 		sess.showOrgMessage("Error updating %s title for %d", table, row.id)
 	}
-	switch org.view {
-	case CONTEXT:
-		generateContextMap()
-	case FOLDER:
-		generateFolderMap()
-	case KEYWORD:
-		generateKeywordMap()
-	}
 }
 
 func insertContainer(row *Row) int {
@@ -1144,14 +1064,6 @@ func insertContainer(row *Row) int {
 	if err != nil {
 		sess.showOrgMessage("Error in insertContainer: %v", err)
 		return -1
-	}
-	switch org.view {
-	case CONTEXT:
-		generateContextMap()
-	case FOLDER:
-		generateFolderMap()
-	case KEYWORD:
-		generateKeywordMap()
 	}
 	id, _ := res.LastInsertId()
 	row.id = int(id)

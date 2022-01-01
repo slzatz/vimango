@@ -126,45 +126,30 @@ func main() {
 	org.highlight[0], org.highlight[1] = -1, -1
 	org.mode = NORMAL
 	org.last_mode = NORMAL
-	//org.command = ""
-	//org.command_line = ""
-	//org.repeat = 0 //number of times to repeat commands like x,s,yy ? also used for visual line mode x,y
 	org.view = TASK
 	if config.Options.Type == "folder" {
 		org.taskview = BY_FOLDER
 	} else {
 		org.taskview = BY_CONTEXT
 	}
-	//org.filter = "todo"
 	org.filter = config.Options.Title
-	org.contextMap = make(map[string]int)
-	org.folderMap = make(map[string]int)
 	org.marked_entries = make(map[int]struct{})
-	org.keywordMap = make(map[string]int)
-	org.vbuf = vim.BufferNew(0)    ///////////////////////////////////////////////////////
-	vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////
+	org.vbuf = vim.BufferNew(0)
+	vim.BufferSetCurrent(org.vbuf)
 
 	// ? where this should be.  Also in signal.
 	sess.textLines = sess.screenLines - 2 - TOP_MARGIN // -2 for status bar and message bar
-	//sess.divider = sess.screencols - sess.cfg.ed_pct * sess.screencols/100
 	sess.edPct = 60
-	moveDividerPct(sess.edPct) // sets sess.divider
-	//sess.divider = sess.screenCols - (60 * sess.screenCols / 100)
+	moveDividerPct(sess.edPct)                                // sets sess.divider
 	sess.totaleditorcols = sess.screenCols - sess.divider - 1 // was 2
-
-	generateContextMap()
-	generateFolderMap()
-	generateKeywordMap()
 	sess.eraseScreenRedrawLines()
 	org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
 	if len(org.rows) == 0 {
 		org.insertRow(0, "", true, false, false, BASE_DATE)
 		org.rows[0].dirty = false
 		sess.showOrgMessage("No results were returned")
-		//org.mode = NO_ROWS
 	}
-	//org.readTitleIntoBuffer() /////////////////////////////////////////////
-	org.readRowsIntoBuffer() /////////////////////////////////////////////
+	org.readRowsIntoBuffer()
 	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 	org.drawPreview()
 	org.refreshScreen()

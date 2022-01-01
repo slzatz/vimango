@@ -204,7 +204,6 @@ func (o *Organizer) openFolder(pos int) {
 		return
 	}
 
-	//var success bool
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
@@ -250,13 +249,15 @@ func (o *Organizer) openKeyword(pos int) {
 		return
 	}
 	input := o.command_line[pos+1:]
-	if keywordExists(input) == -1 {
+	var ok bool
+	var tid int
+	if tid, ok = keywordExists(input); !ok {
+		sess.showOrgMessage("%s is not a valid keyword!", input)
 		o.mode = o.last_mode
-		sess.showOrgMessage("keyword '%s' does not exist!", input)
 		return
 	}
-
-	if o.keywordMap[input] < 1 {
+	// this guard may not be necessary for keywords
+	if tid < 1 {
 		sess.showOrgMessage("%q is an unsynced keyword!", input)
 		o.mode = o.last_mode
 		return
@@ -539,9 +540,6 @@ func (o *Organizer) sync(unused int) {
 		log = synchronize(true)
 	} else {
 		log = synchronize(false)
-		generateContextMap()
-		generateFolderMap()
-		generateKeywordMap()
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
@@ -568,9 +566,6 @@ func (o *Organizer) initialSync(unused int) {
 		log = firstSync(true)
 	} else {
 		log = firstSync(false)
-		generateContextMap()
-		generateFolderMap()
-		generateKeywordMap()
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
@@ -612,7 +607,7 @@ func (o *Organizer) contexts(pos int) {
 	input := o.command_line[pos+1:]
 	var tid int
 	var ok bool
-	if tid, ok = o.contextMap[input]; !ok {
+	if tid, ok = contextExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid context!", input)
 		return
 	}
@@ -662,8 +657,8 @@ func (o *Organizer) folders(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
-	if tid, ok = o.folderMap[input]; !ok {
-		sess.showOrgMessage("%s is not a valid context!", input)
+	if tid, ok = folderExists(input); !ok {
+		sess.showOrgMessage("%s is not a valid folder!", input)
 		return
 	}
 
@@ -706,20 +701,21 @@ func (o *Organizer) keywords(pos int) {
 	}
 
 	input := o.command_line[pos+1:]
-	keyword_id := keywordExists(input)
-	if keyword_id == -1 {
-		//o.mode = o.last_mode
-		sess.showOrgMessage("keyword '%s' does not exist!", input)
+	var ok bool
+	var tid int
+	if tid, ok = keywordExists(input); !ok {
+		sess.showOrgMessage("%s is not a valid keyword!", input)
+		o.mode = o.last_mode
 		return
 	}
 
-	/* I think it's ok to attach a new keyword to a task ??
-	if o.keywordMap[keyword] < 1 {
-		sess.showOrgMessage("Keyword is unsynced")
+	// this guard may not be necessary for keywords
+	if tid < 1 {
+		sess.showOrgMessage("%q is an unsynced keyword!", input)
+		o.mode = o.last_mode
 		return
 	}
-	*/
-
+	keyword_id := keywordId(input) // no check if it exists; done above
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
 			addTaskKeyword(keyword_id, entry_id, true) //true = update fts_dn

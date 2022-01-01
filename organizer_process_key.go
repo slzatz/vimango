@@ -108,7 +108,8 @@ func organizerProcessKey(c int) {
 				tid, _ = folderExists(row.title)
 			case KEYWORD:
 				org.taskview = BY_KEYWORD
-				tid = org.keywordMap[row.title]
+				// this guard to see if synced may not be necessary for keyword
+				tid, _ = keywordExists(row.title)
 			}
 
 			// if it's a new context|folder|keyword we can't filter tasks by it
@@ -287,16 +288,16 @@ func organizerProcessKey(c int) {
 				sess.showEdMessage("tab")
 				cmd := org.command_line[:pos]
 				option := org.command_line[pos+1:]
-				var filterMap = make(map[string]int)
+				var filterMap = make(map[string]struct{})
 				switch cmd {
 				case "o", "oc", "c":
-					filterMap = org.contextMap
+					filterMap = contextList()
 				case "of", "f":
-					filterMap = org.folderMap
+					filterMap = folderList()
 				case "ok", "k":
-					filterMap = org.keywordMap
+					filterMap = keywordList()
 				case "sort":
-					filterMap = map[string]int{"added": 0, "created": 0, "modified": 0}
+					filterMap = map[string]struct{}{"added": struct{}{}, "created": struct{}{}, "modified": struct{}{}}
 				default:
 					return
 				}
