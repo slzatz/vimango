@@ -464,8 +464,6 @@ func synchronize(reportOnly bool) (log string) {
 		return
 	}
 
-	//defer rows.Close()
-
 	var client_updated_keywords []Container
 	for rows.Next() {
 		var c Container
@@ -522,12 +520,8 @@ func synchronize(reportOnly bool) (log string) {
 	var client_updated_entries []Entry
 	for rows.Next() {
 		var e Entry
-		// right now tid not being set on new entries so need this
-		// no longer true as of ~ 12/15/2021
-		//var tid sql.NullInt64
 		rows.Scan(
 			&e.id,
-			//&tid,
 			&e.tid,
 			&e.title,
 			&e.star,
@@ -539,14 +533,6 @@ func synchronize(reportOnly bool) (log string) {
 			&e.context_tid,
 			&e.folder_tid,
 		)
-		/*
-			if tid.Valid {
-				e.tid = int(tid.Int64)
-			} else {
-				e.tid = 0
-			}
-		*/
-
 		client_updated_entries = append(client_updated_entries, e)
 	}
 	if len(client_updated_entries) > 0 {
@@ -556,7 +542,6 @@ func synchronize(reportOnly bool) (log string) {
 		lg.WriteString("- No `Entries` updated.\n")
 	}
 	for _, e := range client_updated_entries {
-		//fmt.Fprintf(&lg, "    - id: %d tid: %d %q modified: %v\n", e.id, e.tid, tc(e.title, 15, true), tc(e.modified, 19, false))
 		fmt.Fprintf(&lg, "    - id: %d tid: %d star: %t *%q* context_tid: %d folder_tid: %d  modified: %v\n", e.id, e.tid, e.star, truncate(e.title, 15), e.context_tid, e.folder_tid, tc(e.modified, 19, false))
 	}
 
@@ -598,7 +583,6 @@ func synchronize(reportOnly bool) (log string) {
 	/****************below is where changes start***********************************/
 
 	//updated server contexts -> client
-
 	for _, c := range server_updated_contexts {
 		row := db.QueryRow("SELECT id from context WHERE tid=?", c.id)
 		var id int
@@ -640,24 +624,43 @@ func synchronize(reportOnly bool) (log string) {
 		switch {
 		// server context doesn't exist
 		case err == sql.ErrNoRows:
-			err1 := pdb.QueryRow("INSERT INTO context (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING id;",
+			/* this is where we could create a list of client entry ids where the context_tid = something less than 1
+				rows, err = db.Query("SELECT id from task WHERE context_tid = c.tid;")
+				defer rows.Close()
+				var ids []int
+				for rows.Next() {
+				var id
+				err = rows.Scan(&row.id)
+				if err != nil ...
+				ids = append(ids, id)
+			}
+			db.Execute("Update task SET context_tid = 1 WHERE context_tid = c.tid;")
+			after the UPDATE context below.
+			for id := range ids {
+				text := strconv.Itoa(id)
+				idsS = append(idsS, text)
+			}
+			in := strings.Join(idsS, ",")
+			db.Execute(fmt.Sprintf("Update task SET context_tid=? WHERE id IN (%s);", in), tid)
+			*/
+			err = pdb.QueryRow("INSERT INTO context (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING id;",
 				c.title, c.star, c.created).Scan(&tid)
-			if err1 != nil {
-				fmt.Fprintf(&lg, "Error inserting new context %q with id %d into postgres: %v", truncate(c.title, 15), c.id, err1)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error inserting new context %q with id %d into postgres: %v", truncate(c.title, 15), c.id, err)
 				break
 			}
-			_, err2 := db.Exec("UPDATE context SET tid=$1 WHERE id=$2;", tid, c.id)
-			if err2 != nil {
-				fmt.Fprintf(&lg, "Error setting tid for new client context %q with id %d to %d: %v\n", truncate(c.title, 15), c.id, tid, err2)
+			_, err = db.Exec("UPDATE context SET tid=$1 WHERE id=$2;", tid, c.id)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error setting tid for new client context %q with id %d to %d: %v\n", truncate(c.title, 15), c.id, tid, err)
 				break
 			}
 			fmt.Fprintf(&lg, "Set value of tid for new client context %q with id: %d to tid = %d\n", c.title, c.id, tid)
 		case err != nil:
 			fmt.Fprintf(&lg, "Error querying postgres for a context with id: %v: %v\n", c.tid, err)
 		default:
-			_, err3 := pdb.Exec("UPDATE context SET title=$1, star=$2, modified=now() WHERE id=$3;", c.title, c.star, c.tid)
-			if err3 != nil {
-				fmt.Fprintf(&lg, "Error updating postgres for context %q with id %d: %v\n", truncate(c.title, 15), c.tid, err3)
+			_, err = pdb.Exec("UPDATE context SET title=$1, star=$2, modified=now() WHERE id=$3;", c.title, c.star, c.tid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error updating postgres for context %q with id %d: %v\n", truncate(c.title, 15), c.tid, err)
 			} else {
 				fmt.Fprintf(&lg, "Updated server/postgres context: *%q* with id: **%d**\n", c.title, c.tid)
 			}

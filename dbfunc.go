@@ -165,7 +165,6 @@ func toggleDeleted() {
 }
 
 func toggleCompleted() {
-	//orow& row = org.rows.at(org.fr);
 	id := getId()
 
 	var completed sql.NullTime
@@ -240,21 +239,15 @@ func getSyncItems(max int) {
 	org.rows = nil
 	for rows.Next() {
 		var row Row
-		//var modified string
 		var sort string
 
-		err = rows.Scan(&row.id,
-			&row.title,
-			//&modified,
-			&sort,
-		)
+		err = rows.Scan(&row.id, &row.title, &sort)
 
 		if err != nil {
 			sess.showOrgMessage("Error in getSyncItems: %v", err)
 			return
 		}
 
-		//row.modified = timeDelta(modified)
 		row.sort = timeDelta(sort)
 		org.rows = append(org.rows, row)
 
@@ -272,7 +265,6 @@ func deleteSyncItem(id int) {
 
 func filterEntries(taskView int, filter string, showDeleted bool, sort string, max int) []Row {
 
-	//s := "SELECT task.id, task.title, task.star, task.deleted, task.completed, task.modified FROM task "
 	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.completed, task.%s FROM task ", sort)
 
 	switch taskView {
@@ -557,13 +549,6 @@ func getEntryInfo(id int) Entry {
 		sess.showOrgMessage("Error in getEntryInfo for id %d: %v", id, err)
 		return Entry{}
 	}
-	/*
-		if tid.Valid {
-			e.tid = int(tid.Int64)
-		} else {
-			e.tid = 0
-		}
-	*/
 	return e
 }
 
@@ -588,6 +573,8 @@ func taskContext(id int) string {
 	}
 	return title
 }
+
+/*
 func getContextTid(id int) int {
 	row := db.QueryRow("SELECT context_tid FROM task WHERE id=?;", id)
 	var tid int
@@ -597,6 +584,7 @@ func getContextTid(id int) int {
 	}
 	return tid
 }
+*/
 
 func getTitle(id int) string {
 	row := db.QueryRow("SELECT title FROM task WHERE id=?;", id)

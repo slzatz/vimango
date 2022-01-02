@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/mandolyte/mdtopdf"
 	"github.com/slzatz/vimango/vim"
@@ -554,19 +553,19 @@ func (e *Editor) goFormat() {
 	cmd := exec.Command("goimports")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		sess.showEdMessage("Problem in gofmt stdout: %v", err)
+		sess.showEdMessage("Problem in goimports stdout: %v", err)
 		return
 	}
 	buf_out := bufio.NewReader(stdout)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		sess.showEdMessage("Problem in gofmt stdin: %v", err)
+		sess.showEdMessage("Problem in goimports stdin: %v", err)
 		return
 	}
 	err = cmd.Start()
 	if err != nil {
-		sess.showEdMessage("Problem in cmd.Start (gofmt) stdin: %v", err)
+		sess.showEdMessage("Problem in cmd.Start (goimports) stdin: %v", err)
 		return
 	}
 
@@ -577,35 +576,27 @@ func (e *Editor) goFormat() {
 
 	for {
 		s, err := buf_out.ReadString('\n')
-
 		if err == io.EOF {
 			break
 		}
-
-		/*
-			if len(bytes) == 0 {
-				break
-			}
-		*/
-
 		ss = append(ss, s[:len(s)-1])
 	}
+	if len(ss) == 0 {
+		sess.showOrgMessage("Return from goimports has length zero - likely code errors")
+		return
+	}
+
 	e.ss = ss
 
 	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
-	pos := vim.CursorGetPosition()
-	e.fr = pos[0] - 1
-	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+	lines := vim.BufferGetLineCount(e.vbuf)
+	sess.showOrgMessage("Number of lines in the formatted text = %d", lines)
+	vim.CursorSetPosition(1, 0)
+	e.fr = 0
+	e.fc = 0
 	e.scroll()
 	e.drawText()
 	sess.returnCursor()
-	/*
-		err = v.Command(fmt.Sprintf("w temp/buf%d", e.vbuf))
-		if err != nil {
-			sess.showEdMessage("Error in writing file in dbfunc: %v", err)
-		}
-	*/
-
 }
 
 func (e *Editor) rename() {
