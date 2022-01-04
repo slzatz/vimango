@@ -26,19 +26,18 @@ var e_lookup2 = map[string]interface{}{
 	"\x17+":              (*Editor).changeSplit,
 	"\x17>":              (*Editor).changeHSplit,
 	"\x17<":              (*Editor).changeHSplit,
-	//"\x06":               (*Editor).findMatchForBrace, // for testing
+	leader + "m":         (*Editor).showMarkdownPreview,
+	leader + "y":         (*Editor).nextStyle,
+	leader + "t":         (*Editor).readGoTemplate,
+	leader + "co":        (*Editor).completion,
+	leader + "ho":        (*Editor).hover,
+	leader + "sh":        (*Editor).signatureHelp,
+	leader + "dh":        (*Editor).documentHighlight,
+	leader + "df":        (*Editor).definition,
+	leader + "rf":        (*Editor).reference,
+	leader + "sp":        (*Editor).spellingCheck,
+	leader + "su":        (*Editor).spellSuggest,
 	//leader + "l": (*Editor).showVimMessageLog,
-	leader + "m":  (*Editor).showMarkdownPreview,
-	leader + "y":  (*Editor).nextStyle,
-	leader + "t":  (*Editor).readGoTemplate,
-	leader + "co": (*Editor).completion,
-	leader + "ho": (*Editor).hover,
-	leader + "sh": (*Editor).signatureHelp,
-	leader + "dh": (*Editor).documentHighlight,
-	leader + "df": (*Editor).definition,
-	leader + "rf": (*Editor).reference,
-	leader + "sp": (*Editor).spellingCheck,
-	leader + "su": (*Editor).spellSuggest,
 	//leader + "xx": (*Editor).test,
 	//"z=": (*Editor).spellSuggest,
 }
@@ -158,11 +157,8 @@ func (e *Editor) controlH() {
 			sess.edPct = 80
 			moveDividerPct(80)
 		}
-
-		sess.editorMode = false        //needs to be here
-		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
-
-		//org.readTitleIntoBuffer() // shouldn't be necessary
+		sess.editorMode = false
+		vim.BufferSetCurrent(org.vbuf)
 		org.drawPreview()
 		org.mode = NORMAL
 		sess.returnCursor()
@@ -191,11 +187,8 @@ func (e *Editor) controlH() {
 			sess.edPct = 80
 			moveDividerPct(80)
 		}
-
-		sess.editorMode = false        //needs to be here
-		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
-
-		//org.readTitleIntoBuffer() // shouldn't be necessary
+		sess.editorMode = false
+		vim.BufferSetCurrent(org.vbuf)
 		org.drawPreview()
 		org.mode = NORMAL
 		sess.returnCursor()

@@ -36,16 +36,15 @@ var e_lookup_C = map[string]func(*Editor){
 	"number":          (*Editor).number,
 	"num":             (*Editor).number,
 	"ha":              (*Editor).printNote,
-	//"modified":        (*Editor).modified, // debugging
-	"quit":   (*Editor).quitActions,
-	"q":      (*Editor).quitActions,
-	"quit!":  (*Editor).quitActions,
-	"q!":     (*Editor).quitActions,
-	"x":      (*Editor).quitActions,
-	"fmt":    (*Editor).goFormat,
-	"rename": (*Editor).rename, //lsp command
-	"pdf":    (*Editor).createPDF,
-	"print":  (*Editor).printDocument,
+	"quit":            (*Editor).quitActions,
+	"q":               (*Editor).quitActions,
+	"quit!":           (*Editor).quitActions,
+	"q!":              (*Editor).quitActions,
+	"x":               (*Editor).quitActions,
+	"fmt":             (*Editor).goFormat,
+	"rename":          (*Editor).rename, //lsp command
+	"pdf":             (*Editor).createPDF,
+	"print":           (*Editor).printDocument,
 	//"spell":  (*Editor).spell,
 }
 
