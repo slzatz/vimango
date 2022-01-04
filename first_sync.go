@@ -11,32 +11,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func keywordExistsS0(dbase *sql.DB, plg io.Writer, name string) int {
-	row := dbase.QueryRow("SELECT keyword.id FROM keyword WHERE keyword.name=$1;", name)
-	var id int
-	err := row.Scan(&id)
-	if err != nil {
-		fmt.Fprintf(plg, "Error in keywordExistsS0: %v\n", err)
-		return -1
-	}
-	return id
-}
-
-func addTaskKeywordS0(dbase *sql.DB, plg io.Writer, keyword_id, entry_id int) {
-	_, err := dbase.Exec("INSERT INTO task_keyword (task_id, keyword_id) VALUES ($1, $2);",
-		entry_id, keyword_id)
-	if err != nil {
-		fmt.Fprintf(plg, "Error in addTaskKeywordS0 = INSERT INTO task_keyword: %v\n", err)
-		return
-	}
-}
-
-func getTaskKeywordsS0(dbase *sql.DB, plg io.Writer, id int) []string {
-
+func generateTag(dbase *sql.DB, plg io.Writer, id int) string {
 	rows, err := dbase.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=$1;", id)
 	if err != nil {
-		fmt.Fprintf(plg, "Error in getTaskKeywordsS0: %v\n", err)
+		fmt.Fprintf(plg, "Error in generateTag for task_id %d:%v\n", err)
 	}
 	defer rows.Close()
 
@@ -47,8 +26,10 @@ func getTaskKeywordsS0(dbase *sql.DB, plg io.Writer, id int) []string {
 		err = rows.Scan(&name)
 		kk = append(kk, name)
 	}
-	return kk
+	return strings.Join(kk, ",")
 }
+
+//func serverTaskKeywordIds(dbase *sql.DB, plg io.Writer, id int) []int { // in synchronize
 
 func firstSync(reportOnly bool) (log string) {
 
@@ -277,15 +258,21 @@ func firstSync(reportOnly bool) (log string) {
 		}
 
 		// Update the client entry's keywords
-		kwTids := serverTaskKeywordIds(pdb, &lg, e.id) // returns []string
+		kwTids := serverTaskKeywordIds(pdb, &lg, e.id)
 		for _, keywordTid := range kwTids {
-			addClientTaskKeywordTids(db, &lg, keywordTid, e.id)
+			//addClientTaskKeywordTids(db, &lg, keywordTid, e.id)
+			_, err := db.Exec("INSERT INTO task_keyword (task_tid, keyword_tid) VALUES ($1, $2);", e.id, keywordTid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error in INSERT INTO task_keyword - task_tid:%d keyword_tid:%d: %v\n", e.id, keywordTid, err)
+				continue
+			}
 		}
-		kwns := serverTaskKeywords(pdb, &lg, e.id)
-		tag := strings.Join(kwns, ",")
-		_, err = fts_db.Exec("UPDATE fts SET tag=$1 WHERE tid=$2;", tag, e.id)
-		if err != nil {
-			fmt.Fprintf(&lg, "Error in Update tag in fts: %v\n", err)
+		tag := generateTag(pdb, &lg, e.id)
+		if tag != "" {
+			_, err = fts_db.Exec("UPDATE fts SET tag=$1 WHERE tid=$2;", tag, e.id)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error in Update tag in fts: %v\n", err)
+			}
 		}
 	}
 
