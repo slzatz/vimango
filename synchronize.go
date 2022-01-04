@@ -13,18 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func keywordExistsS(dbase *sql.DB, plg io.Writer, name string) int {
-	row := dbase.QueryRow("SELECT keyword.id FROM keyword WHERE keyword.name=$1;", name)
-	var id int
-	err := row.Scan(&id)
-	if err != nil {
-		fmt.Fprintf(plg, "Error in keywordExistsS: %v\n", err)
-		return -1
-	}
-	return id
-}
-
-func addTaskKeywordS(dbase *sql.DB, plg io.Writer, keyword_id, entry_id int) {
+func addServerTaskKeywordIds(dbase *sql.DB, plg io.Writer, keyword_id, entry_id int) {
 	_, err := dbase.Exec("INSERT INTO task_keyword (task_id, keyword_id) VALUES ($1, $2);",
 		entry_id, keyword_id)
 	if err != nil {
@@ -35,12 +24,22 @@ func addTaskKeywordS(dbase *sql.DB, plg io.Writer, keyword_id, entry_id int) {
 	}
 }
 
-func getTaskKeywordsS(dbase *sql.DB, plg io.Writer, id int) []string {
+func addClientTaskKeywordTids(dbase *sql.DB, plg io.Writer, keyword_tid, entry_tid int) {
+	_, err := dbase.Exec("INSERT INTO task_keyword (task_tid, keyword_tid) VALUES ($1, $2);",
+		entry_tid, keyword_tid)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in addTaskKeywordS = INSERT INTO task_keyword: %v\n", err)
+		return
+	} else {
+		fmt.Fprintf(plg, "Inserted into task_keyword task_tid **%d** and keyword_tid **%d**\n", entry_tid, keyword_tid)
+	}
+}
 
+func serverTaskKeywords(dbase *sql.DB, plg io.Writer, id int) []string {
 	rows, err := dbase.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=$1;", id)
 	if err != nil {
-		fmt.Fprintf(plg, "Error in getTaskKeywordsS: %v\n", err)
+		fmt.Fprintf(plg, "Error in serverTaskKeywords: %v\n", err)
 	}
 	defer rows.Close()
 
@@ -52,6 +51,61 @@ func getTaskKeywordsS(dbase *sql.DB, plg io.Writer, id int) []string {
 		kk = append(kk, name)
 	}
 	return kk
+}
+
+// not in use
+func clientTaskKeywords(dbase *sql.DB, plg io.Writer, tid int) []string {
+	rows, err := dbase.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
+		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=$1;", tid)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in clientTaskKeywords: %v\n", err)
+	}
+	defer rows.Close()
+
+	kk := []string{}
+	for rows.Next() {
+		var name string
+
+		err = rows.Scan(&name)
+		kk = append(kk, name)
+	}
+	return kk
+}
+
+func serverTaskKeywordIds(dbase *sql.DB, plg io.Writer, id int) []int { ////////////////////////////
+	rows, err := dbase.Query("SELECT keyword.id FROM task_keyword LEFT OUTER JOIN keyword ON "+
+		"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=$1;", id)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in getTaskKeywordsS: %v\n", err)
+	}
+	defer rows.Close()
+
+	keywordIds := []int{}
+	for rows.Next() {
+		var keywordId int
+
+		err = rows.Scan(&keywordId)
+		keywordIds = append(keywordIds, keywordId)
+	}
+	return keywordIds
+}
+
+func clientTaskKeywordTids(dbase *sql.DB, plg io.Writer, tid int) []int { ////////////////////////////
+	rows, err := dbase.Query("SELECT keyword.tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
+		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=$1;", tid)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in getTaskKeywordsS: %v\n", err)
+	}
+	defer rows.Close()
+
+	keywordTids := []int{}
+	for rows.Next() {
+		var keywordTid int
+
+		err = rows.Scan(&keywordTid)
+		keywordTids = append(keywordTids, keywordTid)
+	}
+	return keywordTids
 }
 
 func synchronize(reportOnly bool) (log string) {
@@ -554,17 +608,11 @@ func synchronize(reportOnly bool) (log string) {
 	var client_deleted_entries []Entry
 	for rows.Next() {
 		var e Entry
-		var tid sql.NullInt64
 		rows.Scan(
 			&e.id,
-			&tid,
+			&e.tid,
 			&e.title,
 		)
-		if tid.Valid {
-			e.tid = int(tid.Int64)
-		} else {
-			e.tid = 0
-		}
 		client_deleted_entries = append(client_deleted_entries, e)
 	}
 	if len(client_deleted_entries) > 0 {
@@ -814,9 +862,9 @@ func synchronize(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error inserting new entry for %q into sqlite: %v\n", truncate(e.title, 15), err1)
 				break
 			}
-			_, err2 := fts_db.Exec("INSERT INTO fts (title, note, lm_id) VALUES (?, ?, ?);", e.title, e.note, client_id)
+			_, err2 := fts_db.Exec("INSERT INTO fts (title, note, tid) VALUES (?, ?, ?);", e.title, e.note, e.id)
 			if err2 != nil {
-				fmt.Fprintf(&lg, "Error inserting into fts_db for entry with id %d: %v\n", client_id, err2)
+				fmt.Fprintf(&lg, "Error inserting into fts_db for entry with tid %d: %v\n", e.id, err2)
 				break
 			}
 			if len(server_updated_entries) < 100 {
@@ -834,32 +882,30 @@ func synchronize(reportOnly bool) (log string) {
 			}
 			fmt.Fprintf(&lg, "Updated local entry *%q* with id **%d** and tid **%d**\n", truncate(e.title, 15), client_id, e.id)
 
-			_, err4 := fts_db.Exec("UPDATE fts SET title=?, note=? WHERE lm_id=?;", e.title, e.note, client_id)
+			_, err4 := fts_db.Exec("UPDATE fts SET title=?, note=? WHERE tid=?;", e.title, e.note, e.id)
 			if err4 != nil {
-				fmt.Fprintf(&lg, "Error updating fts_db for entry %s; id: %d; %v\n", truncate(e.title, 15), client_id, err4)
+				fmt.Fprintf(&lg, "Error updating fts_db for entry %s; tid: %d; %v\n", truncate(e.title, 15), e.id, err4)
 			} else {
 				fmt.Fprint(&lg, "and updated fts_db for the entry.\n")
 			}
 		}
 		// Update the client entry's keywords
-		_, err5 := db.Exec("DELETE FROM task_keyword WHERE task_id=?;", client_id)
+		_, err5 := db.Exec("DELETE FROM task_keyword WHERE task_tid=?;", e.id)
 		if err5 != nil {
-			fmt.Fprintf(&lg, "Error deleting from task_keyword from server id %d: %v\n", client_id, err5)
+			fmt.Fprintf(&lg, "Error deleting from task_keyword from server id %d: %v\n", e.id, err5)
 			continue
 		}
-		kwns := getTaskKeywordsS(pdb, &lg, e.id) // returns []string
-		for _, kwn := range kwns {
-			keyword_id := keywordExistsS(db, &lg, kwn)
-			if keyword_id != -1 { // ? should create the keyword if it doesn't exist
-				addTaskKeywordS(db, &lg, keyword_id, client_id)
-			}
+		kwTids := serverTaskKeywordIds(pdb, &lg, e.id)
+		for _, keywordTid := range kwTids {
+			addClientTaskKeywordTids(db, &lg, keywordTid, e.id)
 		}
+		kwns := serverTaskKeywords(pdb, &lg, e.id)
 		tag := strings.Join(kwns, ",")
-		_, err = fts_db.Exec("UPDATE fts SET tag=$1 WHERE lm_id=$2;", tag, client_id)
+		_, err = fts_db.Exec("UPDATE fts SET tag=$1 WHERE tid=$2;", tag, e.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error in Update tag in fts: %v\n", err)
 		} else {
-			fmt.Fprintf(&lg, "Set fts_db tag(keywords) for client id **%d** to *%q*\n", client_id, tag)
+			fmt.Fprintf(&lg, "Set fts_db tag(keywords) for client tid **%d** to *%q*\n", e.id, tag)
 		}
 	}
 
@@ -913,19 +959,18 @@ func synchronize(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Error deleting from task_keyword from server id %d: %v\n", server_id, err4)
 			continue
 		}
-		kwns := getTaskKeywordsS(db, &lg, e.id) // returns []string
-		if len(kwns) == 0 {
-			fmt.Fprint(&lg, "There were no keywords to add to the server entry.\n\n")
-			continue
+		kwIds := clientTaskKeywordTids(db, &lg, server_id)
+		for _, keywordId := range kwIds {
+			addServerTaskKeywordIds(pdb, &lg, keywordId, server_id)
 		}
-		for _, kwn := range kwns {
-			keyword_id := keywordExistsS(pdb, &lg, kwn)
-			if keyword_id != -1 { // ? should create the keyword if it doesn't exist
-				addTaskKeywordS(pdb, &lg, keyword_id, server_id)
+		if e.tid < 1 { // it was a new entry that just got synched above
+			_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", server_id, e.tid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
+			} else {
+				fmt.Fprintf(&lg, "Set fts_db tid to %d\n", server_id)
 			}
 		}
-		tag := strings.Join(kwns, ",")
-		fmt.Fprintf(&lg, "Keyword(s) %q were added to server entry id %d.\n\n", tag, server_id)
 	}
 
 	// server deleted entries
@@ -951,12 +996,12 @@ func synchronize(reportOnly bool) (log string) {
 		*/
 		fmt.Fprintf(&lg, "Deleted client entry %q with id %d and tid %d\n", truncate(e.title, 15), id, e.id)
 
-		_, err = db.Exec("DELETE FROM task_keyword WHERE task_id=?;", id)
+		_, err = db.Exec("DELETE FROM task_keyword WHERE task_tid=?;", e.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting task_keyword client rows where entry id = %d: %v\n", id, err)
+			fmt.Fprintf(&lg, "Error deleting task_keyword client rows where entry tid = %d: %v\n", e.id, err)
 			continue
 		}
-		fmt.Fprintf(&lg, "and on client deleted task_id %d from task_keyword\n", id)
+		fmt.Fprintf(&lg, "and on client deleted task_tid %d from task_keyword\n", e.id)
 	}
 
 	// client deleted entries
@@ -969,17 +1014,17 @@ func synchronize(reportOnly bool) (log string) {
 		}
 		fmt.Fprintf(&lg, "Deleted client entry %q with id %d\n", tc(e.title, 15, true), e.id)
 
-		_, err = db.Exec("DELETE FROM task_keyword WHERE task_id=?;", e.id)
+		_, err = db.Exec("DELETE FROM task_keyword WHERE task_tid=?;", e.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting task_keyword client rows where entry id = %d: %v\n", e.id, err)
+			fmt.Fprintf(&lg, "Error deleting task_keyword client rows where entry tid = %d: %v\n", e.tid, err)
 			continue
 		}
-		fmt.Fprintf(&lg, "and on client deleted task_id %d from task_keyword\n", e.id)
+		fmt.Fprintf(&lg, "and on client deleted task_tid %d from task_keyword\n", e.tid)
 
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
 		// also note client task may have been new (never synced) and deleted (tid=0)
-		if e.tid == 0 {
+		if e.tid < 1 {
 			fmt.Fprintf(&lg, "There is no server entry to delete for client id %d\n", e.id)
 			continue
 		}
@@ -1120,19 +1165,13 @@ func synchronize(reportOnly bool) (log string) {
 
 	//server_deleted_keywords
 	for _, c := range server_deleted_keywords {
-		//pdb.Exec("DELETE FROM task_keyword WHERE keyword_id=$1;", c.id) //Dec 29, 2021
-		row = db.QueryRow("SELECT id FROM keyword WHERE keyword.tid=?", c.id)
-		var id int
-		err = row.Scan(&id)
+		_, err := db.Exec("DELETE FROM task_keyword WHERE keyword_tid=?;", c.id)
 		if err != nil {
-			sess.showOrgMessage("Error SELECTING id FROM client keyword with tid %d: %v", c.id, err)
-			continue
+			fmt.Fprintf(&lg, "Error deleting from task_keyword client keyword_tid: %d", c.id)
 		}
-		db.Exec("DELETE FROM task_keyword WHERE keyword_id=?;", id)
-		//res, err := db.Exec("DELETE FROM keyword WHERE tid=?", c.id)
-		_, err := db.Exec("DELETE FROM keyword WHERE tid=?", id)
+		_, err = db.Exec("DELETE FROM keyword WHERE tid=?", c.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting local keyword with tid = %v", c.id)
+			fmt.Fprintf(&lg, "Error deleting client keyword with tid = %v", c.id)
 			continue
 		}
 		fmt.Fprintf(&lg, "Deleted client keyword %q with tid %d", truncate(c.title, 15), c.id)
@@ -1142,11 +1181,11 @@ func synchronize(reportOnly bool) (log string) {
 	for _, c := range client_deleted_keywords {
 		_, err = pdb.Exec("DELETE FROM task_keyword WHERE keyword_id=$1;", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error trying to delete server task_keyword with id %d", c.tid)
+			fmt.Fprintf(&lg, "Error deleting from task_keyword server keyword_id: %d", c.tid)
 		}
-		_, err = db.Exec("DELETE FROM task_keyword WHERE keyword_id=?;", c.id)
+		_, err = db.Exec("DELETE FROM task_keyword WHERE keyword_tid=?;", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error trying to delete client task_keyword with id %d", c.id)
+			fmt.Fprintf(&lg, "Error deleting client task_keyword with id %d", c.tid)
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
@@ -1157,7 +1196,7 @@ func synchronize(reportOnly bool) (log string) {
 		}
 		_, err = db.Exec("DELETE FROM keyword WHERE id=?", c.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting local keyword %s with id %d: %v\n", c.title, c.id, err)
+			fmt.Fprintf(&lg, "Error deleting client keyword %s with id %d: %v\n", c.title, c.id, err)
 			continue
 		}
 		fmt.Fprintf(&lg, "Deleted client keyword %s: id %d and updated server keyword with id %d to deleted = true", c.title, c.id, c.tid)

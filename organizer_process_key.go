@@ -347,18 +347,15 @@ func organizerProcessKey(c int) {
 			row := &org.rows[org.fr] //currently highlighted entry row
 			switch org.altView {
 			case KEYWORD:
+				tid, _ = keywordExists(altRow.title)
 			case FOLDER:
 				tid, _ = folderExists(altRow.title)
-				if tid < 1 {
-					sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
-					return
-				}
 			case CONTEXT:
 				tid, _ = contextExists(altRow.title)
-				if tid < 1 {
-					sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
-					return
-				}
+			}
+			if tid < 1 {
+				sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+				return
 			}
 			if len(org.marked_entries) == 0 {
 				switch org.altView {

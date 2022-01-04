@@ -257,31 +257,33 @@ func firstSync(reportOnly bool) (log string) {
 		if i%200 == 0 {
 			sess.showEdMessage("%d entries processed", i)
 		}
-		var client_id int
-		err := db.QueryRow("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
-			"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) RETURNING id;",
-			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note).Scan(&client_id)
-
+		/*
+			var client_id int
+			err := db.QueryRow("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
+				"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) RETURNING id;",
+				e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note).Scan(&client_id)
+		*/
+		_, err := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
+			"VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false);",
+			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v %v %v %v %v %v %v\n", e.id, e.title, e.star, e.context_id, e.folder_id, e.added, e.completed)
 			fmt.Fprintf(&lg, "Error inserting entry %q into sqlite: %v\n", truncate(e.title, 15), err)
 			continue
 		}
-		_, err = fts_db.Exec("INSERT INTO fts (title, note, lm_id) VALUES (?, ?, ?);", e.title, e.note, client_id)
+		_, err = fts_db.Exec("INSERT INTO fts (title, note, tid) VALUES (?, ?, ?);", e.title, e.note, e.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error inserting into fts_db for entry with id %d: %v\n", client_id, err)
+			fmt.Fprintf(&lg, "Error inserting into fts_db for entry with tid %d: %v\n", e.id, err)
 		}
 
 		// Update the client entry's keywords
-		kwns := getTaskKeywordsS0(pdb, &lg, e.id)
-		for _, kwn := range kwns {
-			keyword_id := keywordExistsS0(db, &lg, kwn)
-			if keyword_id != -1 {
-				addTaskKeywordS0(db, &lg, keyword_id, client_id)
-			}
+		kwTids := serverTaskKeywordIds(pdb, &lg, e.id) // returns []string
+		for _, keywordTid := range kwTids {
+			addClientTaskKeywordTids(db, &lg, keywordTid, e.id)
 		}
+		kwns := serverTaskKeywords(pdb, &lg, e.id)
 		tag := strings.Join(kwns, ",")
-		_, err = fts_db.Exec("UPDATE fts SET tag=$1 WHERE lm_id=$2;", tag, client_id)
+		_, err = fts_db.Exec("UPDATE fts SET tag=$1 WHERE tid=$2;", tag, e.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error in Update tag in fts: %v\n", err)
 		}

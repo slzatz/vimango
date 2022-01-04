@@ -129,7 +129,7 @@ func main() {
 }
 
 func createSqliteDB() {
-	path := "sqlite_init.sql"
+	path := "sqlite_init2.sql"
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -163,7 +163,7 @@ func createSqliteDB() {
 		log.Fatal(err)
 	}
 
-	_, err = fts_db.Exec("CREATE VIRTUAL TABLE fts USING fts5 (title, note, tag, lm_id UNINDEXED);")
+	_, err = fts_db.Exec("CREATE VIRTUAL TABLE fts USING fts5 (title, note, tag, tid UNINDEXED);")
 	if err != nil {
 		log.Fatal(err)
 	}

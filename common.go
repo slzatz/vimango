@@ -217,6 +217,7 @@ func tc(s string, l int, b bool) string {
 
 type Row struct {
 	id        int
+	tid       int
 	title     string
 	ftsTitle  string
 	star      bool
