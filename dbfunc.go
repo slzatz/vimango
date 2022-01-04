@@ -324,15 +324,13 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 	for rows.Next() {
 		var row Row
 		var completed sql.NullTime
-		//var modified string
-		var sort string
+		var sort sql.NullString
 
 		err = rows.Scan(&row.id,
 			&row.title,
 			&row.star,
 			&row.deleted,
 			&completed,
-			//&modified,
 			&sort,
 		)
 
@@ -347,8 +345,11 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 			row.completed = false
 		}
 
-		//row.modified = timeDelta(modified)
-		row.sort = timeDelta(sort)
+		if sort.Valid {
+			row.sort = timeDelta(sort.String)
+		} else {
+			row.sort = ""
+		}
 
 		orgRows = append(orgRows, row)
 
