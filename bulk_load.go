@@ -11,8 +11,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-/*
-type Entry struct {
+/* in common
+type serverEntry struct {
 	id         int
 	title      string
 	created    string
@@ -24,7 +24,6 @@ type Entry struct {
 	completed  sql.NullString
 	deleted    bool
 	modified   string
-	tag        string
 }
 */
 
@@ -47,23 +46,15 @@ type TaskTag struct {
 	tag     string
 }
 
-/*
-type ftsEntry struct {
-	title string
-	note  string
-	tag   string
-	tid   int
-}
-*/
-
-func getEntries(dbase *sql.DB, plg io.Writer) []EntryTag {
+// using EntryTag so we can later add the tag to the rest of the entry info
+func getEntries(dbase *sql.DB, count int, plg io.Writer) []EntryTag {
 	rows, err := dbase.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted=false ORDER BY id;")
 	if err != nil {
 		fmt.Fprintf(plg, "Error in getEntries: %v\n", err)
 		return []EntryTag{}
 	}
 
-	entries := make([]EntryTag, 0, 6000)
+	entries := make([]EntryTag, 0, count)
 	for rows.Next() {
 		var e EntryTag
 		rows.Scan(
@@ -84,13 +75,13 @@ func getEntries(dbase *sql.DB, plg io.Writer) []EntryTag {
 }
 
 // returns []struct{client_entry_tid, tag} - need to populate fts
-func getTags(dbase *sql.DB, plg io.Writer) []TaskTag {
+func getTags(dbase *sql.DB, count int, plg io.Writer) []TaskTag {
 	rows, err := dbase.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_id;")
 	if err != nil {
 		println(err)
 		return []TaskTag{}
 	}
-	taskkeywords := make([]TaskKeyword, 0, 100)
+	taskkeywords := make([]TaskKeyword, 0, count)
 	for rows.Next() {
 		var tk TaskKeyword
 		rows.Scan(
@@ -99,7 +90,7 @@ func getTags(dbase *sql.DB, plg io.Writer) []TaskTag {
 		)
 		taskkeywords = append(taskkeywords, tk)
 	}
-	tasktags := make([]TaskTag, 0, 100)
+	tasktags := make([]TaskTag, 0, 1000)
 	keywords := make([]string, 0, 5)
 	var tt TaskTag
 	var id int
@@ -125,14 +116,14 @@ func getTags(dbase *sql.DB, plg io.Writer) []TaskTag {
 	return tasktags
 }
 
-func getTaskKeywordIds(dbase *sql.DB, plg io.Writer) []TaskKeywordIds {
+func getTaskKeywordIds(dbase *sql.DB, count int, plg io.Writer) []TaskKeywordIds {
 	//rows, err := pdb.Query("Select task_id, keyword_id FROM task_keyword ORDER BY task_id;")
 	rows, err := dbase.Query("SELECT task_id, keyword_id FROM task_keyword;")
 	if err != nil {
 		println(err)
 		return []TaskKeywordIds{}
 	}
-	taskKeywordIds := make([]TaskKeywordIds, 0, 1000)
+	taskKeywordIds := make([]TaskKeywordIds, 0, count)
 	for rows.Next() {
 		var tk TaskKeywordIds
 		rows.Scan(
@@ -143,54 +134,6 @@ func getTaskKeywordIds(dbase *sql.DB, plg io.Writer) []TaskKeywordIds {
 	}
 	return taskKeywordIds
 }
-
-/* not in use
-func getServerTags(id int) []string {
-	//select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_id LIMIT 100;
-	rows, err := pdb.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_id LIMIT 100;")
-	if err != nil {
-		fmt.Printf("Error in getServerTags: %v\n", err)
-	}
-	defer rows.Close()
-
-	kk := []string{}
-	for rows.Next() {
-		var name string
-
-		err = rows.Scan(&name)
-		kk = append(kk, name)
-	}
-	return kk
-}
-*/
-/*
-func getClientEntries() []serverEntry {
-	rows, err := pdb.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted=false ORDER BY id LIMIT 1000;")
-	if err != nil {
-		println(err)
-		return []serverEntry{}
-	}
-
-	server_entries := make([]serverEntry, 0, 10)
-	for rows.Next() {
-		var e serverEntry
-		rows.Scan(
-			&e.id,
-			&e.title,
-			&e.star,
-			&e.note,
-			&e.created,
-			&e.modified,
-			&e.context_id,
-			&e.folder_id,
-			&e.added,
-			&e.completed,
-		)
-		server_entries = append(server_entries, e)
-	}
-	return server_entries
-}
-*/
 
 func createBulkInsertQuery(n int, entries []EntryTag) (query string, args []interface{}) {
 	values := make([]string, n)
@@ -227,22 +170,6 @@ func createBulkInsertQueryFTS(n int, entries []EntryTag) (query string, args []i
 	query = fmt.Sprintf("INSERT INTO fts (title, note, tag, tid) VALUES %s", strings.Join(values, ", "))
 	return
 }
-
-/* can't do bulk UPDATE
-func createBulkInsertQueryFTSTags(n int, fts_tags []serverTaskTag) (query string, args []interface{}) {
-	values := make([]string, n)
-	args = make([]interface{}, n*2)
-	pos := 0
-	for i, e := range fts_tags {
-		values[i] = "(?, ?)"
-		args[pos] = e.tag
-		args[pos+1] = e.id
-		pos += 2
-	}
-	query = fmt.Sprintf("UPDATE fts SET tag=? WHERE tid=? %s", strings.Join(values, ", "))
-	return
-}
-*/
 
 func createBulkInsertQueryTaskKeywordIds(n int, tk []TaskKeywordIds) (query string, args []interface{}) {
 	values := make([]string, n)
@@ -311,18 +238,56 @@ func bulkLoad(reportOnly bool) (log string) {
 	}
 
 	t0 := time.Now()
-	fmt.Fprintf(&lg, "Starting initial sync at %v\n", t0)
+	fmt.Fprintf(&lg, "Starting initial sync at %v\n", t0.Format("2006-01-02 15:04:05"))
 
-	var count int
-
-	//server contexts
-	err = pdb.QueryRow("SELECT COUNT(*) FROM context WHERE deleted=false;").Scan(&count)
+	var contextCount int
+	err = pdb.QueryRow("SELECT COUNT(*) FROM context WHERE deleted=false;").Scan(&contextCount)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for server_contexts: %v", err)
 		return
 	}
-	fmt.Fprintf(&lg, "- `Contexts`: %d\n", count)
+	fmt.Fprintf(&lg, "- `Contexts`: %d\n", contextCount)
 
+	var folderCount int
+	err = pdb.QueryRow("SELECT COUNT(*) FROM folder WHERE deleted=false;").Scan(&folderCount)
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_folders: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Folders`: %d\n", folderCount)
+
+	var keywordCount int
+	err = pdb.QueryRow("SELECT COUNT(*) FROM keyword WHERE deleted=false;").Scan(&keywordCount)
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_keywords: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Keywords`: %d\n", keywordCount)
+
+	var taskCount int
+	err = pdb.QueryRow("SELECT COUNT(*) FROM task WHERE deleted=false;").Scan(&taskCount)
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in COUNT(*) for server_entries: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Entries`: %d\n", taskCount)
+
+	var taskKeywordCount int
+	err = pdb.QueryRow("SELECT COUNT(*) FROM task_keyword;").Scan(&taskKeywordCount)
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in COUNT(*) for task_keywords: %v", err)
+		return
+	}
+	fmt.Fprintf(&lg, "- `Task Keyword Combos`: %d\n", taskKeywordCount)
+
+	if reportOnly {
+		// note there is a defer log.String()
+		return
+	}
+
+	/****************below is where changes start***********************************/
+
+	//server contexts -> client
 	rows, err := pdb.Query("SELECT id, title, star, created, modified FROM context WHERE deleted=false ORDER BY id;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_contexts: %v", err)
@@ -331,7 +296,7 @@ func bulkLoad(reportOnly bool) (log string) {
 
 	defer rows.Close()
 
-	server_contexts := make([]Container, 0, count)
+	server_contexts := make([]Container, 0, contextCount)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
@@ -343,75 +308,6 @@ func bulkLoad(reportOnly bool) (log string) {
 		)
 		server_contexts = append(server_contexts, c)
 	}
-
-	//server folders
-	err = pdb.QueryRow("SELECT COUNT(*) FROM folder WHERE deleted=false;").Scan(&count)
-	if err != nil {
-		fmt.Fprintf(&lg, "Error in COUNT(*) for server_folders: %v", err)
-		return
-	}
-	fmt.Fprintf(&lg, "- `Folders`: %d\n", count)
-	rows, err = pdb.Query("SELECT id, title, star, created, modified FROM folder WHERE deleted=false ORDER BY id;")
-	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_folders: %v", err)
-		return
-	}
-
-	server_folders := make([]Container, 0, count)
-	for rows.Next() {
-		var c Container
-		rows.Scan(
-			&c.id,
-			&c.title,
-			&c.star,
-			&c.created,
-			&c.modified,
-		)
-		server_folders = append(server_folders, c)
-	}
-
-	//server keywords
-	err = pdb.QueryRow("SELECT COUNT(*) FROM keyword WHERE deleted=false;").Scan(&count)
-	if err != nil {
-		fmt.Fprintf(&lg, "Error in COUNT(*) for server_keywords: %v", err)
-		return
-	}
-	fmt.Fprintf(&lg, "- `Keywords`: %d\n", count)
-	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted=false ORDER BY id;")
-	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_keywords: %v", err)
-		return
-	}
-
-	server_keywords := make([]Container, 0, count)
-	for rows.Next() {
-		var c Container
-		rows.Scan(
-			&c.id,
-			&c.title,
-			&c.star,
-			&c.modified,
-		)
-		server_keywords = append(server_keywords, c)
-	}
-
-	//server entries
-	err = pdb.QueryRow("SELECT COUNT(*) FROM task WHERE deleted=false;").Scan(&count)
-	if err != nil {
-		fmt.Fprintf(&lg, "Error in COUNT(*) for server_entries: %v", err)
-		return
-	}
-	fmt.Fprintf(&lg, "- `Entries`: %d\n", count)
-
-	entries := getEntries(pdb, &lg)
-
-	if reportOnly {
-		// note there is a defer log.String()
-		return
-	}
-
-	/****************below is where changes start***********************************/
-	//server contexts -> client
 	c := server_contexts[0]
 	_, err = db.Exec("UPDATE context SET title=?, star=?, modified=datetime('now') WHERE tid=?;", c.title, c.star, c.id)
 	if err != nil {
@@ -427,6 +323,25 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 	}
 
+	//server folder -> client
+	rows, err = pdb.Query("SELECT id, title, star, created, modified FROM folder WHERE deleted=false ORDER BY id;")
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in SELECT for server_folders: %v", err)
+		return
+	}
+
+	server_folders := make([]Container, 0, folderCount)
+	for rows.Next() {
+		var c Container
+		rows.Scan(
+			&c.id,
+			&c.title,
+			&c.star,
+			&c.created,
+			&c.modified,
+		)
+		server_folders = append(server_folders, c)
+	}
 	c = server_folders[0]
 	_, err = db.Exec("UPDATE folder SET title=?, star=?, modified=datetime('now') WHERE tid=?;", c.title, c.star, c.id)
 	if err != nil {
@@ -441,6 +356,25 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 	}
 
+	//server keyword -> client
+	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted=false ORDER BY id;")
+	if err != nil {
+		fmt.Fprintf(&lg, "Error in SELECT for server_keywords: %v", err)
+		return
+	}
+
+	server_keywords := make([]Container, 0, keywordCount)
+	for rows.Next() {
+		var c Container
+		rows.Scan(
+			&c.id,
+			&c.title,
+			&c.star,
+			&c.modified,
+		)
+		server_keywords = append(server_keywords, c)
+	}
+
 	for _, c := range server_keywords {
 		_, err := db.Exec("INSERT INTO keyword (tid, name, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
 			c.id, c.title, c.star)
@@ -449,7 +383,9 @@ func bulkLoad(reportOnly bool) (log string) {
 			break
 		}
 	}
-	/**********************************/
+
+	//server entries -> client
+	entries := getEntries(pdb, taskCount, &lg)
 
 	i := 0
 	n := 100
@@ -467,14 +403,13 @@ func bulkLoad(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "%v\n", err)
 		}
 		if done {
-			fmt.Fprintf(&lg, "%d entries were added to the client db\n", m)
+			fmt.Fprintf(&lg, "\n- %d `entries` were added to the client db\n", m)
 			break
 		}
 		i += 1
 	}
 
-	taskKeywordIds := getTaskKeywordIds(pdb, &lg)
-	fmt.Fprintf(&lg, "There are %d task_id, keyword_id pairs\n", len(taskKeywordIds))
+	taskKeywordIds := getTaskKeywordIds(pdb, taskKeywordCount, &lg)
 	i = 0
 	n = 100
 	done = false
@@ -486,28 +421,18 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 		e := taskKeywordIds[i*n : m]
 		query, args := createBulkInsertQueryTaskKeywordIds(len(e), e)
-		//fmt.Fprintf(&lg, "%s\n", query)
-		//fmt.Fprintf(&lg, "%v\n", args)
 		err = bulkInsert(db, query, args)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v\n", err)
 		}
 		if done {
-			fmt.Fprintf(&lg, "%d taskKeywordIds were added to the client db\n", m)
+			fmt.Fprintf(&lg, "- %d `taskKeywordIds` were added to the client db\n", m)
 			break
 		}
-		//fmt.Fprintf(&lg, "i = %d m = %d\n", i, m)
 		i += 1
 	}
-	/*
-		query, args := createBulkInsertQueryTaskKeywordIds(len(taskKeywordIds), taskKeywordIds)
-		err = bulkInsert(db, query, args)
-		if err != nil {
-			fmt.Fprintf(&lg, "%v\n", err)
-		}
-	*/
 
-	tags := getTags(pdb, &lg)
+	tags := getTags(pdb, taskKeywordCount, &lg)
 	i = 0
 	for _, e := range entries {
 		if e.id == tags[i].task_id {
