@@ -57,9 +57,9 @@ type ftsEntry struct {
 */
 
 func getEntries(dbase *sql.DB, plg io.Writer) []EntryTag {
-	rows, err := dbase.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted=false ORDER BY id LIMIT 1000;")
+	rows, err := dbase.Query("SELECT id, title, star, note, created, modified, context_id, folder_id, added, completed FROM task WHERE deleted=false ORDER BY id;")
 	if err != nil {
-		fmt.Fprintf(plg, "Error in getEntries: %v", err)
+		fmt.Fprintf(plg, "Error in getEntries: %v\n", err)
 		return []EntryTag{}
 	}
 
@@ -85,7 +85,7 @@ func getEntries(dbase *sql.DB, plg io.Writer) []EntryTag {
 
 // returns []struct{client_entry_tid, tag} - need to populate fts
 func getTags(dbase *sql.DB, plg io.Writer) []TaskTag {
-	rows, err := dbase.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_id LIMIT 100;")
+	rows, err := dbase.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_id;")
 	if err != nil {
 		println(err)
 		return []TaskTag{}
@@ -377,7 +377,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		return
 	}
 	fmt.Fprintf(&lg, "- `Keywords`: %d\n", count)
-	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted=false;")
+	rows, err = pdb.Query("SELECT id, name, star, modified FROM keyword WHERE deleted=false ORDER BY id;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_keywords: %v", err)
 		return
@@ -422,7 +422,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		_, err := db.Exec("INSERT INTO context (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
 			c.id, c.title, c.star, c.created)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error inserting context into sqlite: %v", err)
+			fmt.Fprintf(&lg, "Error inserting context into sqlite: %v\n", err)
 			break
 		}
 	}
@@ -436,7 +436,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		_, err := db.Exec("INSERT INTO folder (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
 			c.id, c.title, c.star, c.created)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error inserting folder into sqlite: %v", err)
+			fmt.Fprintf(&lg, "Error inserting folder into sqlite: %v\n", err)
 			break
 		}
 	}
@@ -451,24 +451,64 @@ func bulkLoad(reportOnly bool) (log string) {
 	}
 	/**********************************/
 
-	fmt.Fprintf(&lg, "Before createBulkInsertQuery for entries")
-	query, args := createBulkInsertQuery(len(entries), entries)
-	fmt.Fprintf(&lg, "After createBulkInsertQuery for entries and before BulkInsert")
-	err = bulkInsert(db, query, args)
-	if err != nil {
-		fmt.Fprintf(&lg, "%v", err)
+	i := 0
+	n := 100
+	done := false
+	for {
+		m := (i + 1) * n
+		if m > len(entries) {
+			m = len(entries)
+			done = true
+		}
+		e := entries[i*n : m]
+		query, args := createBulkInsertQuery(len(e), e)
+		err = bulkInsert(db, query, args)
+		if err != nil {
+			fmt.Fprintf(&lg, "%v\n", err)
+		}
+		if done {
+			fmt.Fprintf(&lg, "%d entries were added to the client db\n", m)
+			break
+		}
+		i += 1
 	}
-	fmt.Fprintf(&lg, "After BulkInsert for entries")
 
 	taskKeywordIds := getTaskKeywordIds(pdb, &lg)
-	query, args = createBulkInsertQueryTaskKeywordIds(len(taskKeywordIds), taskKeywordIds)
-	err = bulkInsert(db, query, args)
-	if err != nil {
-		fmt.Fprintf(&lg, "%v", err)
+	fmt.Fprintf(&lg, "There are %d task_id, keyword_id pairs\n", len(taskKeywordIds))
+	i = 0
+	n = 100
+	done = false
+	for {
+		m := (i + 1) * n
+		if m > len(taskKeywordIds) {
+			m = len(taskKeywordIds)
+			done = true
+		}
+		e := taskKeywordIds[i*n : m]
+		query, args := createBulkInsertQueryTaskKeywordIds(len(e), e)
+		//fmt.Fprintf(&lg, "%s\n", query)
+		//fmt.Fprintf(&lg, "%v\n", args)
+		err = bulkInsert(db, query, args)
+		if err != nil {
+			fmt.Fprintf(&lg, "%v\n", err)
+		}
+		if done {
+			fmt.Fprintf(&lg, "%d taskKeywordIds were added to the client db\n", m)
+			break
+		}
+		//fmt.Fprintf(&lg, "i = %d m = %d\n", i, m)
+		i += 1
 	}
+	/*
+		query, args := createBulkInsertQueryTaskKeywordIds(len(taskKeywordIds), taskKeywordIds)
+		err = bulkInsert(db, query, args)
+		if err != nil {
+			fmt.Fprintf(&lg, "%v\n", err)
+		}
+	*/
 
 	tags := getTags(pdb, &lg)
-	i := 0
+	i = 0
 	for _, e := range entries {
 		if e.id == tags[i].task_id {
 			e.tag = tags[i].tag
@@ -478,11 +518,42 @@ func bulkLoad(reportOnly bool) (log string) {
 			}
 		}
 	}
-	query, args = createBulkInsertQueryFTS(len(entries), entries)
+	query, args := createBulkInsertQueryFTS(len(entries), entries)
 	err = bulkInsert(fts_db, query, args)
 	if err != nil {
 		fmt.Fprintf(&lg, "%v", err)
 	}
+	/*********************end of sync*************************/
+
+	var server_ts string
+	row := pdb.QueryRow("SELECT now();")
+	err = row.Scan(&server_ts)
+	if err != nil {
+		sess.showOrgMessage("Error with getting current time from server: %w", err)
+		return
+	}
+	_, err = db.Exec("UPDATE sync SET timestamp=$1 WHERE machine='server';", server_ts)
+	if err != nil {
+		sess.showOrgMessage("Error updating client with server timestamp: %w", err)
+		return
+	}
+	_, err = db.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
+	if err != nil {
+		sess.showOrgMessage("Error updating client with client timestamp: %w", err)
+		return
+	}
+	var client_ts string
+	row = db.QueryRow("SELECT datetime('now');")
+	err = row.Scan(&client_ts)
+	if err != nil {
+		sess.showOrgMessage("Error with getting current time from client: %w", err)
+		return
+	}
+	fmt.Fprintf(&lg, "\nClient UTC timestamp: %s\n", client_ts)
+	fmt.Fprintf(&lg, "Server UTC timestamp: %s\n", strings.Replace(tc(server_ts, 19, false), "T", " ", 1))
+
+	fmt.Fprintf(&lg, "Initial sync took %v seconds\n", int(time.Since(t0)/1000000000))
+
 	success = true
 	return
 }
