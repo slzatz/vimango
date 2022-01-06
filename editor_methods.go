@@ -541,7 +541,12 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 				continue
 			}
 			if numrows == 1 {
-				pab.WriteString(row[startCol : endcol+1])
+				// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
+				if len(row) == endcol {
+					pab.WriteString(row[startCol:endcol])
+				} else {
+					pab.WriteString(row[startCol : endcol+1])
+				}
 			} else if n == 0 {
 				pab.WriteString(row[startCol:])
 			} else if n < numrows-1 {

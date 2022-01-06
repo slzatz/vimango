@@ -233,10 +233,17 @@ func (e *Editor) decorateWordVisual(c int) {
 	}
 
 	row := e.ss[e.highlight[0][0]-1]
-	beg, end := e.highlight[0][1]-1, e.highlight[1][1]
+	beg, end := e.highlight[0][1], e.highlight[1][1]
 
 	var undo bool
-	s := row[beg:end]
+	var s string
+	// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
+	if len(row) == end {
+		s = row[beg:end]
+	} else {
+		s = row[beg : end+1]
+	}
+	sess.showEdMessage("end = %d", end)
 	if strings.HasPrefix(s, "**") {
 		if c == ctrlKey('b') {
 			undo = true
@@ -260,13 +267,18 @@ func (e *Editor) decorateWordVisual(c int) {
 		return
 	}
 
+	// Definitely weird and needs to be looked at again but lose space at end of row
+	var space string
+	if len(row) >= end-1 {
+		space = " "
+	}
 	switch c {
 	case ctrlKey('b'):
-		s = fmt.Sprintf("**%s**", s)
+		s = fmt.Sprintf("%s**%s**", space, s)
 	case ctrlKey('i'):
-		s = fmt.Sprintf("*%s*", s)
+		s = fmt.Sprintf("%s*%s*", space, s)
 	case ctrlKey('e'):
-		s = fmt.Sprintf("`%s`", s)
+		s = fmt.Sprintf("%s`%s`", space, s)
 	}
 
 	vim.Input2("xi" + s + "\x1b")
