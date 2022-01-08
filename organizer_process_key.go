@@ -360,7 +360,7 @@ func organizerProcessKey(c int) {
 			if len(org.marked_entries) == 0 {
 				switch org.altView {
 				case KEYWORD:
-					addTaskKeyword(altRow.id, row.id, true)
+					addTaskKeywordByTid(tid, row.id, true)
 					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
 				case FOLDER:
 					updateTaskFolderByTid(tid, row.id)
@@ -373,7 +373,7 @@ func organizerProcessKey(c int) {
 				for id := range org.marked_entries {
 					switch org.altView {
 					case KEYWORD:
-						addTaskKeyword(altRow.id, id, true)
+						addTaskKeywordByTid(tid, id, true)
 					case FOLDER:
 						updateTaskFolderByTid(tid, id)
 					case CONTEXT:

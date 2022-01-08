@@ -76,7 +76,7 @@ func getEntries(dbase *sql.DB, count int, plg io.Writer) []EntryTag {
 
 // returns []struct{client_entry_tid, tag} - need to populate fts
 func getTags(dbase *sql.DB, count int, plg io.Writer) []TaskTag {
-	rows, err := dbase.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_id;")
+	rows, err := dbase.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_keyword.task_id;")
 	if err != nil {
 		println(err)
 		return []TaskTag{}
@@ -89,6 +89,9 @@ func getTags(dbase *sql.DB, count int, plg io.Writer) []TaskTag {
 			&tk.keyword,
 		)
 		taskkeywords = append(taskkeywords, tk)
+	}
+	if len(taskkeywords) == 0 {
+		return []TaskTag{}
 	}
 	tasktags := make([]TaskTag, 0, 1000)
 	keywords := make([]string, 0, 5)

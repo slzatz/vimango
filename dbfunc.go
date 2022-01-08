@@ -291,10 +291,10 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 	case BY_FOLDER:
 		s += "JOIN folder ON folder.tid = task.folder_tid WHERE folder.title=?"
 	case BY_KEYWORD:
-		s += "JOIN task_keyword ON task.id=task_keyword.task_id " +
-			"JOIN keyword ON keyword.id=task_keyword.keyword_id " +
-			"WHERE task.id = task_keyword.task_id AND " +
-			"task_keyword.keyword_id = keyword.id AND keyword.name=?"
+		s += "JOIN task_keyword ON task.tid=task_keyword.task_tid " +
+			"JOIN keyword ON keyword.tid=task_keyword.keyword_tid " +
+			"WHERE task.tid = task_keyword.task_tid AND " +
+			"task_keyword.keyword_tid = keyword.tid AND keyword.name=?"
 	case BY_RECENT:
 		s += "WHERE 1=1"
 	default:
@@ -974,24 +974,20 @@ func getContainerInfo(id int) Container {
 	return c
 }
 
-func addTaskKeyword(keyword_id, entry_id int, update_fts bool) {
-	entry_tid := entryTidFromId(entry_id)       /////////////////////////////////////////////////////
-	keyword_tid := keywordTidFromId(keyword_id) ////////////////////////////////////////////////
-	// have already checked if keyword is synced (might not have to check)
-	//_, err := db.Exec("INSERT OR IGNORE INTO task_keyword (task_id, keyword_id) VALUES (?, ?);",
-	//	entry_id, keyword_id)
+func addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bool) {
+	entry_tid := entryTidFromId(entry_id) /////////////////////////////////////////////////////
 
 	_, err := db.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid) VALUES (?, ?);",
 		entry_tid, keyword_tid)
 
 	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeyword = INSERT or IGNORE INTO task_keyword: %v", err)
+		sess.showOrgMessage("Error in addTaskKeywordByTid = INSERT or IGNORE INTO task_keyword: %v", err)
 		return
 	}
 
 	_, err = db.Exec("UPDATE task SET modified = datetime('now') WHERE id=?;", entry_id)
 	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeyword - Update task modified: %v", err)
+		sess.showOrgMessage("Error in addTaskKeywordByTid - Update task modified: %v", err)
 		return
 	}
 
@@ -1003,40 +999,8 @@ func addTaskKeyword(keyword_id, entry_id int, update_fts bool) {
 	//_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE lm_id=?;", s, entry_id)
 	_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
 	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeyword - fts Update: %v", err)
+		sess.showOrgMessage("Error in addTaskKeywordByTid - fts Update: %v", err)
 	}
-}
-
-func addTaskKeywordByTid(keyword_tid, entry_tid int, update_fts bool) {
-	// have already checked if keyword is synced (might not have to check)
-	//_, err := db.Exec("INSERT OR IGNORE INTO task_keyword (task_id, keyword_id) VALUES (?, ?);",
-	//	entry_id, keyword_id)
-
-	_, err := db.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid) VALUES (?, ?);",
-		entry_tid, keyword_tid)
-
-	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeyword = INSERT or IGNORE INTO task_keyword: %v", err)
-		return
-	}
-
-	_, err = db.Exec("UPDATE task SET modified = datetime('now') WHERE tid=?;", entry_tid)
-	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeyword - Update task modified: %v", err)
-		return
-	}
-
-	// *************fts virtual table update**********************
-	if !update_fts {
-		return
-	}
-	/*
-		s := getTaskKeywords(entry_id)
-		_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
-		if err != nil {
-			sess.showOrgMessage("Error in addTaskKeyword - fts Update: %v", err)
-		}
-	*/
 }
 
 // not in use but worked
@@ -1155,6 +1119,7 @@ func deleteKeywords(id int) int {
 	return int(rowsAffected)
 }
 
+// need to revisit
 func copyEntry() {
 	// ? needs temp tid
 	id := getId()
@@ -1480,6 +1445,7 @@ func moveDividerAbs(num int) {
 func tempTid(table string) int {
 	var tid int
 	err := db.QueryRow(fmt.Sprintf("SELECT MIN(tid) FROM %s;", table)).Scan(&tid)
+	// if there are no keywords etc this will err; could make the variable sql.NullInt64
 	if err != nil {
 		sess.showEdMessage("error in tid from %s: %v", table, err)
 		return 0

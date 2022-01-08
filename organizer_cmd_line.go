@@ -32,6 +32,8 @@ var cmd_lookup = map[string]func(*Organizer, int){
 	"vert res":        (*Organizer).verticalResize,
 	"test":            (*Organizer).sync,
 	"sync":            (*Organizer).sync,
+	"test2":           (*Organizer).sync2,
+	"sync2":           (*Organizer).sync2,
 	"initialtest":     (*Organizer).initialSync,
 	"initialsync":     (*Organizer).initialSync,
 	"bulktest":        (*Organizer).initialBulkLoad,
@@ -561,6 +563,32 @@ func (o *Organizer) sync(unused int) {
 	o.mode = PREVIEW_SYNC_LOG
 }
 
+func (o *Organizer) sync2(unused int) {
+	var log string
+	if o.command_line == "test2" {
+		// true => reportOnly
+		log = synchronize2(true)
+	} else {
+		log = synchronize2(false)
+	}
+	o.command_line = ""
+	o.eraseRightScreen()
+	note := generateWWString(log, o.totaleditorcols)
+	// below draw log as markeup
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithWordWrap(0),
+	)
+	note, _ = r.Render(note)
+	if note[0] == '\n' {
+		note = note[1:]
+	}
+	o.note = strings.Split(note, "\n")
+	o.altRowoff = 0
+	o.drawPreviewWithoutImages()
+	o.mode = PREVIEW_SYNC_LOG
+}
+
 func (o *Organizer) initialSync(unused int) {
 	var log string
 	if o.command_line == "initialtest" {
@@ -743,16 +771,16 @@ func (o *Organizer) keywords(pos int) {
 		o.mode = o.last_mode
 		return
 	}
-	keyword_id := keywordId(input) // no check if it exists; done above
+	//keyword_id := keywordId(input) // no check if it exists; done above
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
-			addTaskKeyword(keyword_id, entry_id, true) //true = update fts_dn
+			addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
 		}
 		sess.showOrgMessage("Added keyword %s to marked entries", input)
 		return
 	}
 
-	addTaskKeyword(keyword_id, o.rows[o.fr].id, true)
+	addTaskKeywordByTid(tid, o.rows[o.fr].id, true)
 	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", input)
 }
 
