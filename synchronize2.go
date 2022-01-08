@@ -990,83 +990,46 @@ func synchronize2(reportOnly bool) (log string) {
 			continue
 		}
 
-		/*
-			server_id := e.tid
-				  if e.tid < 1 {
-					err := pdb.QueryRow("INSERT INTO task (title, star, created, added, completed, context_id, folder_id, note, modified, deleted) "+
-						"VALUES ($1, $2, now(), $3, $4, $5, $6, $7, now(), false)  RETURNING id",
-						e.title, e.star, e.added, e.completed, e.context_tid, e.folder_tid, e.note).Scan(&server_id)
-						if err != nil {
-							fmt.Fprintf(&lg, "Error inserting server entry: %v", err)
-						}
-				_, err = db.Exec("UPDATE task SET tid=? WHERE id=?;", server_id, e.id)
-				if err != nil {
-					fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, server_id, err)
-					break
-				}
-					} else {
-					_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_id=$3, folder_id=$4, note=$5, completed=$6, modified=now() WHERE id=$7;",
-						e.title, e.star, e.context_tid, e.folder_tid, e.note, e.completed, e.tid)
-						if err != nil {
-							fmt.Fprintf(&lg, "Error updating server entry: %v", err)
-						}
-
-		*/
-
-		var exists bool
 		var server_id int
-		err := pdb.QueryRow("SELECT EXISTS(SELECT 1 FROM task WHERE id=$1);", e.tid).Scan(&exists)
-		switch {
-
-		case err != nil:
-			fmt.Fprintf(&lg, "Problem checking if postgres has an entry for %q with client tid/pg id: %d: %v\n", truncate(e.title, 15), e.tid, err)
-
-		case exists:
-			_, err3 := pdb.Exec("UPDATE task SET title=$1, star=$2, context_id=$3, folder_id=$4, note=$5, completed=$6, modified=now() WHERE id=$7;",
-				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.completed, e.tid)
-			if err3 != nil {
-				fmt.Fprintf(&lg, "Error updating server entry %q with id %d: %v", truncate(e.title, 15), e.tid, err3)
-			} else {
-				fmt.Fprintf(&lg, "Updated server entry *%q* with id **%d**\n", truncate(e.title, 15), e.tid)
-			}
-			server_id = e.tid // needed below for keywords
-		case !exists:
-			err1 := pdb.QueryRow("INSERT INTO task (title, star, created, added, completed, context_id, folder_id, note, modified, deleted) "+
-				"VALUES ($1, $2, now(), $3, $4, $5, $6, $7, now(), false) RETURNING id;",
+		if e.tid < 1 {
+			err := pdb.QueryRow("INSERT INTO task (title, star, created, added, completed, context_id, folder_id, note, modified, deleted) "+
+				"VALUES ($1, $2, now(), $3, $4, $5, $6, $7, now(), false)  RETURNING id",
 				e.title, e.star, e.added, e.completed, e.context_tid, e.folder_tid, e.note).Scan(&server_id)
-			if err1 != nil {
-				fmt.Fprintf(&lg, "Error inserting new server entry for client entry *%q* with id %d into postgres: %v\n", truncate(e.title, 15), e.id, err1)
-				break
+			if err != nil {
+				fmt.Fprintf(&lg, "Error inserting server entry: %v", err)
+				continue
 			}
-			_, err2 := db.Exec("UPDATE task SET tid=? WHERE id=?;", server_id, e.id)
-			if err2 != nil {
-				fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, server_id, err2)
-				break
+			_, err = db.Exec("UPDATE task SET tid=? WHERE id=?;", server_id, e.id)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, server_id, err)
+				continue
 			}
-			fmt.Fprintf(&lg, "Created new server entry *%q* with id **%d**\n", truncate(e.title, 15), server_id)
-			fmt.Fprintf(&lg, "and set tid for client entry (id %d) to tid %d\n", e.id, server_id)
-
-		default:
-			fmt.Fprintf(&lg, "Error in SELECT EXISTS in client_updated_entries for client entry id: %d\n", e.id)
-			continue
+			_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", server_id, e.tid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
+			}
+		} else {
+			_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_id=$3, folder_id=$4, note=$5, completed=$6, modified=now() WHERE id=$7;",
+				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.completed, e.tid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error updating server entry: %v", err)
+				continue
+			}
+			server_id = e.tid
 		}
+
+		fmt.Fprintf(&lg, "Created new server entry *%q* with id **%d**\n", truncate(e.title, 15), server_id)
+		fmt.Fprintf(&lg, "and set tid for client entry (id %d) to tid %d\n", e.id, server_id)
+
 		// Update the server entry's keywords
-		_, err4 := pdb.Exec("DELETE FROM task_keyword WHERE task_id=$1;", server_id)
-		if err4 != nil {
-			fmt.Fprintf(&lg, "Error deleting from task_keyword from server id %d: %v\n", server_id, err4)
+		_, err := pdb.Exec("DELETE FROM task_keyword WHERE task_id=$1;", server_id)
+		if err != nil {
+			fmt.Fprintf(&lg, "Error deleting from task_keyword from server id %d: %v\n", server_id, err)
 			continue
 		}
 		kwIds := clientTaskKeywordTids(db, &lg, server_id)
 		for _, keywordId := range kwIds {
 			addServerTaskKeywordIds(pdb, &lg, keywordId, server_id)
-		}
-		if e.tid < 1 { // it was a new entry that just got synched above
-			_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", server_id, e.tid)
-			if err != nil {
-				fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
-			} else {
-				fmt.Fprintf(&lg, "Set fts_db tid to %d\n", server_id)
-			}
 		}
 	}
 
