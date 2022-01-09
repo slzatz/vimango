@@ -256,22 +256,34 @@ func organizerProcessKey(c int) {
 		switch c {
 
 		case '\r':
-			pos := strings.LastIndex(org.command_line, " ")
+			var cmd func(*Organizer, int)
+			var found bool
 			var s string
-			if pos != -1 {
-				s = org.command_line[:pos]
-			} else {
+			pos := strings.LastIndex(org.command_line, " ")
+			if pos == -1 {
 				s = org.command_line
+				if cmd, found = cmd_lookup[s]; found {
+					cmd(&org, pos)
+				}
+			} else {
+				s = org.command_line[:pos]
+				if cmd, found = cmd_lookup[s]; found {
+					cmd(&org, pos)
+				} else {
+					pos := strings.Index(org.command_line, " ")
+					s = org.command_line[:pos]
+					if cmd, found = cmd_lookup[s]; found {
+						cmd(&org, pos)
+					}
+				}
 			}
-			if cmd, found := cmd_lookup[s]; found {
-				cmd(&org, pos)
-				tabCompletion.idx = 0
-				tabCompletion.list = nil
-				return
-			}
+			tabCompletion.idx = 0
+			tabCompletion.list = nil
 
-			sess.showOrgMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
-			org.mode = org.last_mode
+			if !found {
+				sess.showOrgMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
+				org.mode = org.last_mode
+			}
 			return
 
 		case '\t':

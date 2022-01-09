@@ -975,32 +975,18 @@ func synchronize(reportOnly bool) (log string) {
 
 	// server deleted entries
 	for _, e := range server_deleted_entries {
-		var id int
-		err := db.QueryRow("DELETE FROM task WHERE tid=? RETURNING id;", e.id).Scan(&id) //appears mattn doesn't support RETURNING - now it does
-		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.id, err)
-			continue
-		}
-
-		/*
-			err := db.QueryRow("SELECT id FROM task WHERE tid=?;", e.id).Scan(&id)
-			if err != nil {
-				fmt.Fprintf(&lg, "Error selecting id for client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.id, err)
-				continue
-			}
-			_, err = db.Exec("DELETE FROM task WHERE id=?;", id)
-			if err != nil {
-				fmt.Fprintf(&lg, "Error deleting client entry %q with id %d and tid %d: %v\n", tc(e.title, 15, true), id, e.id, err)
-				continue
-			}
-		*/
-		fmt.Fprintf(&lg, "Deleted client entry %q with id %d and tid %d\n", truncate(e.title, 15), id, e.id)
-
 		_, err = db.Exec("DELETE FROM task_keyword WHERE task_tid=?;", e.id)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error deleting task_keyword client rows where entry tid = %d: %v\n", e.id, err)
 			continue
 		}
+
+		_, err := db.Exec("DELETE FROM task WHERE tid=?;", e.id)
+		if err != nil {
+			fmt.Fprintf(&lg, "Error deleting client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.id, err)
+			continue
+		}
+		fmt.Fprintf(&lg, "Deleted client entry %q with tid %d\n", truncate(e.title, 15), e.id)
 		fmt.Fprintf(&lg, "and on client deleted task_tid %d from task_keyword\n", e.id)
 	}
 
