@@ -1007,18 +1007,18 @@ func synchronize(reportOnly bool) (log string) {
 	// client deleted entries
 	for _, e := range client_deleted_entries {
 
-		_, err = db.Exec("DELETE FROM task WHERE id=?", e.id)
-		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting client entry %q with id %d: %v\n", tc(e.title, 15, true), e.id, err)
-			continue
-		}
-		fmt.Fprintf(&lg, "Deleted client entry %q with id %d\n", tc(e.title, 15, true), e.id)
-
 		_, err = db.Exec("DELETE FROM task_keyword WHERE task_tid=?;", e.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error deleting task_keyword client rows where entry tid = %d: %v\n", e.tid, err)
 			continue
 		}
+		_, err = db.Exec("DELETE FROM task WHERE id=?", e.id)
+		if err != nil {
+			fmt.Fprintf(&lg, "Error deleting client entry %q with id %d: %v\n", tc(e.title, 15, true), e.id, err)
+			continue
+		}
+
+		fmt.Fprintf(&lg, "Deleted client entry %q with id %d\n", tc(e.title, 15, true), e.id)
 		fmt.Fprintf(&lg, "and on client deleted task_tid %d from task_keyword\n", e.tid)
 
 		// since on server, we just set deleted to true

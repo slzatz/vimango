@@ -323,10 +323,11 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 	var orgRows []Row
 	for rows.Next() {
 		var row Row
-		var completed sql.NullTime
+		var completed sql.NullString
 		var sort sql.NullString
 
-		err = rows.Scan(&row.id,
+		err = rows.Scan(
+			&row.id,
 			&row.title,
 			&row.star,
 			&row.deleted,
