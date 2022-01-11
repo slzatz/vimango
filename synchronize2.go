@@ -14,26 +14,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func createBulkInsertReplaceQuery(n int, entries []EntryTag) (query string, args []interface{}) {
-	values := make([]string, n)
-	args = make([]interface{}, n*8)
-	pos := 0
-	for i, e := range entries {
-		values[i] = "(?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false)"
-		args[pos] = e.id
-		args[pos+1] = e.title
-		args[pos+2] = e.star
-		args[pos+3] = e.added
-		args[pos+4] = e.completed
-		args[pos+5] = e.context_id
-		args[pos+6] = e.folder_id
-		args[pos+7] = e.note
-		pos += 8
-	}
-	query = fmt.Sprintf("INSERT OR REPLACE INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES %s", strings.Join(values, ", "))
-	return
-}
-
 func getTaskKeywordIds_x(dbase *sql.DB, in string, plg io.Writer) []TaskKeywordIds {
 	//rows, err := pdb.Query("Select task_id, keyword_id FROM task_keyword ORDER BY task_id;")
 	stmt := fmt.Sprintf("SELECT task_id, keyword_id FROM task_keyword WHERE task_id IN (%s);", in)
@@ -934,29 +914,22 @@ func synchronize2(reportOnly bool) (log string) {
 	}
 
 	/**********should come before container deletes to change tasks here*****************/
-	/*
-		server_updated_entries_ids := make(map[int]struct{})
-		for _, e := range server_updated_entries {
-			db.QueryRow("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES
-					 (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false)
-			ON CONFLICT DO
-			UPDATE SET title=excluded.title, star=excluded.star, completed=excluded.completed, context_tid=excluced.context_tid, folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now'),  RETURNING id;",
-					e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note).Scan(&client_id)
-	*/
 	server_updated_entries_ids := make(map[int]struct{})
-	if len(server_updated_entries) != 0 {
-		query, args := createBulkInsertReplaceQuery(len(server_updated_entries), server_updated_entries)
-		err = bulkInsert(db, query, args)
+	var task_ids []string
+	for _, e := range server_updated_entries {
+		db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES"+
+			"(?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
+			"title=excluded.title, star=excluded.star, completed=excluded.completed, context_tid=excluded.context_tid, "+
+			"folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now');",
+			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
 		if err != nil {
-			fmt.Fprintf(&lg, "%v\n", err)
+			fmt.Fprintf(&lg, "Error in Upsert for id/tid %d %s: %v", e.id, e.title, err)
+			continue
 		}
-		var task_ids []string
-		//server_updated_entries_ids := make(map[int]struct{})
-		for _, se := range server_updated_entries {
-			task_ids = append(task_ids, strconv.Itoa(se.id))
-			server_updated_entries_ids[se.id] = struct{}{}
-		}
-
+		task_ids = append(task_ids, strconv.Itoa(e.id))
+		server_updated_entries_ids[e.id] = struct{}{}
+	}
+	if len(server_updated_entries) != 0 {
 		in := strings.Join(task_ids, ",")
 
 		// need to delete all keywords for changed entries first
@@ -972,6 +945,8 @@ func synchronize2(reportOnly bool) (log string) {
 			err = bulkInsert(db, query, args)
 			if err != nil {
 				fmt.Fprintf(&lg, "%v\n", err)
+			} else {
+				fmt.Fprintf(&lg, "Keywords updated for task tids: %s\n", in)
 			}
 			tags := getTags_x(pdb, in, &lg)
 			i := 0
@@ -985,10 +960,12 @@ func synchronize2(reportOnly bool) (log string) {
 				}
 			}
 		}
-		query, args = createBulkInsertQueryFTS(len(server_updated_entries), server_updated_entries)
+		query, args := createBulkInsertQueryFTS(len(server_updated_entries), server_updated_entries)
 		err = bulkInsert(fts_db, query, args)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v", err)
+		} else {
+			fmt.Fprintf(&lg, "FTS entries updated for task tids: %s\n", in)
 		}
 	}
 
@@ -1017,6 +994,8 @@ func synchronize2(reportOnly bool) (log string) {
 			if err != nil {
 				fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
 			}
+			fmt.Fprintf(&lg, "Created new server entry *%q* with id **%d**\n", truncate(e.title, 15), server_id)
+			fmt.Fprintf(&lg, "and set tid for client entry (id %d) to tid %d\n", e.id, server_id)
 		} else {
 			_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_id=$3, folder_id=$4, note=$5, completed=$6, modified=now() WHERE id=$7;",
 				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.completed, e.tid)
@@ -1025,10 +1004,8 @@ func synchronize2(reportOnly bool) (log string) {
 				continue
 			}
 			server_id = e.tid
+			fmt.Fprintf(&lg, "Updated server entry *%q* with id **%d**\n", truncate(e.title, 15), server_id)
 		}
-
-		fmt.Fprintf(&lg, "Created new server entry *%q* with id **%d**\n", truncate(e.title, 15), server_id)
-		fmt.Fprintf(&lg, "and set tid for client entry (id %d) to tid %d\n", e.id, server_id)
 
 		// Update the server entry's keywords
 		_, err := pdb.Exec("DELETE FROM task_keyword WHERE task_id=$1;", server_id)
