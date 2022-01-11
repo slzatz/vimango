@@ -934,6 +934,15 @@ func synchronize2(reportOnly bool) (log string) {
 	}
 
 	/**********should come before container deletes to change tasks here*****************/
+	/*
+		server_updated_entries_ids := make(map[int]struct{})
+		for _, e := range server_updated_entries {
+			db.QueryRow("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES
+					 (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false)
+			ON CONFLICT DO
+			UPDATE SET title=excluded.title, star=excluded.star, completed=excluded.completed, context_tid=excluced.context_tid, folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now'),  RETURNING id;",
+					e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note).Scan(&client_id)
+	*/
 	server_updated_entries_ids := make(map[int]struct{})
 	if len(server_updated_entries) != 0 {
 		query, args := createBulkInsertReplaceQuery(len(server_updated_entries), server_updated_entries)

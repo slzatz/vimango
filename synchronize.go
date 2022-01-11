@@ -850,7 +850,6 @@ func synchronize(reportOnly bool) (log string) {
 	for _, e := range server_updated_entries {
 		// below is for server always wins
 		server_updated_entries_ids[e.id] = struct{}{}
-		//row := db.QueryRow("SELECT id from task WHERE tid=?", e.id)
 		var client_id int
 		err := db.QueryRow("SELECT id from task WHERE tid=?", e.id).Scan(&client_id)
 		switch {
