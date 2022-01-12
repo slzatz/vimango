@@ -925,6 +925,8 @@ func synchronize2(reportOnly bool) (log string) {
 		if err != nil {
 			fmt.Fprintf(&lg, "Error in Upsert for id/tid %d %s: %v", e.id, e.title, err)
 			continue
+		} else {
+			fmt.Fprintf(&lg, "Inserted or updated client entry %q with tid **%d**\n", e.title, e.id)
 		}
 		task_ids = append(task_ids, strconv.Itoa(e.id))
 		server_updated_entries_ids[e.id] = struct{}{}
