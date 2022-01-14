@@ -435,6 +435,9 @@ func organizerProcessKey(c int) {
 		switch c {
 
 		case ARROW_UP, 'k':
+			if len(org.rows) == 0 {
+				return
+			}
 			if org.fr == 0 {
 				return
 			}
@@ -442,10 +445,13 @@ func organizerProcessKey(c int) {
 			sess.eraseRightScreen()
 			org.altRowoff = 0
 			note := readSyncLog(org.rows[org.fr].id)
-			note = generateWWString(note, org.totaleditorcols)
 			org.note = strings.Split(note, "\n")
+			//note = generateWWString(note, org.totaleditorcols)
 			org.drawPreviewWithoutImages()
 		case ARROW_DOWN, 'j':
+			if len(org.rows) == 0 {
+				return
+			}
 			if org.fr == len(org.rows)-1 {
 				return
 			}
@@ -453,7 +459,7 @@ func organizerProcessKey(c int) {
 			sess.eraseRightScreen()
 			org.altRowoff = 0
 			note := readSyncLog(org.rows[org.fr].id)
-			note = generateWWString(note, org.totaleditorcols)
+			//note = generateWWString(note, org.totaleditorcols)
 			org.note = strings.Split(note, "\n")
 			org.drawPreviewWithoutImages()
 		case ':':
@@ -463,7 +469,10 @@ func organizerProcessKey(c int) {
 			org.mode = COMMAND_LINE
 
 		// the two below only handle logs < 2x textLines
-		case PAGE_DOWN:
+		case ctrlKey('j'):
+			if len(org.rows) == 0 {
+				return
+			}
 			if len(org.note) > org.altRowoff+org.textLines {
 				if len(org.note) < org.altRowoff+2*org.textLines {
 					org.altRowoff = len(org.note) - org.textLines
@@ -477,7 +486,11 @@ func organizerProcessKey(c int) {
 			//org.altRowoff++
 			//sess.eraseRightScreen()
 			//org.drawPreviewWithoutImages()
-		case PAGE_UP:
+		//case PAGE_UP:
+		case ctrlKey('k'):
+			if len(org.rows) == 0 {
+				return
+			}
 			if org.altRowoff > org.textLines {
 				org.altRowoff -= org.textLines
 			} else {
@@ -492,6 +505,9 @@ func organizerProcessKey(c int) {
 			//sess.eraseRightScreen()
 			//org.drawPreviewWithoutImages()
 		case ctrlKey('d'):
+			if len(org.rows) == 0 {
+				return
+			}
 			if len(org.marked_entries) == 0 {
 				deleteSyncItem(org.rows[org.fr].id)
 			} else {
@@ -501,6 +517,9 @@ func organizerProcessKey(c int) {
 			}
 			org.log(0)
 		case 'm':
+			if len(org.rows) == 0 {
+				return
+			}
 			mark()
 		}
 

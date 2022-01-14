@@ -92,6 +92,10 @@ func (o *Organizer) log(unused int) {
 
 	// show first row's note
 	o.eraseRightScreen()
+	if len(o.rows) == 0 {
+		sess.showOrgMessage("%sThere are no saved sync logs%s", BOLD, RESET)
+		return
+	}
 	note := readSyncLog(o.rows[o.fr].id)
 	o.note = strings.Split(note, "\n")
 	o.drawPreviewWithoutImages()
