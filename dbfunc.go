@@ -71,6 +71,12 @@ func keywordExists(name string) (int, bool) {
 	return tid, true
 }
 
+func entryTid(id int) int {
+	var tid int
+	_ = db.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
+	return tid
+}
+
 /*
 func keywordName(id int) string {
 	row := db.QueryRow("SELECT name FROM keyword WHERE id=?;", id)

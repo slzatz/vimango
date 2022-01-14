@@ -170,7 +170,7 @@ func createBulkInsertQueryFTS(n int, entries []EntryTag) (query string, args []i
 		args[pos+3] = e.id
 		pos += 4
 	}
-	query = fmt.Sprintf("INSERT INTO fts (title, note, tag, tid) VALUES %s", strings.Join(values, ", "))
+	query = fmt.Sprintf("INSERT INTO fts (title, note, tag, tid) VALUES %s;", strings.Join(values, ", "))
 	return
 }
 

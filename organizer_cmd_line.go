@@ -664,6 +664,12 @@ func (o *Organizer) contexts(pos int) {
 		return
 	}
 
+	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
+		sess.showOrgMessage("The entry has not been synced yet!")
+		o.mode = o.last_mode
+		return
+	}
+
 	input := o.command_line[pos+1:]
 	var tid int
 	var ok bool
@@ -684,6 +690,9 @@ func (o *Organizer) contexts(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for entry_id := range o.marked_entries {
+			if entryTid(entry_id) < 1 {
+				continue
+			}
 			updateTaskContextByTid(tid, entry_id) //true = update fts_dn
 		}
 		sess.showOrgMessage("Marked entries moved into context %s", input)
@@ -714,6 +723,12 @@ func (o *Organizer) folders(pos int) {
 		return
 	}
 
+	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
+		sess.showOrgMessage("The entry has not been synced yet!")
+		o.mode = o.last_mode
+		return
+	}
+
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
@@ -729,6 +744,9 @@ func (o *Organizer) folders(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
+			if entryTid(entry_id) < 1 {
+				continue
+			}
 			updateTaskFolderByTid(tid, entry_id)
 		}
 		sess.showOrgMessage("Marked entries moved into folder %s", input)
@@ -760,6 +778,12 @@ func (o *Organizer) keywords(pos int) {
 		return
 	}
 
+	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
+		sess.showOrgMessage("The entry has not been synced yet!")
+		o.mode = o.last_mode
+		return
+	}
+
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
@@ -769,15 +793,16 @@ func (o *Organizer) keywords(pos int) {
 		return
 	}
 
-	// this guard may not be necessary for keywords
 	if tid < 1 {
 		sess.showOrgMessage("%q is an unsynced keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
-	//keyword_id := keywordId(input) // no check if it exists; done above
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
+			if entryTid(entry_id) < 1 {
+				continue
+			}
 			addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
 		}
 		sess.showOrgMessage("Added keyword %s to marked entries", input)
