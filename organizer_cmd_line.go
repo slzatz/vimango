@@ -664,12 +664,6 @@ func (o *Organizer) contexts(pos int) {
 		return
 	}
 
-	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
-		sess.showOrgMessage("The entry has not been synced yet!")
-		o.mode = o.last_mode
-		return
-	}
-
 	input := o.command_line[pos+1:]
 	var tid int
 	var ok bool
@@ -690,9 +684,6 @@ func (o *Organizer) contexts(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for entry_id := range o.marked_entries {
-			if entryTid(entry_id) < 1 {
-				continue
-			}
 			updateTaskContextByTid(tid, entry_id) //true = update fts_dn
 		}
 		sess.showOrgMessage("Marked entries moved into context %s", input)
@@ -723,12 +714,6 @@ func (o *Organizer) folders(pos int) {
 		return
 	}
 
-	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
-		sess.showOrgMessage("The entry has not been synced yet!")
-		o.mode = o.last_mode
-		return
-	}
-
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
@@ -744,9 +729,6 @@ func (o *Organizer) folders(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
-			if entryTid(entry_id) < 1 {
-				continue
-			}
 			updateTaskFolderByTid(tid, entry_id)
 		}
 		sess.showOrgMessage("Marked entries moved into folder %s", input)
@@ -778,6 +760,7 @@ func (o *Organizer) keywords(pos int) {
 		return
 	}
 
+	// not necessary if handled in sync (but not currently handled there)
 	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
 		sess.showOrgMessage("The entry has not been synced yet!")
 		o.mode = o.last_mode
@@ -798,17 +781,25 @@ func (o *Organizer) keywords(pos int) {
 		o.mode = o.last_mode
 		return
 	}
+	var unsynced []string
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
+			// not necessary if handled in sync (but not currently handled there)
 			if entryTid(entry_id) < 1 {
+				unsynced = append(unsynced, strconv.Itoa(entry_id))
 				continue
 			}
 			addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
 		}
-		sess.showOrgMessage("Added keyword %s to marked entries", input)
+		if len(unsynced) > 0 {
+			sess.showOrgMessage("Added keyword %s to marked entries except for previously unsynced entries: %s", input, strings.Join(unsynced, ", "))
+		} else {
+			sess.showOrgMessage("Added keyword %s to marked entries", input)
+		}
 		return
 	}
 
+	// get here if no marked entries
 	addTaskKeywordByTid(tid, o.rows[o.fr].id, true)
 	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", input)
 }

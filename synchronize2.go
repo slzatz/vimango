@@ -987,6 +987,14 @@ func synchronize2(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error inserting server entry: %v", err)
 				continue
 			}
+			/*
+				if we attach a keyword, this will fail because the task_tid of whatever(<1) will mean no task has the tid in task_keyword
+				 the answer is a little messy
+				SELECT keyword_tid FROM task_keyword WHERE task_tid=e.tid
+				DELETE FROM task_keyword WHERE task_tid=e.tid
+				for _, keyword_tid :=range keyword_tids INSERT INTO task_keyword(task_tid, keyword_tid)
+				VALUES (server_id, keyword_tid) (goes after updating entry tid
+			*/
 			_, err = db.Exec("UPDATE task SET tid=? WHERE id=?;", server_id, e.id)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, server_id, err)
