@@ -958,17 +958,30 @@ func synchronize2(reportOnly bool) (log string) {
 			}
 			tags := getTags_x(pdb, in, &lg)
 			i := 0
-			for j, e := range server_updated_entries {
-				if e.id == tags[i].task_id {
-					//e.tag = tags[i].tag
-					server_updated_entries[j].tag = tags[i].tag
-					fmt.Fprintf(&lg, "tid: %d, tag: %s\n", e.id, server_updated_entries[j].tag)
+			for j := 0; ; j++ {
+				entry := &server_updated_entries[j]
+				if entry.id == tags[i].task_id {
+					entry.tag = tags[i].tag
+					fmt.Fprintf(&lg, "FTS tag will be updated for tid: %d, tag: %s\n", entry.id, entry.tag)
 					i += 1
 					if i == len(tags) {
 						break
 					}
 				}
 			}
+			/*
+				for j, e := range server_updated_entries {
+					if e.id == tags[i].task_id {
+						//e.tag = tags[i].tag
+						server_updated_entries[j].tag = tags[i].tag
+						fmt.Fprintf(&lg, "tid: %d, tag: %s\n", e.id, server_updated_entries[j].tag)
+						i += 1
+						if i == len(tags) {
+							break
+						}
+					}
+				}
+			*/
 		}
 		query, args := createBulkInsertQueryFTS(len(server_updated_entries), server_updated_entries)
 		err = bulkInsert(fts_db, query, args)

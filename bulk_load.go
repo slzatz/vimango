@@ -387,6 +387,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 	}
 
+	/* for the code below need to add guard that entries and keywords might be zero */
 	//server entries -> client
 	entries := getEntries(pdb, taskCount, &lg)
 
@@ -437,16 +438,28 @@ func bulkLoad(reportOnly bool) (log string) {
 
 	tags := getTags(pdb, taskKeywordCount, &lg)
 	i = 0
-	for j, e := range entries {
-		if e.id == tags[i].task_id {
-			//e.tag = tags[i].tag
-			entries[j].tag = tags[i].tag
+	for j := 0; ; j++ {
+		entry := &entries[j]
+		if entry.id == tags[i].task_id {
+			entry.tag = tags[i].tag
 			i += 1
 			if i == len(tags) {
 				break
 			}
 		}
 	}
+	/*
+		for j, e := range entries {
+			if e.id == tags[i].task_id {
+				//e.tag = tags[i].tag
+				entries[j].tag = tags[i].tag
+				i += 1
+				if i == len(tags) {
+					break
+				}
+			}
+		}
+	*/
 	query, args := createBulkInsertQueryFTS(len(entries), entries)
 	err = bulkInsert(fts_db, query, args)
 	if err != nil {
