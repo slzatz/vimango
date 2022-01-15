@@ -437,9 +437,10 @@ func bulkLoad(reportOnly bool) (log string) {
 
 	tags := getTags(pdb, taskKeywordCount, &lg)
 	i = 0
-	for _, e := range entries {
+	for j, e := range entries {
 		if e.id == tags[i].task_id {
-			e.tag = tags[i].tag
+			//e.tag = tags[i].tag
+			entries[j].tag = tags[i].tag
 			i += 1
 			if i == len(tags) {
 				break

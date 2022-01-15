@@ -941,6 +941,12 @@ func synchronize2(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Error deleting from task_keyword from server ids %s: %v\n", in, err)
 		}
 
+		// need to delete all rows for changed entries in fts
+		stmt = fmt.Sprintf("DELETE FROM fts WHERE tid in (%s);", in)
+		_, err = fts_db.Exec(stmt)
+		if err != nil {
+			fmt.Fprintf(&lg, "Error deleting from fts from server ids %s: %v\n", in, err)
+		}
 		tks := getTaskKeywordIds_x(pdb, in, &lg)
 		if len(tks) != 0 {
 			query, args := createBulkInsertQueryTaskKeywordIds(len(tks), tks)
@@ -952,9 +958,11 @@ func synchronize2(reportOnly bool) (log string) {
 			}
 			tags := getTags_x(pdb, in, &lg)
 			i := 0
-			for _, e := range server_updated_entries {
+			for j, e := range server_updated_entries {
 				if e.id == tags[i].task_id {
-					e.tag = tags[i].tag
+					//e.tag = tags[i].tag
+					server_updated_entries[j].tag = tags[i].tag
+					fmt.Fprintf(&lg, "tid: %d, tag: %s\n", e.id, server_updated_entries[j].tag)
 					i += 1
 					if i == len(tags) {
 						break
