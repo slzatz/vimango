@@ -143,7 +143,7 @@ func main() {
 	moveDividerPct(sess.edPct)                                // sets sess.divider
 	sess.totaleditorcols = sess.screenCols - sess.divider - 1 // was 2
 	sess.eraseScreenRedrawLines()
-	org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
+	org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, org.sortPriority, MAX)
 	if len(org.rows) == 0 {
 		org.insertRow(0, "", true, false, false, BASE_DATE)
 		org.rows[0].dirty = false

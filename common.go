@@ -52,6 +52,7 @@ var sortColumns = map[string]struct{}{
 	"added":    z0,
 	"modified": z0,
 	"created":  z0,
+	"priority": z0,
 }
 
 var navKeys = map[int]struct{}{

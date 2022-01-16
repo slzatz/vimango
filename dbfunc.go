@@ -287,7 +287,7 @@ func deleteSyncItem(id int) {
 	sess.showOrgMessage("Deleted sync_log entry with id %d", id)
 }
 
-func filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, max int) []Row {
+func filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) []Row {
 
 	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.completed, task.%s FROM task ", sort)
 
@@ -313,8 +313,11 @@ func filterEntries(taskView int, filter interface{}, showDeleted bool, sort stri
 	if !showDeleted {
 		s += " AND task.completed IS NULL AND task.deleted=false"
 	}
-	//s += fmt.Sprintf(" ORDER BY task.star DESC, task.%s DESC LIMIT %d;", sort, max)
-	s += fmt.Sprintf(" ORDER BY task.%s DESC LIMIT %d;", sort, max) //01162022
+	if sortPriority {
+		s += fmt.Sprintf(" ORDER BY task.star DESC, task.%s DESC LIMIT %d;", sort, max)
+	} else {
+		s += fmt.Sprintf(" ORDER BY task.%s DESC LIMIT %d;", sort, max) //01162022
+	}
 	var rows *sql.Rows
 	var err error
 	/*

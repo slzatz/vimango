@@ -17,6 +17,7 @@ type Organizer struct {
 	altFr               int
 	filter              string
 	sort                string
+	sortPriority        bool
 	command_line        string
 	message             string
 	note                []string // the preview

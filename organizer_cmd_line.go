@@ -143,7 +143,7 @@ func (o *Organizer) open(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -190,7 +190,7 @@ func (o *Organizer) openContext(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -235,7 +235,7 @@ func (o *Organizer) openFolder(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -280,7 +280,7 @@ func (o *Organizer) openKeyword(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -471,7 +471,7 @@ func (o *Organizer) refresh(unused int) {
 		} else {
 			o.mode = o.last_mode
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+			o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -811,7 +811,7 @@ func (o *Organizer) recent(unused int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
+	o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -1075,10 +1075,15 @@ func (o *Organizer) sortEntries(pos int) {
 		sess.showOrgMessage("You need to provide a column to sort by")
 		return
 	}
-	if _, OK := sortColumns[o.command_line[pos+1:]]; OK {
-		o.sort = o.command_line[pos+1:]
+	sort := o.command_line[pos+1:]
+	if _, OK := sortColumns[sort]; OK {
+		if sort == "priority" {
+			o.sortPriority = !o.sortPriority
+		} else {
+			o.sort = sort
+		}
 	} else {
-		sess.showOrgMessage("The sort columns are modified, added and created")
+		sess.showOrgMessage("The sort columns are modified, added, created and priority")
 		return
 	}
 	o.refresh(0)

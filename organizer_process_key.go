@@ -123,7 +123,7 @@ func organizerProcessKey(c int) {
 			org.clearMarkedEntries()
 			org.view = TASK
 			org.fc, org.fr, org.rowoff = 0, 0, 0
-			org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, MAX)
+			org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, org.sortPriority, MAX)
 			if len(org.rows) == 0 {
 				org.insertRow(0, "", true, false, false, BASE_DATE)
 				org.rows[0].dirty = false
@@ -309,7 +309,7 @@ func organizerProcessKey(c int) {
 				case "ok", "k":
 					filterMap = keywordList()
 				case "sort":
-					filterMap = map[string]struct{}{"added": struct{}{}, "created": struct{}{}, "modified": struct{}{}}
+					filterMap = sortColumns
 				default:
 					return
 				}
