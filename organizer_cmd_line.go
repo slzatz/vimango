@@ -426,10 +426,9 @@ func (o *Organizer) newEntry(unused int) {
 	row := Row{
 		id: -1,
 		//title:    " ",
-		star:  true,
+		star:  false,
 		dirty: true,
-		//modified: time.Now().Format("3:04:05 pm"),
-		sort: time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
+		sort:  time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
 	}
 
 	vim.BufferSetLines(o.vbuf, 0, 0, []string{""}, 1)

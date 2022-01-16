@@ -287,7 +287,7 @@ func deleteSyncItem(id int) {
 	sess.showOrgMessage("Deleted sync_log entry with id %d", id)
 }
 
-func filterEntries(taskView int, filter string, showDeleted bool, sort string, max int) []Row {
+func filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, max int) []Row {
 
 	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.completed, task.%s FROM task ", sort)
 
@@ -302,7 +302,9 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 			"WHERE task.tid = task_keyword.task_tid AND " +
 			"task_keyword.keyword_tid = keyword.tid AND keyword.name=?"
 	case BY_RECENT:
-		s += "WHERE 1=1"
+		//s += "WHERE 1=1"
+		s += "WHERE 1=?"
+		filter = 1
 	default:
 		sess.showOrgMessage("You asked for an unsupported db query")
 		return []Row{}
@@ -311,14 +313,18 @@ func filterEntries(taskView int, filter string, showDeleted bool, sort string, m
 	if !showDeleted {
 		s += " AND task.completed IS NULL AND task.deleted=false"
 	}
-	s += fmt.Sprintf(" ORDER BY task.star DESC, task.%s DESC LIMIT %d;", sort, max)
+	//s += fmt.Sprintf(" ORDER BY task.star DESC, task.%s DESC LIMIT %d;", sort, max)
+	s += fmt.Sprintf(" ORDER BY task.%s DESC LIMIT %d;", sort, max) //01162022
 	var rows *sql.Rows
 	var err error
-	if filter == "" { //Recent
-		rows, err = db.Query(s)
-	} else {
-		rows, err = db.Query(s, filter)
-	}
+	/*
+		if filter == "" { //Recent
+			rows, err = db.Query(s)
+		} else {
+			rows, err = db.Query(s, filter)
+		}
+	*/
+	rows, err = db.Query(s, filter)
 	if err != nil {
 		sess.showOrgMessage("Error in getItems: %v", err)
 		return []Row{}
@@ -447,9 +453,9 @@ func insertRowInDB(row *Row) int {
 
 	res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
-		"VALUES (?, ?, ?, ?, True, datetime('now'), '', False, "+
+		"VALUES (?, ?, ?, ?, ?, datetime('now'), '', False, "+
 		"datetime('now'), datetime('now'));",
-		tempTid("task"), row.title, folder_tid, context_tid)
+		tempTid("task"), row.title, folder_tid, context_tid, row.star)
 
 	/*
 	   not used:
@@ -477,7 +483,6 @@ func insertRowInDB(row *Row) int {
 	/***************fts virtual table update*********************/
 	entry_tid := entryTidFromId(row.id) /////////////////////////////////////////////////////
 
-	//_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, lm_id) VALUES (?, ?, ?, ?);", row.title, "", "", row.id)
 	_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, tid) VALUES (?, ?, ?, ?);", row.title, "", "", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in insertRowInDB inserting into fts for %s: %v", row.title, err)
@@ -655,13 +660,11 @@ func getTaskKeywords(id int) string {
 	return strings.Join(kk, ",")
 }
 
-func getTaskKeywordTids(id int) []int { /////////////////
+func getTaskKeywordTids(id int) []int {
 
 	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
 
 	keyword_tids := []int{}
-	//rows, err := db.Query("SELECT keyword_id FROM task_keyword LEFT OUTER JOIN keyword ON "+
-	//		"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=?;", id)
 	rows, err := db.Query("SELECT keyword_tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
 	if err != nil {
@@ -680,8 +683,6 @@ func getTaskKeywordTids(id int) []int { /////////////////
 
 func searchEntries(st string, showDeleted, help bool) []Row {
 
-	//rows, err := fts_db.Query("SELECT lm_id, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
-	//	"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
 	rows, err := fts_db.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
 		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
 
