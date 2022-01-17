@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -437,8 +438,19 @@ func bulkLoad(reportOnly bool) (log string) {
 	}
 
 	tags := getTags(pdb, taskKeywordCount, &lg)
+	//tags and entries must be sorted before updating server_updated_entries with tag
+	sort.Slice(tags, func(i, j int) bool {
+		return tags[i].task_id < tags[j].task_id
+	})
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].id < entries[j].id
+	})
 	i = 0
 	for j := 0; ; j++ {
+		// below check shouldn't be necessary
+		if j == len(entries) {
+			break
+		}
 		entry := &entries[j]
 		if entry.id == tags[i].task_id {
 			entry.tag = tags[i].tag
@@ -448,18 +460,6 @@ func bulkLoad(reportOnly bool) (log string) {
 			}
 		}
 	}
-	/*
-		for j, e := range entries {
-			if e.id == tags[i].task_id {
-				//e.tag = tags[i].tag
-				entries[j].tag = tags[i].tag
-				i += 1
-				if i == len(tags) {
-					break
-				}
-			}
-		}
-	*/
 	query, args := createBulkInsertQueryFTS(len(entries), entries)
 	err = bulkInsert(fts_db, query, args)
 	if err != nil {

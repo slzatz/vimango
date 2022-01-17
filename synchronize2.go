@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -956,9 +957,20 @@ func synchronize2(reportOnly bool) (log string) {
 			} else {
 				fmt.Fprintf(&lg, "Keywords updated for task tids: %s\n", in)
 			}
+			//tags and entries must be sorted before updating server_updated_entries with tag
 			tags := getTags_x(pdb, in, &lg)
+			sort.Slice(tags, func(i, j int) bool {
+				return tags[i].task_id < tags[j].task_id
+			})
+			sort.Slice(server_updated_entries, func(i, j int) bool {
+				return server_updated_entries[i].id < server_updated_entries[j].id
+			})
 			i := 0
 			for j := 0; ; j++ {
+				// below check shouldn't be necessary
+				if j == len(server_updated_entries) {
+					break
+				}
 				entry := &server_updated_entries[j]
 				if entry.id == tags[i].task_id {
 					entry.tag = tags[i].tag
@@ -969,19 +981,6 @@ func synchronize2(reportOnly bool) (log string) {
 					}
 				}
 			}
-			/*
-				for j, e := range server_updated_entries {
-					if e.id == tags[i].task_id {
-						//e.tag = tags[i].tag
-						server_updated_entries[j].tag = tags[i].tag
-						fmt.Fprintf(&lg, "tid: %d, tag: %s\n", e.id, server_updated_entries[j].tag)
-						i += 1
-						if i == len(tags) {
-							break
-						}
-					}
-				}
-			*/
 		}
 		query, args := createBulkInsertQueryFTS(len(server_updated_entries), server_updated_entries)
 		err = bulkInsert(fts_db, query, args)
