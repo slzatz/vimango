@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +35,7 @@ func getTaskKeywordIds_x(dbase *sql.DB, in string, plg io.Writer) []TaskKeywordI
 }
 
 func getTags_x(dbase *sql.DB, in string, plg io.Writer) []TaskTag {
-	stmt := fmt.Sprintf("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id in (%s) order by task_keyword.task_id;", in)
+	stmt := fmt.Sprintf("SELECT task_keyword.task_id, keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id in (%s) ORDER BY task_keyword.task_id;", in)
 	rows, err := dbase.Query(stmt)
 	if err != nil {
 		fmt.Printf("Error in getTags_x: %v", err)
@@ -407,7 +406,7 @@ func synchronize2(reportOnly bool) (log string) {
 	}
 
 	//server updated entries
-	rows, err = pdb.Query("SELECT id, title, star, note, created, modified, added, completed, context_id, folder_id FROM task WHERE modified > $1 AND deleted = $2;", server_t, false)
+	rows, err = pdb.Query("SELECT id, title, star, note, created, modified, added, completed, context_id, folder_id FROM task WHERE modified > $1 AND deleted = $2 ORDER BY id;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_entries: %v", err)
 		return
@@ -957,14 +956,16 @@ func synchronize2(reportOnly bool) (log string) {
 			} else {
 				fmt.Fprintf(&lg, "Keywords updated for task tids: %s\n", in)
 			}
-			//tags and entries must be sorted before updating server_updated_entries with tag
 			tags := getTags_x(pdb, in, &lg)
+			//entries and tags must be sorted before updating server_updated_entries with tag
+			/* there is an ORDER BY so also shouldn't need to do the sorts
 			sort.Slice(tags, func(i, j int) bool {
 				return tags[i].task_id < tags[j].task_id
 			})
-			sort.Slice(server_updated_entries, func(i, j int) bool {
-				return server_updated_entries[i].id < server_updated_entries[j].id
-			})
+				sort.Slice(server_updated_entries, func(i, j int) bool {
+					return server_updated_entries[i].id < server_updated_entries[j].id
+				})
+			*/
 			i := 0
 			for j := 0; ; j++ {
 				// below check shouldn't be necessary

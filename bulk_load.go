@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"time"
 
@@ -77,7 +76,7 @@ func getEntries(dbase *sql.DB, count int, plg io.Writer) []EntryTag {
 
 // returns []struct{client_entry_tid, tag} - need to populate fts
 func getTags(dbase *sql.DB, count int, plg io.Writer) []TaskTag {
-	rows, err := dbase.Query("select task_keyword.task_id, keyword.name from task_keyword left outer join keyword on keyword.id=task_keyword.keyword_id order by task_keyword.task_id;")
+	rows, err := dbase.Query("SELECT task_keyword.task_id, keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON keyword.id=task_keyword.keyword_id ORDER BY task_keyword.task_id;")
 	if err != nil {
 		println(err)
 		return []TaskTag{}
@@ -438,13 +437,14 @@ func bulkLoad(reportOnly bool) (log string) {
 	}
 
 	tags := getTags(pdb, taskKeywordCount, &lg)
-	//tags and entries must be sorted before updating server_updated_entries with tag
+	/*tags and entries must be sorted before updating entries with tag; done in queries
 	sort.Slice(tags, func(i, j int) bool {
 		return tags[i].task_id < tags[j].task_id
 	})
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].id < entries[j].id
 	})
+	*/
 	i = 0
 	for j := 0; ; j++ {
 		// below check shouldn't be necessary
@@ -460,11 +460,37 @@ func bulkLoad(reportOnly bool) (log string) {
 			}
 		}
 	}
-	query, args := createBulkInsertQueryFTS(len(entries), entries)
-	err = bulkInsert(fts_db, query, args)
-	if err != nil {
-		fmt.Fprintf(&lg, "%v", err)
+	// this should be broken up like the other bulk inserts
+	/*
+		query, args := createBulkInsertQueryFTS(len(entries), entries)
+		err = bulkInsert(fts_db, query, args)
+		if err != nil {
+			fmt.Fprintf(&lg, "%v", err)
+		}
+	*/
+
+	i = 0
+	n = 100
+	done = false
+	for {
+		m := (i + 1) * n
+		if m > len(entries) {
+			m = len(entries)
+			done = true
+		}
+		e := entries[i*n : m]
+		query, args := createBulkInsertQueryFTS(len(e), e)
+		err = bulkInsert(db, query, args)
+		if err != nil {
+			fmt.Fprintf(&lg, "%v\n", err)
+		}
+		if done {
+			fmt.Fprintf(&lg, "\n- %d `entries` were added to the client FTS5 db\n", m)
+			break
+		}
+		i += 1
 	}
+
 	/*********************end of sync*************************/
 
 	var server_ts string
