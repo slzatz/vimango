@@ -923,8 +923,12 @@ func synchronize2(reportOnly bool) (log string) {
 			"folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now');",
 			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error in Upsert for id/tid %d %s: %v", e.id, e.title, err)
-			continue
+			if err == sql.ErrNoRows {
+				fmt.Fprintf(&lg, "%sNon-error in INSERT ... ON CONFLICT (INSERT) for id/tid %d %q: %v%s\n", RED_BG, e.id, e.title, err, RESET)
+			} else {
+				fmt.Fprintf(&lg, "Error in INSERT ... ON CONFLICT for id/tid %d %q: %v\n", e.id, e.title, err)
+				continue
+			}
 		} else {
 			fmt.Fprintf(&lg, "Inserted or updated client entry %q with tid **%d**\n", e.title, e.id)
 		}

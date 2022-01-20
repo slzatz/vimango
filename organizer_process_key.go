@@ -282,6 +282,7 @@ func organizerProcessKey(c int) {
 
 			if !found {
 				sess.showOrgMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
+				sess.showOrgMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
 				org.mode = org.last_mode
 			}
 			return
