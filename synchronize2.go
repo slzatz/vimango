@@ -917,18 +917,14 @@ func synchronize2(reportOnly bool) (log string) {
 	server_updated_entries_ids := make(map[int]struct{})
 	var task_ids []string
 	for _, e := range server_updated_entries {
-		db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES"+
+		_, err := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES"+
 			"(?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
 			"title=excluded.title, star=excluded.star, completed=excluded.completed, context_tid=excluded.context_tid, "+
 			"folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now');",
 			e.id, e.title, e.star, e.added, e.completed, e.context_id, e.folder_id, e.note)
 		if err != nil {
-			if err == sql.ErrNoRows {
-				fmt.Fprintf(&lg, "%sNon-error in INSERT ... ON CONFLICT (INSERT) for id/tid %d %q: %v%s\n", RED_BG, e.id, e.title, err, RESET)
-			} else {
-				fmt.Fprintf(&lg, "Error in INSERT ... ON CONFLICT for id/tid %d %q: %v\n", e.id, e.title, err)
-				continue
-			}
+			fmt.Fprintf(&lg, "**Error** in INSERT ... ON CONFLICT for id/tid %d %q: %v\n", e.id, e.title, err)
+			continue
 		} else {
 			fmt.Fprintf(&lg, "Inserted or updated client entry %q with tid **%d**\n", e.title, e.id)
 		}
