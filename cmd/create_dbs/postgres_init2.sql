@@ -1,4 +1,3 @@
-
 SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET client_min_messages = warning;
@@ -8,7 +7,7 @@ CREATE TABLE task (
     id integer PRIMARY KEY NOT NULL,
     tid integer UNIQUE NOT NULL,
     star boolean,
-    title character varying(255),
+    title character varying(255) NOT NULL,
     folder_tid integer,
     context_tid integer,
     note text,
@@ -43,7 +42,7 @@ CREATE TABLE folder (
 CREATE TABLE keyword (
     id integer PRIMARY KEY NOT NULL,
     tid integer UNIQUE NOT NULL,
-    title character varying(32) NOT NULL,
+    title character varying(32) UNIQUE NOT NULL,
     star boolean,
     deleted boolean
     modified timestamp without time zone,
@@ -56,7 +55,8 @@ CREATE TABLE task_keyword (
 );
 
 CREATE TABLE sync (
-    machine character varying(32) PRIMARY KEY NOT NULL,
+    id integer PRIMARY KEY NOT NULL,
+    machine character varying(32) UNIQUE NOT NULL,
     "timestamp" timestamp without time zone,
     unix_timestamp integer
 );

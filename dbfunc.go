@@ -454,11 +454,13 @@ func insertRowInDB(row *Row) int {
 		folder_tid, _ = folderExists(org.filter)
 	}
 
-	res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
+	//res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
+	res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
 		"VALUES (?, ?, ?, ?, ?, datetime('now'), '', False, "+
 		"datetime('now'), datetime('now'));",
-		tempTid("task"), row.title, folder_tid, context_tid, row.star)
+		//tempTid("task"), row.title, folder_tid, context_tid, row.star)
+		row.title, folder_tid, context_tid, row.star)
 
 	/*
 	   not used:
@@ -1085,12 +1087,14 @@ func insertContainer(row *Row) int {
 	table := fmt.Sprintf("%s", org.view)
 	switch org.view {
 	case CONTEXT, FOLDER:
-		stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified, tid) ", table)
-		//stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), 0);"
-		stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), ?);"
+		//stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified, tid) ", table)
+		//stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), ?);"
+		stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified) ", table)
+		stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'));"
 	case KEYWORD:
+		//stmt = "INSERT INTO keyword (name, star, deleted, modified, tid) " +
+		"VALUES (?, ?, False, datetime('now'), ?);"
 		stmt = "INSERT INTO keyword (name, star, deleted, modified, tid) " +
-			//"VALUES (?, ?, False, datetime('now'), 0);"
 			"VALUES (?, ?, False, datetime('now'), ?);"
 	}
 	//res, err := db.Exec(stmt, row.title, row.star)
