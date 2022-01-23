@@ -23,7 +23,6 @@ var n_lookup = map[string]func(){
 	string(ctrlKey('z')): controlZ,
 	string(ctrlKey('n')): drawPreviewWithImages,
 	" m":                 drawPreviewWithImages,
-	" t":                 showTid,
 }
 
 func exCmd() {
@@ -128,8 +127,4 @@ func drawPreviewWithImages() {
 	sess.eraseRightScreen()
 	org.drawPreviewWithImages()
 	sess.imagePreview = true
-}
-
-func showTid() {
-	tempTid("context")
 }

@@ -63,12 +63,12 @@ func keywordId(name string) int {
 }
 
 func keywordExists(name string) (int, bool) {
-	var tid int
+	var tid sql.NullInt64
 	err := db.QueryRow("SELECT tid FROM keyword WHERE name=?;", name).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
-	return tid, true
+	return int(tid.Int64), true
 }
 
 func entryTid(id int) int {
@@ -100,21 +100,21 @@ func filterTitle(filter string, tid int) string {
 }
 
 func contextExists(title string) (int, bool) {
-	var tid int
+	var tid sql.NullInt64
 	err := db.QueryRow("SELECT tid FROM context WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
-	return tid, true
+	return int(tid.Int64), true
 }
 
 func folderExists(title string) (int, bool) {
-	var tid int
+	var tid sql.NullInt64
 	err := db.QueryRow("SELECT tid FROM folder WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
-	return tid, true
+	return int(tid.Int64), true
 }
 
 func contextList() map[string]struct{} {
@@ -454,12 +454,10 @@ func insertRowInDB(row *Row) int {
 		folder_tid, _ = folderExists(org.filter)
 	}
 
-	//res, err := db.Exec("INSERT INTO task (tid, title, folder_tid, context_tid, "+
 	res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
 		"VALUES (?, ?, ?, ?, ?, datetime('now'), '', False, "+
 		"datetime('now'), datetime('now'));",
-		//tempTid("task"), row.title, folder_tid, context_tid, row.star)
 		row.title, folder_tid, context_tid, row.star)
 
 	/*
@@ -1083,31 +1081,18 @@ func updateContainerTitle() {
 }
 
 func insertContainer(row *Row) int {
-	var stmt string
-	table := fmt.Sprintf("%s", org.view)
-	switch org.view {
-	case CONTEXT, FOLDER:
-		//stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified, tid) ", table)
-		//stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'), ?);"
-		stmt = fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified) ", table)
-		stmt += "VALUES (?, ?, False, datetime('now'), datetime('now'));"
-	case KEYWORD:
-		//stmt = "INSERT INTO keyword (name, star, deleted, modified, tid) " +
-		"VALUES (?, ?, False, datetime('now'), ?);"
-		stmt = "INSERT INTO keyword (name, star, deleted, modified, tid) " +
-			"VALUES (?, ?, False, datetime('now'), ?);"
-	}
-	//res, err := db.Exec(stmt, row.title, row.star)
-	res, err := db.Exec(stmt, row.title, row.star, tempTid(table))
+	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified) ", org.view)
+	stmt += "VALUES (?, ?, False, datetime('now'), datetime('now')) RETURNING id;"
+	var id int
+	err := db.QueryRow(stmt, row.title, row.star).Scan(&id)
 	if err != nil {
 		sess.showOrgMessage("Error in insertContainer: %v", err)
 		return -1
 	}
-	id, _ := res.LastInsertId()
-	row.id = int(id)
+	row.id = id
 	row.dirty = false
 
-	return row.id
+	return id
 }
 
 func deleteKeywords(id int) int {
@@ -1151,10 +1136,9 @@ func copyEntry() {
 		sess.showOrgMessage("Error in copyEntry trying to copy id %d: %v", id, err)
 	}
 
-	entry_tid := tempTid("task")
-	res, err := db.Exec("INSERT INTO task (tid, title, star, note, context_tid, folder_tid, created, added, modified, deleted) "+
+	res, err := db.Exec("INSERT INTO task (title, star, note, context_tid, folder_tid, created, added, modified, deleted) "+
 		"VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'), false);",
-		entry_tid, "copy of "+e.title, e.star, e.note, e.context_tid, e.folder_tid)
+		"copy of "+e.title, e.star, e.note, e.context_tid, e.folder_tid)
 	if err != nil {
 		sess.showOrgMessage("Error inserting copy of entry %q into sqlite: %v:", truncate(e.title, 15), err)
 		return

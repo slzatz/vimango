@@ -5,7 +5,7 @@ SET default_tablespace = '';
 
 CREATE TABLE task (
     id integer PRIMARY KEY NOT NULL,
-    tid integer UNIQUE NOT NULL,
+    tid serial UNIQUE NOT NULL,
     star boolean,
     title character varying(255) NOT NULL,
     folder_tid integer,
@@ -20,7 +20,7 @@ CREATE TABLE task (
 
 CREATE TABLE context (
     id integer PRIMARY KEY NOT NULL,
-    tid integer UNIQUE NOT NULL,
+    tid serial UNIQUE NOT NULL,
     title character varying(32) UNIQUE NOT NULL,
     star boolean,
     deleted boolean,
@@ -31,7 +31,7 @@ CREATE TABLE context (
 --
 CREATE TABLE folder (
     id integer PRIMARY KEY NOT NULL,
-    tid integer UNIQUE NOT NULL,
+    tid serial UNIQUE NOT NULL,
     title character varying(32) UNIQUE NOT NULL,
     star boolean,
     deleted boolean,
@@ -41,7 +41,7 @@ CREATE TABLE folder (
 
 CREATE TABLE keyword (
     id integer PRIMARY KEY NOT NULL,
-    tid integer UNIQUE NOT NULL,
+    tid serial UNIQUE NOT NULL,
     title character varying(32) UNIQUE NOT NULL,
     star boolean,
     deleted boolean
