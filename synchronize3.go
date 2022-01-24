@@ -50,6 +50,33 @@ func getTaskKeywordIds_x(dbase *sql.DB, in string, plg io.Writer) []TaskKeywordI
 	return taskKeywordIds
 }
 
+func TaskKeywordTids(dbase *sql.DB, plg io.Writer, tid int) []int { ////////////////////////////
+	rows, err := dbase.Query("SELECT keyword.tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
+		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=$1;", tid)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in getTaskKeywordsS: %v\n", err)
+	}
+	defer rows.Close()
+
+	keywordTids := []int{}
+	for rows.Next() {
+		var keywordTid int
+
+		err = rows.Scan(&keywordTid)
+		keywordTids = append(keywordTids, keywordTid)
+	}
+	return keywordTids
+}
+func insertTaskKeywordTids(dbase *sql.DB, plg io.Writer, keyword_tid, entry_tid int) {
+	_, err := dbase.Exec("INSERT INTO task_keyword (task_tid, keyword_tid) VALUES ($1, $2);",
+		entry_tid, keyword_tid)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in insertTaskKeywordTids: %v\n", err)
+		return
+	} else {
+		fmt.Fprintf(plg, "Inserted into task_keyword entry tid **%d** and keyword_tid **%d**\n", entry_tid, keyword_tid)
+	}
+}
 func getTags_x(dbase *sql.DB, in string, plg io.Writer) []TaskTag {
 	stmt := fmt.Sprintf("SELECT task_keyword.task_id, keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id in (%s) ORDER BY task_keyword.task_id;", in)
 	rows, err := dbase.Query(stmt)
@@ -1001,11 +1028,11 @@ func synchronize2(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, tid, err)
 				continue
 			}
-			/*
-				_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", tid, e.tid)
-				if err != nil {
-					fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
-				}
+			/*For new entries there are no records in FTS
+			_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", tid, e.tid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
+			}
 			*/
 			fmt.Fprintf(&lg, "Created new server entry *%q* with tid **%d**\n", truncate(e.title, 15), tid)
 			fmt.Fprintf(&lg, "and set tid for client entry (id %d) to tid %d\n", e.id, tid)
@@ -1026,9 +1053,9 @@ func synchronize2(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Error deleting from task_keyword from server tid %d: %v\n", tid, err)
 			continue
 		}
-		kwIds := clientTaskKeywordTids(db, &lg, tid)
-		for _, keywordId := range kwIds {
-			addServerTaskKeywordIds(pdb, &lg, keywordId, tid)
+		kwTids := TaskKeywordTids(db, &lg, tid)
+		for _, keywordTid := range kwIds {
+			insertTaskKeywordTids(pdb, &lg, keywordTid, tid)
 		}
 	}
 
@@ -1093,14 +1120,14 @@ func synchronize2(reportOnly bool) (log string) {
 	//server_deleted_contexts - start here
 	for _, c := range server_deleted_contexts {
 		// I think the task changes may not be necessary because only a previous client sync can delete server context
-		res, err := pdb.Exec("Update task SET context_id=1, modified=now() WHERE context_id=$1;", c.id)
+		res, err := pdb.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=$1;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry context to 'none' for a deleted context: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
 			fmt.Fprintf(&lg, "The number of server entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
-		res, err = db.Exec("Update task SET context_tid=1, modified=datetime('now') WHERE context_tid=?;", c.id)
+		res, err = db.Exec("Update task SET context_tid=1, modified=datetime('now') WHERE context_tid=?;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change client/sqlite entry contexts for a deleted context: %v\n", err)
 		} else {
@@ -1109,17 +1136,17 @@ func synchronize2(reportOnly bool) (log string) {
 		}
 
 		// could use returning to get the id of the context that was deleted - would just be for log
-		_, err = db.Exec("DELETE FROM context WHERE tid=?", c.id)
+		_, err = db.Exec("DELETE FROM context WHERE tid=?", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Problem deleting local context with tid = %v", c.id)
+			fmt.Fprintf(&lg, "Error deleting local context %q with tid = %d", c.title, c.tid)
 			continue
 		}
-		fmt.Fprintf(&lg, "Deleted client context %s with tid %d", c.title, c.id)
+		fmt.Fprintf(&lg, "Deleted client context %s with tid %d", c.title, c.tid)
 	}
 
 	// client deleted contexts
 	for _, c := range client_deleted_contexts {
-		res, err := pdb.Exec("Update task SET context_id=1, modified=now() WHERE context_id=$1;", c.tid) //?modified=now()
+		res, err := pdb.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=$1;", c.tid) //?modified=now()
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry contexts for a deleted context: %v\n", err)
 		} else {
@@ -1135,31 +1162,31 @@ func synchronize2(reportOnly bool) (log string) {
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
-		_, err = pdb.Exec("UPDATE context SET deleted=true, modified=now() WHERE context.id=$1", c.tid)
+		_, err = pdb.Exec("UPDATE context SET deleted=true, modified=now() WHERE context.tid=$1", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error (pdb.Exec) setting server context %s with id = %d to deleted: %v\n", c.title, c.tid, err)
+			fmt.Fprintf(&lg, "Error (pdb.Exec) setting server context %s with tid = %d to deleted: %v\n", c.title, c.tid, err)
 			continue
 		}
-		_, err = db.Exec("DELETE FROM folder WHERE id=?", c.id)
+		_, err = db.Exec("DELETE FROM context WHERE id=?", c.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting local context %s with id %d: %v", c.title, c.id, err)
+			fmt.Fprintf(&lg, "Error deleting local context %q with id %d: %v", c.title, c.id, err)
 			continue
 		}
-		fmt.Fprintf(&lg, "Deleted client context %s: id %d and updated server context with id %d to deleted = true", c.title, c.id, c.tid)
+		fmt.Fprintf(&lg, "Deleted client context %s: id %d and updated server context with tid %d to deleted = true", c.title, c.id, c.tid)
 	}
 
 	//server_deleted_folders
 	for _, c := range server_deleted_folders {
 		// I think the task changes may not be necessary because only a previous client sync can delete server context
 		// and that previous client sync should have changed the relevant tasks to 'none'
-		res, err := pdb.Exec("Update task SET folder_id=1, modified=now() WHERE folder_id=$1;", c.id)
+		res, err := pdb.Exec("Update task SET folder_tid=1, modified=now() WHERE folder_tid=$1;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry folder to 'none' for a deleted folder: %v\n", err)
 		} else {
 			rowsAffected, _ := res.RowsAffected()
 			fmt.Fprintf(&lg, "The number of server entries that were changed to 'none' (might be zero): **%d**\n", rowsAffected)
 		}
-		res, err = db.Exec("Update task SET folder_tid=1, modified=datetime('now') WHERE folder_tid=?;", c.id)
+		res, err = db.Exec("Update task SET folder_tid=1, modified=datetime('now') WHERE folder_tid=?;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change client/sqlite entry folders for a deleted folder: %v\n", err)
 		} else {
@@ -1168,12 +1195,12 @@ func synchronize2(reportOnly bool) (log string) {
 		}
 
 		// could use returning to get the id of the folder that was deleted - would just be for log
-		_, err = db.Exec("DELETE FROM folder WHERE tid=?", c.id)
+		_, err = db.Exec("DELETE FROM folder WHERE tid=?", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Problem deleting local folder with tid = %v", c.id)
+			fmt.Fprintf(&lg, "Error deleting local folder %q with tid = %d", c.title, c.tid)
 			continue
 		}
-		fmt.Fprintf(&lg, "Deleted client folder %v with tid %v", c.title, c.id)
+		fmt.Fprintf(&lg, "Deleted client folder %q with tid %d", c.title, c.tid)
 	}
 
 	// client deleted folders
@@ -1202,13 +1229,13 @@ func synchronize2(reportOnly bool) (log string) {
 		}
 		_, err = db.Exec("DELETE FROM folder WHERE id=?", c.id)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting local folder %s with id %d: %v", c.title, c.id, err)
+			fmt.Fprintf(&lg, "Error deleting local folder %q with id %d: %v", c.title, c.id, err)
 			continue
 		}
-		fmt.Fprintf(&lg, "Deleted client folder %s: id %d and updated server folder with id %d to deleted = true", c.title, c.id, c.tid)
+		fmt.Fprintf(&lg, "Deleted client folder %q: id %d and updated server folder with tid %d to deleted = true", c.title, c.id, c.tid)
 	}
 
-	//server_deleted_keywords
+	//server_deleted_keywords - start here
 	for _, c := range server_deleted_keywords {
 		_, err := db.Exec("DELETE FROM task_keyword WHERE keyword_tid=?;", c.id)
 		if err != nil {
