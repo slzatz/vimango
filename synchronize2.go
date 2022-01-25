@@ -759,7 +759,7 @@ func synchronize2(reportOnly bool) (log string) {
 			in := strings.Join(idsS, ",")
 			db.Execute(fmt.Sprintf("Update task SET context_tid=? WHERE id IN (%s);", in), tid)
 			*/
-			err = pdb.QueryRow("INSERT INTO context (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING id;",
+			err = pdb.QueryRow("INSERT INTO context (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING tid;",
 				c.title, c.star, c.created).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new context %q with id %d into postgres: %v", truncate(c.title, 15), c.id, err)

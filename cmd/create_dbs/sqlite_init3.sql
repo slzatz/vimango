@@ -59,7 +59,7 @@ CREATE TABLE keyword (
         deleted BOOLEAN, 
         modified TEXT,
         PRIMARY KEY (id), 
-        UNIQUE (title)
+        UNIQUE (title),
         UNIQUE (tid), 
         CHECK (star IN (0, 1)), 
         CHECK (deleted IN (0, 1))
@@ -68,8 +68,8 @@ CREATE TABLE sync (
         id INTEGER NOT NULL, 
         machine TEXT NOT NULL, 
         timestamp TEXT, 
-        PRIMARY KEY (id)
-        UNIQUE (machine), 
+        PRIMARY KEY (id),
+        UNIQUE (machine) 
 );
 CREATE TABLE task_keyword (
         task_tid INTEGER NOT NULL, 

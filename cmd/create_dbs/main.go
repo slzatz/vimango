@@ -129,7 +129,7 @@ func main() {
 }
 
 func createSqliteDB() {
-	path := "sqlite_init2.sql"
+	path := "sqlite_init3.sql"
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -202,7 +202,7 @@ func createPostgresDB(config *dbConfig) {
 		os.Exit(1)
 	}
 
-	path := "postgres_init.sql"
+	path := "postgres_init2.sql"
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)

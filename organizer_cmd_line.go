@@ -30,56 +30,54 @@ var cmd_lookup = map[string]func(*Organizer, int){
 	"e":               (*Organizer).editNote,
 	"vertical resize": (*Organizer).verticalResize,
 	"vert res":        (*Organizer).verticalResize,
-	"test":            (*Organizer).sync2,
-	"sync":            (*Organizer).sync2,
-	//"test2":           (*Organizer).sync2,
-	//"sync2":           (*Organizer).sync2,
-	"initialtest":    (*Organizer).initialSync,
-	"initialsync":    (*Organizer).initialSync,
-	"bulktest":       (*Organizer).initialBulkLoad,
-	"bulkload":       (*Organizer).initialBulkLoad,
-	"new":            (*Organizer).newEntry,
-	"n":              (*Organizer).newEntry,
-	"refresh":        (*Organizer).refresh,
-	"r":              (*Organizer).refresh,
-	"find":           (*Organizer).find,
-	"contexts":       (*Organizer).contexts,
-	"context":        (*Organizer).contexts,
-	"c":              (*Organizer).contexts,
-	"folders":        (*Organizer).folders,
-	"folder":         (*Organizer).folders,
-	"f":              (*Organizer).folders,
-	"keywords":       (*Organizer).keywords,
-	"keyword":        (*Organizer).keywords,
-	"k":              (*Organizer).keywords,
-	"recent":         (*Organizer).recent,
-	"log":            (*Organizer).log,
-	"deletekeywords": (*Organizer).deleteKeywords,
-	"delkw":          (*Organizer).deleteKeywords,
-	"delk":           (*Organizer).deleteKeywords,
-	"showall":        (*Organizer).showAll,
-	"show":           (*Organizer).showAll,
-	"cc":             (*Organizer).updateContainer,
-	"ff":             (*Organizer).updateContainer,
-	"kk":             (*Organizer).updateContainer,
-	"write":          (*Organizer).write,
-	"w":              (*Organizer).write,
-	"deletemarks":    (*Organizer).deleteMarks,
-	"delmarks":       (*Organizer).deleteMarks,
-	"delm":           (*Organizer).deleteMarks,
-	"copy":           (*Organizer).copyEntry,
-	"savelog":        (*Organizer).savelog,
-	"save":           (*Organizer).save,
-	"image":          (*Organizer).setImage,
-	"images":         (*Organizer).setImage,
-	"print":          (*Organizer).printDocument,
-	"ha":             (*Organizer).printList,
-	"ha2":            (*Organizer).printList2,
-	"printlist":      (*Organizer).printList2,
-	"pl":             (*Organizer).printList2,
-	"lsp":            (*Organizer).launchLsp,
-	"shutdown":       (*Organizer).shutdownLsp,
-	"sort":           (*Organizer).sortEntries,
+	"test":            (*Organizer).sync3,
+	"sync":            (*Organizer).sync3,
+	"initialtest":     (*Organizer).initialSync,
+	"initialsync":     (*Organizer).initialSync,
+	"bulktest":        (*Organizer).initialBulkLoad,
+	"bulkload":        (*Organizer).initialBulkLoad,
+	"new":             (*Organizer).newEntry,
+	"n":               (*Organizer).newEntry,
+	"refresh":         (*Organizer).refresh,
+	"r":               (*Organizer).refresh,
+	"find":            (*Organizer).find,
+	"contexts":        (*Organizer).contexts,
+	"context":         (*Organizer).contexts,
+	"c":               (*Organizer).contexts,
+	"folders":         (*Organizer).folders,
+	"folder":          (*Organizer).folders,
+	"f":               (*Organizer).folders,
+	"keywords":        (*Organizer).keywords,
+	"keyword":         (*Organizer).keywords,
+	"k":               (*Organizer).keywords,
+	"recent":          (*Organizer).recent,
+	"log":             (*Organizer).log,
+	"deletekeywords":  (*Organizer).deleteKeywords,
+	"delkw":           (*Organizer).deleteKeywords,
+	"delk":            (*Organizer).deleteKeywords,
+	"showall":         (*Organizer).showAll,
+	"show":            (*Organizer).showAll,
+	"cc":              (*Organizer).updateContainer,
+	"ff":              (*Organizer).updateContainer,
+	"kk":              (*Organizer).updateContainer,
+	"write":           (*Organizer).write,
+	"w":               (*Organizer).write,
+	"deletemarks":     (*Organizer).deleteMarks,
+	"delmarks":        (*Organizer).deleteMarks,
+	"delm":            (*Organizer).deleteMarks,
+	"copy":            (*Organizer).copyEntry,
+	"savelog":         (*Organizer).savelog,
+	"save":            (*Organizer).save,
+	"image":           (*Organizer).setImage,
+	"images":          (*Organizer).setImage,
+	"print":           (*Organizer).printDocument,
+	"ha":              (*Organizer).printList,
+	"ha2":             (*Organizer).printList2,
+	"printlist":       (*Organizer).printList2,
+	"pl":              (*Organizer).printList2,
+	"lsp":             (*Organizer).launchLsp,
+	"shutdown":        (*Organizer).shutdownLsp,
+	"sort":            (*Organizer).sortEntries,
 }
 
 func (o *Organizer) log(unused int) {
@@ -540,13 +538,13 @@ func (o *Organizer) find(pos int) {
 	o.drawPreview()
 }
 
-func (o *Organizer) sync(unused int) {
+func (o *Organizer) sync3(unused int) {
 	var log string
 	if o.command_line == "test" {
 		// true => reportOnly
-		log = synchronize(true)
+		log = synchronize3(true)
 	} else {
-		log = synchronize(false)
+		log = synchronize3(false)
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
@@ -566,6 +564,7 @@ func (o *Organizer) sync(unused int) {
 	o.mode = PREVIEW_SYNC_LOG
 }
 
+/*
 func (o *Organizer) sync2(unused int) {
 	var log string
 	if o.command_line == "test" {
@@ -591,6 +590,7 @@ func (o *Organizer) sync2(unused int) {
 	o.drawPreviewWithoutImages()
 	o.mode = PREVIEW_SYNC_LOG
 }
+*/
 
 func (o *Organizer) initialSync(unused int) {
 	var log string
@@ -874,7 +874,7 @@ func (o *Organizer) deleteMarks(unused int) {
 }
 
 func (o *Organizer) copyEntry(unused int) {
-	copyEntry()
+	//copyEntry()
 	o.mode = NORMAL
 	o.command_line = ""
 	o.refresh(0)

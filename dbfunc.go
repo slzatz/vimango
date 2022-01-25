@@ -300,7 +300,7 @@ func filterEntries(taskView int, filter interface{}, showDeleted bool, sort stri
 		s += "JOIN task_keyword ON task.tid=task_keyword.task_tid " +
 			"JOIN keyword ON keyword.tid=task_keyword.keyword_tid " +
 			"WHERE task.tid = task_keyword.task_tid AND " +
-			"task_keyword.keyword_tid = keyword.tid AND keyword.name=?"
+			"task_keyword.keyword_tid = keyword.tid AND keyword.title=?"
 	case BY_RECENT:
 		//s += "WHERE 1=1"
 		s += "WHERE 1=?"
@@ -456,7 +456,7 @@ func insertRowInDB(row *Row) int {
 
 	res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, "+
 		"star, added, note, deleted, created, modified) "+
-		"VALUES (?, ?, ?, ?, ?, datetime('now'), '', False, "+
+		"VALUES (?, ?, ?, ?, datetime('now'), '', False, "+
 		"datetime('now'), datetime('now'));",
 		row.title, folder_tid, context_tid, row.star)
 
@@ -642,7 +642,7 @@ func getTaskKeywords(id int) string {
 	//rows, err := db.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
 	//	"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=?;", id)
 
-	rows, err := db.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
+	rows, err := db.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in getTaskKeywords for entry id %d: %v", id, err)
@@ -1120,6 +1120,7 @@ func deleteKeywords(id int) int {
 }
 
 // need to revisit
+/*
 func copyEntry() {
 	// ? needs temp tid
 	id := getId()
@@ -1157,6 +1158,7 @@ func copyEntry() {
 		return
 	}
 }
+*/
 
 // not in use but worked
 func highlightTerms__(text string, word_positions [][]int) string {
