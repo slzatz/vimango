@@ -504,6 +504,9 @@ func synchronize3(reportOnly bool) (log string) {
 	if len(client_deleted_contexts) > 0 {
 		nn += len(client_deleted_contexts)
 		fmt.Fprintf(&lg, "- Deleted client `Contexts`: %d\n", len(client_deleted_contexts))
+		for _, e := range client_deleted_contexts {
+			fmt.Fprintf(&lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
+		}
 	} else {
 		lg.WriteString("- No `Contexts` deleted.\n")
 	}
@@ -555,7 +558,7 @@ func synchronize3(reportOnly bool) (log string) {
 		var tid sql.NullInt64
 		rows.Scan(
 			&c.id,
-			&c.tid,
+			&tid,
 			&c.title,
 		)
 		c.tid = int(tid.Int64)
@@ -564,6 +567,9 @@ func synchronize3(reportOnly bool) (log string) {
 	if len(client_deleted_folders) > 0 {
 		nn += len(client_deleted_folders)
 		fmt.Fprintf(&lg, "- Deleted client `Folders`: %d\n", len(client_updated_folders))
+		for _, e := range client_deleted_folders {
+			fmt.Fprintf(&lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
+		}
 	} else {
 		lg.WriteString("- No `Folders` deleted.\n")
 	}
@@ -613,7 +619,7 @@ func synchronize3(reportOnly bool) (log string) {
 		var tid sql.NullInt64
 		rows.Scan(
 			&c.id,
-			&c.tid,
+			&tid,
 			&c.title,
 		)
 		c.tid = int(tid.Int64)
@@ -622,6 +628,9 @@ func synchronize3(reportOnly bool) (log string) {
 	if len(client_deleted_keywords) > 0 {
 		nn += len(client_deleted_keywords)
 		fmt.Fprintf(&lg, "- Deleted `Keywords`: %d\n", len(client_deleted_keywords))
+		for _, e := range client_deleted_keywords {
+			fmt.Fprintf(&lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
+		}
 	} else {
 		lg.WriteString("- No `Keywords` deleted.\n")
 	}
@@ -675,7 +684,7 @@ func synchronize3(reportOnly bool) (log string) {
 		var tid sql.NullInt64
 		rows.Scan(
 			&e.id,
-			&e.tid,
+			&tid,
 			&e.title,
 		)
 		e.tid = int(tid.Int64)
@@ -684,6 +693,9 @@ func synchronize3(reportOnly bool) (log string) {
 	if len(client_deleted_entries) > 0 {
 		nn += len(client_deleted_entries)
 		fmt.Fprintf(&lg, "- Deleted `Entries`: %d\n", len(client_deleted_entries))
+		for _, e := range client_deleted_entries {
+			fmt.Fprintf(&lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
+		}
 	} else {
 		lg.WriteString("- No `Entries` deleted.\n")
 	}
@@ -748,7 +760,7 @@ func synchronize3(reportOnly bool) (log string) {
 			if err != nil {
 				fmt.Fprintf(&lg, "Error on UPDATE context SET tid ...: %v\n", err)
 			} else {
-				fmt.Fprintf(&lg, "Inserted server context %q and updated local tid to %d\n", c.title, c.tid)
+				fmt.Fprintf(&lg, "Inserted server context %q and updated local tid to %d\n", c.title, tid)
 			}
 		}
 	}
@@ -804,7 +816,7 @@ func synchronize3(reportOnly bool) (log string) {
 			if err != nil {
 				fmt.Fprintf(&lg, "Error on UPDATE folder SET tid ...: %v\n", err)
 			} else {
-				fmt.Fprintf(&lg, "Inserted server folder %q and updated local tid to %d\n", c.title, c.tid)
+				fmt.Fprintf(&lg, "Inserted server folder %q and updated local tid to %d\n", c.title, tid)
 			}
 		}
 	}
@@ -859,6 +871,8 @@ func synchronize3(reportOnly bool) (log string) {
 			_, err = db.Exec("UPDATE keyword SET tid=? WHERE id=?;", tid, c.id)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error on UPDATE keyword SET tid ...: %v\n", err)
+			} else {
+				fmt.Fprintf(&lg, "Inserted server keyword %q and updated local tid to %d\n", c.title, tid)
 			}
 		}
 	}
