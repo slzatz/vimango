@@ -622,9 +622,9 @@ func (o *Organizer) initialBulkLoad(unused int) {
 	var log string
 	if o.command_line == "bulktest" {
 		// true => reportOnly
-		log = bulkLoad(true)
+		log = bulkLoad2(true)
 	} else {
-		log = bulkLoad(false)
+		log = bulkLoad2(false)
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
