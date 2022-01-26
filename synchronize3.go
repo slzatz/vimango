@@ -334,7 +334,7 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//server updated keywords
-	rows, err = pdb.Query("SELECT tid, title, star, modified FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, false)
+	rows, err = pdb.Query("SELECT tid, title, star, created, modified FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_keywords: %v", err)
 		return
@@ -349,6 +349,7 @@ func synchronize3(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
+			&c.created,
 			&c.modified,
 		)
 		server_updated_keywords = append(server_updated_keywords, c)
@@ -568,7 +569,7 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//client updated keywords
-	rows, err = db.Query("SELECT id, tid, title, star, modified FROM keyword WHERE substr(keyword.modified, 1, 19)  > $1 AND keyword.deleted = $2;", client_t, false)
+	rows, err = db.Query("SELECT id, tid, title, star, created, modified FROM keyword WHERE substr(keyword.modified, 1, 19)  > $1 AND keyword.deleted = $2;", client_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_updated_keywords: %v", err)
 		return
@@ -583,6 +584,7 @@ func synchronize3(reportOnly bool) (log string) {
 			&tid,
 			&c.title,
 			&c.star,
+			&c.created,
 			&c.modified,
 		)
 		c.tid = int(tid.Int64)
@@ -730,9 +732,9 @@ func synchronize3(reportOnly bool) (log string) {
 		if exists {
 			_, err := pdb.Exec("UPDATE context SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
 			if err != nil {
-				fmt.Fprintf(&lg, "Error updating sqlite for a context with tid: %d: %v\n", c.tid, err)
+				fmt.Fprintf(&lg, "Error updating postgres for a context with tid: %d: %v\n", c.tid, err)
 			} else {
-				fmt.Fprintf(&lg, "Updated local context: %q with tid: %v\n", c.title, c.tid)
+				fmt.Fprintf(&lg, "Updated server context: %q with tid: %v\n", c.title, c.tid)
 			}
 		} else {
 			var tid int
@@ -745,6 +747,8 @@ func synchronize3(reportOnly bool) (log string) {
 			_, err = db.Exec("UPDATE context SET tid=? WHERE id=?;", tid, c.id)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error on UPDATE context SET tid ...: %v\n", err)
+			} else {
+				fmt.Fprintf(&lg, "Inserted server context %q and updated local tid to %d\n", c.title, c.tid)
 			}
 		}
 	}
@@ -784,9 +788,9 @@ func synchronize3(reportOnly bool) (log string) {
 		if exists {
 			_, err := pdb.Exec("UPDATE folder SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
 			if err != nil {
-				fmt.Fprintf(&lg, "Error updating sqlite for a folder with tid: %v: %w\n", c.tid, err)
+				fmt.Fprintf(&lg, "Error updating postgres for a folder with tid: %v: %w\n", c.tid, err)
 			} else {
-				fmt.Fprintf(&lg, "Updated local folder: %q with tid: %v\n", c.title, c.tid)
+				fmt.Fprintf(&lg, "Updated server folder: %q with tid: %v\n", c.title, c.tid)
 			}
 		} else {
 			var tid int
@@ -799,6 +803,8 @@ func synchronize3(reportOnly bool) (log string) {
 			_, err = db.Exec("UPDATE folder SET tid=? WHERE id=?;", tid, c.id)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error on UPDATE folder SET tid ...: %v\n", err)
+			} else {
+				fmt.Fprintf(&lg, "Inserted server folder %q and updated local tid to %d\n", c.title, c.tid)
 			}
 		}
 	}
@@ -844,7 +850,7 @@ func synchronize3(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO keyword (title, star, created, modified, deleted) VALUES ($1,$2,$3,$4, now(), false) RETURNING tid;",
+			err := pdb.QueryRow("INSERT INTO keyword (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING tid;",
 				c.title, c.star, c.created).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new keyword into postgres and returning tid: %v\n", err)

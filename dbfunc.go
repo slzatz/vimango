@@ -56,15 +56,15 @@ func timeDelta(t string) string {
 	}
 }
 
-func keywordId(name string) int {
+func keywordId(title string) int {
 	var id int
-	_ = db.QueryRow("SELECT id FROM keyword WHERE name=?;", name).Scan(&id)
+	_ = db.QueryRow("SELECT id FROM keyword WHERE title=?;", title).Scan(&id)
 	return id
 }
 
-func keywordExists(name string) (int, bool) {
+func keywordExists(title string) (int, bool) {
 	var tid sql.NullInt64
-	err := db.QueryRow("SELECT tid FROM keyword WHERE name=?;", name).Scan(&tid)
+	err := db.QueryRow("SELECT tid FROM keyword WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
@@ -144,14 +144,14 @@ func folderList() map[string]struct{} {
 }
 
 func keywordList() map[string]struct{} {
-	rows, _ := db.Query("SELECT name FROM keyword;")
+	rows, _ := db.Query("SELECT title FROM keyword;")
 	defer rows.Close()
 
 	keywords := make(map[string]struct{})
 	for rows.Next() {
-		var name string
-		_ = rows.Scan(&name)
-		keywords[name] = struct{}{}
+		var title string
+		_ = rows.Scan(&title)
+		keywords[title] = struct{}{}
 	}
 	return keywords
 }
@@ -652,10 +652,10 @@ func getTaskKeywords(id int) string {
 
 	kk := []string{}
 	for rows.Next() {
-		var name string
+		var title string
 
-		err = rows.Scan(&name)
-		kk = append(kk, name)
+		err = rows.Scan(&title)
+		kk = append(kk, title)
 	}
 	if len(kk) == 0 {
 		return ""
@@ -783,32 +783,34 @@ func getContainers() {
 	org.rows = nil
 	org.sort = "modified" //only time column that all containers have
 
-	var table string
-	var columns string
-	var orderBy string //only needs to be change for keyword
+	/*
+		var table string
+		var columns string
+		var orderBy string //only needs to be change for keyword
+		switch org.view {
+		case CONTEXT:
+			table = "context"
+			columns = "id, title, star, deleted, modified"
+			orderBy = "title"
+		case FOLDER:
+			table = "folder"
+			columns = "id, title, star, deleted, modified"
+			orderBy = "title"
+		case KEYWORD:
+			table = "keyword"
+			columns = "id, title, star, deleted, modified"
+			orderBy = "titltitltitle"
+		default:
+			sess.showOrgMessage("Somehow you are in a view I can't handle")
+			return
+		}
+	*/
 
-	switch org.view {
-	case CONTEXT:
-		table = "context"
-		columns = "id, title, star, deleted, modified"
-		orderBy = "title"
-	case FOLDER:
-		table = "folder"
-		columns = "id, title, star, deleted, modified"
-		orderBy = "title"
-	case KEYWORD:
-		table = "keyword"
-		columns = "id, name, star, deleted, modified"
-		orderBy = "name"
-	default:
-		sess.showOrgMessage("Somehow you are in a view I can't handle")
-		return
-	}
-
-	stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
+	//stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
+	stmt := fmt.Sprintf("SELECT id, title, star, deleted, modified FROM %s ORDER BY title COLLATE NOCASE ASC;", org.view)
 	rows, err := db.Query(stmt)
 	if err != nil {
-		sess.showOrgMessage("Error SELECTING %s FROM %s", columns, table)
+		sess.showOrgMessage("Error SELECTING id, title, star, deleted, modified FROM %s", org.view)
 		return
 	}
 	defer rows.Close()
@@ -843,34 +845,37 @@ func getContainers() {
 func getAltContainers() {
 	org.altRows = nil
 
-	var table string
-	var columns string
-	var orderBy string //only needs to be change for keyword
+	/*
+		var table string
+		var columns string
+		var orderBy string //only needs to be change for keyword
 
-	switch org.altView {
-	case CONTEXT:
-		table = "context"
-		//columns = "id, title, \"default\""
-		columns = "id, title, star"
-		orderBy = "title"
-	case FOLDER:
-		table = "folder"
-		//columns = "id, title, private"
-		columns = "id, title, star"
-		orderBy = "title"
-	case KEYWORD:
-		table = "keyword"
-		columns = "id, name, star"
-		orderBy = "name"
-	default:
-		sess.showOrgMessage("Somehow you are in a view I can't handle")
-		return
-	}
+		switch org.altView {
+		case CONTEXT:
+			table = "context"
+			//columns = "id, title, \"default\""
+			columns = "id, title, star"
+			orderBy = "title"
+		case FOLDER:
+			table = "folder"
+			//columns = "id, title, private"
+			columns = "id, title, star"
+			orderBy = "title"
+		case KEYWORD:
+			table = "keyword"
+			columns = "id, title, star"
+			orderBy = "title"
+		default:
+			sess.showOrgMessage("Somehow you are in a view I can't handle")
+			return
+		}
+	*/
 
-	stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
+	//stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
+	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", org.altView)
 	rows, err := db.Query(stmt)
 	if err != nil {
-		sess.showOrgMessage("Error SELECTING %s FROM %s", columns, table)
+		sess.showOrgMessage("Error SELECTING id, title, star FROM %s", org.altView)
 		return
 	}
 	defer rows.Close()
@@ -914,24 +919,22 @@ func getContainerInfo(id int) Container {
 		return Container{}
 	}
 
-	var table string
 	var countQuery string
-	var columns string
 	switch org.view {
 	case CONTEXT:
-		table = "context"
+		//table = "context"
 		// Note: the join for context and folder is on the context/folder *tid*
 		countQuery = "SELECT COUNT(*) FROM task JOIN context ON context.tid = task.context_tid WHERE context.id=?;"
-		columns = "id, tid, title, star, created, deleted, modified"
+		//columns = "id, tid, title, star, created, deleted, modified"
 	case FOLDER:
-		table = "folder"
+		//table = "folder"
 		countQuery = "SELECT COUNT(*) FROM task JOIN folder ON folder.tid = task.folder_tid WHERE folder.id=?;"
-		columns = "id, tid, title, star, created, deleted, modified"
+		//columns = "id, tid, title, star, created, deleted, modified"
 	case KEYWORD:
-		table = "keyword"
+		//table = "keyword"
 		//countQuery = "SELECT COUNT(*) FROM task_keyword WHERE keyword_tid=?;"
 		countQuery = "SELECT COUNT(*) FROM task_keyword WHERE keyword_tid=(SELECT tid FROM keyword WHERE id=?);"
-		columns = "id, tid, name, star, deleted, modified"
+		//columns = "id, tid, name, star, deleted, modified"
 	default:
 		sess.showOrgMessage("Somehow you are in a view I can't handle")
 		return Container{}
@@ -946,41 +949,25 @@ func getContainerInfo(id int) Container {
 		return Container{}
 	}
 
-	stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", columns, table)
+	//stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", columns, table)
+	stmt := fmt.Sprintf("SELECT id, tid, title, star, created, deleted, modified FROM %s WHERE id=?;", org.view)
 	row = db.QueryRow(stmt, id)
-	//var tid sql.NullInt64
-	if org.view == KEYWORD {
-		err = row.Scan(
-			&c.id,
-			&c.tid,
-			&c.title,
-			&c.star,
-			&c.deleted,
-			&c.modified,
-		)
-	} else {
-		err = row.Scan(
-			&c.id,
-			&c.tid,
-			&c.title,
-			&c.star,
-			&c.created,
-			&c.deleted,
-			&c.modified,
-		)
-	}
+	var tid sql.NullInt64
+	err = row.Scan(
+		&c.id,
+		&tid,
+		&c.title,
+		&c.star,
+		&c.created,
+		&c.deleted,
+		&c.modified,
+	)
+	c.tid = int(tid.Int64)
+
 	if err != nil {
 		sess.showOrgMessage("Error in getContainerInfo: %v", err)
 		return Container{}
 	}
-
-	/*
-		if tid.Valid {
-			c.tid = int(tid.Int64)
-		} else {
-			c.tid = 0
-		}
-	*/
 
 	return c
 }
@@ -1055,28 +1042,10 @@ func updateContainerTitle() {
 		insertContainer(row)
 		return
 	}
-	var table string
-	var column string
-	switch org.view {
-	case CONTEXT:
-		table = "context"
-		column = "title"
-	case FOLDER:
-		table = "folder"
-		column = "title"
-	case KEYWORD:
-		table = "keyword"
-		column = "name"
-	default:
-		sess.showOrgMessage("Somehow that's a container I don't recognize")
-		return
-	}
-
-	stmt := fmt.Sprintf("UPDATE %s SET %s=?, modified=datetime('now') WHERE id=?",
-		table, column)
+	stmt := fmt.Sprintf("UPDATE %s SET title=?, modified=datetime('now') WHERE id=?", org.view)
 	_, err := db.Exec(stmt, row.title, row.id)
 	if err != nil {
-		sess.showOrgMessage("Error updating %s title for %d", table, row.id)
+		sess.showOrgMessage("Error updating %s title for %d", org.view, row.id)
 	}
 }
 

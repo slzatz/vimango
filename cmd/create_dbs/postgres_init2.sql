@@ -43,6 +43,7 @@ CREATE TABLE keyword (
     title character varying(32) UNIQUE NOT NULL,
     star boolean,
     deleted boolean,
+    created timestamp without time zone,
     modified timestamp without time zone
 );
 
