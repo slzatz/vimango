@@ -134,7 +134,8 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	/****************below is where changes start***********************************/
 
 	//client contexts -> server
-	rows, err := db.Query("SELECT tid, title, star, created, modified FROM context WHERE deleted=false ORDER BY tid;")
+	// shouldn't need deleted = false but doesn't hurt if something deleted never got synched
+	rows, err := db.Query("SELECT tid, title, star FROM context WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client contexts: %v", err)
 		return
@@ -142,77 +143,79 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 
 	defer rows.Close()
 
-	server_contexts := make([]Container, 0, contextCount)
+	client_contexts := make([]Container, 0, contextCount)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
-			&c.modified,
+			//&c.created,
+			//&c.modified,
 		)
-		server_contexts = append(server_contexts, c)
+		client_contexts = append(client_contexts, c)
 	}
-	for _, c := range server_contexts {
-		_, err := pdb.Exec("INSERT INTO context (tid, title, star, created, modified, deleted) VALUES ($1,$2,$3,$4, now(), false);",
-			c.tid, c.title, c.star, c.created)
+	for _, c := range client_contexts {
+		_, err := pdb.Exec("INSERT INTO context (tid, title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), now(), false);",
+			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting context into sqlite: %v\n", err)
 			break
 		}
 	}
 
-	//server folder -> client
-	rows, err = db.Query("SELECT tid, title, star, created, modified FROM folder WHERE deleted=false ORDER BY tid;")
+	//client folder -> server
+	rows, err = db.Query("SELECT tid, title, star FROM folder WHERE deleted=false ORDER BY tid;")
 	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_folders: %v", err)
+		fmt.Fprintf(&lg, "Error in SELECT for client_folders: %v", err)
 		return
 	}
 
-	server_folders := make([]Container, 0, folderCount)
+	client_folders := make([]Container, 0, folderCount)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
-			&c.modified,
+			//&c.created,
+			//&c.modified,
 		)
-		server_folders = append(server_folders, c)
+		client_folders = append(client_folders, c)
 	}
-	for _, c := range server_folders {
-		_, err := pdb.Exec("INSERT INTO folder (tid, title, star, created, modified, deleted) VALUES ($1,$2,$3,$4, now(), false);",
-			c.tid, c.title, c.star, c.created)
+	for _, c := range client_folders {
+		_, err := pdb.Exec("INSERT INTO folder (tid, title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), now(), false);",
+			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting folder into sqlite: %v\n", err)
 			break
 		}
 	}
 
-	//server keyword -> client
-	rows, err = db.Query("SELECT tid, title, star, created, modified FROM keyword WHERE deleted=false ORDER BY tid;")
+	//client keyword -> server
+	// note that the original database does not have a keyword created column
+	//rows, err = db.Query("SELECT tid, title, star, created, modified FROM keyword WHERE deleted=false ORDER BY tid;")
+	rows, err = db.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
 	if err != nil {
-		fmt.Fprintf(&lg, "Error in SELECT for server_keywords: %v", err)
+		fmt.Fprintf(&lg, "Error in SELECT for client_keywords: %v", err)
 		return
 	}
 
-	server_keywords := make([]Container, 0, keywordCount)
+	client_keywords := make([]Container, 0, keywordCount)
 	for rows.Next() {
 		var c Container
 		rows.Scan(
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
-			&c.modified,
+			//&c.created,
+			//&c.modified,
 		)
-		server_keywords = append(server_keywords, c)
+		client_keywords = append(client_keywords, c)
 	}
 
-	for _, c := range server_keywords {
-		_, err := pdb.Exec("INSERT INTO keyword (tid, title, star, created, modified, deleted) VALUES ($1,$2,$3, now(), now(), false);",
+	for _, c := range client_keywords {
+		_, err := pdb.Exec("INSERT INTO keyword (tid, title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), now(), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting new keyword %q into sqlite: %v", truncate(c.title, 15), err)
@@ -221,7 +224,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	}
 
 	/* for the code below need to add guard that entries and keywords might be zero */
-	//server entries -> client
+	//client entries -> server
 	entries := getEntriesBulk(db, taskCount, &lg)
 
 	i := 0
@@ -258,7 +261,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 		}
 		e := taskKeywordPairs[i*n : m]
 		query, args := createBulkInsertQueryTaskKeywordPairsReverse(len(e), e)
-		fmt.Fprintf(&lg, "query = %s\n, args = %v\n", query, args)
+		//fmt.Fprintf(&lg, "query = %s\n, args = %v\n", query, args)
 		err = bulkInsert2(pdb, query, args)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v\n", err)
@@ -268,6 +271,18 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 			break
 		}
 		i += 1
+	}
+
+	tables := []string{"task", "context", "folder", "keyword"}
+	var nextTid int
+	for _, table := range tables {
+		stmt := fmt.Sprintf("SELECT SETVAL('%s_tid_seq', (SELECT (MAX(tid) + 1) FROM %s), FALSE);", table, table)
+		err := pdb.QueryRow(stmt).Scan(&nextTid)
+		if err != nil {
+			fmt.Fprintf(&lg, "Error setting next tid for table %s: %v\n", table, err)
+			continue
+		}
+		fmt.Fprintf(&lg, "Next tid for table %s: %d\n", table, nextTid)
 	}
 
 	/*********************end of sync*************************/
