@@ -195,7 +195,9 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	//client keyword -> server
 	// note that the original database does not have a keyword created column
 	//rows, err = db.Query("SELECT tid, title, star, created, modified FROM keyword WHERE deleted=false ORDER BY tid;")
-	rows, err = db.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
+	//more important note: current active db thinks its keyword name
+	//rows, err = db.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
+	rows, err = db.Query("SELECT tid, name, star FROM keyword WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_keywords: %v", err)
 		return

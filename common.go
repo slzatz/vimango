@@ -247,7 +247,7 @@ type Entry struct {
 	folder_tid  int
 	context_tid int
 	star        bool
-	note        string
+	note        sql.NullString //string
 	added       sql.NullString //string DATE
 	completed   sql.NullString //sql.NullTime since sqlite doesn't have datetime type
 	deleted     bool
