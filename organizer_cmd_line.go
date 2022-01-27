@@ -36,6 +36,8 @@ var cmd_lookup = map[string]func(*Organizer, int){
 	"initialsync":     (*Organizer).initialSync,
 	"bulktest":        (*Organizer).initialBulkLoad,
 	"bulkload":        (*Organizer).initialBulkLoad,
+	"reverseload":     (*Organizer).reverse,
+	"reversetest":     (*Organizer).reverse,
 	"new":             (*Organizer).newEntry,
 	"n":               (*Organizer).newEntry,
 	"refresh":         (*Organizer).refresh,
@@ -643,6 +645,33 @@ func (o *Organizer) initialBulkLoad(unused int) {
 	o.drawPreviewWithoutImages()
 	o.mode = PREVIEW_SYNC_LOG
 }
+
+func (o *Organizer) reverse(unused int) {
+	var log string
+	if o.command_line == "reversetest" {
+		// true => reportOnly
+		log = reverseBulkLoad(true)
+	} else {
+		log = reverseBulkLoad(false)
+	}
+	o.command_line = ""
+	o.eraseRightScreen()
+	note := generateWWString(log, o.totaleditorcols)
+	// below draw log as markeup
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithWordWrap(0),
+	)
+	note, _ = r.Render(note)
+	if note[0] == '\n' {
+		note = note[1:]
+	}
+	o.note = strings.Split(note, "\n")
+	o.altRowoff = 0
+	o.drawPreviewWithoutImages()
+	o.mode = PREVIEW_SYNC_LOG
+}
+
 func (o *Organizer) contexts(pos int) {
 	o.mode = NORMAL
 
