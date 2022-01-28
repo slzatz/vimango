@@ -51,7 +51,6 @@ var Languages = map[string]string{
 var sortColumns = map[string]struct{}{
 	"added":    z0,
 	"modified": z0,
-	"created":  z0,
 	"priority": z0,
 }
 
@@ -217,13 +216,13 @@ func tc(s string, l int, b bool) string {
 }
 
 type Row struct {
-	id        int
-	tid       int
-	title     string
-	ftsTitle  string
-	star      bool
-	deleted   bool
-	completed bool
+	id       int
+	tid      int
+	title    string
+	ftsTitle string
+	star     bool
+	deleted  bool
+	archived bool
 	//modified  string
 	sort string
 
@@ -239,6 +238,20 @@ type AltRow struct {
 }
 
 // used in synchronize and getEntryInfo
+type NewEntry struct {
+	id          int
+	tid         int
+	title       string
+	folder_tid  int
+	context_tid int
+	star        bool
+	note        sql.NullString //string
+	added       string
+	archived    bool
+	deleted     bool
+	modified    string
+}
+
 type Entry struct {
 	id          int
 	tid         int
@@ -248,12 +261,11 @@ type Entry struct {
 	context_tid int
 	star        bool
 	note        sql.NullString //string
-	added       sql.NullString //string DATE
-	completed   sql.NullString //sql.NullTime since sqlite doesn't have datetime type
+	added       sql.NullString
+	completed   sql.NullString
 	deleted     bool
 	modified    string
 }
-
 type serverEntry struct {
 	id         int
 	title      string
@@ -273,10 +285,10 @@ type Container struct {
 	tid      int
 	title    string
 	star     bool
-	created  string
 	deleted  bool
 	modified string
 	count    int
+	created  string
 }
 
 //type outlineKey int

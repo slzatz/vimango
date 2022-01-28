@@ -34,7 +34,7 @@ type TaskKeyword3 struct {
 	keyword  string
 }
 
-func createBulkInsertQueryFTS3(n int, entries []EntryPlusTag) (query string, args []interface{}) {
+func createBulkInsertQueryFTS3(n int, entries []NewEntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*4)
 	pos := 0
@@ -224,7 +224,7 @@ func synchronize3(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "Client last sync: %v\n", client_t)
 
 	//server updated contexts
-	rows, err := pdb.Query("SELECT tid, title, star, created, modified FROM context WHERE context.modified > $1 AND context.deleted = $2;", server_t, false)
+	rows, err := pdb.Query("SELECT tid, title, star, modified FROM context WHERE context.modified > $1 AND context.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_contexts: %v", err)
 		return
@@ -241,7 +241,6 @@ func synchronize3(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		server_updated_contexts = append(server_updated_contexts, c)
@@ -266,9 +265,6 @@ func synchronize3(reportOnly bool) (log string) {
 		rows.Scan(
 			&c.tid,
 			&c.title,
-		//	&c.star,
-		//	&c.created,
-		//	&c.modified,
 		)
 		server_deleted_contexts = append(server_deleted_contexts, c)
 	}
@@ -280,7 +276,7 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//server updated folders
-	rows, err = pdb.Query("SELECT tid, title, star, created, modified FROM folder WHERE folder.modified > $1 AND folder.deleted = $2;", server_t, false)
+	rows, err = pdb.Query("SELECT tid, title, star, modified FROM folder WHERE folder.modified > $1 AND folder.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_folders: %v", err)
 		return
@@ -295,7 +291,6 @@ func synchronize3(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		server_updated_folders = append(server_updated_folders, c)
@@ -320,9 +315,6 @@ func synchronize3(reportOnly bool) (log string) {
 		rows.Scan(
 			&c.tid,
 			&c.title,
-			//&c.star,
-			//&c.created,
-			//&c.modified,
 		)
 		server_deleted_folders = append(server_deleted_folders, c)
 	}
@@ -334,7 +326,7 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//server updated keywords
-	rows, err = pdb.Query("SELECT tid, title, star, created, modified FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, false)
+	rows, err = pdb.Query("SELECT tid, title, star, modified FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_keywords: %v", err)
 		return
@@ -349,7 +341,6 @@ func synchronize3(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		server_updated_keywords = append(server_updated_keywords, c)
@@ -387,24 +378,23 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//server updated entries
-	rows, err = pdb.Query("SELECT tid, title, star, note, created, modified, added, completed, context_tid, folder_tid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", server_t, false)
+	rows, err = pdb.Query("SELECT tid, title, star, note, modified, added, archived, context_tid, folder_tid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_entries: %v", err)
 		return
 	}
 
-	var server_updated_entries []EntryPlusTag
+	var server_updated_entries []NewEntryPlusTag
 	for rows.Next() {
-		var e EntryPlusTag
+		var e NewEntryPlusTag
 		rows.Scan(
 			&e.tid,
 			&e.title,
 			&e.star,
 			&e.note,
-			&e.created,
 			&e.modified,
 			&e.added,
-			&e.completed,
+			&e.archived,
 			&e.context_tid,
 			&e.folder_tid,
 		)
@@ -448,7 +438,7 @@ func synchronize3(reportOnly bool) (log string) {
 	//Client changes
 
 	//client updated contexts
-	rows, err = db.Query("SELECT id, tid, title, star, created, modified FROM context WHERE substr(context.modified, 1, 19) > $1 AND context.deleted = $2;", client_t, false)
+	rows, err = db.Query("SELECT id, tid, title, star, modified FROM context WHERE substr(context.modified, 1, 19) > $1 AND context.deleted = $2;", client_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_updated_contexts: %v", err)
 		return
@@ -466,7 +456,6 @@ func synchronize3(reportOnly bool) (log string) {
 			&tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		c.tid = int(tid.Int64)
@@ -512,7 +501,7 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//client updated folders
-	rows, err = db.Query("SELECT id, tid, title, star, created, modified FROM folder WHERE substr(folder.modified, 1, 19) > $1 AND folder.deleted = $2;", client_t, false)
+	rows, err = db.Query("SELECT id, tid, title, star, modified FROM folder WHERE substr(folder.modified, 1, 19) > $1 AND folder.deleted = $2;", client_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_updated_folders: %v", err)
 		return
@@ -529,7 +518,6 @@ func synchronize3(reportOnly bool) (log string) {
 			&tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		c.tid = int(tid.Int64)
@@ -575,7 +563,7 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//client updated keywords
-	rows, err = db.Query("SELECT id, tid, title, star, created, modified FROM keyword WHERE substr(keyword.modified, 1, 19)  > $1 AND keyword.deleted = $2;", client_t, false)
+	rows, err = db.Query("SELECT id, tid, title, star, modified FROM keyword WHERE substr(keyword.modified, 1, 19)  > $1 AND keyword.deleted = $2;", client_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_updated_keywords: %v", err)
 		return
@@ -590,7 +578,6 @@ func synchronize3(reportOnly bool) (log string) {
 			&tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		c.tid = int(tid.Int64)
@@ -636,15 +623,15 @@ func synchronize3(reportOnly bool) (log string) {
 	}
 
 	//client updated entries
-	rows, err = db.Query("SELECT id, tid, title, star, note, created, modified, added, completed, context_tid, folder_tid FROM task WHERE substr(modified, 1, 19)  > ? AND deleted = ?;", client_t, false)
+	rows, err = db.Query("SELECT id, tid, title, star, note, modified, added, archived, context_tid, folder_tid FROM task WHERE substr(modified, 1, 19)  > ? AND deleted = ?;", client_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_updated_entries: %v", err)
 		return
 	}
 
-	var client_updated_entries []Entry
+	var client_updated_entries []NewEntry
 	for rows.Next() {
-		var e Entry
+		var e NewEntry
 		var tid sql.NullInt64
 		rows.Scan(
 			&e.id,
@@ -652,10 +639,9 @@ func synchronize3(reportOnly bool) (log string) {
 			&e.title,
 			&e.star,
 			&e.note,
-			&e.created,
 			&e.modified,
 			&e.added,
-			&e.completed,
+			&e.archived,
 			&e.context_tid,
 			&e.folder_tid,
 		)
@@ -725,8 +711,8 @@ func synchronize3(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Updated local context: %q with tid: %v\n", c.title, c.tid)
 			}
 		} else {
-			_, err := db.Exec("INSERT INTO context (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
-				c.tid, c.title, c.star, c.created)
+			_, err := db.Exec("INSERT INTO context (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+				c.tid, c.title, c.star)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new context into sqlite: %v\n", err)
 			}
@@ -750,8 +736,8 @@ func synchronize3(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO context (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING tid;",
-				c.title, c.star, c.created).Scan(&tid)
+			err := pdb.QueryRow("INSERT INTO context (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
+				c.title, c.star).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new context into postgres and returning tid: %v\n", err)
 				continue
@@ -781,8 +767,8 @@ func synchronize3(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Updated local folder: %q with tid: %v\n", c.title, c.tid)
 			}
 		} else {
-			_, err := db.Exec("INSERT INTO folder (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
-				c.tid, c.title, c.star, c.created)
+			_, err := db.Exec("INSERT INTO folder (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+				c.tid, c.title, c.star)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new folder into sqlite: %v\n", err)
 			}
@@ -806,8 +792,8 @@ func synchronize3(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO folder (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING tid;",
-				c.title, c.star, c.created).Scan(&tid)
+			err := pdb.QueryRow("INSERT INTO folder (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
+				c.title, c.star).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new folder into postgres and returning tid: %v\n", err)
 				continue
@@ -837,8 +823,8 @@ func synchronize3(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Updated local keyword: %q with tid: %v\n", c.title, c.tid)
 			}
 		} else {
-			_, err := db.Exec("INSERT INTO keyword (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
-				c.tid, c.title, c.star, c.created)
+			_, err := db.Exec("INSERT INTO keyword (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+				c.tid, c.title, c.star)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new keyword into sqlite: %v\n", err)
 			}
@@ -862,8 +848,8 @@ func synchronize3(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO keyword (title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING tid;",
-				c.title, c.star, c.created).Scan(&tid)
+			err := pdb.QueryRow("INSERT INTO keyword (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
+				c.title, c.star).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new keyword into postgres and returning tid: %v\n", err)
 				continue
@@ -881,11 +867,11 @@ func synchronize3(reportOnly bool) (log string) {
 	server_updated_entries_tids := make(map[int]struct{})
 	var task_tids []string
 	for _, e := range server_updated_entries {
-		_, err := db.Exec("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES"+
-			"(?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
-			"title=excluded.title, star=excluded.star, completed=excluded.completed, context_tid=excluded.context_tid, "+
+		_, err := db.Exec("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, note, modified, deleted) VALUES"+
+			"(?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
+			"title=excluded.title, star=excluded.star, archived=excluded.archived, context_tid=excluded.context_tid, "+
 			"folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now');",
-			e.tid, e.title, e.star, e.added, e.completed, e.context_tid, e.folder_tid, e.note)
+			e.tid, e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.note)
 		if err != nil {
 			fmt.Fprintf(&lg, "**Error** in INSERT ... ON CONFLICT for id/tid %d %q: %v\n", e.id, e.title, err)
 			continue
@@ -966,9 +952,9 @@ func synchronize3(reportOnly bool) (log string) {
 
 		var tid int
 		if e.tid < 1 {
-			err := pdb.QueryRow("INSERT INTO task (title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) "+
-				"VALUES ($1, $2, now(), $3, $4, $5, $6, $7, now(), false)  RETURNING tid",
-				e.title, e.star, e.added, e.completed, e.context_tid, e.folder_tid, e.note).Scan(&tid)
+			err := pdb.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, note, modified, deleted) "+
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, now(), false)  RETURNING tid",
+				e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.note).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting server entry: %v", err)
 				continue
@@ -987,8 +973,8 @@ func synchronize3(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Created new server entry *%q* with tid **%d**\n", truncate(e.title, 15), tid)
 			fmt.Fprintf(&lg, "and set tid for client entry with id **%d**\n", e.id)
 		} else {
-			_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, note=$5, completed=$6, modified=now() WHERE tid=$7;",
-				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.completed, e.tid)
+			_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, note=$5, archived=$6, modified=now() WHERE tid=$7;",
+				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.archived, e.tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error updating server entry: %v", err)
 				continue

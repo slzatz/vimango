@@ -74,9 +74,9 @@ func (o *Organizer) drawRows() {
 			ab.WriteString(CYAN_BOLD)
 		}
 
-		if o.rows[fr].completed && o.rows[fr].deleted {
+		if o.rows[fr].archived && o.rows[fr].deleted {
 			ab.WriteString(GREEN)
-		} else if o.rows[fr].completed {
+		} else if o.rows[fr].archived {
 			ab.WriteString(YELLOW)
 		} else if o.rows[fr].deleted {
 			ab.WriteString(RED)
@@ -381,9 +381,9 @@ func (o *Organizer) drawSearchRows() {
 			ab.WriteString("\x1b[1;36m")
 		}
 
-		if o.rows[fr].completed && o.rows[fr].deleted {
+		if o.rows[fr].archived && o.rows[fr].deleted {
 			ab.WriteString("\x1b[32m") //green foreground
-		} else if o.rows[fr].completed {
+		} else if o.rows[fr].archived {
 			ab.WriteString("\x1b[33m") //yellow foreground
 		} else if o.rows[fr].deleted {
 			ab.WriteString("\x1b[31m") //red foreground

@@ -530,7 +530,7 @@ func (o *Organizer) find(pos int) {
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		//sess.showOrgMessage("No results were returned")
 	}
 	sess.imagePreview = false
 	//o.readTitleIntoBuffer() /////////////////////////////////////////////

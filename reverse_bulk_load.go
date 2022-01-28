@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -10,23 +11,61 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func getEntriesBulkReverse(dbase *sql.DB, count int, plg io.Writer) []EntryPlusTag {
+	rows, err := dbase.Query("SELECT tid, title, star, note, modified, context_tid, folder_tid, added, completed FROM task WHERE deleted=false ORDER BY tid;")
+	if err != nil {
+		fmt.Fprintf(plg, "Error in getEntriesBulk: %v\n", err)
+		return []EntryPlusTag{}
+	}
+
+	entries := make([]EntryPlusTag, 0, count)
+	for rows.Next() {
+		var e EntryPlusTag
+		rows.Scan(
+			&e.tid,
+			&e.title,
+			&e.star,
+			&e.note,
+			&e.modified,
+			&e.context_tid,
+			&e.folder_tid,
+			&e.added,
+			&e.completed,
+		)
+		entries = append(entries, e)
+	}
+	return entries
+}
+
 func createBulkInsertQueryReverse(n int, entries []EntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*8)
+	var added string
+	var archived bool
 	pos := 0
 	for i, e := range entries {
-		values[i] = fmt.Sprintf("($%d, $%d, $%d, now(), $%d, $%d, $%d, $%d, $%d, now(), false)", pos+1, pos+2, pos+3, pos+4, pos+5, pos+6, pos+7, pos+8)
+		values[i] = fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, now(), false)", pos+1, pos+2, pos+3, pos+4, pos+5, pos+6, pos+7, pos+8)
 		args[pos] = e.tid
 		args[pos+1] = e.title
 		args[pos+2] = e.star
-		args[pos+3] = e.added
-		args[pos+4] = e.completed
+		if e.added.Valid {
+			added = e.added.String
+		} else {
+			added = "1970-01-01"
+		}
+		args[pos+3] = added
+		if e.completed.Valid {
+			archived = true
+		} else {
+			archived = false
+		}
+		args[pos+4] = archived
 		args[pos+5] = e.context_tid
 		args[pos+6] = e.folder_tid
 		args[pos+7] = e.note
 		pos += 8
 	}
-	query = fmt.Sprintf("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES %s", strings.Join(values, ", "))
+	query = fmt.Sprintf("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, note, modified, deleted) VALUES %s", strings.Join(values, ", "))
 	return
 }
 
@@ -156,7 +195,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 		client_contexts = append(client_contexts, c)
 	}
 	for _, c := range client_contexts {
-		_, err := pdb.Exec("INSERT INTO context (tid, title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), now(), false);",
+		_, err := pdb.Exec("INSERT INTO context (tid, title, star, modified, deleted) VALUES ($1, $2, $3, now(), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting context into sqlite: %v\n", err)
@@ -184,7 +223,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 		client_folders = append(client_folders, c)
 	}
 	for _, c := range client_folders {
-		_, err := pdb.Exec("INSERT INTO folder (tid, title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), now(), false);",
+		_, err := pdb.Exec("INSERT INTO folder (tid, title, star, modified, deleted) VALUES ($1, $2, $3, now(), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting folder into sqlite: %v\n", err)
@@ -217,7 +256,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	}
 
 	for _, c := range client_keywords {
-		_, err := pdb.Exec("INSERT INTO keyword (tid, title, star, created, modified, deleted) VALUES ($1, $2, $3, now(), now(), false);",
+		_, err := pdb.Exec("INSERT INTO keyword (tid, title, star, modified, deleted) VALUES ($1, $2, $3, now(), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting new keyword %q into sqlite: %v", truncate(c.title, 15), err)
@@ -227,7 +266,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 
 	/* for the code below need to add guard that entries and keywords might be zero */
 	//client entries -> server
-	entries := getEntriesBulk(db, taskCount, &lg)
+	entries := getEntriesBulkReverse(db, taskCount, &lg)
 
 	i := 0
 	n := 100

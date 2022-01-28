@@ -185,26 +185,19 @@ func toggleDeleted() {
 	sess.showOrgMessage("Toggle deleted for %s id %d succeeded", org.view, id)
 }
 
-func toggleCompleted() {
+func toggleArchived() {
 	id := getId()
+	org.rows[org.fr].archived = !org.rows[org.fr].archived
 
-	var completed sql.NullTime
-	if org.rows[org.fr].completed {
-		completed = sql.NullTime{}
-	} else {
-		completed = sql.NullTime{Time: time.Now(), Valid: true}
-	}
-
-	_, err := db.Exec("UPDATE task SET completed=?, modified=datetime('now') WHERE id=?;",
-		completed, id)
+	_, err := db.Exec("UPDATE task SET archived=?, modified=datetime('now') WHERE id=?;",
+		org.rows[org.fr].archived, id)
 
 	if err != nil {
-		sess.showOrgMessage("Error toggling entry id %d to completed: %v", id, err)
+		sess.showOrgMessage("Error toggling archived for entry id %d: %v", id, err)
 		return
 	}
 
-	org.rows[org.fr].completed = !org.rows[org.fr].completed
-	sess.showOrgMessage("Toggle completed for entry %d succeeded", id)
+	sess.showOrgMessage("Toggle archived for entry %d succeeded", id)
 }
 
 func updateTaskContextByTid(tid, id int) {
@@ -289,7 +282,7 @@ func deleteSyncItem(id int) {
 
 func filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) []Row {
 
-	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.completed, task.%s FROM task ", sort)
+	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.%s FROM task ", sort)
 
 	switch taskView {
 	case BY_CONTEXT:
@@ -311,7 +304,7 @@ func filterEntries(taskView int, filter interface{}, showDeleted bool, sort stri
 	}
 
 	if !showDeleted {
-		s += " AND task.completed IS NULL AND task.deleted=false"
+		s += " AND task.archived=false AND task.deleted=false"
 	}
 	if sortPriority {
 		s += fmt.Sprintf(" ORDER BY task.star DESC, task.%s DESC LIMIT %d;", sort, max)
@@ -338,7 +331,6 @@ func filterEntries(taskView int, filter interface{}, showDeleted bool, sort stri
 	var orgRows []Row
 	for rows.Next() {
 		var row Row
-		var completed sql.NullString
 		var sort sql.NullString
 
 		err = rows.Scan(
@@ -346,19 +338,13 @@ func filterEntries(taskView int, filter interface{}, showDeleted bool, sort stri
 			&row.title,
 			&row.star,
 			&row.deleted,
-			&completed,
+			&row.archived,
 			&sort,
 		)
 
 		if err != nil {
 			sess.showOrgMessage("Error in filterEntries: %v", err)
 			return orgRows
-		}
-
-		if completed.Valid {
-			row.completed = true
-		} else {
-			row.completed = false
 		}
 
 		if sort.Valid {
@@ -454,12 +440,17 @@ func insertRowInDB(row *Row) int {
 		folder_tid, _ = folderExists(org.filter)
 	}
 
-	res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, "+
-		"star, added, note, deleted, created, modified) "+
-		"VALUES (?, ?, ?, ?, datetime('now'), '', False, "+
-		"datetime('now'), datetime('now'));",
-		row.title, folder_tid, context_tid, row.star)
+	/*
+		res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, "+
+			"star, added, note, deleted, created, modified) "+
+			"VALUES (?, ?, ?, ?, datetime('now'), '', False, "+
+			"datetime('now'), datetime('now'));",
+			row.title, folder_tid, context_tid, row.star)
+	*/
 
+	res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
+		"VALUES (?, ?, ?, ?, datetime('now'));",
+		row.title, folder_tid, context_tid, row.star)
 	/*
 	   not used:
 	   tid, (temp)
@@ -563,30 +554,30 @@ func readSyncLog(id int) string {
 	return note
 }
 
-func getEntryInfo(id int) Entry {
+func getEntryInfo(id int) NewEntry {
 	if id == -1 {
-		return Entry{}
+		return NewEntry{}
 	}
-	row := db.QueryRow("SELECT id, tid, title, created, folder_tid, context_tid, star, added, completed, deleted, modified FROM task WHERE id=?;", id)
+	row := db.QueryRow("SELECT id, tid, title, folder_tid, context_tid, star, added, archived, deleted, modified FROM task WHERE id=?;", id)
 
-	var e Entry
-	//var tid sql.NullInt64
+	var e NewEntry
+	var tid sql.NullInt64
 	err := row.Scan(
 		&e.id,
-		&e.tid,
+		&tid,
 		&e.title,
-		&e.created,
 		&e.folder_tid,
 		&e.context_tid,
 		&e.star,
-		&e.added,     //sql.NullString
-		&e.completed, //sql.NullString
+		&e.added,
+		&e.archived,
 		&e.deleted,
 		&e.modified,
 	)
+	e.tid = int(tid.Int64)
 	if err != nil {
 		sess.showOrgMessage("Error in getEntryInfo for id %d: %v", id, err)
-		return Entry{}
+		return NewEntry{}
 	}
 	return e
 }
@@ -716,7 +707,7 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 	}
 
 	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
-	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.completed, task.%s FROM task WHERE ", org.sort)
+	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.%s FROM task WHERE ", org.sort)
 	if help {
 		stmt += "task.context_tid = 16 and task.tid IN ("
 	} else {
@@ -732,7 +723,7 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 	if showDeleted {
 		stmt += " ORDER BY "
 	} else {
-		stmt += " AND task.completed IS NULL AND task.deleted = False ORDER BY "
+		stmt += " AND task.archived=false AND task.deleted=false ORDER BY "
 	}
 
 	for i := 0; i < max; i++ {
@@ -741,11 +732,13 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 	stmt += "task.tid = " + strconv.Itoa(ftsTids[max]) + " DESC"
 
 	rows, err = db.Query(stmt)
+	if err != nil {
+		sess.showOrgMessage("Error in Find query %q: %v", stmt[:10], err)
+		return []Row{}
+	}
 	var orgRows []Row
 	for rows.Next() {
 		var row Row
-		var completed sql.NullString
-		//var modified string
 		var sort string
 
 		err = rows.Scan(
@@ -754,8 +747,7 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 			&row.title,
 			&row.star,
 			&row.deleted,
-			&completed,
-			//&modified,
+			&row.archived,
 			&sort,
 		)
 
@@ -764,13 +756,6 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 			return []Row{}
 		}
 
-		if completed.Valid {
-			row.completed = true
-		} else {
-			row.completed = false
-		}
-
-		//row.modified = timeDelta(modified)
 		row.sort = timeDelta(sort)
 		row.ftsTitle = ftsTitles[row.tid]
 

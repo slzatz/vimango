@@ -149,15 +149,15 @@ func createSqliteDB() {
 		log.Fatal(err)
 	}
 
-	stmt := "INSERT INTO context (title, star, deleted, created, modified, tid) "
-	stmt += "VALUES (?, True, False, datetime('now'), datetime('now'), 1);"
+	stmt := "INSERT INTO context (title, star, deleted, modified, tid) "
+	stmt += "VALUES (?, True, False, datetime('now'), 1);"
 	_, err = db.Exec(stmt, "none")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	stmt = "INSERT INTO folder (title, star, deleted, created, modified, tid) "
-	stmt += "VALUES (?, True, False, datetime('now'), datetime('now'), 1);"
+	stmt = "INSERT INTO folder (title, star, deleted, modified, tid) "
+	stmt += "VALUES (?, True, False, datetime('now'), 1);"
 	_, err = db.Exec(stmt, "none")
 	if err != nil {
 		log.Fatal(err)
@@ -202,7 +202,7 @@ func createPostgresDB(config *dbConfig) {
 		os.Exit(1)
 	}
 
-	path := "postgres_init2.sql"
+	path := "postgres_init3.sql"
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)

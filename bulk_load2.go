@@ -11,28 +11,32 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// using EntryPlusTag so we can later add the tag to the rest of the entry info
-func getEntriesBulk(dbase *sql.DB, count int, plg io.Writer) []EntryPlusTag {
-	rows, err := dbase.Query("SELECT tid, title, star, note, created, modified, context_tid, folder_tid, added, completed FROM task WHERE deleted=false ORDER BY tid;")
+type NewEntryPlusTag struct {
+	NewEntry
+	tag string
+}
+
+// using NewEntryPlusTag so we can later add the tag to the rest of the entry info
+func getEntriesBulk(dbase *sql.DB, count int, plg io.Writer) []NewEntryPlusTag {
+	rows, err := dbase.Query("SELECT tid, title, star, note, modified, context_tid, folder_tid, added, archived FROM task WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(plg, "Error in getEntriesBulk: %v\n", err)
-		return []EntryPlusTag{}
+		return []NewEntryPlusTag{}
 	}
 
-	entries := make([]EntryPlusTag, 0, count)
+	entries := make([]NewEntryPlusTag, 0, count)
 	for rows.Next() {
-		var e EntryPlusTag
+		var e NewEntryPlusTag
 		rows.Scan(
 			&e.tid,
 			&e.title,
 			&e.star,
 			&e.note,
-			&e.created,
 			&e.modified,
 			&e.context_tid,
 			&e.folder_tid,
 			&e.added,
-			&e.completed,
+			&e.archived,
 		)
 		entries = append(entries, e)
 	}
@@ -102,23 +106,23 @@ func getTaskKeywordPairsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskKeyw
 	return taskKeywordPairs
 }
 
-func createBulkInsertQuery2(n int, entries []EntryPlusTag) (query string, args []interface{}) {
+func createBulkInsertQuery2(n int, entries []NewEntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*8)
 	pos := 0
 	for i, e := range entries {
-		values[i] = "(?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, datetime('now'), false)"
+		values[i] = "(?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), false)"
 		args[pos] = e.tid
 		args[pos+1] = e.title
 		args[pos+2] = e.star
 		args[pos+3] = e.added
-		args[pos+4] = e.completed
+		args[pos+4] = e.archived
 		args[pos+5] = e.context_tid
 		args[pos+6] = e.folder_tid
 		args[pos+7] = e.note
 		pos += 8
 	}
-	query = fmt.Sprintf("INSERT INTO task (tid, title, star, created, added, completed, context_tid, folder_tid, note, modified, deleted) VALUES %s", strings.Join(values, ", "))
+	query = fmt.Sprintf("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, note, modified, deleted) VALUES %s", strings.Join(values, ", "))
 	return
 }
 
@@ -226,7 +230,7 @@ func bulkLoad2(reportOnly bool) (log string) {
 	/****************below is where changes start***********************************/
 
 	//server contexts -> client
-	rows, err := pdb.Query("SELECT tid, title, star, created, modified FROM context WHERE deleted=false ORDER BY tid;")
+	rows, err := pdb.Query("SELECT tid, title, star, modified FROM context WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_contexts: %v", err)
 		return
@@ -241,7 +245,6 @@ func bulkLoad2(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		server_contexts = append(server_contexts, c)
@@ -253,8 +256,8 @@ func bulkLoad2(reportOnly bool) (log string) {
 	}
 
 	for _, c := range server_contexts[1:] {
-		_, err := db.Exec("INSERT INTO context (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
-			c.tid, c.title, c.star, c.created)
+		_, err := db.Exec("INSERT INTO context (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting context into sqlite: %v\n", err)
 			break
@@ -262,7 +265,7 @@ func bulkLoad2(reportOnly bool) (log string) {
 	}
 
 	//server folder -> client
-	rows, err = pdb.Query("SELECT tid, title, star, created, modified FROM folder WHERE deleted=false ORDER BY tid;")
+	rows, err = pdb.Query("SELECT tid, title, star, modified FROM folder WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_folders: %v", err)
 		return
@@ -275,7 +278,6 @@ func bulkLoad2(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			&c.created,
 			&c.modified,
 		)
 		server_folders = append(server_folders, c)
@@ -286,8 +288,8 @@ func bulkLoad2(reportOnly bool) (log string) {
 		fmt.Fprintf(&lg, "Error updating sqlite folder with tid: %v: %v\n", c.tid, err)
 	}
 	for _, c := range server_folders[1:] {
-		_, err := db.Exec("INSERT INTO folder (tid, title, star, created, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);",
-			c.tid, c.title, c.star, c.created)
+		_, err := db.Exec("INSERT INTO folder (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting folder into sqlite: %v\n", err)
 			break

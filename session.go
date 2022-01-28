@@ -287,7 +287,7 @@ func (s *Session) returnCursor() {
 	fmt.Print(ab.String())
 }
 
-func (s *Session) displayEntryInfo(e *Entry) {
+func (s *Session) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder
 	width := s.totaleditorcols - 10
 	length := s.textLines - 10
@@ -332,25 +332,9 @@ func (s *Session) displayEntryInfo(e *Entry) {
 	fmt.Fprintf(&ab, "star: %t%s", e.star, lf_ret)
 	fmt.Fprintf(&ab, "deleted: %t%s", e.deleted, lf_ret)
 
-	var completed bool
-	// may be NULL
-	if e.completed.Valid {
-		completed = true
-	} else {
-		completed = false
-	}
-
-	var added string
-	// may be NULL
-	if e.added.Valid {
-		added = e.added.String
-	} else {
-		completed = false
-		added = "null"
-	}
-	fmt.Fprintf(&ab, "completed: %t%s", completed, lf_ret)
+	fmt.Fprintf(&ab, "completed: %t%s", e.archived, lf_ret)
 	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
-	fmt.Fprintf(&ab, "added: %s%s", added, lf_ret)
+	fmt.Fprintf(&ab, "added: %s%s", e.added, lf_ret)
 
 	//fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(getId()), lf_ret)
 	fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(e.id), lf_ret)

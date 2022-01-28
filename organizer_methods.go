@@ -98,7 +98,7 @@ func (o *Organizer) changeCase() {
 */
 
 //func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, modified string) {
-func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, sort string) {
+func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, archived bool, sort string) {
 	/* note since only inserting blank line at top, don't really need at, s and also don't need size_t*/
 
 	var row Row
@@ -109,7 +109,7 @@ func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, complet
 	row.id = -1
 	row.star = star
 	row.deleted = deleted
-	row.completed = completed
+	row.archived = archived
 	row.dirty = true
 	//row.modified = modified
 	row.sort = sort
