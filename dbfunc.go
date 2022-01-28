@@ -518,12 +518,14 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	}
 
 	row := db.QueryRow("SELECT note FROM task WHERE id=?;", id)
-	var note string
+	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
+		sess.showOrgMessage("Error opening note for editing: %v", err)
 		return
 	}
-	e.ss = strings.Split(note, "\n")
+	e.ss = strings.Split(note.String, "\n")
+	//e.ss = strings.Split(note, "\n")
 	e.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(e.vbuf)
 	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
