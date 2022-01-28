@@ -23,7 +23,6 @@ type dbConfig struct {
 		User     string `json:"user"`
 		Password string `json:"password"`
 		DB       string `json:"db"`
-		Test     string `json:"test"`
 	} `json:"postgres"`
 
 	Sqlite3 struct {
@@ -37,55 +36,91 @@ type dbConfig struct {
 	} `json:"options`
 }
 
+// FromFile returns a dbConfig struct parsed from a file.
+func FromFile(path string) (*dbConfig, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg dbConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 var config = &dbConfig{}
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Do you want to create a new remote (postgres) database? (y or N):")
+	fmt.Println("Do you want to create the tables for a new remote (postgres) database? (y or N):")
 	res, _ := reader.ReadString('\n')
 	if strings.ToLower(res)[:1] != "y" {
 		fmt.Println("exiting ...")
 		return
 	}
 
-	filename := "config.json.test"
-	fmt.Print("What is the host string for the database server? ")
+	fmt.Println("Do you want to create the config file (vs using an existing one)? (y or N):")
 	res, _ = reader.ReadString('\n')
-	host := strings.TrimSpace(res)
-	config.Postgres.Host = host
-	fmt.Print("What is the port for the database server? ")
-	res, _ = reader.ReadString('\n')
-	port := strings.TrimSpace(res)
-	config.Postgres.Port = port
-	fmt.Print("Who is the database user? ")
-	res, _ = reader.ReadString('\n')
-	user := strings.TrimSpace(res)
-	config.Postgres.User = user
-	fmt.Print("What is the user password? ")
-	bpw, err := term.ReadPassword(int(syscall.Stdin))
-	pw := string(bpw)
-	config.Postgres.Password = pw
-	fmt.Print("\nWhat is the name of the database? ")
-	res, _ = reader.ReadString('\n')
-	dbName := strings.TrimSpace(res)
-	config.Postgres.DB = dbName
+	if strings.ToLower(res)[:1] == "y" {
+		filename := "config.json.test"
+		fmt.Print("What is the host string for the database server? ")
+		res, _ = reader.ReadString('\n')
+		host := strings.TrimSpace(res)
+		config.Postgres.Host = host
+		fmt.Print("What is the port for the database server? ")
+		res, _ = reader.ReadString('\n')
+		port := strings.TrimSpace(res)
+		config.Postgres.Port = port
+		fmt.Print("Who is the database user? ")
+		res, _ = reader.ReadString('\n')
+		user := strings.TrimSpace(res)
+		config.Postgres.User = user
+		fmt.Print("What is the user password? ")
+		bpw, err := term.ReadPassword(int(syscall.Stdin))
+		pw := string(bpw)
+		config.Postgres.Password = pw
+		fmt.Print("\nWhat is the name of the database? ")
+		res, _ = reader.ReadString('\n')
+		dbName := strings.TrimSpace(res)
+		config.Postgres.DB = dbName
 
-	z, _ := json.Marshal(config)
-	f, err := os.Create(filename)
-	if err != nil {
-		log.Fatal(err)
+		z, _ := json.Marshal(config)
+		f, err := os.Create(filename)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		defer f.Close()
+
+		_, err = f.Write(z)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		var err error
+		config, err = FromFile("config.json")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	fmt.Println("Do you want to create the remote database tables (because it is created but empty)? (y or N):")
+	res, _ = reader.ReadString('\n')
+	if strings.ToLower(res)[:1] != "y" {
+		fmt.Println("exiting ...")
 		return
 	}
-	defer f.Close()
-
-	_, err = f.Write(z)
-	if err != nil {
-		log.Fatal(err)
+	fmt.Println("Just checking one more time -- do you want to create the necessary tables in the remote database? (y or N):")
+	res, _ = reader.ReadString('\n')
+	if strings.ToLower(res)[:1] != "y" {
+		fmt.Println("exiting ...")
+		return
 	}
-	createPostgresDB() // need password
+	createPostgresDB(config)
 }
 
-func createPostgresDB() {
+func createPostgresDB(config *dbConfig) {
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		config.Postgres.Host,
 		config.Postgres.Port,
@@ -98,16 +133,18 @@ func createPostgresDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer pdb.Close()
 
-	/* Right now creating db prior to running script via
-	[postgres]$ createdb vimango
-	_, err = pdb.Exec("CREATE DATABASE " + config.Postgres.DB)
-	if err != nil {
-		log.Fatal(err)
+	// creating database separately as postgres user: [posgres@...]$ createdb <database>
+	// the check below is to make sure the database is empty
+	var exists bool
+	err = pdb.QueryRow("SELECT EXISTS(SELECT FROM context);").Scan(&exists)
+	if exists {
+		fmt.Printf("The database %q does not appear to be empty", config.Postgres.DB)
+		os.Exit(1)
 	}
-	*/
 
-	path := "postgres_init.sql"
+	path := "postgres_init3.sql"
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -116,25 +153,4 @@ func createPostgresDB() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	stmt := "INSERT INTO context (title, star, deleted, created, modified) "
-	stmt += "VALUES ($1, true, false, now(), now());"
-	_, err = pdb.Exec(stmt, "none")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	stmt = "INSERT INTO folder (title, star, deleted, created, modified) "
-	stmt += "VALUES ($1, true, false, now(), now());"
-	_, err = pdb.Exec(stmt, "none")
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Ping to connection
-	/*
-		err = pdb.Ping()
-		if err != nil {
-			fmt.Fprintf(&lg, "postgres ping failure!: %v", err)
-			return
-		}
-	*/
 }

@@ -11,16 +11,16 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func getEntriesBulkReverse(dbase *sql.DB, count int, plg io.Writer) []EntryPlusTag {
-	rows, err := dbase.Query("SELECT tid, title, star, note, modified, context_tid, folder_tid, added, completed FROM task WHERE deleted=false ORDER BY tid;")
+func getEntriesBulkReverse(dbase *sql.DB, count int, plg io.Writer) []NewEntryPlusTag {
+	rows, err := dbase.Query("SELECT tid, title, star, note, modified, context_tid, folder_tid, added, archived FROM task WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(plg, "Error in getEntriesBulk: %v\n", err)
-		return []EntryPlusTag{}
+		return []NewEntryPlusTag{}
 	}
 
-	entries := make([]EntryPlusTag, 0, count)
+	entries := make([]NewEntryPlusTag, 0, count)
 	for rows.Next() {
-		var e EntryPlusTag
+		var e NewEntryPlusTag
 		rows.Scan(
 			&e.tid,
 			&e.title,
@@ -30,36 +30,24 @@ func getEntriesBulkReverse(dbase *sql.DB, count int, plg io.Writer) []EntryPlusT
 			&e.context_tid,
 			&e.folder_tid,
 			&e.added,
-			&e.completed,
+			&e.archived,
 		)
 		entries = append(entries, e)
 	}
 	return entries
 }
 
-func createBulkInsertQueryReverse(n int, entries []EntryPlusTag) (query string, args []interface{}) {
+func createBulkInsertQueryReverse(n int, entries []NewEntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*8)
-	var added string
-	var archived bool
 	pos := 0
 	for i, e := range entries {
 		values[i] = fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, now(), false)", pos+1, pos+2, pos+3, pos+4, pos+5, pos+6, pos+7, pos+8)
 		args[pos] = e.tid
 		args[pos+1] = e.title
 		args[pos+2] = e.star
-		if e.added.Valid {
-			added = e.added.String
-		} else {
-			added = "1970-01-01"
-		}
-		args[pos+3] = added
-		if e.completed.Valid {
-			archived = true
-		} else {
-			archived = false
-		}
-		args[pos+4] = archived
+		args[pos+3] = e.added
+		args[pos+4] = e.archived
 		args[pos+5] = e.context_tid
 		args[pos+6] = e.folder_tid
 		args[pos+7] = e.note
@@ -189,8 +177,6 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			//&c.created,
-			//&c.modified,
 		)
 		client_contexts = append(client_contexts, c)
 	}
@@ -217,8 +203,6 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			//&c.created,
-			//&c.modified,
 		)
 		client_folders = append(client_folders, c)
 	}
@@ -233,10 +217,8 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 
 	//client keyword -> server
 	// note that the original database does not have a keyword created column
-	//rows, err = db.Query("SELECT tid, title, star, created, modified FROM keyword WHERE deleted=false ORDER BY tid;")
-	//more important note: current active db thinks its keyword name
-	//rows, err = db.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
-	rows, err = db.Query("SELECT tid, name, star FROM keyword WHERE deleted=false ORDER BY tid;")
+	rows, err = db.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
+	//rows, err = db.Query("SELECT tid, name, star FROM keyword WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_keywords: %v", err)
 		return
@@ -249,8 +231,6 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 			&c.tid,
 			&c.title,
 			&c.star,
-			//&c.created,
-			//&c.modified,
 		)
 		client_keywords = append(client_keywords, c)
 	}

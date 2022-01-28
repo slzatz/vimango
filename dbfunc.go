@@ -222,10 +222,14 @@ func updateTaskFolderByTid(tid, id int) {
 
 func updateNote(id int, text string) {
 
-	//text := e.bufferToString()
+	var nullableText sql.NullString
+	if len(text) != 0 {
+		nullableText.String = text
+		nullableText.Valid = true
+	}
 
 	_, err := db.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
-		text, id)
+		nullableText, id)
 	if err != nil {
 		sess.showOrgMessage("Error in updateNote for entry with id %d: %v", id, err)
 		return
