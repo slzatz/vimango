@@ -169,15 +169,16 @@ func synchronize3(reportOnly bool) (log string) {
 	var lg strings.Builder
 	var success bool
 	defer func() {
-		log = lg.String()
+		partialHost := "..." + strings.SplitAfterN(config.Postgres.Host, ".", 3)[2]
+		text := fmt.Sprintf("server %s (%s)\n\n%s", config.Postgres.DB, partialHost, lg.String())
 		if reportOnly {
-			log = "### Testing without Syncing\n\n" + log
+			log = fmt.Sprintf("### Testing without syncing: %s", text)
 			return
 		}
 		if success {
-			log = "### Synchronization succeeded\n\n" + log
+			log = fmt.Sprintf("### Synchronization succeeded: %s", text)
 		} else {
-			log = "### Synchronization failed\n\n" + log
+			log = fmt.Sprintf("### Synchronization failed: %s", text)
 		}
 
 	}()
