@@ -256,7 +256,6 @@ type Entry struct {
 	id          int
 	tid         int
 	title       string
-	created     string
 	folder_tid  int
 	context_tid int
 	star        bool
@@ -269,7 +268,6 @@ type Entry struct {
 type serverEntry struct {
 	id         int
 	title      string
-	created    string
 	folder_id  int
 	context_id int
 	star       bool
@@ -288,7 +286,6 @@ type Container struct {
 	deleted  bool
 	modified string
 	count    int
-	created  string
 }
 
 //type outlineKey int

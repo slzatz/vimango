@@ -393,7 +393,6 @@ func (s *Session) displayContainerInfo() {
 			tid      int
 			title    string
 			star     bool
-			created  string
 			deleted  bool
 			modified string
 			count    int
@@ -442,7 +441,6 @@ func (s *Session) displayContainerInfo() {
 	fmt.Fprintf(&ab, "star: %t%s", c.star, lf_ret)
 	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, lf_ret)
 
-	fmt.Fprintf(&ab, "created: %s%s", c.created, lf_ret)
 	fmt.Fprintf(&ab, "modified: %s%s", c.modified, lf_ret)
 	fmt.Fprintf(&ab, "entry count: %d%s", c.count, lf_ret)
 

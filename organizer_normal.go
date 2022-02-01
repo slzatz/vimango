@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/slzatz/vimango/vim"
 )
 
 var n_lookup = map[string]func(){
@@ -85,6 +86,7 @@ func switchToEditorMode() {
 	sess.eraseRightScreen()
 	sess.drawRightScreen()
 	sess.editorMode = true
+	vim.BufferSetCurrent(p.vbuf)
 }
 
 func controlJ() {

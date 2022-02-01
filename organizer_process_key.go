@@ -54,6 +54,7 @@ func organizerProcessKey(c int) {
 			row.dirty = false
 			org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
 			org.command = ""
+			sess.showOrgMessage("")
 			return
 		}
 

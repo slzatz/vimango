@@ -28,8 +28,6 @@ var e_lookup_C = map[string]func(*Editor){
 	"c":               (*Editor).compile,
 	"run":             (*Editor).run,
 	"r":               (*Editor).run,
-	"test":            (*Editor).sync,
-	"sync":            (*Editor).sync,
 	"save":            (*Editor).saveNoteToFile,
 	"savefile":        (*Editor).saveNoteToFile,
 	"syntax":          (*Editor).syntax,
@@ -327,14 +325,6 @@ func (e *Editor) run() {
 	op.rows = rows
 	op.drawText()
 	// no need to call drawFrame or drawStatusBar
-}
-
-func (e *Editor) sync() {
-	var reportOnly bool
-	if e.command_line == "test" {
-		reportOnly = true
-	}
-	synchronize(reportOnly)
 }
 
 func (e *Editor) syntax() {

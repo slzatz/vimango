@@ -34,6 +34,20 @@ type TaskKeyword3 struct {
 	keyword  string
 }
 
+func bulkInsert(dbase *sql.DB, query string, args []interface{}) (err error) {
+	stmt, err := dbase.Prepare(query)
+	if err != nil {
+		return fmt.Errorf("Error in bulkInsert Prepare: %v", err)
+	}
+
+	_, err = stmt.Exec(args...)
+	if err != nil {
+		return fmt.Errorf("Error in bulkInsert Exec: %v", err)
+	}
+
+	return
+}
+
 func createBulkInsertQueryFTS3(n int, entries []NewEntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*4)

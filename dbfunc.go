@@ -941,7 +941,7 @@ func getContainerInfo(id int) Container {
 	}
 
 	//stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", columns, table)
-	stmt := fmt.Sprintf("SELECT id, tid, title, star, created, deleted, modified FROM %s WHERE id=?;", org.view)
+	stmt := fmt.Sprintf("SELECT id, tid, title, star, deleted, modified FROM %s WHERE id=?;", org.view)
 	row = db.QueryRow(stmt, id)
 	var tid sql.NullInt64
 	err = row.Scan(
@@ -949,7 +949,6 @@ func getContainerInfo(id int) Container {
 		&tid,
 		&c.title,
 		&c.star,
-		&c.created,
 		&c.deleted,
 		&c.modified,
 	)
@@ -959,7 +958,6 @@ func getContainerInfo(id int) Container {
 		sess.showOrgMessage("Error in getContainerInfo: %v", err)
 		return Container{}
 	}
-
 	return c
 }
 
@@ -1041,8 +1039,8 @@ func updateContainerTitle() {
 }
 
 func insertContainer(row *Row) int {
-	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, created, modified) ", org.view)
-	stmt += "VALUES (?, ?, False, datetime('now'), datetime('now')) RETURNING id;"
+	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, modified) ", org.view)
+	stmt += "VALUES (?, ?, False, datetime('now')) RETURNING id;"
 	var id int
 	err := db.QueryRow(stmt, row.title, row.star).Scan(&id)
 	if err != nil {
