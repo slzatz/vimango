@@ -448,7 +448,7 @@ func (o *Organizer) drawPreview() {
 
 	if lang == "markdown" {
 		r, _ := glamour.NewTermRenderer(
-			glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+			glamour.WithStylePath("darkslz.json"),
 			glamour.WithWordWrap(0),
 		)
 		note, _ = r.Render(note)

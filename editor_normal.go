@@ -345,7 +345,7 @@ func (e *Editor) showMarkdownPreview() {
 	//note = generateWWString(note, e.screencols, -1, "\n")
 	note := e.generateWWStringFromBuffer2()
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)

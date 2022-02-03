@@ -551,7 +551,7 @@ func (o *Organizer) sync3(unused int) {
 	note := generateWWString(log, o.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)
@@ -577,7 +577,7 @@ func (o *Organizer) initialBulkLoad(unused int) {
 	note := generateWWString(log, o.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)
@@ -603,7 +603,7 @@ func (o *Organizer) reverse(unused int) {
 	note := generateWWString(log, o.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)

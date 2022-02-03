@@ -108,7 +108,7 @@ func controlZ() {
 	note := readNoteIntoString(id)
 	note = generateWWString(note, org.totaleditorcols)
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("/home/slzatz/listmango/darkslz.json"),
+		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 		glamour.WithLinkNumbers(true),
 	)
