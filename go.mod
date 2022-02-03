@@ -19,7 +19,7 @@ require (
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/lib/pq v1.10.4
 	github.com/mandolyte/mdtopdf v0.0.0-20201204141826-8d22b5d4e7e3
-	github.com/mattn/go-sqlite3 v1.14.9
+	github.com/mattn/go-sqlite3 v1.14.11
 	//github.com/neovim/go-client v1.1.7
 	go.lsp.dev/jsonrpc2 v0.9.0
 	go.lsp.dev/protocol v0.11.2
@@ -48,9 +48,9 @@ require (
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	go.lsp.dev/pkg v0.0.0-20210323044036-f7deec69b52e // indirect
 	go.lsp.dev/uri v0.3.0 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.17.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.7.0 // indirect
+	go.uber.org/zap v1.20.0 // indirect
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect
 )
