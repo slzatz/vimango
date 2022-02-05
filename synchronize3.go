@@ -979,14 +979,20 @@ func synchronize3(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, tid, err)
 				continue
 			}
-			/*For new entries there are no records in FTS
-			_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", tid, e.tid)
-			if err != nil {
-				fmt.Fprintf(&lg, "Error in Update tid in fts: %v\n", err)
+			/*For new entries there are no records in FTS BUT NEED TO CREATE ONE!!!!!!*/
+			//_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", tid, e.tid)
+			taskTag := getTags3(db, strconv.Itoa(tid), &lg)
+			var tag sql.NullString
+			if len(taskTag) > 0 {
+				tag.String = taskTag[0].tag
+				tag.Valid = true
 			}
-			*/
+			_, err = fts_db.Exec("INSERT INTO fts (title, tag, note, tid) VALUES (?, ?, ?, ?);", e.title, tag, e.note, tid)
+			if err != nil {
+				fmt.Fprintf(&lg, "Error in INSERT INTO fts: %v\n", err)
+			}
 			fmt.Fprintf(&lg, "Created new server entry *%q* with tid **%d**\n", truncate(e.title, 15), tid)
-			fmt.Fprintf(&lg, "and set tid for client entry with id **%d**\n", e.id)
+			fmt.Fprintf(&lg, "and set tid for client entry with id **%d** and created fts entry\n", e.id)
 		} else {
 			_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, note=$5, archived=$6, modified=now() WHERE tid=$7;",
 				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.archived, e.tid)
