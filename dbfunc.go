@@ -378,7 +378,12 @@ func updateTitle() {
 
 	if row.id == -1 {
 		// send pointer to insertRowinDB because updating row struct with new id
-		insertRowInDB(&org.rows[org.fr])
+		err := insertRowInDB(&org.rows[org.fr])
+		if err != nil {
+			sess.showOrgMessage("Error inserting into DB: %v", err)
+		} else {
+			sess.showOrgMessage("New entry written to db with id: %d", row.id)
+		}
 		return
 	}
 
@@ -409,9 +414,12 @@ func updateRows() {
 
 		if row.id == -1 {
 			// send pointer to insertRowinDB because updating row struct with new id
-			id := insertRowInDB(&org.rows[fr])
-			updated_rows = append(updated_rows, id)
-			row.dirty = false
+			err := insertRowInDB(&org.rows[fr])
+			if err != nil {
+				sess.showOrgMessage("Error inserting into DB: %v", err) //could be overwritten
+			} else {
+				updated_rows = append(updated_rows, row.id)
+			}
 			continue
 		}
 
@@ -432,64 +440,42 @@ func updateRows() {
 	sess.showOrgMessage("These ids were updated: %v", updated_rows)
 }
 
-func insertRowInDB(row *Row) int {
+func insertRowInDB(row *Row) error { // should return err
 
 	folder_tid := 1
 	context_tid := 1
-	// if org.taskview is BY_KEYWORD or BY_RECENT then new task gets context none, folder none = 1,1
+	// if org.taskview is BY_KEYWORD or BY_RECENT then new task gets context=1, folder=1
 	switch org.taskview {
 	case BY_CONTEXT:
 		context_tid, _ = contextExists(org.filter)
 	case BY_FOLDER:
 		folder_tid, _ = folderExists(org.filter)
 	}
-
-	/*
-		res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, "+
-			"star, added, note, deleted, created, modified) "+
-			"VALUES (?, ?, ?, ?, datetime('now'), '', False, "+
-			"datetime('now'), datetime('now'));",
-			row.title, folder_tid, context_tid, row.star)
-	*/
-
-	res, err := db.Exec("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
-		"VALUES (?, ?, ?, ?, datetime('now'));",
-		row.title, folder_tid, context_tid, row.star)
-	/*
-	   not used:
-	   tid, (temp)
-	   tag,
-	   duetime,
-	   completed,
-	   duedate,
-	   repeat,
-	   remind
-	*/
+	err := db.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
+		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
+		row.title, folder_tid, context_tid, row.star).Scan(row.id)
 	if err != nil {
 		sess.showOrgMessage("Error inserting into DB: %v", err)
-		return -1
+		//return -1
+		return err
 	}
-
-	row_id, err := res.LastInsertId()
-	if err != nil {
-		sess.showOrgMessage("Error in insertRowInDB for %s: %v", row.title, err)
-		return -1
-	}
-	row.id = int(row_id)
 	row.dirty = false
+	return nil
 
 	/***************fts virtual table update*********************/
-	entry_tid := entryTidFromId(row.id) /////////////////////////////////////////////////////
+	/*
+		// this is an issue; in current mode can't index in fts until sync and get a tid
+		entry_tid := entryTidFromId(row.id) /////////////////////////////////////////////////////
 
-	_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, tid) VALUES (?, ?, ?, ?);", row.title, "", "", entry_tid)
-	if err != nil {
-		sess.showOrgMessage("Error in insertRowInDB inserting into fts for %s: %v", row.title, err)
-		return row.id
-	}
-
-	sess.showOrgMessage("Successfully inserted new row with id %d and indexed it (new version)", row.id)
-
-	return row.id
+		_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, tid) VALUES (?, ?, ?, ?);", row.title, "", "", entry_tid)
+		if err != nil {
+			sess.showOrgMessage("Error in insertRowInDB inserting into fts for %s: %v", row.title, err)
+			return row.id
+		}
+		sess.showOrgMessage("Successfully inserted new row with id %d and indexed it (new version)", row.id)
+		//return row.id
+		return nil
+	*/
 }
 
 func insertSyncEntry(title, note string) {
