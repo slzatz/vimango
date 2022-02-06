@@ -11,22 +11,24 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+/*
 type NewEntryPlusTag struct {
 	NewEntry
 	tag string
 }
+*/
 
-// using NewEntryPlusTag so we can later add the tag to the rest of the entry info
-func getEntriesBulk(dbase *sql.DB, count int, plg io.Writer) []NewEntryPlusTag {
+// using EntryPlusTag so we can later add the tag to the rest of the entry info
+func getEntriesBulk(dbase *sql.DB, count int, plg io.Writer) []EntryPlusTag {
 	rows, err := dbase.Query("SELECT tid, title, star, note, modified, context_tid, folder_tid, added, archived FROM task WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(plg, "Error in getEntriesBulk: %v\n", err)
-		return []NewEntryPlusTag{}
+		return []EntryPlusTag{}
 	}
 
-	entries := make([]NewEntryPlusTag, 0, count)
+	entries := make([]EntryPlusTag, 0, count)
 	for rows.Next() {
-		var e NewEntryPlusTag
+		var e EntryPlusTag
 		rows.Scan(
 			&e.tid,
 			&e.title,
@@ -73,7 +75,8 @@ func getTagsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskTag3 {
 			keywords = append(keywords, tk.keyword)
 		} else {
 			tt.task_tid = prev_tid
-			tt.tag = strings.Join(keywords, ",")
+			tt.tag.String = strings.Join(keywords, ",")
+			tt.tag.Valid = true
 			tasktags = append(tasktags, tt)
 			prev_tid = tid
 			keywords = keywords[:0]
@@ -82,7 +85,8 @@ func getTagsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskTag3 {
 	}
 	// need to get the last pair
 	tt.task_tid = tid
-	tt.tag = strings.Join(keywords, ",")
+	tt.tag.String = strings.Join(keywords, ",")
+	tt.tag.Valid = true
 	tasktags = append(tasktags, tt)
 
 	return tasktags
@@ -106,7 +110,7 @@ func getTaskKeywordPairsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskKeyw
 	return taskKeywordPairs
 }
 
-func createBulkInsertQuery2(n int, entries []NewEntryPlusTag) (query string, args []interface{}) {
+func createBulkInsertQuery2(n int, entries []EntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*8)
 	pos := 0
@@ -390,7 +394,7 @@ func bulkLoad2(reportOnly bool) (log string) {
 		}
 		entry := &entries[j]
 		if entry.tid == tags[i].task_tid {
-			entry.tag = tags[i].tag
+			entry.tag = tags[i].tag //tags[i].tag type = sql.NullString
 			i += 1
 			if i == len(tags) {
 				break

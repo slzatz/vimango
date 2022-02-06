@@ -15,8 +15,8 @@ import (
 )
 
 type EntryPlusTag struct {
-	Entry
-	tag string
+	NewEntry
+	tag sql.NullString
 }
 
 type TaskKeywordPairs struct {
@@ -26,7 +26,7 @@ type TaskKeywordPairs struct {
 
 type TaskTag3 struct {
 	task_tid int
-	tag      string
+	tag      sql.NullString
 }
 
 type TaskKeyword3 struct {
@@ -48,7 +48,7 @@ func bulkInsert(dbase *sql.DB, query string, args []interface{}) (err error) {
 	return
 }
 
-func createBulkInsertQueryFTS3(n int, entries []NewEntryPlusTag) (query string, args []interface{}) {
+func createBulkInsertQueryFTS3(n int, entries []EntryPlusTag) (query string, args []interface{}) {
 	values := make([]string, n)
 	args = make([]interface{}, n*4)
 	pos := 0
@@ -172,7 +172,8 @@ func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag3 {
 			keywords = append(keywords, tk.keyword)
 		} else {
 			tt.task_tid = prev_tid
-			tt.tag = strings.Join(keywords, ",")
+			tt.tag.String = strings.Join(keywords, ",")
+			tt.tag.Valid = true
 			tasktags = append(tasktags, tt)
 			prev_tid = tid
 			keywords = keywords[:0]
@@ -181,7 +182,8 @@ func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag3 {
 	}
 	// need to get the last pair
 	tt.task_tid = tid
-	tt.tag = strings.Join(keywords, ",")
+	tt.tag.String = strings.Join(keywords, ",")
+	tt.tag.Valid = true
 	tasktags = append(tasktags, tt)
 
 	return tasktags
@@ -431,9 +433,9 @@ func synchronize3(reportOnly bool) (log string) {
 		return
 	}
 
-	var server_updated_entries []NewEntryPlusTag
+	var server_updated_entries []EntryPlusTag
 	for rows.Next() {
-		var e NewEntryPlusTag
+		var e EntryPlusTag
 		rows.Scan(
 			&e.tid,
 			&e.title,
@@ -968,8 +970,8 @@ func synchronize3(reportOnly bool) (log string) {
 				}
 				entry := &server_updated_entries[j]
 				if entry.tid == tags[i].task_tid {
-					entry.tag = tags[i].tag
-					fmt.Fprintf(&lg, "FTS tag will be updated for tid: %d, tag: %s\n", entry.tid, entry.tag)
+					entry.tag = tags[i].tag //tags[i].tag type is sql.NullString
+					fmt.Fprintf(&lg, "FTS tag will be updated for tid: %d, tag: %s\n", entry.tid, entry.tag.String)
 					i += 1
 					if i == len(tags) {
 						break
