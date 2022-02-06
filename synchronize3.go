@@ -6,10 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -97,6 +97,24 @@ func getTaskKeywordPairs(dbase *sql.DB, in string, plg io.Writer) []TaskKeywordP
 	return tkPairs
 }
 
+func getTaskKeywordPairsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskKeywordPairs {
+	rows, err := dbase.Query("SELECT task_tid, keyword_tid FROM task_keyword WHERE task_tid = ANY($1);", pq.Array(tids))
+	if err != nil {
+		println(err)
+		return []TaskKeywordPairs{}
+	}
+	tkPairs := make([]TaskKeywordPairs, 0)
+	for rows.Next() {
+		var tk TaskKeywordPairs
+		rows.Scan(
+			&tk.task_tid,
+			&tk.keyword_tid,
+		)
+		tkPairs = append(tkPairs, tk)
+	}
+	return tkPairs
+}
+
 func TaskKeywordTids(dbase *sql.DB, plg io.Writer, tid int) []int { ////////////////////////////
 	rows, err := dbase.Query("SELECT keyword.tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=$1;", tid)
@@ -125,9 +143,8 @@ func insertTaskKeywordTids(dbase *sql.DB, plg io.Writer, keyword_tid, entry_tid 
 		fmt.Fprintf(plg, "Inserted into task_keyword entry tid **%d** and keyword_tid **%d**\n", entry_tid, keyword_tid)
 	}
 }
-func getTags3(dbase *sql.DB, in string, plg io.Writer) []TaskTag3 {
-	stmt := fmt.Sprintf("SELECT task_keyword.task_tid, keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid in (%s) ORDER BY task_keyword.task_tid;", in)
-	rows, err := dbase.Query(stmt)
+func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag3 {
+	rows, err := dbase.Query("SELECT task_keyword.task_tid, keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid = ANY($1) ORDER BY task_keyword.task_tid;", pq.Array(tids))
 	if err != nil {
 		fmt.Printf("Error in getTags_x: %v", err)
 		return []TaskTag3{}
@@ -168,6 +185,21 @@ func getTags3(dbase *sql.DB, in string, plg io.Writer) []TaskTag3 {
 	tasktags = append(tasktags, tt)
 
 	return tasktags
+}
+
+func getTagSQ(dbase *sql.DB, tid int, plg io.Writer) string {
+	rows, err := dbase.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid = ?;", tid)
+	if err != nil {
+		fmt.Printf("Error in getTagSQ: %v", err)
+		return ""
+	}
+	tag := []string{}
+	for rows.Next() {
+		var kn string
+		rows.Scan(&kn)
+		tag = append(tag, kn)
+	}
+	return strings.Join(tag, ",")
 }
 
 func synchronize3(reportOnly bool) (log string) {
@@ -880,7 +912,7 @@ func synchronize3(reportOnly bool) (log string) {
 
 	/**********should come before container deletes to change tasks here*****************/
 	server_updated_entries_tids := make(map[int]struct{})
-	var task_tids []string
+	var tids []int
 	for _, e := range server_updated_entries {
 		_, err := db.Exec("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, note, modified, deleted) VALUES"+
 			"(?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
@@ -888,50 +920,46 @@ func synchronize3(reportOnly bool) (log string) {
 			"folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now');",
 			e.tid, e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.note)
 		if err != nil {
-			fmt.Fprintf(&lg, "**Error** in INSERT ... ON CONFLICT for id/tid %d %q: %v\n", e.id, e.title, err)
+			fmt.Fprintf(&lg, "**Error** in INSERT ... ON CONFLICT for tid %d %q: %v\n", e.tid, e.title, err)
 			continue
 		} else {
 			fmt.Fprintf(&lg, "Inserted or updated client entry %q with tid **%d**\n", e.title, e.tid)
 		}
-		task_tids = append(task_tids, strconv.Itoa(e.tid))
+		tids = append(tids, e.tid)
 		server_updated_entries_tids[e.tid] = struct{}{}
 	}
 	if len(server_updated_entries) != 0 {
-		in := strings.Join(task_tids, ",")
-
 		// need to delete all keywords for changed entries first
-		stmt := fmt.Sprintf("DELETE FROM task_keyword WHERE task_tid in (%s);", in)
-		_, err = db.Exec(stmt)
+		s := "?" + strings.Repeat(",?", len(tids)-1)
+		stmt := fmt.Sprintf("DELETE FROM task_keyword WHERE task_tid IN (%s);", s)
+		tidsIf := make([]interface{}, len(tids))
+		for i := range tids {
+			tidsIf[i] = tids[i]
+		}
+		_, err = db.Exec(stmt, tidsIf...)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting from client task_keyword for server tids %s: %v\n", in, err)
+			fmt.Fprintf(&lg, "Error deleting from client task_keyword for tids: %v: %v\n", tids, err)
 		}
 
 		// need to delete all rows for changed entries in fts
 		// note only rows for existing client entries will be in fts
-		stmt = fmt.Sprintf("DELETE FROM fts WHERE tid in (%s);", in)
-		_, err = fts_db.Exec(stmt)
+		stmt = fmt.Sprintf("DELETE FROM fts WHERE tid IN (%s);", s)
+		_, err = fts_db.Exec(stmt, tidsIf...)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error deleting from fts from server ids %s: %v\n", in, err)
+			fmt.Fprintf(&lg, "Error deleting from fts for tids: %v: %v\n", tids, err)
 		}
-		tks := getTaskKeywordPairs(pdb, in, &lg)
+		tks := getTaskKeywordPairsPQ(pdb, tids, &lg)
 		if len(tks) != 0 {
 			query, args := createBulkInsertQueryTaskKeywordPairs(len(tks), tks)
 			err = bulkInsert(db, query, args)
 			if err != nil {
 				fmt.Fprintf(&lg, "%v\n", err)
 			} else {
-				fmt.Fprintf(&lg, "Keywords updated for task tids: %s\n", in)
+				fmt.Fprintf(&lg, "Keywords updated for task tids: %v\n", tids)
 			}
-			tags := getTags3(pdb, in, &lg)
-			//entries and tags must be sorted before updating server_updated_entries with tag
-			/* there is an ORDER BY so also shouldn't need to do the sorts
-			sort.Slice(tags, func(i, j int) bool {
-				return tags[i].task_id < tags[j].task_id
-			})
-				sort.Slice(server_updated_entries, func(i, j int) bool {
-					return server_updated_entries[i].id < server_updated_entries[j].id
-				})
-			*/
+			tags := getTagsPQ(pdb, tids, &lg)
+			//entries and tags must be sorted by tid before updating server_updated_entries with tag
+			// the queries include ORDER BY so don't need to do the sorts in code
 			i := 0
 			for j := 0; ; j++ {
 				// below check shouldn't be necessary
@@ -954,7 +982,7 @@ func synchronize3(reportOnly bool) (log string) {
 		if err != nil {
 			fmt.Fprintf(&lg, "%v", err)
 		} else {
-			fmt.Fprintf(&lg, "FTS entries updated for task tids: %s\n", in)
+			fmt.Fprintf(&lg, "FTS entries updated for task tids: %v\n", tids)
 		}
 	}
 
@@ -979,12 +1007,12 @@ func synchronize3(reportOnly bool) (log string) {
 				fmt.Fprintf(&lg, "Error setting tid for client entry %q with id %d to tid %d: %v\n", truncate(e.title, 15), e.id, tid, err)
 				continue
 			}
-			/*For new entries there are no records in FTS BUT NEED TO CREATE ONE!!!!!!*/
-			//_, err = fts_db.Exec("UPDATE fts SET tid=$1 WHERE tid=$2;", tid, e.tid)
-			taskTag := getTags3(db, strconv.Itoa(tid), &lg)
+			/*For new entries there are no records in FTS BUT NEED TO CREATE ONE!!!!!!
+			Also note that there should be no keywords on a new client entry */
+			taskTag := getTagSQ(db, tid, &lg)
 			var tag sql.NullString
 			if len(taskTag) > 0 {
-				tag.String = taskTag[0].tag
+				tag.String = taskTag
 				tag.Valid = true
 			}
 			_, err = fts_db.Exec("INSERT INTO fts (title, tag, note, tid) VALUES (?, ?, ?, ?);", e.title, tag, e.note, tid)
