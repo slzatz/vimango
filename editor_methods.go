@@ -154,7 +154,11 @@ func (e *Editor) getLinesInRowWW(r int) int {
 
 func (e *Editor) getLineInRowWW(r, c int) int {
 	row := e.ss[r]
-	row = strings.ReplaceAll(row, "\t", "$$$$")
+	tabCount := strings.Count(row[:c], "\t")
+	if tabCount > 0 {
+		row = strings.ReplaceAll(row, "\t", "$$$$")
+		c += 3 * tabCount
+	}
 	width := e.screencols - e.left_margin_offset
 	if width >= len(row) {
 		return 1
@@ -174,7 +178,7 @@ func (e *Editor) getLineInRowWW(r, c int) int {
 			end = start + pos
 		}
 		lines++
-		if end >= c {
+		if end >= c { //+3
 			break
 		}
 		start = end + 1
@@ -496,6 +500,8 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 
 		for n := 0; n < (endRow - startRow + 1); n++ { //++n
 			rowNum := startRow + n
+			row := e.ss[rowNum]
+			row = strings.ReplaceAll(row, "\t", "    ")
 			pos := 0
 			for line := 1; line <= e.getLinesInRowWW(rowNum); line++ { //++line
 				if y < 0 {
@@ -506,7 +512,8 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 					break //out for should be done (theoretically) - 1
 				}
 				line_char_count := e.getLineCharCountWW(rowNum, line)
-				pab.WriteString(strings.ReplaceAll(e.ss[rowNum][pos:pos+line_char_count], "\t", "    "))
+				//pab.WriteString(strings.ReplaceAll(e.ss[rowNum][pos:pos+line_char_count], "\t", "$$$$"))
+				pab.WriteString(row[pos : pos+line_char_count])
 				pab.WriteString(lf_ret)
 				y += 1
 				pos += line_char_count
@@ -596,6 +603,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 
 func (e *Editor) getLineCharCountWW(r, line int) int {
 	row := e.ss[r]
+	row = strings.ReplaceAll(row, "\t", "$$$$")
 
 	width := e.screencols - e.left_margin_offset
 

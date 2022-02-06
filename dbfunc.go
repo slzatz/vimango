@@ -451,14 +451,16 @@ func insertRowInDB(row *Row) error { // should return err
 	case BY_FOLDER:
 		folder_tid, _ = folderExists(org.filter)
 	}
+	var id int
 	err := db.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
 		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
-		row.title, folder_tid, context_tid, row.star).Scan(row.id)
+		row.title, folder_tid, context_tid, row.star).Scan(&id)
 	if err != nil {
 		sess.showOrgMessage("Error inserting into DB: %v", err)
 		//return -1
 		return err
 	}
+	row.id = id
 	row.dirty = false
 	return nil
 
