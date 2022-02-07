@@ -523,15 +523,13 @@ func (o *Organizer) find(pos int) {
 	o.mode = FIND
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
-	sess.showOrgMessage("Searching for '%s'", searchTerms)
+	sess.showOrgMessage("Search for '%s'", searchTerms)
 	o.rows = searchEntries(searchTerms, o.show_deleted, false)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		//sess.showOrgMessage("No results were returned")
 	}
 	sess.imagePreview = false
-	//o.readTitleIntoBuffer() /////////////////////////////////////////////
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)

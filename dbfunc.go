@@ -496,12 +496,13 @@ func readNoteIntoString(id int) string {
 	}
 
 	row := db.QueryRow("SELECT note FROM task WHERE id=?;", id)
-	var note string
+	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
+		sess.showOrgMessage("Error retrieving note for id %d: %v", id, err)
 		return ""
 	}
-	return note
+	return note.String
 }
 
 func readNoteIntoBuffer(e *Editor, id int) {
@@ -1171,14 +1172,13 @@ func highlightTerms2(id int) string {
 	row := fts_db.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
 		"FROM fts WHERE tid=$1 AND fts MATCH $2;", entry_tid, sess.fts_search_terms)
 
-	var note string
+	var note sql.NullString
 	err := row.Scan(&note)
-	sess.showOrgMessage("%v", err)
 	if err != nil {
+		sess.showOrgMessage("Error in SELECT highlight(fts ...:%v", err)
 		return ""
 	}
-
-	return note
+	return note.String
 }
 
 // not currently in use but more general than generateWWString

@@ -428,7 +428,7 @@ func organizerProcessKey(c int) {
 			org.command = ""
 			organizerProcessKey(c)
 		}
-		sess.showOrgMessage("Find: fr %d fc %d", org.fr, org.fc)
+		//sess.showOrgMessage("Find: fr %d fc %d", org.fr, org.fc)
 
 		//probably should be a org.view not org.mode but
 		// for the moment this kluge works
