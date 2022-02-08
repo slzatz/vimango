@@ -24,7 +24,7 @@ type TaskKeywordPairs struct {
 	keyword_tid int
 }
 
-type TaskTag3 struct {
+type TaskTag struct {
 	task_tid int
 	tag      sql.NullString
 }
@@ -143,11 +143,11 @@ func insertTaskKeywordTids(dbase *sql.DB, plg io.Writer, keyword_tid, entry_tid 
 		fmt.Fprintf(plg, "Inserted into task_keyword entry tid **%d** and keyword_tid **%d**\n", entry_tid, keyword_tid)
 	}
 }
-func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag3 {
+func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag {
 	rows, err := dbase.Query("SELECT task_keyword.task_tid, keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid = ANY($1) ORDER BY task_keyword.task_tid;", pq.Array(tids))
 	if err != nil {
 		fmt.Printf("Error in getTags_x: %v", err)
-		return []TaskTag3{}
+		return []TaskTag{}
 	}
 	taskkeywords := make([]TaskKeyword3, 0)
 	for rows.Next() {
@@ -159,11 +159,11 @@ func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag3 {
 		taskkeywords = append(taskkeywords, tk)
 	}
 	if len(taskkeywords) == 0 {
-		return []TaskTag3{}
+		return []TaskTag{}
 	}
-	tasktags := make([]TaskTag3, 0, 1000)
+	tasktags := make([]TaskTag, 0, 1000)
 	keywords := make([]string, 0, 5)
-	var tt TaskTag3
+	var tt TaskTag
 	var tid int
 	prev_tid := taskkeywords[0].task_tid
 	for _, tk := range taskkeywords {
@@ -204,7 +204,7 @@ func getTagSQ(dbase *sql.DB, tid int, plg io.Writer) string {
 	return strings.Join(tag, ",")
 }
 
-func synchronize3(reportOnly bool) (log string) {
+func synchronize(reportOnly bool) (log string) {
 
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		config.Postgres.Host,

@@ -46,11 +46,11 @@ func getEntriesBulk(dbase *sql.DB, count int, plg io.Writer) []EntryPlusTag {
 }
 
 // returns []struct{client_entry_tid, tag} - need to populate fts
-func getTagsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskTag3 {
+func getTagsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskTag {
 	rows, err := dbase.Query("SELECT task_keyword.task_tid, keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid ORDER BY task_keyword.task_tid;")
 	if err != nil {
 		println(err)
-		return []TaskTag3{}
+		return []TaskTag{}
 	}
 	taskkeywords := make([]TaskKeyword3, 0, count)
 	for rows.Next() {
@@ -62,11 +62,11 @@ func getTagsBulk(dbase *sql.DB, count int, plg io.Writer) []TaskTag3 {
 		taskkeywords = append(taskkeywords, tk)
 	}
 	if len(taskkeywords) == 0 {
-		return []TaskTag3{}
+		return []TaskTag{}
 	}
-	tasktags := make([]TaskTag3, 0, 1000)
+	tasktags := make([]TaskTag, 0, 1000)
 	keywords := make([]string, 0, 5)
-	var tt TaskTag3
+	var tt TaskTag
 	var tid int
 	prev_tid := taskkeywords[0].task_tid
 	for _, tk := range taskkeywords {
@@ -144,7 +144,7 @@ func bulkInsert2(dbase *sql.DB, query string, args []interface{}) (err error) {
 	return
 }
 
-func bulkLoad2(reportOnly bool) (log string) {
+func bulkLoad(reportOnly bool) (log string) {
 
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		config.Postgres.Host,

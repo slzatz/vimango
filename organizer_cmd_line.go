@@ -540,9 +540,9 @@ func (o *Organizer) sync3(unused int) {
 	var log string
 	if o.command_line == "test" {
 		// true => reportOnly
-		log = synchronize3(true)
+		log = synchronize(true)
 	} else {
-		log = synchronize3(false)
+		log = synchronize(false)
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
@@ -566,9 +566,9 @@ func (o *Organizer) initialBulkLoad(unused int) {
 	var log string
 	if o.command_line == "bulktest" {
 		// true => reportOnly
-		log = bulkLoad2(true)
+		log = bulkLoad(true)
 	} else {
-		log = bulkLoad2(false)
+		log = bulkLoad(false)
 	}
 	o.command_line = ""
 	o.eraseRightScreen()
