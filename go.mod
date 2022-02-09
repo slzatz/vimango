@@ -1,6 +1,6 @@
 module github.com/slzatz/vimango
 
-replace github.com/charmbracelet/glamour v0.3.0 => /home/slzatz/glamour
+replace github.com/charmbracelet/glamour v0.5.0 => /home/slzatz/glamour
 
 replace github.com/neovim/go-client v1.1.7 => /home/slzatz/go-client
 
