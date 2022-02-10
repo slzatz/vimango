@@ -179,7 +179,8 @@ func (e *Editor) compile() {
 		cmd = exec.Command("make")
 	} else if lang == "go" {
 		dir = "/home/slzatz/go_fragments/"
-		cmd = exec.Command("go", "build", "main.go")
+		//cmd = exec.Command("go", "build", "main.go")
+		cmd = exec.Command("go", "build")
 	} else if lang == "python" {
 		sess.showEdMessage("You don't have to compile python")
 		return
@@ -257,7 +258,8 @@ func (e *Editor) run() {
 		obj = "./test_cpp"
 		dir = "/home/slzatz/clangd_examples/"
 	} else {
-		obj = "./main"
+		//obj = "./main"
+		obj = "./go_fragments"
 		dir = "/home/slzatz/go_fragments/"
 	}
 	lang := Languages[taskContext(e.id)]

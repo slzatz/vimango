@@ -47,6 +47,11 @@
     "crossed_out": true,
     "color": "243"
   },
+  "highlight": {
+    "background_color": "#5e5747",
+    "bold": true,
+    "color": "39"
+  },
   "emph": {
     "italic": true
   },
