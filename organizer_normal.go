@@ -115,6 +115,7 @@ func controlZ() {
 	note, _ = r.Render(note)
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
+	note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
 	org.note = strings.Split(note, "\n")
 	sess.eraseRightScreen()
 	if !sess.imagePreview {

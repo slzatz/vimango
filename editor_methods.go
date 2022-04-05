@@ -813,6 +813,16 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 			continue
 		}
 
+		// added 04052022 so urls that word wrap handled correctly`
+		// question if might cause issue for spellcheck
+		if strings.Index(row, "](http") != -1 {
+			ab.WriteString(row)
+			ab.WriteString("\n")
+			filerow++
+			y++
+			continue
+		}
+
 		start := 0
 		end := 0
 		for {
@@ -835,7 +845,8 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 
 			//ab.WriteString(row[start : end+1])
 			//ab.WriteString("\n")
-			fmt.Fprintf(&ab, "%s%s", row[start:end+1], "\n")
+			//fmt.Fprintf(&ab, "%s%s", row[start:end+1], "\n")
+			fmt.Fprintf(&ab, "%s%s", row[start:end+1], "^^^") //04052022
 			y++
 			start = end + 1
 		}

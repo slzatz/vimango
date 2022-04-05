@@ -350,6 +350,7 @@ func (e *Editor) showMarkdownPreview() {
 	)
 	note, _ = r.Render(note)
 	note = strings.TrimSpace(note)
+	note = strings.ReplaceAll(note, "^^^", "\n")              ///////////////04052022
 	note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n") //headings seem to place \x1b[0m after the return
 	note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 

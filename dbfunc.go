@@ -1296,7 +1296,8 @@ func generateWWString(text string, width int) string {
 				end = start + pos
 			}
 			ab.WriteString(s[start : end+1])
-			ab.WriteString("\n")
+			ab.WriteString("^^^")
+			//ab.WriteString("\n")
 			y++
 			start = end + 1
 		}
