@@ -360,17 +360,16 @@ const (
 
 const leader = " "
 
-func getStringInBetween(str string, start string, end string) (result string) {
-	s := strings.Index(str, start)
-	if s == -1 {
-		return
+func getStringInBetween(str string, start string, end string) string {
+	k, v, ok := strings.Cut(str, start)
+	if !ok {
+		return ""
 	}
-	s += len(start)
-	e := strings.Index(str[s:], end)
-	if e == -1 {
-		return
+	k, v, ok = strings.Cut(v, start)
+	if !ok {
+		return ""
 	}
-	return str[s : s+e]
+	return k
 }
 
 /*
