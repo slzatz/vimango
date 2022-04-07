@@ -553,9 +553,11 @@ func (o *Organizer) sync3(unused int) {
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)
-	if note[0] == '\n' {
-		note = note[1:]
-	}
+	note = strings.TrimSpace(note)
+	note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04072022
+	//headings seem to place \x1b[0m after the return
+	note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
+	note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
 	o.drawPreviewWithoutImages()
