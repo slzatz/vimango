@@ -454,6 +454,7 @@ func (o *Organizer) drawPreview() {
 		note, _ = r.Render(note)
 		// glamour seems to add a '\n' at the start
 		note = strings.TrimSpace(note)
+		// replacing placeholder ^^^ with word wrap \n
 		note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
 		//headings seem to place \x1b[0m after the return
 		note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")

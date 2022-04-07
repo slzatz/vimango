@@ -1269,6 +1269,7 @@ func generateWWString(text string, width int) string {
 			continue
 		}
 
+		// do not word wrap http[s] links
 		if strings.Index(s, "](http") != -1 {
 			ab.WriteString(s)
 			ab.WriteString("\n")
@@ -1296,6 +1297,8 @@ func generateWWString(text string, width int) string {
 				end = start + pos
 			}
 			ab.WriteString(s[start : end+1])
+			// generating placeholder so markdown handles word wrap \n correctly
+			// things like ** ....\n .....** correctly
 			ab.WriteString("^^^")
 			//ab.WriteString("\n")
 			y++
