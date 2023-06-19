@@ -10,7 +10,7 @@ replace go.lsp.dev/pkg v0.0.0-20210323044036-f7deec69b52e => /home/slzatz/pkg
 
 //replace go.lsp.dev/jsonrpc2 v0.9.0 => /home/slzatz/jsonrpc2
 
-go 1.18
+go 1.20
 
 require (
 	github.com/alecthomas/chroma v0.10.0
