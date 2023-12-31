@@ -15,7 +15,6 @@ type Editor struct {
 	left_margin        int //can vary (so could TOP_MARGIN - will do that later
 	left_margin_offset int // 0 if no line numbers
 	top_margin         int
-	code               string    //used by lsp thread and intended to avoid unnecessary calls to editorRowsToString
 	highlight          [2][2]int // [line col][line col] -> note line is 1-based not zero-based
 	mode               Mode
 	command_line       string //for commands on the command line; string doesn't include ':'

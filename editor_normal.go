@@ -29,12 +29,6 @@ var e_lookup2 = map[string]interface{}{
 	leader + "m":         (*Editor).showMarkdownPreview,
 	leader + "y":         (*Editor).nextStyle,
 	leader + "t":         (*Editor).readGoTemplate,
-	leader + "co":        (*Editor).completion,
-	leader + "ho":        (*Editor).hover,
-	leader + "sh":        (*Editor).signatureHelp,
-	leader + "dh":        (*Editor).documentHighlight,
-	leader + "df":        (*Editor).definition,
-	leader + "rf":        (*Editor).reference,
 	leader + "sp":        (*Editor).spellingCheck,
 	leader + "su":        (*Editor).spellSuggest,
 	//leader + "l": (*Editor).showVimMessageLog,
@@ -377,65 +371,6 @@ func (e *Editor) readGoTemplate() {
 	e.readFileIntoNote("go.template")
 }
 
-func (e *Editor) completion() {
-	if e.isModified() {
-		sess.showEdMessage("%sNeed to write note first%s", RED_BG, RESET)
-		return
-		//sendDidChangeNotification(e.bufferToString())
-		//e.drawDiagnostics()
-	}
-	//e.drawDiagnostics()
-	sendCompletionRequest(uint32(e.fr), uint32(e.fc+1)) //+1 seems to work better
-}
-
-func (e *Editor) hover() {
-	if e.isModified() {
-		sess.showEdMessage("%sNeed to write note first%s", RED_BG, RESET)
-		return
-		//sendDidChangeNotification(e.bufferToString())
-		//e.drawDiagnostics()
-	}
-	sendHoverRequest(uint32(e.fr), uint32(e.fc+1)) //+1 seems to work better
-}
-
-func (e *Editor) signatureHelp() {
-	if e.isModified() {
-		sess.showEdMessage("%sNeed to write note first%s", RED_BG, RESET)
-		return
-		//sendDidChangeNotification(e.bufferToString())
-		//e.drawDiagnostics()
-	}
-	sendSignatureHelpRequest(uint32(e.fr), uint32(e.fc)) //+1 seems to work better
-}
-
-func (e *Editor) documentHighlight() {
-	if e.isModified() {
-		sess.showEdMessage("%sNeed to write note first%s", RED_BG, RESET)
-		return
-		//sendDidChangeNotification(e.bufferToString())
-		//e.drawDiagnostics()
-	}
-	sendDocumentHighlightRequest(uint32(e.fr), uint32(e.fc)) //+1 seems to work better
-}
-
-func (e *Editor) definition() {
-	if e.isModified() {
-		sess.showEdMessage("%sNeed to write note first%s", RED_BG, RESET)
-		return
-		//sendDidChangeNotification(e.bufferToString())
-		//e.drawDiagnostics()
-	}
-	sendDefinitionRequest(uint32(e.fr), uint32(e.fc)) //+1 seems to work better
-}
-
-func (e *Editor) reference() {
-	if e.isModified() {
-		sendDidChangeNotification(e.bufferToString())
-		e.drawDiagnostics()
-	}
-	sendReferenceRequest(uint32(e.fr), uint32(e.fc)) //+1 seems to work better
-}
-
 func (e *Editor) spellingCheck() {
 	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
 	if e.isModified() {
@@ -456,42 +391,3 @@ func (e *Editor) spellSuggest() {
 	sess.showEdMessage("%q -> %s", w, strings.Join(s, "|"))
 }
 
-/*
-func (e *Editor) suggest() {
-	// clear messageBuf before redirecting z= output
-	_ = v.SetBufferLines(messageBuf, 0, -1, true, [][]byte{}) // in test case bytes.Fields(nil)
-
-	_ = v.FeedKeys("qaq", "t", false)
-
-	// so below you get suggestions but with the return
-	// you're telling vim you didn't select one
-	// gets selected when you type a number
-	// in SPELLING mode
-	_, err := v.Input("z=\r")
-	if err != nil {
-		sess.showEdMessage("z= err: %v", err)
-	}
-
-	// 1) set current buffer to messageBuf
-	// 2) paste register a into messageBuf -> "ap
-	// 3) clear register a -> qaq
-	// ? step 3 necessary if always clear before using
-	_ = v.SetCurrentBuffer(messageBuf)
-	_ = v.FeedKeys("\x1bgg\"apqaq", "t", false)
-
-	// set current buffer back to editor
-	v.SetCurrentBuffer(e.vbuf)
-
-	bb, _ := v.BufferLines(messageBuf, 0, -1, true)
-
-	// NOTE: not word wrapping and probably should
-	var rows []string
-	for _, b := range bb {
-		rows = append(rows, string(b))
-	}
-	e.overlay = rows[1:] // first row is blank
-	e.mode = SPELLING
-	e.previewLineOffset = 0
-	e.drawOverlay()
-}
-*/

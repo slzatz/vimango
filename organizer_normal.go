@@ -110,7 +110,7 @@ func controlZ() {
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
-		glamour.WithLinkNumbers(true),
+		//glamour.WithLinkNumbers(true), //12312023 -- trying to use standard glamour
 	)
 	note, _ = r.Render(note)
 	// glamour seems to add a '\n' at the start

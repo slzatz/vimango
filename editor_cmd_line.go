@@ -40,7 +40,6 @@ var e_lookup_C = map[string]func(*Editor){
 	"q!":              (*Editor).quitActions,
 	"x":               (*Editor).quitActions,
 	"fmt":             (*Editor).goFormat,
-	"rename":          (*Editor).rename, //lsp command
 	"pdf":             (*Editor).createPDF,
 	"print":           (*Editor).printDocument,
 	//"spell":  (*Editor).spell,
@@ -72,10 +71,6 @@ func (e *Editor) writeNote() {
 	text := e.bufferToString()
 
 	if taskFolder(e.id) == "code" {
-		if lsp.name != "" {
-			go sendDidChangeNotification(text)
-			go e.drawDiagnostics()
-		}
 		go updateCodeFile(e.id, text)
 	}
 
@@ -302,7 +297,7 @@ func (e *Editor) run() {
 	buffer_err := bufio.NewReader(stderr)
 
 	var rows []string
-	rows = append(rows, "------------------------")
+	rows = append(rows, "%-----------------------")
 
 	for {
 		bytes, _, err := buffer_out.ReadLine()
@@ -588,16 +583,6 @@ func (e *Editor) goFormat() {
 	e.scroll()
 	e.drawText()
 	sess.returnCursor()
-}
-
-func (e *Editor) rename() {
-	pos := strings.Index(e.command_line, " ")
-	if pos == -1 {
-		sess.showEdMessage("You need to provide a filename")
-		return
-	}
-	newName := e.command_line[pos+1:]
-	sendRenameRequest(uint32(e.fr), uint32(e.fc), newName) //+1 seems to work better
 }
 
 func (e *Editor) createPDF() {

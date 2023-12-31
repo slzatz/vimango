@@ -75,8 +75,6 @@ var cmd_lookup = map[string]func(*Organizer, int){
 	"ha2":             (*Organizer).printList2,
 	"printlist":       (*Organizer).printList2,
 	"pl":              (*Organizer).printList2,
-	"lsp":             (*Organizer).launchLsp,
-	"shutdown":        (*Organizer).shutdownLsp,
 	"sort":            (*Organizer).sortEntries,
 }
 
@@ -1010,35 +1008,6 @@ func (o *Organizer) printList2(unused int) {
 	if err != nil {
 		sess.showEdMessage("Error printing document: %v", err)
 	}
-	o.mode = o.last_mode
-	o.command_line = ""
-}
-
-func (o *Organizer) launchLsp(pos int) {
-	var lsp string
-	var cl string
-	if pos != 0 {
-		cl = o.command_line
-		for _, v := range Lsps {
-			if strings.HasPrefix(v, cl[pos+1:]) {
-				lsp = v
-				break
-			}
-		}
-	} else {
-		lsp = "gopls"
-	}
-	if lsp != "" {
-		go launchLsp(lsp) // could be race to write to screen
-	} else {
-		sess.showOrgMessage("%q does not match an lsp", cl[pos+1:])
-	}
-	o.mode = o.last_mode
-	o.command_line = ""
-}
-
-func (o *Organizer) shutdownLsp(unused int) {
-	shutdownLsp()
 	o.mode = o.last_mode
 	o.command_line = ""
 }

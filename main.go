@@ -18,11 +18,7 @@ import (
 var sess Session
 var org = Organizer{Session: &sess}
 var p *Editor
-
-//var editors []*Editor
-
 var windows []Window
-
 var config *dbConfig
 var db *sql.DB
 var fts_db *sql.DB
