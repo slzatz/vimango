@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mandolyte/mdtopdf"
+	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -592,7 +592,7 @@ func (e *Editor) createPDF() {
 		return
 	}
 	filename := e.command_line[pos+1:]
-	pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log")
+	pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log", nil, mdtopdf.LIGHT)
 	/*
 		pf.Pdf.SetSubject("How to convert markdown to PDF", true)
 		pf.Pdf.SetTitle("Example PDF converted from Markdown", true)
@@ -645,7 +645,7 @@ func (e *Editor) printDocument() {
 		}
 	} else {
 		content := strings.Join(e.ss, "\n")
-		pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log")
+	        pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
 		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
 			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}

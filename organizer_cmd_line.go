@@ -11,7 +11,7 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/jung-kurt/gofpdf"
-	"github.com/mandolyte/mdtopdf"
+	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -940,7 +940,7 @@ func (o *Organizer) printDocument(unused int) {
 			sess.showOrgMessage("Error creating pdf from code: %v", err)
 		}
 	} else {
-		pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log")
+		pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
 		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
 			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}

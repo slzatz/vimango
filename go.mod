@@ -7,33 +7,40 @@ require (
 	github.com/charmbracelet/glamour v0.6.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/jung-kurt/gofpdf v1.16.2
-	github.com/lib/pq v1.10.4
-	github.com/mandolyte/mdtopdf v0.0.0-20201204141826-8d22b5d4e7e3
+	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.19
-	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/sys v0.15.0
+	golang.org/x/term v0.15.0
 )
 
+require github.com/mandolyte/mdtopdf/v2 v2.2.4
+
 require (
-	github.com/aymanbagabas/go-osc52 v1.0.3 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/canhlinh/svg2png v0.0.0-20201124065332-6ba87c82371f // indirect
+	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
+	github.com/go-pdf/fpdf v0.9.0 // indirect
+	github.com/gomarkdown/markdown v0.0.0-20230922105210-14b16010c2ee // indirect
+	github.com/jessp01/gohighlight v0.21.2 // indirect
+	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 require (
 	github.com/aymerick/douceur v0.2.0 // indirect
-	github.com/dlclark/regexp2 v1.4.0 // indirect
-	github.com/gorilla/css v1.0.0 // indirect
+	github.com/dlclark/regexp2 v1.10.0 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
-	github.com/mattn/go-runewidth v0.0.14 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
-	github.com/muesli/termenv v0.13.0 // indirect
+	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/yuin/goldmark v1.5.2
-	github.com/yuin/goldmark-emoji v1.0.1 // indirect
-	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
-	golang.org/x/net v0.0.0-20221002022538-bcab6841153b // indirect
+	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/yuin/goldmark v1.6.0
+	github.com/yuin/goldmark-emoji v1.0.2 // indirect
+	golang.org/x/image v0.14.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
 )

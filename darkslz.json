@@ -75,6 +75,14 @@
     "color": "6",
     "bold": true
   },
+  "enumeration": {
+    "color": "6",
+    "prefix": ". "
+  },
+  "item": {
+    "color": "6",
+    "prefix": "• "
+},
   "image": {
     "color": "212",
     "underline": true
