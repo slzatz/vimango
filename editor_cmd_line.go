@@ -592,7 +592,18 @@ func (e *Editor) createPDF() {
 		return
 	}
 	filename := e.command_line[pos+1:]
-	pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log", nil, mdtopdf.LIGHT)
+
+  params := mdtopdf.PdfRendererParams{
+      Orientation: "",
+      Papersz: "",
+      PdfFile: filename,
+      TracerFile: "trace.log",
+      Opts: nil,
+      Theme: mdtopdf.LIGHT,
+  }
+
+	//pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log", nil, mdtopdf.LIGHT)
+	pf := mdtopdf.NewPdfRenderer(params)
 	/*
 		pf.Pdf.SetSubject("How to convert markdown to PDF", true)
 		pf.Pdf.SetTitle("Example PDF converted from Markdown", true)
@@ -645,7 +656,19 @@ func (e *Editor) printDocument() {
 		}
 	} else {
 		content := strings.Join(e.ss, "\n")
-	        pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
+
+  params := mdtopdf.PdfRendererParams{
+      Orientation: "",
+      Papersz: "",
+      PdfFile: "output.pdf",
+      TracerFile: "trace.log",
+      Opts: nil,
+      Theme: mdtopdf.LIGHT,
+  }
+
+	pf := mdtopdf.NewPdfRenderer(params)
+
+	        //pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
 		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
 			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}

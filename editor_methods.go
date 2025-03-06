@@ -415,6 +415,7 @@ func (e *Editor) drawPlainRows(pab *strings.Builder) {
 }
 
 func (e *Editor) drawCodeRows(pab *strings.Builder) {
+	note := e.generateWWStringFromBuffer()
 	var lang string
 	if taskFolder(e.id) == "code" {
 		c := taskContext(e.id)
@@ -426,10 +427,12 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 		lang = "markdown"
 	}
 
-	note := e.generateWWStringFromBuffer()
+	//note := e.generateWWStringFromBuffer()
+
 	var buf bytes.Buffer
 	_ = Highlight(&buf, note, lang, "terminal16m", sess.style[sess.styleIndex])
 	note = buf.String()
+
 	nnote := strings.Split(note, "\n")
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
 	fmt.Fprintf(pab, "\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
