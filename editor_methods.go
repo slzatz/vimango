@@ -430,7 +430,11 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 	//note := e.generateWWStringFromBuffer()
 
 	var buf bytes.Buffer
-	_ = Highlight(&buf, note, lang, "terminal16m", sess.style[sess.styleIndex])
+	if lang == "markdown" {
+	  _ = Highlight2(&buf, note, lang, "terminal16m", sess.markdown_style)
+	} else {
+	  _ = Highlight(&buf, note, lang, "terminal16m", sess.style[sess.styleIndex])
+	}
 	note = buf.String()
 
 	nnote := strings.Split(note, "\n")

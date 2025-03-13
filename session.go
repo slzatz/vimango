@@ -9,6 +9,7 @@ import (
 
 	"github.com/slzatz/vimango/rawmode"
 	"golang.org/x/sys/unix"
+	"github.com/alecthomas/chroma/v2"
 )
 
 type Session struct {
@@ -27,7 +28,8 @@ type Session struct {
 	origTermCfg      []byte //from GoKilo
 	//cfg              Config
 	edPct      int // percent that editor space takes up of whole horiz screen real estate
-	style      [7]string
+	style      [8]string
+  markdown_style *chroma.Style
 	styleIndex int
 	ws         unix.Winsize //Row,Col,Xpixel,Ypixel unint16
 	//images           map[string]*image.Image

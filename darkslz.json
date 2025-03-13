@@ -92,7 +92,7 @@
     "format": "Im@ge: {{.text}} →"
   },
   "code": {
-    "color": "203"
+    "color": "9"
   },
   "code_block": {
     "color": "244",

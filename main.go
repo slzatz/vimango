@@ -13,6 +13,7 @@ import (
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
+	//"github.com/alecthomas/chroma/v2"
 )
 
 var sess Session
@@ -71,8 +72,16 @@ func main() {
 	}
 	defer fts_db.Close()
 
-	//rand.Seed(time.Now().UnixNano())
-	sess.style = [7]string{"dracula", "fruity", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"} //vim is dark but unusable
+
+  // create markdown syntax highlighting style
+  //markdown_style, _ := chroma.NewStyle("markdown", chroma.StyleEntries{
+	//	chroma.Background: "bg:#ffffff",
+	//})
+  markdown_style, _ := selectMDStyle("gruvbox.xml")
+
+  sess.markdown_style = markdown_style
+
+	sess.style = [8]string{"dracula", "fruity", "gruvbox", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"} //vim is dark but unusable
 	sess.styleIndex = 2
 	sess.imagePreview = false
 	sess.imgSizeY = 800
