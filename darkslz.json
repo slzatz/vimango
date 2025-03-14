@@ -76,11 +76,9 @@
     "bold": true
   },
   "enumeration": {
-    "color": "6",
     "block_prefix": ". "
   },
   "item": {
-    "color": "6",
     "block_prefix": "• "
 },
   "image": {
