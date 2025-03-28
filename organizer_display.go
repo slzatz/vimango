@@ -203,7 +203,8 @@ func (o *Organizer) drawPreviewWithImages() {
 
 		fmt.Printf("Loading Image ... \x1b[%dG", o.divider+1)
 		prevY := y
-		path := getStringInBetween(o.note[fr], "|", "|")
+		path := extractFilePath(o.note[fr])
+		//path := getStringInBetween(o.note[fr], "$$", "$$")
 		var img image.Image
 		var err error
 		if strings.Contains(path, "http") {

@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"strings"
+	"regexp"
+  "fmt"
 )
 
 type Position struct {
@@ -372,6 +374,65 @@ func getStringInBetween(str string, start string, end string) string {
 	return k
 }
 
+// doesn't work because there are escape codes around the file paths
+func extractFilePath__(input string) string {
+	// First split by the arrow
+	parts := strings.Split(input, "→")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	// Get everything after the arrow
+	afterArrow := strings.TrimSpace(parts[1])
+  fmt.Println("afterArrow:", afterArrow)
+	
+	return afterArrow
+}
+
+// need the regex to separate the file path from the rest of the string that may contain escape codes
+func extractFilePath_(input string) string {
+	// First split by the arrow
+	parts := strings.Split(input, "→")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	// Get everything after the arrow
+	afterArrow := strings.TrimSpace(parts[1])
+	
+	// Use regex to find the file path pattern
+	// This assumes Unix-style paths ending with common image extensions
+	re := regexp.MustCompile(`(/[^\s]+\.(jpg|jpeg|png|gif|bmp|tiff))`)
+	match := re.FindString(afterArrow)
+	fmt.Println("Match:", match)
+	return match
+}
+
+func extractFilePath(input string) string {
+	// First split by the arrow
+	parts := strings.Split(input, "→")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	// Get everything after the arrow
+	afterArrow := strings.TrimSpace(parts[1])
+
+	// Use regex to find either:
+	// 1. Local file paths (starting with /)
+	// 2. Web URLs (starting with http:// or https://)
+	// Both ending with common image extensions
+	re := regexp.MustCompile(`((https?://|/)[^\s]+\.(jpg|jpeg|png|gif|bmp|tiff))`)
+	match := re.FindString(afterArrow)
+
+	return match
+}
+
+//func main() {
+//	input := "Im@ge: baby sycamore → /home/slzatz/drive/meadow_2023/img_0530.jpg hello people"
+//	filePath := extractFilePath(input)
+//	fmt.Println("Extracted file path:", filePath)
+//}
 /*
 type BufLinesEvent struct {
 	Buffer nvim.Buffer

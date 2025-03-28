@@ -42,7 +42,7 @@ func readPNGIntoBuffer(path string) (err error) {
 }
 
 func loadImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
-
+//fmt.Printf("loadImage: path=%s, maxWidth=%d, maxHeight=%d\n", path, maxWidth, maxHeight)
 	f, err := os.Open(path)
 	if err != nil {
 		return
