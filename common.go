@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"strings"
 	"regexp"
-  "fmt"
 )
 
 type Position struct {
@@ -374,65 +373,67 @@ func getStringInBetween(str string, start string, end string) string {
 	return k
 }
 
-// doesn't work because there are escape codes around the file paths
-func extractFilePath__(input string) string {
-	// First split by the arrow
-	parts := strings.Split(input, "→")
-	if len(parts) < 2 {
-		return ""
-	}
-	
-	// Get everything after the arrow
-	afterArrow := strings.TrimSpace(parts[1])
-  fmt.Println("afterArrow:", afterArrow)
-	
-	return afterArrow
-}
-
-// need the regex to separate the file path from the rest of the string that may contain escape codes
-func extractFilePath_(input string) string {
-	// First split by the arrow
-	parts := strings.Split(input, "→")
-	if len(parts) < 2 {
-		return ""
-	}
-	
-	// Get everything after the arrow
-	afterArrow := strings.TrimSpace(parts[1])
-	
-	// Use regex to find the file path pattern
-	// This assumes Unix-style paths ending with common image extensions
-	re := regexp.MustCompile(`(/[^\s]+\.(jpg|jpeg|png|gif|bmp|tiff))`)
-	match := re.FindString(afterArrow)
-	fmt.Println("Match:", match)
-	return match
-}
-
 func extractFilePath(input string) string {
-	// First split by the arrow
-	parts := strings.Split(input, "→")
+	// Normalize line breaks
+	normalized := strings.ReplaceAll(input, "\n", "")
+	
+	// Split by the arrow
+	parts := strings.Split(normalized, "→")
 	if len(parts) < 2 {
 		return ""
 	}
-
+	
 	// Get everything after the arrow
 	afterArrow := strings.TrimSpace(parts[1])
-
-	// Use regex to find either:
-	// 1. Local file paths (starting with /)
-	// 2. Web URLs (starting with http:// or https://)
-	// Both ending with common image extensions
-	re := regexp.MustCompile(`((https?://|/)[^\s]+\.(jpg|jpeg|png|gif|bmp|tiff))`)
-	match := re.FindString(afterArrow)
-
+	
+	// Strip ANSI escape codes
+	ansiEscapeRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	cleanedText := ansiEscapeRegex.ReplaceAllString(afterArrow, "")
+	
+	// Enhanced regex for complex paths and URLs
+	// This handles:
+	// 1. URLs with multiple path segments
+	// 2. Wikipedia-style URLs with dimensions in the path
+	// 3. Traditional file paths and simple URLs
+	pathRegex := regexp.MustCompile(`((?:https?://)[^\s]+?/[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:/[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp))?(?:\?[^\s]*)?|(?:/|[A-Za-z]:\\|[A-Za-z0-9_\-\.]+/)[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:\?[^\s]*)?)`)
+	
+	match := pathRegex.FindString(cleanedText)
+	
+	// If no match yet, try a more permissive regex focused on URLs
+	if match == "" {
+		urlRegex := regexp.MustCompile(`https?://[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:/[^\s]*?)?`)
+		match = urlRegex.FindString(cleanedText)
+	}
+	
 	return match
 }
 
-//func main() {
-//	input := "Im@ge: baby sycamore → /home/slzatz/drive/meadow_2023/img_0530.jpg hello people"
-//	filePath := extractFilePath(input)
-//	fmt.Println("Extracted file path:", filePath)
-//}
+func extractFilePath_(input string) string {
+	// First, normalize line breaks to handle word wrapping
+	normalized := strings.ReplaceAll(input, "\n", "")
+	
+	// Split by the arrow
+	parts := strings.Split(normalized, "→")
+	if len(parts) < 2 {
+		return ""
+	}
+	
+	// Get everything after the arrow
+	afterArrow := strings.TrimSpace(parts[1])
+	
+	// Strip ANSI escape codes that might be surrounding the path
+	// ANSI escape codes typically start with ESC[ (represented as \x1b[ or \033[)
+	// and end with a letter (m is common for color codes)
+	ansiEscapeRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	cleanedText := ansiEscapeRegex.ReplaceAllString(afterArrow, "")
+	
+	// Match URLs and file paths
+	pathRegex := regexp.MustCompile(`((?:https?://|/|[A-Za-z]:\\|[A-Za-z0-9_\-\.]+/)[^\s]+?(?:\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:[\?#][^\s]*)?))`)
+	match := pathRegex.FindString(cleanedText)
+	
+	return match
+}
+
 /*
 type BufLinesEvent struct {
 	Buffer nvim.Buffer

@@ -203,7 +203,17 @@ func (o *Organizer) drawPreviewWithImages() {
 
 		fmt.Printf("Loading Image ... \x1b[%dG", o.divider+1)
 		prevY := y
-		path := extractFilePath(o.note[fr])
+    s := o.note[fr]
+    for i := range 2 {
+      if fr + 1 + i >= len(o.note) {
+        break
+      }
+      s = s + o.note[fr+i+1]
+    }
+		//path := extractFilePath(o.note[fr])
+    //fmt.Printf("s: %s\n", s)
+		path := extractFilePath(s)
+    //fmt.Printf("path: %s\n", path)
 		//path := getStringInBetween(o.note[fr], "$$", "$$")
 		var img image.Image
 		var err error
@@ -433,7 +443,8 @@ func (o *Organizer) drawPreview() {
 	} else {
 		note = highlightTerms2(id)
 	}
-	note = generateWWString(note, o.totaleditorcols)
+	//note = generateWWString(note, o.totaleditorcols)
+	//note = WordWrap(note, o.totaleditorcols)
 	sess.eraseRightScreen() //includes erasing images 11062021
 
 	var lang string
@@ -453,13 +464,14 @@ func (o *Organizer) drawPreview() {
 			glamour.WithWordWrap(0),
 		)
 		note, _ = r.Render(note)
+	  note = WordWrap(note, o.totaleditorcols)
 		// glamour seems to add a '\n' at the start
 		note = strings.TrimSpace(note)
 		// replacing placeholder ^^^ with word wrap \n
-		note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
-		//headings seem to place \x1b[0m after the return
-		note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
-		note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
+		//note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
+		////headings seem to place \x1b[0m after the return
+		//note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
+		//note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 	} else {
 		var buf bytes.Buffer
 		_ = Highlight(&buf, note, lang, "terminal16m", sess.style[sess.styleIndex])
