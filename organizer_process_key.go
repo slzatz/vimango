@@ -264,17 +264,17 @@ func organizerProcessKey(c int) {
 			if pos == -1 {
 				s = org.command_line
 				if cmd, found = cmd_lookup[s]; found {
-					cmd(&org, pos)
+					cmd(org, pos)
 				}
 			} else {
 				s = org.command_line[:pos]
 				if cmd, found = cmd_lookup[s]; found {
-					cmd(&org, pos)
+					cmd(org, pos)
 				} else {
 					pos := strings.Index(org.command_line, " ")
 					s = org.command_line[:pos]
 					if cmd, found = cmd_lookup[s]; found {
-						cmd(&org, pos)
+						cmd(org, pos)
 					}
 				}
 			}

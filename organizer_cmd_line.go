@@ -343,7 +343,7 @@ func (o *Organizer) editNote(id int) {
 	sess.editorMode = true
 
 	active := false
-	for _, w := range windows {
+	for _, w := range appCtx.Windows {
 		if e, ok := w.(*Editor); ok {
 			if e.id == id {
 				active = true
@@ -355,7 +355,7 @@ func (o *Organizer) editNote(id int) {
 
 	if !active {
 		p = NewEditor()
-		windows = append(windows, p)
+		appCtx.Windows = append(appCtx.Windows, p)
 		p.id = id
 		p.top_margin = TOP_MARGIN + 1
 
@@ -363,7 +363,7 @@ func (o *Organizer) editNote(id int) {
 			p.output = &Output{}
 			p.output.is_below = true
 			p.output.id = id
-			windows = append(windows, p.output)
+			appCtx.Windows = append(appCtx.Windows, p.output)
 		}
 		readNoteIntoBuffer(p, id)
 		p.bufferTick = vim.BufferGetLastChangedTick(p.vbuf)
@@ -536,11 +536,17 @@ func (o *Organizer) find(pos int) {
 
 func (o *Organizer) sync3(unused int) {
 	var log string
+	var err error
 	if o.command_line == "test" {
 		// true => reportOnly
-		log = synchronize(true)
+		log, err = appCtx.SynchronizeWrapper(true)
 	} else {
-		log = synchronize(false)
+		log, err = appCtx.SynchronizeWrapper(false)
+	}
+	
+	if err != nil {
+		o.Session.showOrgMessage("Synchronization error: %v", err)
+		return
 	}
 	o.command_line = ""
 	o.eraseRightScreen()

@@ -204,21 +204,30 @@ func getTagSQ(dbase *sql.DB, tid int, plg io.Writer) string {
 	return strings.Join(tag, ",")
 }
 
-func synchronize(reportOnly bool) (log string) {
-
+// Synchronize synchronizes data between local and remote databases
+// reportOnly: if true, only reports changes without applying them
+func (app *AppContext) Synchronize(reportOnly bool) (log string) {
+	if app.SyncInProcess {
+		return "Synchronization already in process"
+	}
+	
+	app.SyncInProcess = true
+	defer func() { app.SyncInProcess = false }()
+	
+	// Use config from app context
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.Postgres.Host,
-		config.Postgres.Port,
-		config.Postgres.User,
-		config.Postgres.Password,
-		config.Postgres.DB,
+		app.Config.Postgres.Host,
+		app.Config.Postgres.Port,
+		app.Config.Postgres.User,
+		app.Config.Postgres.Password,
+		app.Config.Postgres.DB,
 	)
 
 	var lg strings.Builder
 	var success bool
 	defer func() {
-		partialHost := "..." + strings.SplitAfterN(config.Postgres.Host, ".", 3)[2]
-		text := fmt.Sprintf("server %s (%s)\n\n%s", config.Postgres.DB, partialHost, lg.String())
+		partialHost := "..." + strings.SplitAfterN(app.Config.Postgres.Host, ".", 3)[2]
+		text := fmt.Sprintf("server %s (%s)\n\n%s", app.Config.Postgres.DB, partialHost, lg.String())
 		if reportOnly {
 			log = fmt.Sprintf("### Testing without syncing: %s", text)
 			return
