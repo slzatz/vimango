@@ -39,7 +39,7 @@ func (dbc *DBContext) KeywordTidFromId(id int) int {
 // GetEntries retrieves entries based on filtering criteria
 func (dbc *DBContext) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
 	// Get show_completed flag from the organizer
-	showCompleted := appCtx.Organizer.show_completed
+	showCompleted := dbc.App.Organizer.show_completed
 	
 	// Build the query based on task view
 	query := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.%s FROM task ", sort)
@@ -128,7 +128,7 @@ func (dbc *DBContext) FilterEntries(taskview int, filter string, showDeleted boo
 	// This wrapper maintains compatibility with the existing code
 	result, err := dbc.GetEntries(taskview, filter, showDeleted, sort, sortPriority, limit)
 	if err != nil {
-		appCtx.Session.showOrgMessage("Error getting entries: %v", err)
+		dbc.App.Session.showOrgMessage("Error getting entries: %v", err)
 		return []Row{}
 	}
 	return result
@@ -157,7 +157,7 @@ func (dbc *DBContext) ReadNoteText(id int) (string, error) {
 func (dbc *DBContext) ReadNoteIntoString(id int) string {
 	note, err := dbc.ReadNoteText(id)
 	if err != nil {
-		appCtx.Session.showOrgMessage("Error: %v", err)
+		dbc.App.Session.showOrgMessage("Error: %v", err)
 		return ""
 	}
 	return note
@@ -192,10 +192,10 @@ func (dbc *DBContext) UpdateNote(id int, text string) error {
 func (dbc *DBContext) UpdateNoteWrapper(id int, text string) {
 	err := dbc.UpdateNote(id, text)
 	if err != nil {
-		appCtx.Session.showOrgMessage("Error: %v", err)
+		dbc.App.Session.showOrgMessage("Error: %v", err)
 		return
 	}
-	appCtx.Session.showOrgMessage("Updated note and FTS entry for entry %d", id)
+	dbc.App.Session.showOrgMessage("Updated note and FTS entry for entry %d", id)
 }
 
 // UpdateFTSNote updates a note in the full-text search database
@@ -320,7 +320,7 @@ func (dbc *DBContext) KeywordList() []Container {
 // SearchEntries searches for entries
 func (dbc *DBContext) SearchEntries(searchTerm string, showDeleted bool, help bool) ([]Row, error) {
 	// Get show_completed flag from the organizer
-	showCompleted := appCtx.Organizer.show_completed
+	showCompleted := dbc.App.Organizer.show_completed
 	
 	// First query the FTS database for matching entries
 	ftsQuery := "SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);"
@@ -444,7 +444,7 @@ func (dbc *DBContext) SearchEntries(searchTerm string, showDeleted bool, help bo
 func (dbc *DBContext) SearchEntriesWrapper(term string, showDeleted bool, help bool) []Row {
 	result, err := dbc.SearchEntries(term, showDeleted, help)
 	if err != nil {
-		appCtx.Session.showOrgMessage("Search error: %v", err)
+		dbc.App.Session.showOrgMessage("Search error: %v", err)
 		return []Row{}
 	}
 	return result

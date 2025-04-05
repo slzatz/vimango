@@ -2,9 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -26,19 +24,7 @@ var fts_db *sql.DB
 var config *dbConfig
 var windows []Window
 
-// FromFile returns a dbConfig struct parsed from a file.
-func FromFile(path string) (*dbConfig, error) {
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var cfg dbConfig
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
+// FromFile has been moved to AppContext
 
 func main() {
 	// Create new app context

@@ -35,6 +35,7 @@ type Editor struct {
 	highlightPositions []Position
 	suggestions        []string //spelling suggestions
 	bufferTick         int
+	modified           bool     // tracks if the buffer has been modified
 }
 
 func NewEditor() *Editor {
@@ -53,6 +54,6 @@ func NewEditor() *Editor {
 		redraw:             false,
 		output:             nil,
 		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
-
+		modified:           false,
 	}
 }

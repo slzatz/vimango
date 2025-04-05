@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
+	"io/ioutil"
 	"time"
 	
 	"github.com/slzatz/vimango/terminal"
@@ -37,12 +39,26 @@ func NewAppContext() *AppContext {
 	}
 }
 
+// FromFile returns a dbConfig struct parsed from a file.
+func (app *AppContext) FromFile(path string) (*dbConfig, error) {
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg dbConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 // InitDatabases initializes database connections
 func (app *AppContext) InitDatabases(configPath string) error {
 	var err error
 	
 	// Read config file
-	app.Config, err = FromFile(configPath)
+	app.Config, err = app.FromFile(configPath)
 	if err != nil {
 		return err
 	}
@@ -192,7 +208,8 @@ func (app *AppContext) MainLoop() {
 		}
 
 		if sess.editorMode {
-			textChange := editorProcessKey(k)
+			// Use our new context-based method
+			textChange := app.Editor.ProcessKey(app, k)
 
 			if !sess.editorMode {
 				continue

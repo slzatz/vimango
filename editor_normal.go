@@ -356,7 +356,6 @@ func (e *Editor) showMarkdownPreview() {
 	e.mode = PREVIEW
 	e.previewLineOffset = 0
 	e.drawPreview()
-
 }
 
 func (e *Editor) nextStyle() {
