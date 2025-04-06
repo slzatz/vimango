@@ -109,10 +109,11 @@ func (e *Editor) ProcessKey(app *AppContext, key int) bool {
 	// and delegate everything else to the global function
 	
 	// Only handle Ctrl-S in this method for now
-	if key == ctrlKey('s') {
-		e.WriteNote(app)
-		return false
-	}
+  // This was never a method in the application but a Claude hallucination
+//	if key == ctrlKey('s') {
+//		e.WriteNote(app)
+//		return false
+//	}
 	
 	// Let the global function handle everything else
 	return editorProcessKey(key)

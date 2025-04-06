@@ -91,6 +91,7 @@ func (app *AppContext) InitDatabases(configPath string) error {
 func (app *AppContext) InitApp() {
 	// Initialize organizer
 	app.Organizer = &Organizer{Session: app.Session}
+  //app.Organizer = &Organizer // This is where we'd like to go
 	
 	// Initialize Organizer values that were previously in main.go
 	app.Organizer.cx = 0
@@ -222,6 +223,7 @@ func (app *AppContext) MainLoop() {
 			}
 		} else {
 			organizerProcessKey(k)
+      //app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
 			org.scroll()
 			org.refreshScreen()
 			if sess.divider > 10 {
