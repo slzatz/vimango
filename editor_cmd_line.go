@@ -74,7 +74,7 @@ func (e *Editor) writeNote() {
 		go updateCodeFile(e.id, text)
 	}
 
-	updateNote(e.id, text)
+	DB.updateNote(e.id, text)
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
@@ -356,7 +356,7 @@ func (e *Editor) quitActions() {
 	cmd := e.command_line
 	if cmd == "x" {
 		text := e.bufferToString()
-		updateNote(e.id, text)
+		DB.updateNote(e.id, text)
 
 	} else if cmd == "q!" || cmd == "quit!" {
 		// do nothing = allow editor to be closed

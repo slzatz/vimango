@@ -10,19 +10,27 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// AppContext encapsulates the global application state
-type AppContext struct {
+// App encapsulates the global application state
+type App struct {
 	// Core components
-	Session   *Session
-	Organizer *Organizer
-	Editor    *Editor
-	Windows   []Window
+	Session   *Session // Session handles terminal and screen management
+	Organizer *Organizer // Organizer manages tasks and their display
+	Editor    *Editor // Editor manages text editing
+	Windows   []Window // Windows manages multiple windows in the application
+
+  /*
+  Sess
+  Org
+  Ed
+  Wnd
+  DB
+  */
 	
 	// Database connections and context
 	Config  *dbConfig
-	DB      *sql.DB
+	DB      *sql.DB // Main database connection so maybe MainDB
 	FtsDB   *sql.DB
-	DBCtx   *DBContext
+	//DBCtx   *DBContext
 	
 	// Application state
 	LastSync      time.Time
@@ -30,9 +38,9 @@ type AppContext struct {
 	Run           bool
 }
 
-// NewAppContext creates and initializes a new application context
-func NewAppContext() *AppContext {
-	return &AppContext{
+// CreateApp creates and initializes the application struct
+func CreateApp() *App {
+	return &App{
 		Session:   &Session{},
 		Windows:   make([]Window, 0),
 		Run:       true,
@@ -40,7 +48,7 @@ func NewAppContext() *AppContext {
 }
 
 // FromFile returns a dbConfig struct parsed from a file.
-func (a *AppContext) FromFile(path string) (*dbConfig, error) {
+func (a *App) FromFile(path string) (*dbConfig, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -54,7 +62,7 @@ func (a *AppContext) FromFile(path string) (*dbConfig, error) {
 }
 
 // InitDatabases initializes database connections
-func (a *AppContext) InitDatabases(configPath string) error {
+func (a *App) InitDatabases(configPath string) error {
 	var err error
 	
 	// Read config file
@@ -82,13 +90,13 @@ func (a *AppContext) InitDatabases(configPath string) error {
 	}
 	
 	// Initialize DB context
-	a.DBCtx = NewDBContext(a)
+	//a.DBCtx = NewDBContext(a)
 	
 	return nil
 }
 
 // InitApp initializes the application components
-func (a *AppContext) InitApp() {
+func (a *App) InitApp() {
 	// Initialize organizer
 	a.Organizer = &Organizer{Session: a.Session}
   //app.Organizer = &Organizer // This is where we'd like to go
@@ -128,7 +136,7 @@ func (a *AppContext) InitApp() {
 }
 
 // LoadInitialData loads the initial data for the organizer
-func (a *AppContext) LoadInitialData() {
+func (a *App) LoadInitialData() {
 	org := a.Organizer
 	sess := a.Session
 	
@@ -165,7 +173,7 @@ func (a *AppContext) LoadInitialData() {
 }
 
 // Cleanup handles proper shutdown of resources
-func (a *AppContext) Cleanup() {
+func (a *App) Cleanup() {
 	if a.DB != nil {
 		a.DB.Close()
 	}
@@ -180,13 +188,13 @@ func (a *AppContext) Cleanup() {
 }
 
 // SynchronizeWrapper provides a synchronization function that can be called from existing code
-func (a *AppContext) SynchronizeWrapper(reportOnly bool) (string, error) {
+func (a *App) SynchronizeWrapper(reportOnly bool) (string, error) {
 	// This is a wrapper around the Synchronize method
 	return a.Synchronize(reportOnly), nil
 }
 
 // MainLoop is the main application loop
-func (a *AppContext) MainLoop() {
+func (a *App) MainLoop() {
 	sess := a.Session
 	org := a.Organizer
 	

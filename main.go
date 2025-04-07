@@ -12,8 +12,8 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// Global app context
-var app *AppContext
+// Global app struct
+var app *App
 
 // For backward compatibility - these can be removed in a follow-up refactoring
 var sess *Session
@@ -23,18 +23,25 @@ var db *sql.DB
 var fts_db *sql.DB
 var config *dbConfig
 var windows []Window
-
-// FromFile has been moved to AppContext
+var DB *Database
 
 func main() {
 	// Create new app context
-	app = NewAppContext()
+	app = CreateApp()
 	
 	// Initialize Vim
 	vim.Init(0)
 	
 	// Initialize database connections
 	err := app.InitDatabases("config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+
+	// Initialize database connections
+  DB = &Database{}
+	err = DB.InitDatabases(app, "config.json")
 	if err != nil {
 		log.Fatal(err)
 	}

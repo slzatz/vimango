@@ -6,6 +6,7 @@ import (
 //	"strings"
 )
 
+/*
 // DBContext handles database operations for the application
 type DBContext struct {
 	App    *AppContext
@@ -21,10 +22,11 @@ func NewDBContext(a *AppContext) *DBContext {
 		FtsDB:  a.FtsDB,
 	}
 }
+*/
 
 // GetEntries retrieves entries based on filtering criteria
 //func (dbc *DBContext) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
-func (a *AppContext) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
+func (a *App) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
 	// Get show_completed flag from the organizer
 	showCompleted := a.Organizer.show_completed
 	
@@ -111,7 +113,7 @@ func (a *AppContext) GetEntries(taskView int, filter interface{}, showDeleted bo
 }
 
 // FilterEntries filters entries based on criteria (compatibility wrapper)
-func (a *AppContext) FilterEntries(taskview int, filter string, showDeleted bool, sort string, sortPriority bool, limit int) []Row {
+func (a *App) FilterEntries(taskview int, filter string, showDeleted bool, sort string, sortPriority bool, limit int) []Row {
 	// This wrapper maintains compatibility with the existing code
 	result, err := a.GetEntries(taskview, filter, showDeleted, sort, sortPriority, limit)
 	if err != nil {

@@ -12,14 +12,79 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
+type Database struct {
+	//Config  *dbConfig
+	MainDB  *sql.DB // Main database connection so maybe MainDB
+	FtsDB   *sql.DB
+}
+
+/*
+func NewDBContext(a *AppContext) *DBContext {
+	return &DBContext{
+		App:    a,
+		MainDB: a.DB,
+		FtsDB:  a.FtsDB,
+	}
+}
+*/
+
+// InitDatabases initializes database connections
+func (db *Database) InitDatabases(a *App, configPath string) error {
+	var err error
+	
+	// Read config file
+	config, err = a.FromFile(configPath)
+	if err != nil {
+		return err
+	}
+	
+	// Initialize main database
+	db.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
+	if err != nil {
+		return err
+	}
+	
+	// Enable foreign keys
+	_, err = db.MainDB.Exec("PRAGMA foreign_keys=ON;")
+	if err != nil {
+		return err
+	}
+	
+	// Initialize FTS database
+	db.FtsDB, err = sql.Open("sqlite3", a.Config.Sqlite3.FTS_DB)
+	if err != nil {
+		return err
+	}
+	
+	// Initialize DB context
+	//a.DBCtx = NewDBContext(a)
+	
+	return nil
+}
+
 func getId() int {
 	return org.rows[org.fr].id
+}
+
+func (o *Organizer) getId() int {
+	return o.rows[o.fr].id
 }
 
 /***********************************new*********************************/
 func entryTidFromId(id int) int {
 	var tid int
 	_ = db.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
+	return tid
+}
+
+func (a *App) entryTidFromId(id int) int {
+	var tid int
+	_ = a.DB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
+	return tid
+}
+func (db *Database) entryTidFromId(id int) int {
+	var tid int
+	_ = db.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
 	return tid
 }
 
@@ -89,8 +154,8 @@ func keywordName(id int) string {
 }
 */
 
-func filterTitle(filter string, tid int) string {
-	row := db.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
+func (a *App) filterTitle(filter string, tid int) string {
+	row := a.DB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -157,7 +222,8 @@ func keywordList() map[string]struct{} {
 }
 
 func toggleStar() {
-	id := getId()
+	//id := getId()
+	id := org.getId()
 
 	s := fmt.Sprintf("UPDATE %s SET star=?, modified=datetime('now') WHERE id=?;",
 		org.view) //table
@@ -172,7 +238,8 @@ func toggleStar() {
 }
 
 func toggleDeleted() {
-	id := getId()
+	//id := getId()
+	id := org.getId()
 
 	s := fmt.Sprintf("UPDATE %s SET deleted=?, modified=datetime('now') WHERE id=?;", org.view)
 	_, err := db.Exec(s, !org.rows[org.fr].deleted, id)
@@ -220,7 +287,7 @@ func updateTaskFolderByTid(tid, id int) {
 	}
 }
 
-func updateNote(id int, text string) {
+func (db *Database) updateNote(id int, text string) {
 
 	var nullableText sql.NullString
 	if len(text) != 0 {
@@ -228,7 +295,7 @@ func updateNote(id int, text string) {
 		nullableText.Valid = true
 	}
 
-	_, err := db.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
+	_, err := db.MainDB.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
 		nullableText, id)
 	if err != nil {
 		sess.showOrgMessage("Error in updateNote for entry with id %d: %v", id, err)
@@ -237,10 +304,10 @@ func updateNote(id int, text string) {
 
 	/***************fts virtual table update*********************/
 
-	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
+	entry_tid := db.entryTidFromId(id) /////////////////////////////////////////////////////
 
 	//_, err = fts_db.Exec("UPDATE fts SET note=? WHERE lm_id=?;", text, id)
-	_, err = fts_db.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid)
+	_, err = db.FtsDB.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in updateNote updating fts for entry with id %d: %v", id, err)
 	}
@@ -284,7 +351,7 @@ func deleteSyncItem(id int) {
 	sess.showOrgMessage("Deleted sync_log entry with id %d", id)
 }
 
-func filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) []Row {
+func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) []Row {
 
 	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.%s FROM task ", sort)
 
@@ -324,7 +391,7 @@ func filterEntries(taskView int, filter interface{}, showDeleted bool, sort stri
 			rows, err = db.Query(s, filter)
 		}
 	*/
-	rows, err = db.Query(s, filter)
+	rows, err = db.MainDB.Query(s, filter)
 	if err != nil {
 		sess.showOrgMessage("Error in getItems: %v", err)
 		return []Row{}

@@ -206,7 +206,7 @@ func getTagSQ(dbase *sql.DB, tid int, plg io.Writer) string {
 
 // Synchronize synchronizes data between local and remote databases
 // reportOnly: if true, only reports changes without applying them
-func (app *AppContext) Synchronize(reportOnly bool) (log string) {
+func (app *App) Synchronize(reportOnly bool) (log string) {
 	if app.SyncInProcess {
 		return "Synchronization already in process"
 	}

@@ -124,7 +124,7 @@ func organizerProcessKey(c int) {
 			org.clearMarkedEntries()
 			org.view = TASK
 			org.fc, org.fr, org.rowoff = 0, 0, 0
-			org.rows = filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, org.sortPriority, MAX)
+			org.rows = DB.filterEntries(org.taskview, org.filter, org.show_deleted, org.sort, org.sortPriority, MAX)
 			if len(org.rows) == 0 {
 				org.insertRow(0, "", true, false, false, BASE_DATE)
 				org.rows[0].dirty = false
