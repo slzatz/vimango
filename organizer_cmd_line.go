@@ -343,7 +343,7 @@ func (o *Organizer) editNote(id int) {
 	sess.editorMode = true
 
 	active := false
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		if e, ok := w.(*Editor); ok {
 			if e.id == id {
 				active = true
@@ -355,7 +355,7 @@ func (o *Organizer) editNote(id int) {
 
 	if !active {
 		p = NewEditor()
-		appCtx.Windows = append(appCtx.Windows, p)
+		app.Windows = append(app.Windows, p)
 		p.id = id
 		p.top_margin = TOP_MARGIN + 1
 
@@ -363,7 +363,7 @@ func (o *Organizer) editNote(id int) {
 			p.output = &Output{}
 			p.output.is_below = true
 			p.output.id = id
-			appCtx.Windows = append(appCtx.Windows, p.output)
+			app.Windows = append(app.Windows, p.output)
 		}
 		readNoteIntoBuffer(p, id)
 		p.bufferTick = vim.BufferGetLastChangedTick(p.vbuf)
@@ -539,9 +539,9 @@ func (o *Organizer) sync3(unused int) {
 	var err error
 	if o.command_line == "test" {
 		// true => reportOnly
-		log, err = appCtx.SynchronizeWrapper(true)
+		log, err = app.SynchronizeWrapper(true)
 	} else {
-		log, err = appCtx.SynchronizeWrapper(false)
+		log, err = app.SynchronizeWrapper(false)
 	}
 	
 	if err != nil {

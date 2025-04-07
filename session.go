@@ -48,7 +48,7 @@ type Config struct {
 
 func (s *Session) numberOfEditors() int {
 	i := 0
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		if _, ok := w.(*Editor); ok {
 			i++
 		}
@@ -58,7 +58,7 @@ func (s *Session) numberOfEditors() int {
 
 func (s *Session) editors() []*Editor {
 	eds := []*Editor{}
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		if e, ok := w.(*Editor); ok {
 			eds = append(eds, e)
 		}
@@ -136,7 +136,7 @@ func (s *Session) eraseRightScreen() {
 }
 
 func (s *Session) drawRightScreen() {
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		w.drawText()
 		w.drawFrame()
 		w.drawStatusBar()
@@ -145,7 +145,7 @@ func (s *Session) drawRightScreen() {
 
 func (s *Session) positionWindows() {
 	windowSlots := 0
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		switch v := w.(type) {
 		case *Output:
 			if !v.is_below {
@@ -159,7 +159,7 @@ func (s *Session) positionWindows() {
 
 	cols := -1 + (s.screenCols-s.divider)/windowSlots
 	i := -1 //i = number of columns of windows -1
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		switch v := w.(type) {
 		case *Output:
 			if !v.is_below {

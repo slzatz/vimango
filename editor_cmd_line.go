@@ -372,38 +372,38 @@ func (e *Editor) quitActions() {
 	vim.Execute("bw") // wipout the buffer
 
 	index := -1
-	for i, w := range appCtx.Windows {
+	for i, w := range app.Windows {
 		if w == e {
 			index = i
 			break
 		}
 	}
-	copy(appCtx.Windows[index:], appCtx.Windows[index+1:])
-	appCtx.Windows = appCtx.Windows[:len(appCtx.Windows)-1]
+	copy(app.Windows[index:], app.Windows[index+1:])
+	app.Windows = app.Windows[:len(app.Windows)-1]
 
 	if e.output != nil {
 		index = -1
-		for i, w := range appCtx.Windows {
+		for i, w := range app.Windows {
 			if w == e.output {
 				index = i
 				break
 			}
 		}
-		copy(appCtx.Windows[index:], appCtx.Windows[index+1:])
-		appCtx.Windows = appCtx.Windows[:len(appCtx.Windows)-1]
+		copy(app.Windows[index:], app.Windows[index+1:])
+		app.Windows = app.Windows[:len(app.Windows)-1]
 	}
 
-	//if len(appCtx.Windows) > 0 {
+	//if len(app.Windows) > 0 {
 	if sess.numberOfEditors() > 0 {
 		// easier to just go to first window which has to be an editor (at least right now)
-		for _, w := range appCtx.Windows {
+		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need the type assertion
 				p = ed //p is the global current editor
 				break
 			}
 		}
 
-		//p = appCtx.Windows[0].(*Editor)
+		//p = app.Windows[0].(*Editor)
 		vim.BufferSetCurrent(p.vbuf)
 		sess.positionWindows()
 		sess.eraseRightScreen()
@@ -429,7 +429,7 @@ func (e *Editor) quitActions() {
 }
 
 func (e *Editor) writeAll() {
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		if ed, ok := w.(*Editor); ok {
 			vim.BufferSetCurrent(ed.vbuf)
 			ed.writeNote()
@@ -442,38 +442,38 @@ func (e *Editor) writeAll() {
 
 func (e *Editor) quitAll() {
 
-	for _, w := range appCtx.Windows {
+	for _, w := range app.Windows {
 		if ed, ok := w.(*Editor); ok {
 			if ed.isModified() {
 				continue
 			} else {
 				index := -1
-				for i, w := range appCtx.Windows {
+				for i, w := range app.Windows {
 					if w == ed {
 						index = i
 						break
 					}
 				}
-				copy(appCtx.Windows[index:], appCtx.Windows[index+1:])
-				appCtx.Windows = appCtx.Windows[:len(appCtx.Windows)-1]
+				copy(app.Windows[index:], app.Windows[index+1:])
+				app.Windows = app.Windows[:len(app.Windows)-1]
 
 				if ed.output != nil {
 					index = -1
-					for i, w := range appCtx.Windows {
+					for i, w := range app.Windows {
 						if w == ed.output {
 							index = i
 							break
 						}
 					}
-					copy(appCtx.Windows[index:], appCtx.Windows[index+1:])
-					appCtx.Windows = appCtx.Windows[:len(appCtx.Windows)-1]
+					copy(app.Windows[index:], app.Windows[index+1:])
+					app.Windows = app.Windows[:len(app.Windows)-1]
 				}
 			}
 		}
 	}
 
 	if sess.numberOfEditors() > 0 { // we could not quit some editors because they were in modified state
-		for _, w := range appCtx.Windows {
+		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need this type assertion to have statement below
 				p = ed //p is the global representing the current editor
 				break

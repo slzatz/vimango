@@ -13,7 +13,7 @@ import (
 )
 
 // Global app context
-var appCtx *AppContext
+var app *AppContext
 
 // For backward compatibility - these can be removed in a follow-up refactoring
 var sess *Session
@@ -28,26 +28,26 @@ var windows []Window
 
 func main() {
 	// Create new app context
-	appCtx = NewAppContext()
+	app = NewAppContext()
 	
 	// Initialize Vim
 	vim.Init(0)
 	
 	// Initialize database connections
-	err := appCtx.InitDatabases("config.json")
+	err := app.InitDatabases("config.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	
 	// Set global references for backward compatibility
-	sess = appCtx.Session
-	config = appCtx.Config
-	db = appCtx.DB
-	fts_db = appCtx.FtsDB
+	sess = app.Session
+	config = app.Config
+	db = app.DB
+	fts_db = app.FtsDB
 	
 	// Initialize windows array
-	appCtx.Windows = make([]Window, 0)
-	windows = appCtx.Windows // This is a slice, so need to make sure it's the same slice, not just a copy
+	app.Windows = make([]Window, 0)
+	windows = app.Windows // This is a slice, so need to make sure it's the same slice, not just a copy
 	
 	// Create markdown syntax highlighting style
 	markdown_style, _ := selectMDStyle("gruvbox.xml")
@@ -92,16 +92,16 @@ func main() {
 	}
 	
 	// Initialize application components
-	appCtx.InitApp()
-	org = appCtx.Organizer
+	app.InitApp()
+	org = app.Organizer
 	
 	// Load initial data
-	appCtx.LoadInitialData()
+	app.LoadInitialData()
 	
 	// Set run flag
 	sess.run = true
-	appCtx.Run = true
+	app.Run = true
 	
 	// Run the main loop
-	appCtx.MainLoop()
+	app.MainLoop()
 }

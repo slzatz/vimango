@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"strings"
+//	"strings"
 )
 
 // DBContext handles database operations for the application
@@ -14,32 +14,19 @@ type DBContext struct {
 }
 
 // NewDBContext creates a new database context
-func NewDBContext(app *AppContext) *DBContext {
+func NewDBContext(a *AppContext) *DBContext {
 	return &DBContext{
-		App:    app,
-		MainDB: app.DB,
-		FtsDB:  app.FtsDB,
+		App:    a,
+		MainDB: a.DB,
+		FtsDB:  a.FtsDB,
 	}
 }
 
-// EntryTidFromId gets the transaction ID for an entry
-func (dbc *DBContext) EntryTidFromId(id int) int {
-	var tid int
-	_ = dbc.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
-	return tid
-}
-
-// KeywordTidFromId gets the transaction ID for a keyword
-func (dbc *DBContext) KeywordTidFromId(id int) int {
-	var tid int
-	_ = dbc.MainDB.QueryRow("SELECT tid FROM keyword WHERE id=?;", id).Scan(&tid)
-	return tid
-}
-
 // GetEntries retrieves entries based on filtering criteria
-func (dbc *DBContext) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
+//func (dbc *DBContext) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
+func (a *AppContext) GetEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, limit int) ([]Row, error) {
 	// Get show_completed flag from the organizer
-	showCompleted := dbc.App.Organizer.show_completed
+	showCompleted := a.Organizer.show_completed
 	
 	// Build the query based on task view
 	query := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.%s FROM task ", sort)
@@ -90,7 +77,7 @@ func (dbc *DBContext) GetEntries(taskView int, filter interface{}, showDeleted b
 	}
 	
 	// Execute the query
-	rows, err := dbc.MainDB.Query(query, filter)
+	rows, err := a.DB.Query(query, filter)
 	if err != nil {
 		return nil, fmt.Errorf("database query error: %v", err)
 	}
@@ -124,16 +111,17 @@ func (dbc *DBContext) GetEntries(taskView int, filter interface{}, showDeleted b
 }
 
 // FilterEntries filters entries based on criteria (compatibility wrapper)
-func (dbc *DBContext) FilterEntries(taskview int, filter string, showDeleted bool, sort string, sortPriority bool, limit int) []Row {
+func (a *AppContext) FilterEntries(taskview int, filter string, showDeleted bool, sort string, sortPriority bool, limit int) []Row {
 	// This wrapper maintains compatibility with the existing code
-	result, err := dbc.GetEntries(taskview, filter, showDeleted, sort, sortPriority, limit)
+	result, err := a.GetEntries(taskview, filter, showDeleted, sort, sortPriority, limit)
 	if err != nil {
-		dbc.App.Session.showOrgMessage("Error getting entries: %v", err)
+		a.Session.showOrgMessage("Error getting entries: %v", err)
 		return []Row{}
 	}
 	return result
 }
 
+/*
 // ReadNoteText reads a note from the database
 func (dbc *DBContext) ReadNoteText(id int) (string, error) {
 	if id == -1 {
@@ -237,7 +225,6 @@ func (dbc *DBContext) UpdateTaskTitle(id int, title string) error {
 
 	return nil
 }
-
 // InsertNewTask inserts a new task into the database
 func (dbc *DBContext) InsertNewTask(title string, star bool, deleted bool, archived bool, sortDate string) (int, error) {
 	result, err := dbc.MainDB.Exec("INSERT INTO task (tid, title, star, deleted, archived, added, modified) VALUES (NULL, ?, ?, ?, ?, datetime('now'), datetime('now'));",
@@ -449,3 +436,19 @@ func (dbc *DBContext) SearchEntriesWrapper(term string, showDeleted bool, help b
 	}
 	return result
 }
+
+// EntryTidFromId gets the transaction ID for an entry
+func (dbc *DBContext) EntryTidFromId(id int) int {
+	var tid int
+	_ = dbc.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
+	return tid
+}
+
+// KeywordTidFromId gets the transaction ID for a keyword
+func (dbc *DBContext) KeywordTidFromId(id int) int {
+	var tid int
+	_ = dbc.MainDB.QueryRow("SELECT tid FROM keyword WHERE id=?;", id).Scan(&tid)
+	return tid
+}
+
+*/
