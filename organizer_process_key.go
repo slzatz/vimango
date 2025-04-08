@@ -144,7 +144,13 @@ func organizerProcessKey(c int) {
 		}
 
 		if cmd, found := n_lookup[org.command]; found {
-			cmd()
+      if org.command == "dd" || org.command == string(0x4) {
+        org.del()
+      } else if org.command == string(0x18) {
+        org.archive()
+      } else {
+			  cmd()
+      }
 			org.command = ""
 			vim.Key("<esc>")
 			return

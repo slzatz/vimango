@@ -220,7 +220,7 @@ func keywordList() map[string]struct{} {
 	}
 	return keywords
 }
-
+// should it be toggleStar(id int) so you have to call id :=org.getId() before you call toggleStar?
 func toggleStar() {
 	//id := getId()
 	id := org.getId()
@@ -237,34 +237,16 @@ func toggleStar() {
 	sess.showOrgMessage("Toggle star succeeded")
 }
 
-func toggleDeleted() {
-	//id := getId()
-	id := org.getId()
-
-	s := fmt.Sprintf("UPDATE %s SET deleted=?, modified=datetime('now') WHERE id=?;", org.view)
-	_, err := db.Exec(s, !org.rows[org.fr].deleted, id)
-	if err != nil {
-		sess.showOrgMessage("Error toggling %s id %d to deleted: %v", org.view, id, err)
-		return
-	}
-
-	org.rows[org.fr].deleted = !org.rows[org.fr].deleted
-	sess.showOrgMessage("Toggle deleted for %s id %d succeeded", org.view, id)
+func (db *Database) toggleDeleted(id int, state bool, table string) error {
+	s := fmt.Sprintf("UPDATE %s SET deleted=?, modified=datetime('now') WHERE id=?;", table)
+	_, err := db.MainDB.Exec(s, !state, id)
+  return err
 }
 
-func toggleArchived() {
-	id := getId()
-	org.rows[org.fr].archived = !org.rows[org.fr].archived
-
-	_, err := db.Exec("UPDATE task SET archived=?, modified=datetime('now') WHERE id=?;",
-		org.rows[org.fr].archived, id)
-
-	if err != nil {
-		sess.showOrgMessage("Error toggling archived for entry id %d: %v", id, err)
-		return
-	}
-
-	sess.showOrgMessage("Toggle archived for entry %d succeeded", id)
+func (db *Database) toggleArchived(id int, state bool, table string) error {
+	s := fmt.Sprintf("UPDATE %s SET archived=?, modified=datetime('now') WHERE id=?;", table)
+	_, err := db.MainDB.Exec(s, !state, id)
+  return err
 }
 
 func updateTaskContextByTid(tid, id int) {

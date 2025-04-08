@@ -9,15 +9,15 @@ import (
 
 var n_lookup = map[string]func(){
 	//"dd": noop,
-	"dd":                       del,
+	"dd":                       noop, //delete
 	"m":                        mark,
 	":":                        exCmd,
 	string(ctrlKey('l')):       switchToEditorMode,
 	string([]byte{0x17, 0x17}): switchToEditorMode,
-	string(0x4):                del, //ctrl-d
+	string(0x4):                noop, //ctrl-d delete
 	//string(0x2):                starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
 	string(0x1):          starEntry, //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
-	string(0x18):         archive,   //ctrl-x
+	string(0x18):         noop,   //ctrl-x archive
 	string(ctrlKey('i')): entryInfo, //{{0x9}}
 	string(ctrlKey('j')): controlJ,
 	string(ctrlKey('k')): controlK,
@@ -60,16 +60,32 @@ func _n() {
 	org.findNextWord()
 }
 
-func del() {
-	toggleDeleted()
+func (o *Organizer) del() {
+  id := o.rows[o.fr].id
+  state := o.rows[o.fr].deleted
+	err := DB.toggleDeleted(id, state, o.view.String())
+	if err != nil {
+		o.showOrgMessage("Error toggling %s id %d to deleted: %v", o.view, id, err)
+		return
+  }
+	o.rows[org.fr].deleted = !state
+	o.showOrgMessage("Toggle deleted for %s id %d succeeded (new)", o.view, id)
 }
 
 func starEntry() {
 	toggleStar()
 }
 
-func archive() {
-	toggleArchived()
+func (o *Organizer) archive() {
+  id := o.rows[o.fr].id
+  state := o.rows[o.fr].archived
+	err := DB.toggleArchived(id, state, o.view.String())
+	if err != nil {
+		o.showOrgMessage("Error toggling %s id %d to archived: %v", o.view, id, err)
+		return
+  }
+	o.rows[o.fr].archived = !state
+	o.showOrgMessage("Toggle archive for %s id %d succeeded (new)", o.view, id)
 }
 
 func entryInfo() {
