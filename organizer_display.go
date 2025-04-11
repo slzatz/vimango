@@ -439,7 +439,7 @@ func (o *Organizer) drawPreview() {
 	id := o.rows[o.fr].id
 	var note string
 	if o.mode != FIND {
-		note = readNoteIntoString(id)
+		note = DB.readNoteIntoString(id)
 	} else {
 		note = highlightTerms2(id)
 	}

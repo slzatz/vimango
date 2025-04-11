@@ -166,7 +166,7 @@ func (a *App) filterTitle(filter string, tid int) string {
 
 func contextExists(title string) (int, bool) {
 	var tid sql.NullInt64
-	err := db.QueryRow("SELECT tid FROM context WHERE title=?;", title).Scan(&tid)
+	err := DB.MainDB.QueryRow("SELECT tid FROM context WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
@@ -539,12 +539,12 @@ func insertSyncEntry(title, note string) {
 	}
 }
 
-func readNoteIntoString(id int) string {
+func (db *Database) readNoteIntoString(id int) string {
 	if id == -1 {
 		return "" // id given to new and unsaved entries
 	}
 
-	row := db.QueryRow("SELECT note FROM task WHERE id=?;", id)
+	row := db.MainDB.QueryRow("SELECT note FROM task WHERE id=?;", id)
 	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
@@ -629,7 +629,7 @@ func getEntryInfo(id int) NewEntry {
 func taskFolder(id int) string {
 	//row := db.QueryRow("SELECT folder.title FROM folder JOIN task on task.folder_tid = folder.tid WHERE task.id=?;", id)
 	// below seems better because where clause is on task
-	row := db.QueryRow("SELECT folder.title FROM task JOIN folder on task.folder_tid = folder.tid WHERE task.id=?;", id)
+	row := DB.MainDB.QueryRow("SELECT folder.title FROM task JOIN folder on task.folder_tid = folder.tid WHERE task.id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -639,7 +639,7 @@ func taskFolder(id int) string {
 }
 
 func taskContext(id int) string {
-	row := db.QueryRow("SELECT context.title FROM task JOIN context on task.context_tid = context.tid WHERE task.id=?;", id)
+	row := DB.MainDB.QueryRow("SELECT context.title FROM task JOIN context on task.context_tid = context.tid WHERE task.id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -672,12 +672,12 @@ func getTitle(id int) string {
 
 func getTaskKeywords(id int) string {
 
-	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
+	entry_tid := DB.entryTidFromId(id) /////////////////////////////////////////////////////
 
 	//rows, err := db.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
 	//	"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=?;", id)
 
-	rows, err := db.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
+	rows, err := DB.MainDB.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in getTaskKeywords for entry id %d: %v", id, err)

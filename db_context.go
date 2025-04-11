@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+//  "os"
 //	"strings"
 )
 
@@ -79,10 +80,13 @@ func (a *App) GetEntries(taskView int, filter interface{}, showDeleted bool, sor
 	}
 	
 	// Execute the query
-	rows, err := a.DB.Query(query, filter)
+	//rows, err := a.DB.Query(query, filter)
+  fmt.Printf("Query: %s\n", query)
+	rows, err := DB.MainDB.Query(query, filter)
 	if err != nil {
 		return nil, fmt.Errorf("database query error: %v", err)
 	}
+  //os.Exit(0)
 	defer rows.Close()
 	
 	// Process the results
@@ -116,6 +120,7 @@ func (a *App) GetEntries(taskView int, filter interface{}, showDeleted bool, sor
 func (a *App) FilterEntries(taskview int, filter string, showDeleted bool, sort string, sortPriority bool, limit int) []Row {
 	// This wrapper maintains compatibility with the existing code
 	result, err := a.GetEntries(taskview, filter, showDeleted, sort, sortPriority, limit)
+  //os.Exit(0)
 	if err != nil {
 		a.Session.showOrgMessage("Error getting entries: %v", err)
 		return []Row{}

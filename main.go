@@ -49,8 +49,8 @@ func main() {
 	// Set global references for backward compatibility
 	sess = app.Session
 	config = app.Config
-	db = app.DB
-	fts_db = app.FtsDB
+	//db = app.DB
+	//fts_db = app.FtsDB
 	
 	// Initialize windows array
 	app.Windows = make([]Window, 0)

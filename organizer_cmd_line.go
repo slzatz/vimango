@@ -913,7 +913,7 @@ func (o *Organizer) setImage(pos int) {
 
 func (o *Organizer) printDocument(unused int) {
 	id := o.rows[o.fr].id
-	note := readNoteIntoString(id)
+	note := DB.readNoteIntoString(id)
 	if taskFolder(id) == "code" {
 		c := taskContext(id)
 		var ok bool

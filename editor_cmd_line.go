@@ -631,7 +631,7 @@ func (e *Editor) printDocument() {
 			sess.showEdMessage("I don't recognize the language")
 			return
 		}
-		note := readNoteIntoString(e.id)
+		note := DB.readNoteIntoString(e.id)
 		var buf bytes.Buffer
 		// github seems to work pretty well for printer output
 		_ = Highlight(&buf, note, lang, "html", "github")

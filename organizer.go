@@ -34,6 +34,7 @@ type Organizer struct {
 	highlight           [2]int
 	vbuf                vim.Buffer
 	bufferTick          int
-
+  Database            *Database
 	*Session
+  //*Database
 }

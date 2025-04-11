@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"time"
+//  "os"
 	
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
@@ -98,7 +99,8 @@ func (a *App) InitDatabases(configPath string) error {
 // InitApp initializes the application components
 func (a *App) InitApp() {
 	// Initialize organizer
-	a.Organizer = &Organizer{Session: a.Session}
+	//a.Organizer = &Organizer{Session: a.Session}
+	a.Organizer = &Organizer{Session: a.Session, Database: DB}
   //app.Organizer = &Organizer // This is where we'd like to go
 	
 	// Initialize Organizer values that were previously in main.go
@@ -164,7 +166,8 @@ func (a *App) LoadInitialData() {
 	
 	org.readRowsIntoBuffer()
 	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
-	org.drawPreview()
+  //os.Exit(0)
+	org.drawPreview() ////
 	org.refreshScreen()
 	org.drawStatusBar()
 	

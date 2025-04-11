@@ -79,7 +79,7 @@ func starEntry() {
 func (o *Organizer) archive() {
   id := o.rows[o.fr].id
   state := o.rows[o.fr].archived
-	err := DB.toggleArchived(id, state, o.view.String())
+	err := o.Database.toggleArchived(id, state, o.view.String())
 	if err != nil {
 		o.showOrgMessage("Error toggling %s id %d to archived: %v", o.view, id, err)
 		return
@@ -121,7 +121,7 @@ func controlK() {
 
 func controlZ() {
 	id := org.rows[org.fr].id
-	note := readNoteIntoString(id)
+	note := DB.readNoteIntoString(id)
 	note = generateWWString(note, org.totaleditorcols)
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
