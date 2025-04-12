@@ -63,7 +63,7 @@ func _n() {
 func (o *Organizer) del() {
   id := o.rows[o.fr].id
   state := o.rows[o.fr].deleted
-	err := DB.toggleDeleted(id, state, o.view.String())
+	err := o.Database.toggleDeleted(id, state, o.view.String())
 	if err != nil {
 		o.showOrgMessage("Error toggling %s id %d to deleted: %v", o.view, id, err)
 		return

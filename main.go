@@ -21,14 +21,21 @@ var org *Organizer
 var p *Editor
 var db *sql.DB
 var fts_db *sql.DB
-var config *dbConfig
+var config *dbConfig //should be easy to eliminate this global variable
 var windows []Window
 var DB *Database
 
 func main() {
 	// Create new app context
 	app = CreateApp()
-	
+
+	// Set global references for backward compatibility
+	sess = app.Session
+  org = app.Organizer
+  DB = app.Database
+	config = app.Config
+  //p = app.Editor // do we need this here?
+
 	// Initialize Vim
 	vim.Init(0)
 	
@@ -38,20 +45,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-
-	// Initialize database connections
-  DB = &Database{}
-	err = DB.InitDatabases(app, "config.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-	// Set global references for backward compatibility
-	sess = app.Session
-	config = app.Config
-	//db = app.DB
-	//fts_db = app.FtsDB
-	
 	// Initialize windows array
 	app.Windows = make([]Window, 0)
 	windows = app.Windows // This is a slice, so need to make sure it's the same slice, not just a copy

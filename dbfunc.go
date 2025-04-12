@@ -13,62 +13,19 @@ import (
 )
 
 type Database struct {
-	//Config  *dbConfig
-	MainDB  *sql.DB // Main database connection so maybe MainDB
+	MainDB  *sql.DB // Main database connection 
 	FtsDB   *sql.DB
 }
 
-/*
-func NewDBContext(a *AppContext) *DBContext {
-	return &DBContext{
-		App:    a,
-		MainDB: a.DB,
-		FtsDB:  a.FtsDB,
-	}
-}
-*/
-
-// InitDatabases initializes database connections
-func (db *Database) InitDatabases(a *App, configPath string) error {
-	var err error
-	
-	// Read config file
-	config, err = a.FromFile(configPath)
-	if err != nil {
-		return err
-	}
-	
-	// Initialize main database
-	db.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
-	if err != nil {
-		return err
-	}
-	
-	// Enable foreign keys
-	_, err = db.MainDB.Exec("PRAGMA foreign_keys=ON;")
-	if err != nil {
-		return err
-	}
-	
-	// Initialize FTS database
-	db.FtsDB, err = sql.Open("sqlite3", a.Config.Sqlite3.FTS_DB)
-	if err != nil {
-		return err
-	}
-	
-	// Initialize DB context
-	//a.DBCtx = NewDBContext(a)
-	
-	return nil
-}
-
+// need to get rid of this and use method on organizer
 func getId() int {
 	return org.rows[org.fr].id
 }
-
+/*
 func (o *Organizer) getId() int {
 	return o.rows[o.fr].id
 }
+*/
 
 /***********************************new*********************************/
 func entryTidFromId(id int) int {
@@ -79,9 +36,10 @@ func entryTidFromId(id int) int {
 
 func (a *App) entryTidFromId(id int) int {
 	var tid int
-	_ = a.DB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
+	_ = a.Database.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
 	return tid
 }
+
 func (db *Database) entryTidFromId(id int) int {
 	var tid int
 	_ = db.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
@@ -155,7 +113,7 @@ func keywordName(id int) string {
 */
 
 func (a *App) filterTitle(filter string, tid int) string {
-	row := a.DB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
+	row := a.Database.MainDB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {

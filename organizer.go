@@ -38,3 +38,12 @@ type Organizer struct {
 	*Session
   //*Database
 }
+
+func (o *Organizer) FilterEntries(max int) {
+    o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, max)
+}
+
+func (o *Organizer) getId() int {
+	return o.rows[o.fr].id
+}
+

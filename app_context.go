@@ -18,20 +18,10 @@ type App struct {
 	Organizer *Organizer // Organizer manages tasks and their display
 	Editor    *Editor // Editor manages text editing
 	Windows   []Window // Windows manages multiple windows in the application
-
-  /*
-  Sess
-  Org
-  Ed
-  Wnd
-  DB
-  */
+  Database  *Database // Database handles database connections and queries
 	
-	// Database connections and context
+	// Database connections and other config
 	Config  *dbConfig
-	DB      *sql.DB // Main database connection so maybe MainDB
-	FtsDB   *sql.DB
-	//DBCtx   *DBContext
 	
 	// Application state
 	LastSync      time.Time
@@ -41,8 +31,13 @@ type App struct {
 
 // CreateApp creates and initializes the application struct
 func CreateApp() *App {
+  db := &Database{}
+  sess := &Session{}
 	return &App{
-		Session:   &Session{},
+		Session:   sess,
+    Database: db,
+    Editor:    &Editor{},
+    Organizer: &Organizer{Session: sess, Database: db},
 		Windows:   make([]Window, 0),
 		Run:       true,
 	}
@@ -64,46 +59,38 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 
 // InitDatabases initializes database connections
 func (a *App) InitDatabases(configPath string) error {
-	var err error
+	//var err error
 	
 	// Read config file
-	a.Config, err = a.FromFile(configPath)
+	config, err := a.FromFile(configPath)
 	if err != nil {
 		return err
 	}
 	
 	// Initialize main database
-	a.DB, err = sql.Open("sqlite3", a.Config.Sqlite3.DB)
+	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
 	
 	// Enable foreign keys
-	_, err = a.DB.Exec("PRAGMA foreign_keys=ON;")
+	_, err = a.Database.MainDB.Exec("PRAGMA foreign_keys=ON;")
 	if err != nil {
 		return err
 	}
 	
 	// Initialize FTS database
-	a.FtsDB, err = sql.Open("sqlite3", a.Config.Sqlite3.FTS_DB)
+	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
 	if err != nil {
 		return err
 	}
-	
-	// Initialize DB context
-	//a.DBCtx = NewDBContext(a)
-	
+  a.Config = config
 	return nil
 }
 
 // InitApp initializes the application components
 func (a *App) InitApp() {
-	// Initialize organizer
-	//a.Organizer = &Organizer{Session: a.Session}
-	a.Organizer = &Organizer{Session: a.Session, Database: DB}
-  //app.Organizer = &Organizer // This is where we'd like to go
 	
-	// Initialize Organizer values that were previously in main.go
 	a.Organizer.cx = 0
 	a.Organizer.cy = 0
 	a.Organizer.fc = 0
@@ -129,60 +116,50 @@ func (a *App) InitApp() {
 	a.Organizer.marked_entries = make(map[int]struct{})
 	a.Organizer.vbuf = vim.BufferNew(0)
 	vim.BufferSetCurrent(a.Organizer.vbuf)
-	
-	// Initialize Editor (even though it's not used immediately)
-	a.Editor = &Editor{}
-	
-	// Set global references for backward compatibility
-	org = a.Organizer
 }
 
 // LoadInitialData loads the initial data for the organizer
 func (a *App) LoadInitialData() {
-	org := a.Organizer
-	sess := a.Session
-	
 	// Calculate layout dimensions
-	sess.textLines = sess.screenLines - 2 - TOP_MARGIN
-	sess.edPct = 60
+	a.Session.textLines = a.Session.screenLines - 2 - TOP_MARGIN
+	a.Session.edPct = 60
 	
 	// Set divider based on percentage
-	if sess.edPct == 100 {
-		sess.divider = 1
+	if a.Session.edPct == 100 {
+		a.Session.divider = 1
 	} else {
-		sess.divider = sess.screenCols - sess.edPct*sess.screenCols/100
+		a.Session.divider = a.Session.screenCols - a.Session.edPct*a.Session.screenCols/100
 	}
 	
-	sess.totaleditorcols = sess.screenCols - sess.divider - 1
-	sess.eraseScreenRedrawLines()
+	a.Session.totaleditorcols = a.Session.screenCols - a.Session.divider - 1
+	a.Session.eraseScreenRedrawLines()
 	
-	// Load organizer data using DB context
-	org.rows = a.FilterEntries(org.taskview, org.filter, org.show_deleted, org.sort, org.sortPriority, MAX)
+	org.FilterEntries(MAX)
 	if len(org.rows) == 0 {
-		org.insertRow(0, "", true, false, false, BASE_DATE)
-		org.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		a.Organizer.insertRow(0, "", true, false, false, BASE_DATE)
+		a.Organizer.rows[0].dirty = false
+		a.Session.showOrgMessage("No results were returned")
 	}
 	
-	org.readRowsIntoBuffer()
-	org.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
-  //os.Exit(0)
-	org.drawPreview() ////
-	org.refreshScreen()
-	org.drawStatusBar()
-	
-	sess.showOrgMessage("rows: %d  columns: %d", sess.screenLines, sess.screenCols)
-	sess.returnCursor()
+	a.Organizer.readRowsIntoBuffer()
+	a.Organizer.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+	a.Organizer.drawPreview() 
+	a.Organizer.refreshScreen()
+	a.Organizer.drawStatusBar()
+
+	a.Session.showOrgMessage("rows: %d  columns: %d", a.Session.screenLines, a.Session.screenCols)
+	a.Session.returnCursor()
 }
 
 // Cleanup handles proper shutdown of resources
 func (a *App) Cleanup() {
-	if a.DB != nil {
-		a.DB.Close()
+	//if a.DB != nil {
+	if a.Database.MainDB != nil {
+		a.Database.MainDB.Close()
 	}
 	
-	if a.FtsDB != nil {
-		a.FtsDB.Close()
+	if a.Database.FtsDB != nil {
+		a.Database.FtsDB.Close()
 	}
 	
 	if a.Session != nil {
