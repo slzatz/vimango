@@ -17,41 +17,19 @@ type Database struct {
 	FtsDB   *sql.DB
 }
 
-// need to get rid of this and use method on organizer
-func getId() int {
-	return org.rows[org.fr].id
-}
-/*
-func (o *Organizer) getId() int {
-	return o.rows[o.fr].id
-}
-*/
-
-/***********************************new*********************************/
-func entryTidFromId(id int) int {
-	var tid int
-	_ = db.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
-	return tid
-}
-
-func (a *App) entryTidFromId(id int) int {
-	var tid int
-	_ = a.Database.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
-	return tid
-}
-
 func (db *Database) entryTidFromId(id int) int {
 	var tid int
 	_ = db.MainDB.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
 	return tid
 }
 
+/* appears not to be in use
 func keywordTidFromId(id int) int {
 	var tid int
 	_ = db.QueryRow("SELECT tid FROM keyword WHERE id=?;", id).Scan(&tid)
 	return tid
 }
-
+*/
 /***********************************new*********************************/
 
 func timeDelta(t string) string {
@@ -79,26 +57,28 @@ func timeDelta(t string) string {
 	}
 }
 
+/* appears not to be in use
 func keywordId(title string) int {
 	var id int
 	_ = db.QueryRow("SELECT id FROM keyword WHERE title=?;", title).Scan(&id)
 	return id
 }
-
-func keywordExists(title string) (int, bool) {
+*/
+func (db *Database) keywordExists(title string) (int, bool) {
 	var tid sql.NullInt64
-	err := db.QueryRow("SELECT tid FROM keyword WHERE title=?;", title).Scan(&tid)
+	err := db.MainDB.QueryRow("SELECT tid FROM keyword WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
 	return int(tid.Int64), true
 }
-
+/* appears not to be in use and duplicates entryTidFromId
 func entryTid(id int) int {
 	var tid int
 	_ = db.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
 	return tid
 }
+*/
 
 /*
 func keywordName(id int) string {
@@ -178,21 +158,11 @@ func keywordList() map[string]struct{} {
 	}
 	return keywords
 }
-// should it be toggleStar(id int) so you have to call id :=org.getId() before you call toggleStar?
-func toggleStar() {
-	//id := getId()
-	id := org.getId()
-
+func (db *Database) toggleStar(id int, state bool, table string) error {
 	s := fmt.Sprintf("UPDATE %s SET star=?, modified=datetime('now') WHERE id=?;",
 		org.view) //table
-	_, err := db.Exec(s, !org.rows[org.fr].star, id)
-
-	if err != nil {
-		sess.showOrgMessage("Error in toggleStar for id %d: %v", id, err)
-	}
-
-	org.rows[org.fr].star = !org.rows[org.fr].star
-	sess.showOrgMessage("Toggle star succeeded")
+	_, err := db.MainDB.Exec(s, !state, id)
+  return err
 }
 
 func (db *Database) toggleDeleted(id int, state bool, table string) error {
@@ -379,7 +349,7 @@ func (o *Organizer) readRowsIntoBuffer() {
 	vim.BufferSetCurrent(o.vbuf)
 }
 
-func updateTitle() {
+func (db *Database) updateTitle() {
 
 	row := org.rows[org.fr]
 
@@ -394,17 +364,17 @@ func updateTitle() {
 		return
 	}
 
-	_, err := db.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
+	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
 	if err != nil {
 		sess.showOrgMessage("Error in updateTitle for id %d: %v", row.id, err)
 		return
 	}
 
 	/***************fts virtual table update*********************/
-	entry_tid := entryTidFromId(row.id) /////////////////////////////////////////////////////
+	entry_tid := db.entryTidFromId(row.id) /////////////////////////////////////////////////////
 
 	//_, err = fts_db.Exec("UPDATE fts SET title=? WHERE lm_id=?;", row.title, row.id)
-	_, err = fts_db.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
+	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in updateTitle update fts for id %d: %v", row.id, err)
 		return
@@ -470,21 +440,6 @@ func insertRowInDB(row *Row) error { // should return err
 	row.id = id
 	row.dirty = false
 	return nil
-
-	/***************fts virtual table update*********************/
-	/*
-		// this is an issue; in current mode can't index in fts until sync and get a tid
-		entry_tid := entryTidFromId(row.id) /////////////////////////////////////////////////////
-
-		_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, tid) VALUES (?, ?, ?, ?);", row.title, "", "", entry_tid)
-		if err != nil {
-			sess.showOrgMessage("Error in insertRowInDB inserting into fts for %s: %v", row.title, err)
-			return row.id
-		}
-		sess.showOrgMessage("Successfully inserted new row with id %d and indexed it (new version)", row.id)
-		//return row.id
-		return nil
-	*/
 }
 
 func insertSyncEntry(title, note string) {
@@ -628,14 +583,14 @@ func getTitle(id int) string {
 	return title
 }
 
-func getTaskKeywords(id int) string {
+func (db *Database) getTaskKeywords(id int) string {
 
-	entry_tid := DB.entryTidFromId(id) /////////////////////////////////////////////////////
+	entry_tid := db.entryTidFromId(id) /////////////////////////////////////////////////////
 
 	//rows, err := db.Query("SELECT keyword.name FROM task_keyword LEFT OUTER JOIN keyword ON "+
 	//	"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=?;", id)
 
-	rows, err := DB.MainDB.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
+	rows, err := db.MainDB.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in getTaskKeywords for entry id %d: %v", id, err)
@@ -656,6 +611,7 @@ func getTaskKeywords(id int) string {
 	return strings.Join(kk, ",")
 }
 
+/* Doesn't appear to be used
 func getTaskKeywordTids(id int) []int {
 
 	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
@@ -676,6 +632,7 @@ func getTaskKeywordTids(id int) []int {
 	}
 	return keyword_tids
 }
+*/
 
 func searchEntries(st string, showDeleted, help bool) []Row {
 
@@ -957,10 +914,10 @@ func getContainerInfo(id int) Container {
 	return c
 }
 
-func addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bool) {
-	entry_tid := entryTidFromId(entry_id) /////////////////////////////////////////////////////
+func (db *Database) addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bool) {
+	entry_tid := db.entryTidFromId(entry_id) /////////////////////////////////////////////////////
 
-	_, err := db.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid) VALUES (?, ?);",
+	_, err := db.MainDB.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid) VALUES (?, ?);",
 		entry_tid, keyword_tid)
 
 	if err != nil {
@@ -968,7 +925,7 @@ func addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bool) {
 		return
 	}
 
-	_, err = db.Exec("UPDATE task SET modified = datetime('now') WHERE id=?;", entry_id)
+	_, err = db.MainDB.Exec("UPDATE task SET modified = datetime('now') WHERE id=?;", entry_id)
 	if err != nil {
 		sess.showOrgMessage("Error in addTaskKeywordByTid - Update task modified: %v", err)
 		return
@@ -978,9 +935,9 @@ func addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bool) {
 	if !update_fts {
 		return
 	}
-	s := getTaskKeywords(entry_id)
+	s := db.getTaskKeywords(entry_id)
 	//_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE lm_id=?;", s, entry_id)
-	_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
+	_, err = db.FtsDB.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in addTaskKeywordByTid - fts Update: %v", err)
 	}
@@ -1049,70 +1006,29 @@ func insertContainer(row *Row) int {
 	return id
 }
 
-func deleteKeywords(id int) int {
-	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
+func (db *Database) deleteKeywords(id int) int {
+	entry_tid := db.entryTidFromId(id) /////////////////////////////////////////////////////
 	//res, err := db.Exec("DELETE FROM task_keyword WHERE task_id=?;", id)
-	res, err := db.Exec("DELETE FROM task_keyword WHERE task_tid=?;", entry_tid)
+	res, err := db.MainDB.Exec("DELETE FROM task_keyword WHERE task_tid=?;", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error deleting from task_keyword: %v", err)
 		return -1
 	}
 	rowsAffected, _ := res.RowsAffected()
-	_, err = db.Exec("UPDATE task SET modified=datetime('now') WHERE id=?;", id)
+	_, err = db.MainDB.Exec("UPDATE task SET modified=datetime('now') WHERE id=?;", id)
 	if err != nil {
 		sess.showOrgMessage("Error updating entry modified column in deleteKeywords: %v", err)
 		return -1
 	}
 
 	//_, err = fts_db.Exec("UPDATE fts SET tag='' WHERE lm_id=?", id)
-	_, err = fts_db.Exec("UPDATE fts SET tag='' WHERE tid=?", entry_tid)
+	_, err = db.FtsDB.Exec("UPDATE fts SET tag='' WHERE tid=?", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error updating fts in deleteKeywords: %v", err)
 		return -1
 	}
 	return int(rowsAffected)
 }
-
-// need to revisit
-/*
-func copyEntry() {
-	// ? needs temp tid
-	id := getId()
-	row := db.QueryRow("SELECT title, star, note, context_tid, folder_tid FROM task WHERE id=?;", id)
-	var e Entry
-	err := row.Scan(
-		&e.title,
-		&e.star,
-		&e.note,
-		&e.context_tid,
-		&e.folder_tid,
-	)
-	if err != nil {
-		sess.showOrgMessage("Error in copyEntry trying to copy id %d: %v", id, err)
-	}
-
-	res, err := db.Exec("INSERT INTO task (title, star, note, context_tid, folder_tid, created, added, modified, deleted) "+
-		"VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'), false);",
-		"copy of "+e.title, e.star, e.note, e.context_tid, e.folder_tid)
-	if err != nil {
-		sess.showOrgMessage("Error inserting copy of entry %q into sqlite: %v:", truncate(e.title, 15), err)
-		return
-	}
-	lastId, _ := res.LastInsertId()
-	newId := int(lastId)
-	kwtids := getTaskKeywordTids(id)
-	for _, keywordTid := range kwtids {
-		//kwn := keywordName(keywordId)
-		addTaskKeywordByTid(keywordTid, entry_tid, false) // means don't update fts
-	}
-	tag := getTaskKeywords(newId) // returns string
-	_, err = fts_db.Exec("INSERT INTO fts (title, note, tag, tid) VALUES (?, ?, ?, ?);", e.title, e.note, tag, entry_tid)
-	if err != nil {
-		sess.showOrgMessage("Error inserting into fts_db for entry %q with id %d: %v", truncate(e.title, 15), newId, err)
-		return
-	}
-}
-*/
 
 // not in use but worked
 func highlightTerms__(text string, word_positions [][]int) string {
@@ -1168,15 +1084,15 @@ func highlightTerms__(text string, word_positions [][]int) string {
 }
 
 // current method in use
-func highlightTerms2(id int) string {
+func (db *Database) highlightTerms2(id int) string {
 	if id == -1 {
 		return "" // id given to new and unsaved entries
 	}
-	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
+	entry_tid := db.entryTidFromId(id) 
 
 	//row := fts_db.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
 	//	"FROM fts WHERE lm_id=$1 AND fts MATCH $2;", id, sess.fts_search_terms)
-	row := fts_db.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
+	row := db.FtsDB.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
 		"FROM fts WHERE tid=$1 AND fts MATCH $2;", entry_tid, sess.fts_search_terms)
 
 	var note sql.NullString

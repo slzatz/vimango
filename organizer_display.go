@@ -286,7 +286,7 @@ func (o *Organizer) drawStatusBar() {
 	if len(o.rows) > 0 {
 		switch o.view {
 		case TASK:
-			id = getId()
+			id = o.getId()
 			switch o.taskview {
 			case BY_FIND:
 				str = "search - " + o.fts_search_terms
@@ -323,7 +323,7 @@ func (o *Organizer) drawStatusBar() {
 		id = row.id
 
 		if o.view == TASK {
-			keywords = getTaskKeywords(row.id)
+			keywords = o.Database.getTaskKeywords(row.id)
 		}
 	} else {
 		title = "   No Results   "
@@ -439,9 +439,9 @@ func (o *Organizer) drawPreview() {
 	id := o.rows[o.fr].id
 	var note string
 	if o.mode != FIND {
-		note = DB.readNoteIntoString(id)
+		note = o.Database.readNoteIntoString(id)
 	} else {
-		note = highlightTerms2(id)
+		note = o.Database.highlightTerms2(id)
 	}
 	//note = generateWWString(note, o.totaleditorcols)
 	//note = WordWrap(note, o.totaleditorcols)

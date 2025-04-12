@@ -134,15 +134,15 @@ func (a *App) LoadInitialData() {
 	a.Session.totaleditorcols = a.Session.screenCols - a.Session.divider - 1
 	a.Session.eraseScreenRedrawLines()
 	
-	org.FilterEntries(MAX)
-	if len(org.rows) == 0 {
+	a.Organizer.FilterEntries(MAX)
+	if len(a.Organizer.rows) == 0 {
 		a.Organizer.insertRow(0, "", true, false, false, BASE_DATE)
 		a.Organizer.rows[0].dirty = false
 		a.Session.showOrgMessage("No results were returned")
 	}
 	
 	a.Organizer.readRowsIntoBuffer()
-	a.Organizer.bufferTick = vim.BufferGetLastChangedTick(org.vbuf)
+	a.Organizer.bufferTick = vim.BufferGetLastChangedTick(a.Organizer.vbuf)
 	a.Organizer.drawPreview() 
 	a.Organizer.refreshScreen()
 	a.Organizer.drawStatusBar()
@@ -175,8 +175,6 @@ func (a *App) SynchronizeWrapper(reportOnly bool) (string, error) {
 
 // MainLoop is the main application loop
 func (a *App) MainLoop() {
-	sess := a.Session
-	org := a.Organizer
 	
 	// Set global reference for backward compatibility
 	p = a.Editor
@@ -211,12 +209,12 @@ func (a *App) MainLoop() {
 				p.drawStatusBar()
 			}
 		} else {
-			organizerProcessKey(k)
+			a.Organizer.organizerProcessKey(k)
       //app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
-			org.scroll()
-			org.refreshScreen()
+			a.Organizer.scroll()
+			a.Organizer.refreshScreen()
 			if sess.divider > 10 {
-				org.drawStatusBar()
+				a.Organizer.drawStatusBar()
 			}
 		}
 		sess.returnCursor()

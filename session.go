@@ -338,8 +338,7 @@ func (s *Session) displayEntryInfo(e *NewEntry) {
 	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
 	fmt.Fprintf(&ab, "added: %s%s", e.added, lf_ret)
 
-	//fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(getId()), lf_ret)
-	fmt.Fprintf(&ab, "keywords: %s%s", getTaskKeywords(e.id), lf_ret)
+	fmt.Fprintf(&ab, "keywords: %s%s", DB.getTaskKeywords(e.id), lf_ret)
 
 	fmt.Print(ab.String())
 }

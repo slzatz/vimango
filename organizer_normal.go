@@ -16,14 +16,23 @@ var n_lookup = map[string]func(){
 	string([]byte{0x17, 0x17}): switchToEditorMode,
 	string(0x4):                noop, //ctrl-d delete
 	//string(0x2):                starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
-	string(0x1):          starEntry, //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
+	string(0x1):          noop, //ctrl-b starEntry
 	string(0x18):         noop,   //ctrl-x archive
-	string(ctrlKey('i')): entryInfo, //{{0x9}}
+	string(ctrlKey('i')): noop, //{{0x9}} entryInfo
 	string(ctrlKey('j')): controlJ,
 	string(ctrlKey('k')): controlK,
 	string(ctrlKey('z')): controlZ,
 	string(ctrlKey('n')): drawPreviewWithImages,
 	" m":                 drawPreviewWithImages,
+}
+
+var new_lookup = map[string]func(*Organizer)(){
+	//"dd": noop,
+	"dd":                 (*Organizer).del, //delete
+	string(0x4):          (*Organizer).del, //ctrl-d delete
+	string(0x1):          (*Organizer).star, //ctrl-b starEntry
+	string(0x18):         (*Organizer).archive,   //ctrl-x archive
+	string(ctrlKey('i')): (*Organizer).info, //{{0x9}} entryInfo
 }
 
 func exCmd() {
@@ -72,8 +81,16 @@ func (o *Organizer) del() {
 	o.showOrgMessage("Toggle deleted for %s id %d succeeded (new)", o.view, id)
 }
 
-func starEntry() {
-	toggleStar()
+func (o *Organizer) star() {
+  id := o.rows[o.fr].id
+  state := o.rows[o.fr].star
+	err := o.Database.toggleStar(id, state, o.view.String())
+	if err != nil {
+		o.showOrgMessage("Error toggling %s id %d to star: %v", o.view, id, err)
+		return
+  }
+	o.rows[o.fr].star = !state
+	o.showOrgMessage("Toggle star for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) archive() {
@@ -88,8 +105,8 @@ func (o *Organizer) archive() {
 	o.showOrgMessage("Toggle archive for %s id %d succeeded (new)", o.view, id)
 }
 
-func entryInfo() {
-	e := getEntryInfo(getId())
+func (o *Organizer) info() {
+	e := getEntryInfo(o.getId())
 	sess.displayEntryInfo(&e)
 	sess.drawPreviewBox()
 }

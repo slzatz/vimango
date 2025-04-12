@@ -196,7 +196,7 @@ func (o *Organizer) writeTitle() {
 	}
 
 	if o.view == TASK {
-		updateTitle()
+		o.Database.updateTitle()
 	} else {
 		updateContainerTitle()
 	}

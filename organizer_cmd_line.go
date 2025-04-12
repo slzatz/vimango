@@ -255,7 +255,7 @@ func (o *Organizer) openKeyword(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
-	if tid, ok = keywordExists(input); !ok {
+	if tid, ok = o.Database.keywordExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid keyword!", input)
 		o.mode = o.last_mode
 		return
@@ -330,7 +330,7 @@ func (o *Organizer) editNote(id int) {
 
 	//pos is zero if no space and command modifier
 	if id == -1 {
-		id = getId()
+		id = o.getId()
 	}
 	if id == -1 {
 		sess.showOrgMessage("You need to save item before you can create a note")
@@ -737,7 +737,7 @@ func (o *Organizer) keywords(pos int) {
 	}
 
 	// not necessary if handled in sync (but not currently handled there)
-	if len(o.marked_entries) == 0 && entryTid(o.rows[o.fr].id) < 1 {
+	if len(o.marked_entries) == 0 && o.Database.entryTidFromId(o.rows[o.fr].id) < 1 {
 		sess.showOrgMessage("The entry has not been synced yet!")
 		o.mode = o.last_mode
 		return
@@ -746,7 +746,7 @@ func (o *Organizer) keywords(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
-	if tid, ok = keywordExists(input); !ok {
+	if tid, ok = o.Database.keywordExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid keyword!", input)
 		o.mode = o.last_mode
 		return
@@ -761,11 +761,11 @@ func (o *Organizer) keywords(pos int) {
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
 			// not necessary if handled in sync (but not currently handled there)
-			if entryTid(entry_id) < 1 {
+			if o.Database.entryTidFromId(entry_id) < 1 {
 				unsynced = append(unsynced, strconv.Itoa(entry_id))
 				continue
 			}
-			addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
+			o.Database.addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
 		}
 		if len(unsynced) > 0 {
 			sess.showOrgMessage("Added keyword %s to marked entries except for previously unsynced entries: %s", input, strings.Join(unsynced, ", "))
@@ -776,7 +776,7 @@ func (o *Organizer) keywords(pos int) {
 	}
 
 	// get here if no marked entries
-	addTaskKeywordByTid(tid, o.rows[o.fr].id, true)
+	o.Database.addTaskKeywordByTid(tid, o.rows[o.fr].id, true)
 	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", input)
 }
 
@@ -802,8 +802,8 @@ func (o *Organizer) recent(unused int) {
 }
 
 func (o *Organizer) deleteKeywords(unused int) {
-	id := getId()
-	res := deleteKeywords(id)
+	id := o.getId()
+	res := o.Database.deleteKeywords(id)
 	o.mode = o.last_mode
 	if res != -1 {
 		sess.showOrgMessage("%d keyword(s) deleted from entry %d", res, id)
