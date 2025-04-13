@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lib/pq"
-	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/lib/pq" //should go eventually
+//	_ "github.com/lib/pq" //should go eventually
+//	_ "github.com/mattn/go-sqlite3"
 )
 
 type EntryPlusTag struct {
@@ -214,6 +214,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	a.SyncInProcess = true
 	defer func() { a.SyncInProcess = false }()
 	
+  /*
 	// Use config from app context
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		a.Config.Postgres.Host,
@@ -222,7 +223,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		a.Config.Postgres.Password,
 		a.Config.Postgres.DB,
 	)
-
+*/
 	var lg strings.Builder
 	var success bool
 	defer func() {
@@ -240,6 +241,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	}()
 
+  /*
 	pdb, err := sql.Open("postgres", connect)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error opening postgres db: %v", err)
@@ -253,12 +255,12 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		fmt.Fprintf(&lg, "postgres ping failure!: %v", err)
 		return
 	}
-
+ */
 	nn := 0 //number of changes
 
 	row := a.Database.MainDB.QueryRow("SELECT timestamp FROM sync WHERE machine=$1;", "client")
 	var raw_client_t string
-	err = row.Scan(&raw_client_t)
+	err := row.Scan(&raw_client_t)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error retrieving last client sync: %v", err)
 		return
@@ -282,7 +284,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "Client last sync: %v\n", client_t)
 
 	//server updated contexts
-	rows, err := pdb.Query("SELECT tid, title, star, modified FROM context WHERE context.modified > $1 AND context.deleted = $2;", server_t, false)
+	rows, err := a.Database.PG.Query("SELECT tid, title, star, modified FROM context WHERE context.modified > $1 AND context.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_contexts: %v", err)
 		return
@@ -311,7 +313,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server deleted contexts
-	rows, err = pdb.Query("SELECT tid, title FROM context WHERE context.modified > $1 AND context.deleted = $2;", server_t, true)
+	rows, err = a.Database.PG.Query("SELECT tid, title FROM context WHERE context.modified > $1 AND context.deleted = $2;", server_t, true)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_deleted_contexts: %v\n", err)
 		return
@@ -334,7 +336,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server updated folders
-	rows, err = pdb.Query("SELECT tid, title, star, modified FROM folder WHERE folder.modified > $1 AND folder.deleted = $2;", server_t, false)
+	rows, err = a.Database.PG.Query("SELECT tid, title, star, modified FROM folder WHERE folder.modified > $1 AND folder.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_folders: %v", err)
 		return
@@ -361,7 +363,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server deleted folders
-	rows, err = pdb.Query("SELECT tid, title FROM folder WHERE folder.modified > $1 AND folder.deleted = $2;", server_t, true)
+	rows, err = a.Database.PG.Query("SELECT tid, title FROM folder WHERE folder.modified > $1 AND folder.deleted = $2;", server_t, true)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_deleted_folders: %v", err)
 		return
@@ -384,7 +386,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server updated keywords
-	rows, err = pdb.Query("SELECT tid, title, star, modified FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, false)
+	rows, err = a.Database.PG.Query("SELECT tid, title, star, modified FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_keywords: %v", err)
 		return
@@ -411,7 +413,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server deleted keywords
-	rows, err = pdb.Query("SELECT tid, title FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, true)
+	rows, err = a.Database.PG.Query("SELECT tid, title FROM keyword WHERE keyword.modified > $1 AND keyword.deleted = $2;", server_t, true)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_deleted_keywords: %v", err)
 		return
@@ -436,7 +438,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server updated entries
-	rows, err = pdb.Query("SELECT tid, title, star, note, modified, added, archived, context_tid, folder_tid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", server_t, false)
+	rows, err = a.Database.PG.Query("SELECT tid, title, star, note, modified, added, archived, context_tid, folder_tid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", server_t, false)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_updated_entries: %v", err)
 		return
@@ -471,7 +473,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 
 	//server deleted entries
-	rows, err = pdb.Query("SELECT tid, title FROM task WHERE modified > $1 AND deleted = $2;", server_t, true)
+	rows, err = a.Database.PG.Query("SELECT tid, title FROM task WHERE modified > $1 AND deleted = $2;", server_t, true)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for server_deleted_entries: %v", err)
 		return
@@ -779,14 +781,14 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	for _, c := range client_updated_contexts {
 		var exists bool
-		err := pdb.QueryRow("SELECT EXISTS(SELECT 1 FROM context WHERE tid=$1);", c.tid).Scan(&exists)
+		err := a.Database.PG.QueryRow("SELECT EXISTS(SELECT 1 FROM context WHERE tid=$1);", c.tid).Scan(&exists)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error SELECT EXISTS(SELECT 1 FROM context ...: %v\n", err)
 			continue
 		}
 
 		if exists {
-			_, err := pdb.Exec("UPDATE context SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
+			_, err := a.Database.PG.Exec("UPDATE context SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error updating postgres for a context with tid: %d: %v\n", c.tid, err)
 			} else {
@@ -794,7 +796,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO context (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
+			err := a.Database.PG.QueryRow("INSERT INTO context (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
 				c.title, c.star).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new context into postgres and returning tid: %v\n", err)
@@ -835,14 +837,14 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	for _, c := range client_updated_folders {
 		var exists bool
-		err := pdb.QueryRow("SELECT EXISTS(SELECT 1 FROM folder WHERE tid=$1);", c.tid).Scan(&exists)
+		err := a.Database.PG.QueryRow("SELECT EXISTS(SELECT 1 FROM folder WHERE tid=$1);", c.tid).Scan(&exists)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error SELECT EXISTS(SELECT 1 FROM folder ...: %v\n", err)
 			continue
 		}
 
 		if exists {
-			_, err := pdb.Exec("UPDATE folder SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
+			_, err := a.Database.PG.Exec("UPDATE folder SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error updating postgres for a folder with tid: %v: %w\n", c.tid, err)
 			} else {
@@ -850,7 +852,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO folder (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
+			err := a.Database.PG.QueryRow("INSERT INTO folder (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
 				c.title, c.star).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new folder into postgres and returning tid: %v\n", err)
@@ -891,14 +893,14 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	for _, c := range client_updated_keywords {
 		var exists bool
-		err := pdb.QueryRow("SELECT EXISTS(SELECT 1 FROM keyword WHERE tid=$1)", c.tid).Scan(&exists)
+		err := a.Database.PG.QueryRow("SELECT EXISTS(SELECT 1 FROM keyword WHERE tid=$1)", c.tid).Scan(&exists)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error SELECT EXISTS(SELECT 1 FROM keyword ...: %v\n", err)
 			continue
 		}
 
 		if exists {
-			_, err := pdb.Exec("UPDATE keyword SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
+			_, err := a.Database.PG.Exec("UPDATE keyword SET title=$1, star=$2, modified=now() WHERE tid=$3;", c.title, c.star, c.tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error updating sqlite for a keyword with tid: %d: %v\n", c.tid, err)
 			} else {
@@ -906,7 +908,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 			}
 		} else {
 			var tid int
-			err := pdb.QueryRow("INSERT INTO keyword (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
+			err := a.Database.PG.QueryRow("INSERT INTO keyword (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;",
 				c.title, c.star).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error inserting new keyword into postgres and returning tid: %v\n", err)
@@ -959,7 +961,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		if err != nil {
 			fmt.Fprintf(&lg, "Error deleting from fts for tids: %v: %v\n", tids, err)
 		}
-		tks := getTaskKeywordPairsPQ(pdb, tids, &lg)
+		tks := getTaskKeywordPairsPQ(a.Database.PG, tids, &lg)
 		if len(tks) != 0 {
 			query, args := createBulkInsertQueryTaskKeywordPairs(len(tks), tks)
 			err = bulkInsert(a.Database.MainDB, query, args)
@@ -968,7 +970,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 			} else {
 				fmt.Fprintf(&lg, "Keywords updated for task tids: %v\n", tids)
 			}
-			tags := getTagsPQ(pdb, tids, &lg)
+			tags := getTagsPQ(a.Database.PG, tids, &lg)
 			//entries and tags must be sorted by tid before updating server_updated_entries with tag
 			// the queries include ORDER BY so don't need to do the sorts in code
 			i := 0
@@ -1006,7 +1008,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 		var tid int
 		if e.tid < 1 {
-			err := pdb.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, note, modified, deleted) "+
+			err := a.Database.PG.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, note, modified, deleted) "+
 				"VALUES ($1, $2, $3, $4, $5, $6, $7, now(), false)  RETURNING tid",
 				e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.note).Scan(&tid)
 			if err != nil {
@@ -1033,7 +1035,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 			fmt.Fprintf(&lg, "Created new server entry *%q* with tid **%d**\n", truncate(e.title, 15), tid)
 			fmt.Fprintf(&lg, "and set tid for client entry with id **%d** and created fts entry\n", e.id)
 		} else {
-			_, err := pdb.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, note=$5, archived=$6, modified=now() WHERE tid=$7;",
+			_, err := a.Database.PG.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, note=$5, archived=$6, modified=now() WHERE tid=$7;",
 				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.archived, e.tid)
 			if err != nil {
 				fmt.Fprintf(&lg, "Error updating server entry: %v", err)
@@ -1044,14 +1046,14 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		}
 
 		// Update the server entry's keywords
-		_, err := pdb.Exec("DELETE FROM task_keyword WHERE task_tid=$1;", tid)
+		_, err := a.Database.PG.Exec("DELETE FROM task_keyword WHERE task_tid=$1;", tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error deleting from task_keyword from server tid %d: %v\n", tid, err)
 			continue
 		}
 		kwTids := TaskKeywordTids(a.Database.MainDB, &lg, tid)
 		for _, kwTid := range kwTids {
-			insertTaskKeywordTids(pdb, &lg, kwTid, tid)
+			insertTaskKeywordTids(a.Database.PG, &lg, kwTid, tid)
 		}
 	}
 
@@ -1097,14 +1099,14 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 			continue
 		}
 
-		_, err := pdb.Exec("UPDATE task SET deleted=true, modified=now() WHERE tid=$1", e.tid)
+		_, err := a.Database.PG.Exec("UPDATE task SET deleted=true, modified=now() WHERE tid=$1", e.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error setting server entry with id %d to deleted: %v\n", e.tid, err)
 			continue
 		}
 		fmt.Fprintf(&lg, "Updated server entry %q with id %d to **deleted = true**\n", truncate(e.title, 15), e.tid)
 
-		_, err = pdb.Exec("DELETE FROM task_keyword WHERE task_tid=$1;", e.tid)
+		_, err = a.Database.PG.Exec("DELETE FROM task_keyword WHERE task_tid=$1;", e.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error deleting task_keyword server rows where entry tid = %d: %v\n", e.tid, err)
 			continue
@@ -1116,7 +1118,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	//server_deleted_contexts - start here
 	for _, c := range server_deleted_contexts {
 		// I think the task changes may not be necessary because only a previous client sync can delete server context
-		res, err := pdb.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=$1;", c.tid)
+		res, err := a.Database.PG.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=$1;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry context to 'none' for a deleted context: %v\n", err)
 		} else {
@@ -1142,7 +1144,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	// client deleted contexts
 	for _, c := range client_deleted_contexts {
-		res, err := pdb.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=$1;", c.tid) //?modified=now()
+		res, err := a.Database.PG.Exec("Update task SET context_tid=1, modified=now() WHERE context_tid=$1;", c.tid) //?modified=now()
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry contexts for a deleted context: %v\n", err)
 		} else {
@@ -1158,9 +1160,9 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
-		_, err = pdb.Exec("UPDATE context SET deleted=true, modified=now() WHERE context.tid=$1", c.tid)
+		_, err = a.Database.PG.Exec("UPDATE context SET deleted=true, modified=now() WHERE context.tid=$1", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error (pdb.Exec) setting server context %s with tid = %d to deleted: %v\n", c.title, c.tid, err)
+			fmt.Fprintf(&lg, "Error (a.Database.PG.Exec) setting server context %s with tid = %d to deleted: %v\n", c.title, c.tid, err)
 			continue
 		}
 		_, err = a.Database.MainDB.Exec("DELETE FROM context WHERE id=?", c.id)
@@ -1175,7 +1177,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	for _, c := range server_deleted_folders {
 		// I think the task changes may not be necessary because only a previous client sync can delete server context
 		// and that previous client sync should have changed the relevant tasks to 'none'
-		res, err := pdb.Exec("Update task SET folder_tid=1, modified=now() WHERE folder_tid=$1;", c.tid)
+		res, err := a.Database.PG.Exec("Update task SET folder_tid=1, modified=now() WHERE folder_tid=$1;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry folder to 'none' for a deleted folder: %v\n", err)
 		} else {
@@ -1201,7 +1203,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	// client deleted folders
 	for _, c := range client_deleted_folders {
-		res, err := pdb.Exec("Update task SET folder_tid=1, modified=now() WHERE folder_tid=$1;", c.tid) //?modified=now()
+		res, err := a.Database.PG.Exec("Update task SET folder_tid=1, modified=now() WHERE folder_tid=$1;", c.tid) //?modified=now()
 		if err != nil {
 			fmt.Fprintf(&lg, "Error trying to change server/postgres entry folders for a deleted folder: %v\n", err)
 			continue
@@ -1218,9 +1220,9 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
-		_, err = pdb.Exec("UPDATE folder SET deleted=true, modified=now() WHERE folder.tid=$1", c.tid)
+		_, err = a.Database.PG.Exec("UPDATE folder SET deleted=true, modified=now() WHERE folder.tid=$1", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error (pdb.Exec) setting server folder %s with id = %v to deleted: %v\n", c.title, c.tid, err)
+			fmt.Fprintf(&lg, "Error (a.Database.PG.Exec) setting server folder %s with id = %v to deleted: %v\n", c.title, c.tid, err)
 			continue
 		}
 		_, err = a.Database.MainDB.Exec("DELETE FROM folder WHERE id=?", c.id)
@@ -1247,7 +1249,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	// client deleted keywords
 	for _, c := range client_deleted_keywords {
-		_, err = pdb.Exec("DELETE FROM task_keyword WHERE keyword_tid=$1;", c.tid)
+		_, err = a.Database.PG.Exec("DELETE FROM task_keyword WHERE keyword_tid=$1;", c.tid)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error deleting from task_keyword server keyword_tid: %d", c.tid)
 		}
@@ -1257,9 +1259,9 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		}
 		// since on server, we just set deleted to true
 		// since may have to sync with other clients
-		_, err := pdb.Exec("UPDATE keyword SET deleted=true WHERE keyword.tid=$1", c.tid)
+		_, err := a.Database.PG.Exec("UPDATE keyword SET deleted=true WHERE keyword.tid=$1", c.tid)
 		if err != nil {
-			fmt.Fprintf(&lg, "Error (pdb.Exec) setting server keyword %s with id %d to deleted:%v\n", c.title, c.tid, err)
+			fmt.Fprintf(&lg, "Error (a.Database.PG.Exec) setting server keyword %s with id %d to deleted:%v\n", c.title, c.tid, err)
 			continue
 		}
 		_, err = a.Database.MainDB.Exec("DELETE FROM keyword WHERE id=?", c.id)
@@ -1272,7 +1274,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	/*********************end of sync changes*************************/
 
 	var server_ts string
-	row = pdb.QueryRow("SELECT now();")
+	row = a.Database.PG.QueryRow("SELECT now();")
 	err = row.Scan(&server_ts)
 	if err != nil {
 		sess.showOrgMessage("Error with getting current time from server: %w", err)

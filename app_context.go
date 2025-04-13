@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"time"
+  "fmt"
 //  "os"
 	
 	"github.com/slzatz/vimango/terminal"
@@ -84,6 +85,28 @@ func (a *App) InitDatabases(configPath string) error {
 	if err != nil {
 		return err
 	}
+
+	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		config.Postgres.Host,
+		config.Postgres.Port,
+		config.Postgres.User,
+		config.Postgres.Password,
+		config.Postgres.DB,
+	)
+
+	a.Database.PG, err = sql.Open("postgres", connect)
+	if err != nil {
+		//fmt.Fprintf("Error opening postgres db: %v", err)
+		return err
+	}
+	//defer pdb.Close() //need to look at this
+
+	// Ping to connection
+	err = a.Database.PG.Ping()
+	if err != nil {
+		//fmt.Fprintf("postgres ping failure!: %v", err)
+		return err
+	}
   a.Config = config
 	return nil
 }
@@ -161,16 +184,12 @@ func (a *App) Cleanup() {
 	if a.Database.FtsDB != nil {
 		a.Database.FtsDB.Close()
 	}
-	
+	if a.Database.PG != nil {
+	  a.Database.PG.Close()
+	}
 	if a.Session != nil {
 		a.Session.quitApp()
 	}
-}
-
-// SynchronizeWrapper provides a synchronization function that can be called from existing code
-func (a *App) SynchronizeWrapper(reportOnly bool) (string, error) {
-	// This is a wrapper around the Synchronize method
-	return a.Synchronize(reportOnly), nil
 }
 
 // MainLoop is the main application loop

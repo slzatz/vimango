@@ -8,13 +8,16 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/slzatz/vimango/vim"
+	//"github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 type Database struct {
 	MainDB  *sql.DB // Main database connection 
 	FtsDB   *sql.DB
+	PG   *sql.DB
 }
 
 func (db *Database) entryTidFromId(id int) int {

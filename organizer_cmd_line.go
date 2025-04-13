@@ -540,9 +540,11 @@ func (o *Organizer) sync3(unused int) {
 	var err error
 	if o.command_line == "test" {
 		// true => reportOnly
-		log, err = app.SynchronizeWrapper(true)
+		log = app.Synchronize(true) //Synchronize should return an error:wa
+    err = nil //FIXME
 	} else {
-		log, err = app.SynchronizeWrapper(false)
+		log = app.Synchronize(false)
+    err = nil //FIXME
 	}
 	
 	if err != nil {
