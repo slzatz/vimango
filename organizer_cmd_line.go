@@ -92,7 +92,7 @@ func (o *Organizer) log(unused int) {
 		sess.showOrgMessage("%sThere are no saved sync logs%s", BOLD, RESET)
 		return
 	}
-	note := readSyncLog(o.rows[o.fr].id)
+	note := o.Database.readSyncLog(o.rows[o.fr].id)
 	o.note = strings.Split(note, "\n")
 	o.drawPreviewWithoutImages()
 	o.clearMarkedEntries()
@@ -110,12 +110,12 @@ func (o *Organizer) open(pos int) {
 	var tid int
 	var ok bool
 	input := o.command_line[pos+1:]
-	if tid, ok = contextExists(input); ok {
+	if tid, ok = o.Database.contextExists(input); ok {
 		o.taskview = BY_CONTEXT
 	}
 
 	if !ok {
-		if tid, ok = folderExists(input); ok {
+		if tid, ok = o.Database.folderExists(input); ok {
 			o.taskview = BY_FOLDER
 		}
 	}
@@ -164,7 +164,7 @@ func (o *Organizer) openContext(pos int) {
 	input := o.command_line[pos+1:]
 	var tid int
 	var ok bool
-	if tid, ok = contextExists(input); !ok {
+	if tid, ok = o.Database.contextExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid context!", input)
 		o.mode = o.last_mode
 		return
@@ -211,7 +211,7 @@ func (o *Organizer) openFolder(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
-	if tid, ok = folderExists(input); !ok {
+	if tid, ok = o.Database.folderExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid folder!", input)
 		o.mode = o.last_mode
 		return
@@ -293,7 +293,7 @@ func (o *Organizer) openKeyword(pos int) {
 
 func (o *Organizer) write(pos int) {
 	if o.view == TASK {
-		updateRows()
+		o.Database.updateRows()
 	}
 	o.mode = o.last_mode
 	o.command_line = ""
@@ -357,6 +357,7 @@ func (o *Organizer) editNote(id int) {
 		p = NewEditor()
 		app.Windows = append(app.Windows, p)
 		p.id = id
+    p.title = o.rows[o.fr].title
 		p.top_margin = TOP_MARGIN + 1
 
 		if taskFolder(o.rows[o.fr].id) == "code" {
@@ -365,7 +366,7 @@ func (o *Organizer) editNote(id int) {
 			p.output.id = id
 			app.Windows = append(app.Windows, p.output)
 		}
-		readNoteIntoBuffer(p, id)
+		o.Database.readNoteIntoBuffer(p, id)
 		p.bufferTick = vim.BufferGetLastChangedTick(p.vbuf)
 
 	}
@@ -643,7 +644,7 @@ func (o *Organizer) contexts(pos int) {
 	input := o.command_line[pos+1:]
 	var tid int
 	var ok bool
-	if tid, ok = contextExists(input); !ok {
+	if tid, ok = o.Database.contextExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid context!", input)
 		return
 	}
@@ -693,7 +694,7 @@ func (o *Organizer) folders(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
-	if tid, ok = folderExists(input); !ok {
+	if tid, ok = o.Database.folderExists(input); !ok {
 		sess.showOrgMessage("%s is not a valid folder!", input)
 		return
 	}
@@ -861,7 +862,7 @@ func (o *Organizer) copyEntry(unused int) {
 func (o *Organizer) savelog(unused int) {
 	if o.last_mode == PREVIEW_SYNC_LOG {
 		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
-		insertSyncEntry(title, strings.Join(o.note, "\n"))
+		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
 		sess.showOrgMessage("Sync log save to database")
 		o.command_line = ""
 		o.mode = PREVIEW_SYNC_LOG

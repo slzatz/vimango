@@ -36,6 +36,7 @@ type Editor struct {
 	suggestions        []string //spelling suggestions
 	bufferTick         int
 	modified           bool     // tracks if the buffer has been modified
+  title              string   // title of the note
 }
 
 func NewEditor() *Editor {

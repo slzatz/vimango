@@ -36,7 +36,7 @@ func CreateApp() *App {
 	return &App{
 		Session:   sess,
     Database: db,
-    Editor:    &Editor{},
+    Editor:    &Editor{}, // May not need this here
     Organizer: &Organizer{Session: sess, Database: db},
 		Windows:   make([]Window, 0),
 		Run:       true,

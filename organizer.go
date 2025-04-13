@@ -47,3 +47,12 @@ func (o *Organizer) getId() int {
 	return o.rows[o.fr].id
 }
 
+func (o *Organizer) readRowsIntoBuffer() {
+	var ss []string
+	for _, row := range o.rows {
+		ss = append(ss, row.title)
+	}
+	vim.BufferSetLines(o.vbuf, 0, -1, ss, len(ss))
+	vim.BufferSetCurrent(o.vbuf)
+}
+

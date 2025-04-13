@@ -139,7 +139,7 @@ func (s *Session) drawRightScreen() {
 	for _, w := range app.Windows {
 		w.drawText()
 		w.drawFrame()
-		w.drawStatusBar()
+		w.drawStatusBar() 
 	}
 }
 
@@ -325,10 +325,10 @@ func (s *Session) displayEntryInfo(e *NewEntry) {
 	//s.append(fmt::format("{}title:{} {}{}", COLOR_1, "\x1b[m", title, lf_ret));
 	fmt.Fprintf(&ab, "%s%s", title, lf_ret)
 
-	context := app.filterTitle("context", e.context_tid)
+	context := DB.filterTitle("context", e.context_tid)
 	fmt.Fprintf(&ab, "context: %s%s", context, lf_ret)
 
-	folder := app.filterTitle("folder", e.folder_tid)
+	folder := DB.filterTitle("folder", e.folder_tid)
 	fmt.Fprintf(&ab, "folder: %s%s", folder, lf_ret)
 
 	fmt.Fprintf(&ab, "star: %t%s", e.star, lf_ret)

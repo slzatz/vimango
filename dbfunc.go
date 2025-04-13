@@ -92,8 +92,8 @@ func keywordName(id int) string {
 }
 */
 
-func (a *App) filterTitle(filter string, tid int) string {
-	row := a.Database.MainDB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
+func (db *Database) filterTitle(filter string, tid int) string {
+	row := db.MainDB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -102,18 +102,18 @@ func (a *App) filterTitle(filter string, tid int) string {
 	return title
 }
 
-func contextExists(title string) (int, bool) {
+func (db *Database) contextExists(title string) (int, bool) {
 	var tid sql.NullInt64
-	err := DB.MainDB.QueryRow("SELECT tid FROM context WHERE title=?;", title).Scan(&tid)
+	err := db.MainDB.QueryRow("SELECT tid FROM context WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
 	return int(tid.Int64), true
 }
 
-func folderExists(title string) (int, bool) {
+func (db *Database) folderExists(title string) (int, bool) {
 	var tid sql.NullInt64
-	err := db.QueryRow("SELECT tid FROM folder WHERE title=?;", title).Scan(&tid)
+	err := db.MainDB.QueryRow("SELECT tid FROM folder WHERE title=?;", title).Scan(&tid)
 	if err != nil {
 		return 0, false
 	}
@@ -340,22 +340,13 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	return orgRows
 }
 
-func (o *Organizer) readRowsIntoBuffer() {
-	var ss []string
-	for _, row := range o.rows {
-		ss = append(ss, row.title)
-	}
-	vim.BufferSetLines(o.vbuf, 0, -1, ss, len(ss))
-	vim.BufferSetCurrent(o.vbuf)
-}
-
 func (db *Database) updateTitle() {
 
 	row := org.rows[org.fr]
 
 	if row.id == -1 {
 		// send pointer to insertRowinDB because updating row struct with new id
-		err := insertRowInDB(&org.rows[org.fr])
+		err := db.insertRowInDB(&org.rows[org.fr])
 		if err != nil {
 			sess.showOrgMessage("Error inserting into DB: %v", err)
 		} else {
@@ -381,7 +372,7 @@ func (db *Database) updateTitle() {
 	}
 }
 
-func updateRows() {
+func (db *Database) updateRows() {// need to db *Database this one
 	var updated_rows []int
 
 	for fr, row := range org.rows {
@@ -391,7 +382,7 @@ func updateRows() {
 
 		if row.id == -1 {
 			// send pointer to insertRowinDB because updating row struct with new id
-			err := insertRowInDB(&org.rows[fr])
+			err := db.insertRowInDB(&org.rows[fr])
 			if err != nil {
 				sess.showOrgMessage("Error inserting into DB: %v", err) //could be overwritten
 			} else {
@@ -400,7 +391,7 @@ func updateRows() {
 			continue
 		}
 
-		_, err := db.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
+		_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
 		if err != nil {
 			sess.showOrgMessage("Error in updateRows for id %d: %v", row.id, err)
 			return
@@ -417,19 +408,19 @@ func updateRows() {
 	sess.showOrgMessage("These ids were updated: %v", updated_rows)
 }
 
-func insertRowInDB(row *Row) error { // should return err
+func (db *Database) insertRowInDB(row *Row) error { // should return err
 
 	folder_tid := 1
 	context_tid := 1
 	// if org.taskview is BY_KEYWORD or BY_RECENT then new task gets context=1, folder=1
 	switch org.taskview {
 	case BY_CONTEXT:
-		context_tid, _ = contextExists(org.filter)
+		context_tid, _ = db.contextExists(org.filter)
 	case BY_FOLDER:
-		folder_tid, _ = folderExists(org.filter)
+		folder_tid, _ = db.folderExists(org.filter)
 	}
 	var id int
-	err := db.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
+	err := db.MainDB.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
 		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
 		row.title, folder_tid, context_tid, row.star).Scan(&id)
 	if err != nil {
@@ -442,8 +433,8 @@ func insertRowInDB(row *Row) error { // should return err
 	return nil
 }
 
-func insertSyncEntry(title, note string) {
-	_, err := db.Exec("INSERT INTO sync_log (title, note, modified) VALUES (?, ?, datetime('now'));",
+func (db *Database) insertSyncEntry(title, note string) {
+	_, err := db.MainDB.Exec("INSERT INTO sync_log (title, note, modified) VALUES (?, ?, datetime('now'));",
 		title, note)
 	if err != nil {
 		sess.showOrgMessage("Error inserting sync log into db: %v", err)
@@ -467,12 +458,12 @@ func (db *Database) readNoteIntoString(id int) string {
 	return note.String
 }
 
-func readNoteIntoBuffer(e *Editor, id int) {
+func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	if id == -1 {
 		return // id given to new and unsaved entries
 	}
 
-	row := db.QueryRow("SELECT note FROM task WHERE id=?;", id)
+	row := db.MainDB.QueryRow("SELECT note FROM task WHERE id=?;", id)
 	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
@@ -486,6 +477,7 @@ func readNoteIntoBuffer(e *Editor, id int) {
 	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 }
 
+// ? not in use
 func readSyncLogIntoAltRows(id int) {
 	row := db.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
 	var note string
@@ -499,10 +491,10 @@ func readSyncLogIntoAltRows(id int) {
 		r.title = line
 		org.altRows = append(org.altRows, r)
 	}
-
 }
-func readSyncLog(id int) string {
-	row := db.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
+
+func (db *Database) readSyncLog(id int) string {
+	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
 	var note string
 	err := row.Scan(&note)
 	if err != nil {
@@ -572,9 +564,9 @@ func getContextTid(id int) int {
 	return tid
 }
 */
-
-func getTitle(id int) string {
-	row := db.QueryRow("SELECT title FROM task WHERE id=?;", id)
+// not currently in use
+func (db *Database) getTitle(id int) string {
+	row := db.MainDB.QueryRow("SELECT title FROM task WHERE id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -582,6 +574,7 @@ func getTitle(id int) string {
 	}
 	return title
 }
+
 
 func (db *Database) getTaskKeywords(id int) string {
 

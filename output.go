@@ -1,3 +1,4 @@
+// I think this is for windows that display the output of a compiled program
 package main
 
 import (
@@ -109,14 +110,6 @@ func (o *Output) drawStatusBar() {
 	fmt.Fprintf(&ab, "\x1b[%dX", o.screencols)
 
 	ab.WriteString("\x1b[7m ") //switches to inverted colors
-
-	/*
-		title := getTitle(e.id)
-		if len(title) > 30 {
-			title = title[:30]
-		}
-		status := fmt.Sprintf("%d - %s ... %s", e.id, title, sub)
-	*/
 
 	status := fmt.Sprintf("%d Output", o.id)
 

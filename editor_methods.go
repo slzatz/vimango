@@ -666,7 +666,8 @@ func (e *Editor) drawStatusBar() {
 	fmt.Fprintf(&ab, "\x1b[%dX", e.screencols)
 
 	ab.WriteString("\x1b[7m ") //switches to inverted colors
-	title := getTitle(e.id)
+	//title := DB.getTitle(e.id)
+  title := e.title
 	if len(title) > 30 {
 		title = title[:30]
 	}

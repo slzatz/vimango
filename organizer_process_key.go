@@ -103,10 +103,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			case CONTEXT:
 				o.taskview = BY_CONTEXT
-				tid, _ = contextExists(row.title)
+				tid, _ = o.Database.contextExists(row.title)
 			case FOLDER:
 				o.taskview = BY_FOLDER
-				tid, _ = folderExists(row.title)
+				tid, _ = o.Database.folderExists(row.title)
 			case KEYWORD:
 				o.taskview = BY_KEYWORD
 				// this guard to see if synced may not be necessary for keyword
@@ -370,9 +370,9 @@ func (o *Organizer) organizerProcessKey(c int) {
 			case KEYWORD:
 				tid, _ = o.Database.keywordExists(altRow.title)
 			case FOLDER:
-				tid, _ = folderExists(altRow.title)
+				tid, _ = o.Database.folderExists(altRow.title)
 			case CONTEXT:
-				tid, _ = contextExists(altRow.title)
+				tid, _ = o.Database.contextExists(altRow.title)
 			}
 			if tid < 1 {
 				sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
@@ -453,7 +453,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			o.fr--
 			sess.eraseRightScreen()
 			o.altRowoff = 0
-			note := readSyncLog(o.rows[o.fr].id)
+			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			o.note = strings.Split(note, "\n")
 			//note = generateWWString(note, org.totaleditorcols)
 			o.drawPreviewWithoutImages()
@@ -467,7 +467,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			o.fr++
 			sess.eraseRightScreen()
 			o.altRowoff = 0
-			note := readSyncLog(o.rows[o.fr].id)
+			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			//note = generateWWString(note, org.totaleditorcols)
 			o.note = strings.Split(note, "\n")
 			o.drawPreviewWithoutImages()
