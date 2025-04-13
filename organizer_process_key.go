@@ -312,11 +312,11 @@ func (o *Organizer) organizerProcessKey(c int) {
 				var filterMap = make(map[string]struct{})
 				switch cmd {
 				case "o", "oc", "c":
-					filterMap = contextList()
+					filterMap = o.Database.contextList()
 				case "of", "f":
-					filterMap = folderList()
+					filterMap = o.Database.folderList()
 				case "ok", "k":
-					filterMap = keywordList()
+					filterMap = o.Database.keywordList()
 				case "sort":
 					filterMap = sortColumns
 				default:
@@ -384,10 +384,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 					o.Database.addTaskKeywordByTid(tid, row.id, true)
 					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
 				case FOLDER:
-					updateTaskFolderByTid(tid, row.id)
+					o.Database.updateTaskFolderByTid(tid, row.id)
 					sess.showOrgMessage("Current entry folder changed to %s", altRow.title)
 				case CONTEXT:
-					updateTaskContextByTid(tid, row.id)
+					o.Database.updateTaskContextByTid(tid, row.id)
 					sess.showOrgMessage("Current entry had context changed to %s", altRow.title)
 				}
 			} else {
@@ -396,9 +396,9 @@ func (o *Organizer) organizerProcessKey(c int) {
 					case KEYWORD:
 						o.Database.addTaskKeywordByTid(tid, id, true)
 					case FOLDER:
-						updateTaskFolderByTid(tid, id)
+						o.Database.updateTaskFolderByTid(tid, id)
 					case CONTEXT:
-						updateTaskContextByTid(tid, id)
+						o.Database.updateTaskContextByTid(tid, id)
 					}
 					sess.showOrgMessage("Marked entries' %d changed/added to %s", o.altView, altRow.title)
 				}
@@ -518,10 +518,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			if len(o.marked_entries) == 0 {
-				deleteSyncItem(o.rows[o.fr].id)
+				o.Database.deleteSyncItem(o.rows[o.fr].id)
 			} else {
 				for id := range o.marked_entries {
-					deleteSyncItem(id)
+				  o.Database.deleteSyncItem(id)
 				}
 			}
 			o.log(0)

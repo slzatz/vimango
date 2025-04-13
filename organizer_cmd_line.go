@@ -79,7 +79,7 @@ var cmd_lookup = map[string]func(*Organizer, int){
 }
 
 func (o *Organizer) log(unused int) {
-	getSyncItems(MAX)
+	o.Database.getSyncItems(MAX)
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.altRowoff = 0
 	o.mode = SYNC_LOG //kluge INSERT, NORMAL, ...
@@ -360,7 +360,7 @@ func (o *Organizer) editNote(id int) {
     p.title = o.rows[o.fr].title
 		p.top_margin = TOP_MARGIN + 1
 
-		if taskFolder(o.rows[o.fr].id) == "code" {
+		if o.Database.taskFolder(o.rows[o.fr].id) == "code" {
 			p.output = &Output{}
 			p.output.is_below = true
 			p.output.id = id
@@ -663,12 +663,12 @@ func (o *Organizer) contexts(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for entry_id := range o.marked_entries {
-			updateTaskContextByTid(tid, entry_id) //true = update fts_dn
+			o.Database.updateTaskContextByTid(tid, entry_id) //true = update fts_dn
 		}
 		sess.showOrgMessage("Marked entries moved into context %s", input)
 		return
 	}
-	updateTaskContextByTid(tid, o.rows[o.fr].id)
+	o.Database.updateTaskContextByTid(tid, o.rows[o.fr].id)
 	sess.showOrgMessage("Moved current entry (since none were marked) into context %s", input)
 }
 
@@ -708,12 +708,12 @@ func (o *Organizer) folders(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for entry_id, _ := range o.marked_entries {
-			updateTaskFolderByTid(tid, entry_id)
+			o.Database.updateTaskFolderByTid(tid, entry_id)
 		}
 		sess.showOrgMessage("Marked entries moved into folder %s", input)
 		return
 	}
-	updateTaskFolderByTid(tid, o.rows[o.fr].id)
+o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
 	sess.showOrgMessage("Moved current entry (since none were marked) into folder %s", input)
 }
 
@@ -917,8 +917,8 @@ func (o *Organizer) setImage(pos int) {
 func (o *Organizer) printDocument(unused int) {
 	id := o.rows[o.fr].id
 	note := DB.readNoteIntoString(id)
-	if taskFolder(id) == "code" {
-		c := taskContext(id)
+	if o.Database.taskFolder(id) == "code" {
+		c := o.Database.taskContext(id)
 		var ok bool
 		var lang string
 		if lang, ok = Languages[c]; !ok {

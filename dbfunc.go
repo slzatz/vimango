@@ -75,25 +75,6 @@ func (db *Database) keywordExists(title string) (int, bool) {
 	}
 	return int(tid.Int64), true
 }
-/* appears not to be in use and duplicates entryTidFromId
-func entryTid(id int) int {
-	var tid int
-	_ = db.QueryRow("SELECT tid FROM task WHERE id=?;", id).Scan(&tid)
-	return tid
-}
-*/
-
-/*
-func keywordName(id int) string {
-	row := db.QueryRow("SELECT name FROM keyword WHERE id=?;", id)
-	var name string
-	err := row.Scan(&name)
-	if err != nil {
-		return ""
-	}
-	return name
-}
-*/
 
 func (db *Database) filterTitle(filter string, tid int) string {
 	row := db.MainDB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
@@ -123,8 +104,8 @@ func (db *Database) folderExists(title string) (int, bool) {
 	return int(tid.Int64), true
 }
 
-func contextList() map[string]struct{} {
-	rows, _ := db.Query("SELECT title FROM context;")
+func (db *Database) contextList() map[string]struct{} {
+	rows, _ := db.MainDB.Query("SELECT title FROM context;")
 	defer rows.Close()
 
 	contexts := make(map[string]struct{})
@@ -136,8 +117,8 @@ func contextList() map[string]struct{} {
 	return contexts
 }
 
-func folderList() map[string]struct{} {
-	rows, _ := db.Query("SELECT title FROM folder;")
+func (db *Database) folderList() map[string]struct{} {
+	rows, _ := db.MainDB.Query("SELECT title FROM folder;")
 	defer rows.Close()
 
 	folders := make(map[string]struct{})
@@ -149,8 +130,8 @@ func folderList() map[string]struct{} {
 	return folders
 }
 
-func keywordList() map[string]struct{} {
-	rows, _ := db.Query("SELECT title FROM keyword;")
+func (db *Database) keywordList() map[string]struct{} {
+	rows, _ := db.MainDB.Query("SELECT title FROM keyword;")
 	defer rows.Close()
 
 	keywords := make(map[string]struct{})
@@ -180,8 +161,8 @@ func (db *Database) toggleArchived(id int, state bool, table string) error {
   return err
 }
 
-func updateTaskContextByTid(tid, id int) {
-	_, err := db.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
+func (db *Database) updateTaskContextByTid(tid, id int) {
+	_, err := db.MainDB.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
 		tid, id)
 
 	if err != nil {
@@ -190,8 +171,8 @@ func updateTaskContextByTid(tid, id int) {
 	}
 }
 
-func updateTaskFolderByTid(tid, id int) {
-	_, err := db.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
+func (db *Database) updateTaskFolderByTid(tid, id int) {
+	_, err := db.MainDB.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
 		tid, id)
 
 	if err != nil {
@@ -217,9 +198,8 @@ func (db *Database) updateNote(id int, text string) {
 
 	/***************fts virtual table update*********************/
 
-	entry_tid := db.entryTidFromId(id) /////////////////////////////////////////////////////
+	entry_tid := db.entryTidFromId(id)
 
-	//_, err = fts_db.Exec("UPDATE fts SET note=? WHERE lm_id=?;", text, id)
 	_, err = db.FtsDB.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error in updateNote updating fts for entry with id %d: %v", id, err)
@@ -228,8 +208,8 @@ func (db *Database) updateNote(id int, text string) {
 	sess.showOrgMessage("Updated note and fts entry for entry %d", id)
 }
 
-func getSyncItems(max int) {
-	rows, err := db.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
+func (db *Database) getSyncItems(max int) {
+	rows, err := db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
 	if err != nil {
 		sess.showOrgMessage("Error in getSyncItems: %v", err)
 		return
@@ -255,8 +235,8 @@ func getSyncItems(max int) {
 	}
 }
 
-func deleteSyncItem(id int) {
-	_, err := db.Exec("DELETE FROM sync_log  WHERE id=?;", id)
+func (db *Database) deleteSyncItem(id int) {
+	_, err := db.MainDB.Exec("DELETE FROM sync_log  WHERE id=?;", id)
 	if err != nil {
 		sess.showOrgMessage("Error deleting sync_log entry with id %d: %v", id, err)
 		return
@@ -480,9 +460,9 @@ func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 }
 
-// ? not in use
-func readSyncLogIntoAltRows(id int) {
-	row := db.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
+// not in use
+func (db *Database) readSyncLogIntoAltRows(id int) {
+	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
 	var note string
 	err := row.Scan(&note)
 	if err != nil {
@@ -506,11 +486,11 @@ func (db *Database) readSyncLog(id int) string {
 	return note
 }
 
-func getEntryInfo(id int) NewEntry {
+func (db *Database) getEntryInfo(id int) NewEntry {
 	if id == -1 {
 		return NewEntry{}
 	}
-	row := db.QueryRow("SELECT id, tid, title, folder_tid, context_tid, star, added, archived, deleted, modified FROM task WHERE id=?;", id)
+	row := db.MainDB.QueryRow("SELECT id, tid, title, folder_tid, context_tid, star, added, archived, deleted, modified FROM task WHERE id=?;", id)
 
 	var e NewEntry
 	var tid sql.NullInt64
@@ -534,10 +514,10 @@ func getEntryInfo(id int) NewEntry {
 	return e
 }
 
-func taskFolder(id int) string {
+func (db *Database) taskFolder(id int) string {
 	//row := db.QueryRow("SELECT folder.title FROM folder JOIN task on task.folder_tid = folder.tid WHERE task.id=?;", id)
 	// below seems better because where clause is on task
-	row := DB.MainDB.QueryRow("SELECT folder.title FROM task JOIN folder on task.folder_tid = folder.tid WHERE task.id=?;", id)
+	row := db.MainDB.QueryRow("SELECT folder.title FROM task JOIN folder on task.folder_tid = folder.tid WHERE task.id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -546,8 +526,8 @@ func taskFolder(id int) string {
 	return title
 }
 
-func taskContext(id int) string {
-	row := DB.MainDB.QueryRow("SELECT context.title FROM task JOIN context on task.context_tid = context.tid WHERE task.id=?;", id)
+func (db *Database) taskContext(id int) string {
+	row := db.MainDB.QueryRow("SELECT context.title FROM task JOIN context on task.context_tid = context.tid WHERE task.id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -1229,7 +1209,7 @@ func generateWWString(text string, width int) string {
 
 func updateCodeFile(id int, text string) {
 	var filePath string
-	lang := Languages[taskContext(id)]
+	lang := Languages[DB.taskContext(id)]
 	if lang == "cpp" {
 		filePath = "/home/slzatz/clangd_examples/test.cpp"
 	} else if lang == "go" {
@@ -1237,7 +1217,7 @@ func updateCodeFile(id int, text string) {
 	} else if lang == "python" {
 		filePath = "/home/slzatz/python_fragments/main.py"
 	} else {
-		sess.showEdMessage("I don't recognize %q", taskContext(id))
+		sess.showEdMessage("I don't recognize %q", DB.taskContext(id))
 		return
 	}
 

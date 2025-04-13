@@ -93,7 +93,6 @@ func main() {
 	
 	// Initialize application components
 	app.InitApp()
-	org = app.Organizer
 	
 	// Load initial data
 	app.LoadInitialData()

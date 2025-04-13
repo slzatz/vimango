@@ -241,21 +241,6 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 
 	}()
 
-  /*
-	pdb, err := sql.Open("postgres", connect)
-	if err != nil {
-		fmt.Fprintf(&lg, "Error opening postgres db: %v", err)
-		return
-	}
-	defer pdb.Close()
-
-	// Ping to connection
-	err = pdb.Ping()
-	if err != nil {
-		fmt.Fprintf(&lg, "postgres ping failure!: %v", err)
-		return
-	}
- */
 	nn := 0 //number of changes
 
 	row := a.Database.MainDB.QueryRow("SELECT timestamp FROM sync WHERE machine=$1;", "client")

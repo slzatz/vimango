@@ -417,8 +417,8 @@ func (e *Editor) drawPlainRows(pab *strings.Builder) {
 func (e *Editor) drawCodeRows(pab *strings.Builder) {
 	note := e.generateWWStringFromBuffer()
 	var lang string
-	if taskFolder(e.id) == "code" {
-		c := taskContext(e.id)
+	if DB.taskFolder(e.id) == "code" {
+		c := DB.taskContext(e.id)
 		var ok bool
 		if lang, ok = Languages[c]; !ok {
 			lang = "markdown"

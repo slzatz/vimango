@@ -291,12 +291,12 @@ func (o *Organizer) drawStatusBar() {
 			case BY_FIND:
 				str = "search - " + o.fts_search_terms
 			case BY_FOLDER:
-				str = fmt.Sprintf("%s[f] (%s[c])", o.filter, taskContext(id))
+				str = fmt.Sprintf("%s[f] (%s[c])", o.filter, o.Database.taskContext(id))
 			case BY_CONTEXT:
-				str = fmt.Sprintf("%s[c] (%s[f])", o.filter, taskFolder(id))
+				str = fmt.Sprintf("%s[c] (%s[f])", o.filter, o.Database.taskFolder(id))
 			case BY_RECENT:
 				str = fmt.Sprintf("Recent: %s[c] %s[f]",
-					taskContext(id), taskFolder(id))
+					o.Database.taskContext(id), o.Database.taskFolder(id))
 			case BY_KEYWORD:
 				str = o.filter + "[k]"
 			}
@@ -448,8 +448,8 @@ func (o *Organizer) drawPreview() {
 	sess.eraseRightScreen() //includes erasing images 11062021
 
 	var lang string
-	if taskFolder(id) == "code" {
-		c := taskContext(id)
+	if o.Database.taskFolder(id) == "code" {
+		c := o.Database.taskContext(id)
 		var ok bool
 		if lang, ok = Languages[c]; !ok {
 			lang = "markdown"

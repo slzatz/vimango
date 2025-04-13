@@ -106,7 +106,7 @@ func (o *Organizer) archive() {
 }
 
 func (o *Organizer) info() {
-	e := getEntryInfo(o.getId())
+	e := o.Database.getEntryInfo(o.getId())
 	sess.displayEntryInfo(&e)
 	sess.drawPreviewBox()
 }

@@ -70,7 +70,7 @@ func (e *Editor) saveNoteToFile() {
 func (e *Editor) writeNote() {
 	text := e.bufferToString()
 
-	if taskFolder(e.id) == "code" {
+	if DB.taskFolder(e.id) == "code" {
 		go updateCodeFile(e.id, text)
 	}
 
@@ -168,7 +168,7 @@ func (e *Editor) compile() {
 
 	var dir string
 	var cmd *exec.Cmd
-	lang := Languages[taskContext(e.id)]
+	lang := Languages[DB.taskContext(e.id)]
 	if lang == "cpp" {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
@@ -180,7 +180,7 @@ func (e *Editor) compile() {
 		sess.showEdMessage("You don't have to compile python")
 		return
 	} else {
-		sess.showEdMessage("I don't recognize %q", taskContext(e.id))
+		sess.showEdMessage("I don't recognize %q", DB.taskContext(e.id))
 		return
 	}
 	cmd.Dir = dir
@@ -249,7 +249,7 @@ func (e *Editor) run() {
 	var obj string
 	var cmd *exec.Cmd
 	//if getFolderTid(e.id) == 18 {
-	if taskContext(e.id) == "cpp" {
+	if DB.taskContext(e.id) == "cpp" {
 		obj = "./test_cpp"
 		dir = "/home/slzatz/clangd_examples/"
 	} else {
@@ -257,7 +257,7 @@ func (e *Editor) run() {
 		obj = "./go_fragments"
 		dir = "/home/slzatz/go_fragments/"
 	}
-	lang := Languages[taskContext(e.id)]
+	lang := Languages[DB.taskContext(e.id)]
 	if lang == "cpp" {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
@@ -268,7 +268,7 @@ func (e *Editor) run() {
 		obj = "./main.py"
 		dir = "/home/slzatz/python_fragments/"
 	} else {
-		sess.showEdMessage("I don't recognize %q", taskContext(e.id))
+		sess.showEdMessage("I don't recognize %q", DB.taskContext(e.id))
 		return
 	}
 
@@ -623,8 +623,8 @@ func (e *Editor) createPDF() {
 }
 
 func (e *Editor) printDocument() {
-	if taskFolder(e.id) == "code" {
-		c := taskContext(e.id)
+	if DB.taskFolder(e.id) == "code" {
+		c := DB.taskContext(e.id)
 		var ok bool
 		var lang string
 		if lang, ok = Languages[c]; !ok {
