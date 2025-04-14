@@ -13,7 +13,7 @@ import (
 // should probably be named drawOrgRows
 func (o *Organizer) refreshScreen() {
 	var ab strings.Builder
-	titlecols := o.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.AppUI.divider - TIME_COL_WIDTH - LEFT_MARGIN
 
 	ab.WriteString("\x1b[?25l") //hides the cursor
 
@@ -21,7 +21,7 @@ func (o *Organizer) refreshScreen() {
 	//Now erases time/sort column (+ 17 in line below)
 	//if (org.view != KEYWORD) {
 	if o.mode != ADD_CHANGE_FILTER {
-		for j := TOP_MARGIN; j < o.textLines+1; j++ {
+		for j := TOP_MARGIN; j < o.AppUI.textLines+1; j++ {
 			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17)
 		}
 	}
@@ -47,11 +47,11 @@ func (o *Organizer) drawRows() {
 
 	var j, k int //to swap highlight if org.highlight[1] < org.highlight[0]
 	var ab strings.Builder
-	titlecols := o.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.AppUI.divider - TIME_COL_WIDTH - LEFT_MARGIN
 
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
 
-	for y := 0; y < o.textLines; y++ {
+	for y := 0; y < o.AppUI.textLines; y++ {
 		fr := y + o.rowoff
 		if fr > len(o.rows)-1 {
 			break
@@ -127,7 +127,7 @@ func (o *Organizer) drawRows() {
 		ab.WriteString(strings.Repeat(" ", titlecols-length+1))
 
 		// believe the +2 is just to give some space from the end of long titles
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, o.divider-TIME_COL_WIDTH+2)
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, o.AppUI.divider-TIME_COL_WIDTH+2)
 		//ab.WriteString(o.rows[fr].modified)
 		ab.WriteString(o.rows[fr].sort)
 		ab.WriteString(RESET)
@@ -144,10 +144,10 @@ func (o *Organizer) drawAltRows() {
 	}
 
 	var ab strings.Builder
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+1, o.divider+2)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.divider+1)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+1, o.AppUI.divider+2)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+1)
 
-	for y := 0; y < o.textLines; y++ {
+	for y := 0; y < o.AppUI.textLines; y++ {
 
 		fr := y + o.altRowoff
 		if fr > len(o.altRows)-1 {
@@ -155,8 +155,8 @@ func (o *Organizer) drawAltRows() {
 		}
 
 		length := len(o.altRows[fr].title)
-		if length > o.totaleditorcols {
-			length = o.totaleditorcols
+		if length > o.AppUI.totaleditorcols {
+			length = o.AppUI.totaleditorcols
 		}
 
 		if o.altRows[fr].star {
@@ -184,15 +184,15 @@ func (o *Organizer) drawPreviewWithImages() {
 		return
 	}
 
-	fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1, o.divider+1)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.divider+0)
+	fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1, o.AppUI.divider+1)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+0)
 
 	fr := o.altRowoff - 1
 	y := 0
 
 	for {
 		fr++
-		if fr > len(o.note)-1 || y > o.textLines-1 {
+		if fr > len(o.note)-1 || y > o.AppUI.textLines-1 {
 			break
 		}
 		if !strings.Contains(o.note[fr], "Im@ge") {
@@ -201,7 +201,7 @@ func (o *Organizer) drawPreviewWithImages() {
 			continue
 		}
 
-		fmt.Printf("Loading Image ... \x1b[%dG", o.divider+1)
+		fmt.Printf("Loading Image ... \x1b[%dG", o.AppUI.divider+1)
 		prevY := y
     s := o.note[fr]
     for i := range 2 {
@@ -225,7 +225,7 @@ func (o *Organizer) drawPreviewWithImages() {
 				continue
 			}
 		} else {
-			maxWidth := o.totaleditorcols * int(sess.ws.Xpixel) / sess.screenCols
+			maxWidth := o.AppUI.totaleditorcols * int(o.AppUI.ws.Xpixel) / o.AppUI.screenCols
 			maxHeight := int(sess.ws.Ypixel)
 			img, _, err = loadImage(path, maxWidth-5, maxHeight-150)
 			if err != nil {
@@ -236,18 +236,18 @@ func (o *Organizer) drawPreviewWithImages() {
 		}
 		height := img.Bounds().Max.Y / (int(sess.ws.Ypixel) / sess.screenLines)
 		y += height
-		if y > o.textLines-1 {
-			fmt.Printf("\x1b[3m\x1b[4mImage %s doesn't fit!\x1b[0m \x1b[%dG", path, o.divider+1)
+		if y > o.AppUI.textLines-1 {
+			fmt.Printf("\x1b[3m\x1b[4mImage %s doesn't fit!\x1b[0m \x1b[%dG", path, o.AppUI.divider+1)
 			y = y - height + 1
-			fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.divider+1)
+			fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.AppUI.divider+1)
 			continue
 		}
 
 		displayImage(img)
 
 		// erase "Loading image ..."
-		fmt.Printf("\x1b[%d;%dH\x1b[0K", TOP_MARGIN+1+prevY, o.divider+1)
-		fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.divider+1)
+		fmt.Printf("\x1b[%d;%dH\x1b[0K", TOP_MARGIN+1+prevY, o.AppUI.divider+1)
+		fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.AppUI.divider+1)
 	}
 }
 
@@ -257,14 +257,14 @@ func (o *Organizer) drawPreviewWithoutImages() {
 	if len(o.note) == 0 {
 		return
 	}
-	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.divider+1)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.divider+0)
+	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.AppUI.divider+1)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+0)
 
 	fr := o.altRowoff - 1
 	y := 0
 	for {
 		fr++
-		if fr > len(o.note)-1 || y > o.textLines-1 {
+		if fr > len(o.note)-1 || y > o.AppUI.textLines-1 {
 			break
 		}
 		fmt.Fprintf(os.Stdout, "%s%s", o.note[fr], lf_ret)
@@ -276,7 +276,7 @@ func (o *Organizer) drawStatusBar() {
 
 	var ab strings.Builder
 	//position cursor and erase - and yes you do have to reposition cursor after erase
-	fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.textLines+TOP_MARGIN+1, o.divider, o.textLines+TOP_MARGIN+1)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.AppUI.textLines+TOP_MARGIN+1, o.AppUI.divider, o.AppUI.textLines+TOP_MARGIN+1)
 	ab.WriteString("\x1b[7m") //switches to reversed colors
 
 	var str string
@@ -289,7 +289,7 @@ func (o *Organizer) drawStatusBar() {
 			id = o.getId()
 			switch o.taskview {
 			case BY_FIND:
-				str = "search - " + o.fts_search_terms
+				str = "search - " + o.AppUI.fts_search_terms
 			case BY_FOLDER:
 				str = fmt.Sprintf("%s[f] (%s[c])", o.filter, o.Database.taskContext(id))
 			case BY_CONTEXT:
@@ -344,25 +344,25 @@ func (o *Organizer) drawStatusBar() {
 		str, title, keywords, id, o.fr+1, len(o.rows), o.sort)
 	length := len(plain)
 
-	if length+len(fmt.Sprintf("%s", o.mode)) <= o.divider {
+	if length+len(fmt.Sprintf("%s", o.mode)) <= o.AppUI.divider {
 		/*
 			s := fmt.Sprintf("%%-%ds", o.divider-length) // produces "%-25s"
 			t := fmt.Sprintf(s, o.mode)
 			fmt.Fprintf(&ab, status, t)
 		*/
-		fmt.Fprintf(&ab, status, fmt.Sprintf(fmt.Sprintf("%%-%ds", o.divider-length), o.mode))
+		fmt.Fprintf(&ab, status, fmt.Sprintf(fmt.Sprintf("%%-%ds", o.AppUI.divider-length), o.mode))
 	} else {
 		status = fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s \x1b[0;35;7m%s\x1b[0;7m %d %d/%d\x1b[49m",
 			str, title, keywords, id, o.fr+1, len(o.rows))
 		plain = fmt.Sprintf("%s %s %s %d %d/%d",
 			str, title, keywords, id, o.fr+1, len(o.rows))
 		length := len(plain)
-		if length < o.divider {
-			fmt.Fprintf(&ab, "%s%-*s", status, o.divider-length, " ")
+		if length < o.AppUI.divider {
+			fmt.Fprintf(&ab, "%s%-*s", status, o.AppUI.divider-length, " ")
 		} else {
 			status = fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s %s %d %d/%d",
 				str, title, keywords, id, o.fr+1, len(o.rows))
-			ab.WriteString(status[:o.divider+10])
+			ab.WriteString(status[:o.AppUI.divider+10])
 		}
 	}
 	ab.WriteString("\x1b[0m") //switches back to normal formatting
@@ -376,11 +376,11 @@ func (o *Organizer) drawSearchRows() {
 	}
 
 	var ab strings.Builder
-	titlecols := o.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.AppUI.divider - TIME_COL_WIDTH - LEFT_MARGIN
 
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
 
-	for y := 0; y < o.textLines; y++ {
+	for y := 0; y < o.AppUI.textLines; y++ {
 		fr := y + o.rowoff
 		if fr > len(o.rows)-1 {
 			break
@@ -423,7 +423,7 @@ func (o *Organizer) drawSearchRows() {
 		ab.WriteString(strings.Repeat(" ", spaces))
 
 		ab.WriteString("\x1b[0m") // return background to normal
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+2, o.divider-TIME_COL_WIDTH+2)
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+2, o.AppUI.divider-TIME_COL_WIDTH+2)
 		//ab.WriteString(o.rows[fr].modified)
 		ab.WriteString(o.rows[fr].sort)
 		ab.WriteString(lf_ret)
@@ -464,7 +464,7 @@ func (o *Organizer) drawPreview() {
 			glamour.WithWordWrap(0),
 		)
 		note, _ = r.Render(note)
-	  note = WordWrap(note, o.totaleditorcols)
+	  note = WordWrap(note, o.AppUI.totaleditorcols)
 		// glamour seems to add a '\n' at the start
 		note = strings.TrimSpace(note)
 		// replacing placeholder ^^^ with word wrap \n

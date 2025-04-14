@@ -87,7 +87,7 @@ func (o *Organizer) log(unused int) {
 	o.view = -1 //TASK, FOLDER, KEYWORD ...
 
 	// show first row's note
-	o.eraseRightScreen()
+	o.AppUI.eraseRightScreen()
 	if len(o.rows) == 0 {
 		sess.showOrgMessage("%sThere are no saved sync logs%s", BOLD, RESET)
 		return
@@ -96,7 +96,7 @@ func (o *Organizer) log(unused int) {
 	o.note = strings.Split(note, "\n")
 	o.drawPreviewWithoutImages()
 	o.clearMarkedEntries()
-	o.showOrgMessage("")
+	o.AppUI.showOrgMessage("")
 }
 
 func (o *Organizer) open(pos int) {
@@ -548,12 +548,12 @@ func (o *Organizer) sync3(unused int) {
 	}
 	
 	if err != nil {
-		o.Session.showOrgMessage("Synchronization error: %v", err)
+		o.AppUI.showOrgMessage("Synchronization error: %v", err)
 		return
 	}
 	o.command_line = ""
-	o.eraseRightScreen()
-	note := generateWWString(log, o.totaleditorcols)
+	o.AppUI.eraseRightScreen()
+	note := generateWWString(log, o.AppUI.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
@@ -580,8 +580,8 @@ func (o *Organizer) initialBulkLoad(unused int) {
 		log = bulkLoad(false)
 	}
 	o.command_line = ""
-	o.eraseRightScreen()
-	note := generateWWString(log, o.totaleditorcols)
+	o.AppUI.eraseRightScreen()
+	note := generateWWString(log, o.AppUI.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
@@ -606,8 +606,8 @@ func (o *Organizer) reverse(unused int) {
 		log = reverseBulkLoad(false)
 	}
 	o.command_line = ""
-	o.eraseRightScreen()
-	note := generateWWString(log, o.totaleditorcols)
+	o.AppUI.eraseRightScreen()
+	note := generateWWString(log, o.AppUI.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),

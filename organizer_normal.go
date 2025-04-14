@@ -74,11 +74,11 @@ func (o *Organizer) del() {
   state := o.rows[o.fr].deleted
 	err := o.Database.toggleDeleted(id, state, o.view.String())
 	if err != nil {
-		o.showOrgMessage("Error toggling %s id %d to deleted: %v", o.view, id, err)
+		o.AppUI.showOrgMessage("Error toggling %s id %d to deleted: %v", o.view, id, err)
 		return
   }
 	o.rows[org.fr].deleted = !state
-	o.showOrgMessage("Toggle deleted for %s id %d succeeded (new)", o.view, id)
+	o.AppUI.showOrgMessage("Toggle deleted for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) star() {
@@ -86,11 +86,11 @@ func (o *Organizer) star() {
   state := o.rows[o.fr].star
 	err := o.Database.toggleStar(id, state, o.view.String())
 	if err != nil {
-		o.showOrgMessage("Error toggling %s id %d to star: %v", o.view, id, err)
+		o.AppUI.showOrgMessage("Error toggling %s id %d to star: %v", o.view, id, err)
 		return
   }
 	o.rows[o.fr].star = !state
-	o.showOrgMessage("Toggle star for %s id %d succeeded (new)", o.view, id)
+	o.AppUI.showOrgMessage("Toggle star for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) archive() {
@@ -98,11 +98,11 @@ func (o *Organizer) archive() {
   state := o.rows[o.fr].archived
 	err := o.Database.toggleArchived(id, state, o.view.String())
 	if err != nil {
-		o.showOrgMessage("Error toggling %s id %d to archived: %v", o.view, id, err)
+		o.AppUI.showOrgMessage("Error toggling %s id %d to archived: %v", o.view, id, err)
 		return
   }
 	o.rows[o.fr].archived = !state
-	o.showOrgMessage("Toggle archive for %s id %d succeeded (new)", o.view, id)
+	o.AppUI.showOrgMessage("Toggle archive for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) info() {
@@ -139,7 +139,7 @@ func controlK() {
 func controlZ() {
 	id := org.rows[org.fr].id
 	note := DB.readNoteIntoString(id)
-	note = generateWWString(note, org.totaleditorcols)
+	note = generateWWString(note, org.AppUI.totaleditorcols)
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),

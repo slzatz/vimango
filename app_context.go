@@ -38,7 +38,7 @@ func CreateApp() *App {
 		Session:   sess,
     Database: db,
     Editor:    &Editor{}, // May not need this here
-    Organizer: &Organizer{Session: sess, Database: db},
+    Organizer: &Organizer{AppUI: sess, Database: db},
 		Windows:   make([]Window, 0),
 		Run:       true,
 	}

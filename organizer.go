@@ -1,6 +1,10 @@
 package main
 
-import "github.com/slzatz/vimango/vim"
+import (
+  "fmt"
+
+  "github.com/slzatz/vimango/vim"
+)
 
 type Organizer struct {
 	mode      Mode
@@ -35,7 +39,7 @@ type Organizer struct {
 	vbuf                vim.Buffer
 	bufferTick          int
   Database            *Database
-	*Session
+	AppUI               *Session
   //*Database
 }
 
@@ -56,3 +60,11 @@ func (o *Organizer) readRowsIntoBuffer() {
 	vim.BufferSetCurrent(o.vbuf)
 }
 
+func (o *Organizer) showMessage(format string, a ...interface{}) {
+	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.AppUI.textLines+2+TOP_MARGIN, o.AppUI.divider, o.AppUI.textLines+2+TOP_MARGIN)
+	str := fmt.Sprintf(format, a...)
+	if len(str) > o.AppUI.divider {
+		str = str[:o.AppUI.divider]
+	}
+	fmt.Print(str)
+}

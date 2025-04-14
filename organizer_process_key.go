@@ -18,7 +18,7 @@ var tabCompletion struct {
 func (o *Organizer) organizerProcessKey(c int) {
 
 	if c == '\x1b' {
-		sess.showOrgMessage("")
+		o.showMessage("")
 		o.command = ""
 		vim.Key("<esc>")
 		o.last_mode = o.mode // not sure this is necessary
@@ -29,7 +29,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		//org.fc = utf8.RuneCount(p.ss[org.fr][:pos[1]])
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
-		sess.imagePreview = false
+		o.AppUI.imagePreview = false
 		if o.view == TASK {
 			o.drawPreview()
 		}
@@ -54,7 +54,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row.dirty = false
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.command = ""
-			sess.showOrgMessage("")
+			o.showMessage("")
 			return
 		}
 
@@ -82,7 +82,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 		if c == ctrlKey('l') && o.last_mode == ADD_CHANGE_FILTER {
 			o.mode = ADD_CHANGE_FILTER
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 		}
 
 		if c == '\r' {
@@ -115,11 +115,11 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 			// if it's a new context|folder|keyword we can't filter tasks by it
 			if tid < 1 {
-				sess.showOrgMessage("You need to sync before you can use %q", row.title)
+				o.showMessage("You need to sync before you can use %q", row.title)
 				return
 			}
 			o.filter = row.title
-			sess.showOrgMessage("'%s' will be opened", o.filter)
+			o.showMessage("'%s' will be opened", o.filter)
 
 			o.clearMarkedEntries()
 			o.view = TASK
@@ -128,9 +128,9 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
-				sess.showOrgMessage("No results were returned")
+				o.showMessage("No results were returned")
 			}
-			sess.imagePreview = false
+			o.AppUI.imagePreview = false
 			o.readRowsIntoBuffer()
 			vim.CursorSetPosition(1, 0)
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -161,7 +161,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		// being passed to vim
 		if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
 			if c != int([]byte(leader)[0]) {
-				sess.showOrgMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
+				o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
 			}
 			return
 		}
@@ -186,7 +186,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if o.view == TASK {
 				o.drawPreview()
 			} else {
-				sess.displayContainerInfo()
+				o.AppUI.displayContainerInfo()
 			}
 		}
 		s := vim.BufferLines(o.vbuf)[o.fr]
@@ -209,7 +209,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		//if mode.Mode == "c" && p.mode != SEARCH  //note that "c" => SEARCH
 		//if mode == 8 && org.mode != SEARCH  //note that 8 => SEARCH
 		if mode == 16 && o.mode != INSERT {
-			sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
+			o.showMessage("\x1b[1m-- INSERT --\x1b[0m")
 		}
 		o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		if o.mode == VISUAL {
@@ -217,14 +217,14 @@ func (o *Organizer) organizerProcessKey(c int) {
 			o.highlight[1] = pos[1][1] + 1
 			o.highlight[0] = pos[0][1]
 		}
-		sess.showOrgMessage("%s", s)
+		o.showMessage("%s", s)
 
 		// end case NORMAL
 
 	case VISUAL:
 
 		if c == 'j' || c == 'k' || c == 'J' || c == 'V' || c == ctrlKey('v') || c == 'g' || c == 'G' {
-			sess.showOrgMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
+			o.showMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
 			return
 		}
 
@@ -255,7 +255,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		visPos := vim.VisualGetRange()
 		o.highlight[1] = visPos[1][1] + 1
 		o.highlight[0] = visPos[0][1]
-		sess.showOrgMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])
+		o.showMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])
 
 		// end case VISUAL
 
@@ -289,8 +289,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 			tabCompletion.list = nil
 
 			if !found {
-				sess.showOrgMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
-				sess.showOrgMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
+				o.showMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
+				o.showMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
 				o.mode = o.last_mode
 			}
 			return
@@ -335,7 +335,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			}
 
 			o.command_line = o.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
-			sess.showOrgMessage(":%s", o.command_line)
+			o.showMessage(":%s", o.command_line)
 			return
 
 		case DEL_KEY, BACKSPACE:
@@ -351,7 +351,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
 
-		sess.showOrgMessage(":%s", o.command_line)
+		o.showMessage(":%s", o.command_line)
 
 		//end case COMMAND_LINE
 
@@ -375,20 +375,20 @@ func (o *Organizer) organizerProcessKey(c int) {
 				tid, _ = o.Database.contextExists(altRow.title)
 			}
 			if tid < 1 {
-				sess.showOrgMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
+				o.showMessage("%q has not been synched yet - must do that before adding tasks", altRow.title)
 				return
 			}
 			if len(o.marked_entries) == 0 {
 				switch o.altView {
 				case KEYWORD:
 					o.Database.addTaskKeywordByTid(tid, row.id, true)
-					sess.showOrgMessage("Added keyword %s to current entry", altRow.title)
+					o.showMessage("Added keyword %s to current entry", altRow.title)
 				case FOLDER:
 					o.Database.updateTaskFolderByTid(tid, row.id)
-					sess.showOrgMessage("Current entry folder changed to %s", altRow.title)
+					o.showMessage("Current entry folder changed to %s", altRow.title)
 				case CONTEXT:
 					o.Database.updateTaskContextByTid(tid, row.id)
-					sess.showOrgMessage("Current entry had context changed to %s", altRow.title)
+					o.showMessage("Current entry had context changed to %s", altRow.title)
 				}
 			} else {
 				for id := range o.marked_entries {
@@ -400,7 +400,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 					case CONTEXT:
 						o.Database.updateTaskContextByTid(tid, id)
 					}
-					sess.showOrgMessage("Marked entries' %d changed/added to %s", o.altView, altRow.title)
+					o.showMessage("Marked entries' %d changed/added to %s", o.altView, altRow.title)
 				}
 			}
 		}
@@ -451,7 +451,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			o.fr--
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.altRowoff = 0
 			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			o.note = strings.Split(note, "\n")
@@ -465,14 +465,14 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			o.fr++
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.altRowoff = 0
 			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			//note = generateWWString(note, org.totaleditorcols)
 			o.note = strings.Split(note, "\n")
 			o.drawPreviewWithoutImages()
 		case ':':
-			sess.showOrgMessage(":")
+			o.showMessage(":")
 			o.command_line = ""
 			o.last_mode = o.mode
 			o.mode = COMMAND_LINE
@@ -482,14 +482,14 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if len(o.rows) == 0 {
 				return
 			}
-			if len(o.note) > o.altRowoff+o.textLines {
-				if len(o.note) < o.altRowoff+2*o.textLines {
-					o.altRowoff = len(o.note) - o.textLines
+			if len(o.note) > o.altRowoff+o.AppUI.textLines {
+				if len(o.note) < o.altRowoff+2*o.AppUI.textLines {
+					o.altRowoff = len(o.note) - o.AppUI.textLines
 				} else {
-					o.altRowoff += o.textLines
+					o.altRowoff += o.AppUI.textLines
 				}
 			}
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 
 			//org.altRowoff++
@@ -500,12 +500,12 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if len(o.rows) == 0 {
 				return
 			}
-			if o.altRowoff > o.textLines {
-				o.altRowoff -= o.textLines
+			if o.altRowoff > o.AppUI.textLines {
+				o.altRowoff -= o.AppUI.textLines
 			} else {
 				o.altRowoff = 0
 			}
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 
 			//if org.altRowoff > 0 {
@@ -539,39 +539,39 @@ func (o *Organizer) organizerProcessKey(c int) {
 			exCmd()
 		case ctrlKey('j'):
 			o.altRowoff++
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		//case ARROW_UP, 'k':
 		case ctrlKey('k'):
 			if o.altRowoff > 0 {
 				o.altRowoff--
 			}
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		case PAGE_DOWN:
-			if len(o.note) > o.altRowoff+o.textLines {
-				if len(o.note) < o.altRowoff+2*o.textLines {
-					o.altRowoff = len(o.note) - o.textLines
+			if len(o.note) > o.altRowoff+o.AppUI.textLines {
+				if len(o.note) < o.altRowoff+2*o.AppUI.textLines {
+					o.altRowoff = len(o.note) - o.AppUI.textLines
 				} else {
-					o.altRowoff += o.textLines
+					o.altRowoff += o.AppUI.textLines
 				}
 			}
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		case PAGE_UP:
-			if o.altRowoff > o.textLines {
-				o.altRowoff -= o.textLines
+			if o.altRowoff > o.AppUI.textLines {
+				o.altRowoff -= o.AppUI.textLines
 			} else {
 				o.altRowoff = 0
 			}
-			sess.eraseRightScreen()
+			o.AppUI.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		}
 
 	case LINKS:
 
 		if c < 49 || c > 57 {
-			sess.showOrgMessage("That's not a number between 1 and 9")
+			o.showMessage("That's not a number between 1 and 9")
 			o.mode = NORMAL
 			return
 		}
@@ -587,18 +587,18 @@ func (o *Organizer) organizerProcessKey(c int) {
 			}
 		}
 		if found == "" {
-			sess.showOrgMessage("There is no [%d]", linkNum)
+			o.showMessage("There is no [%d]", linkNum)
 			o.mode = NORMAL
 			return
 		}
 		beg := strings.Index(found, "http")
 		end := strings.Index(found, "\x1b\\")
 		url := found[beg:end]
-		sess.showOrgMessage("Opening %q", url)
+		o.showMessage("Opening %q", url)
 		cmd := exec.Command("qutebrowser", url)
 		err := cmd.Start()
 		if err != nil {
-			sess.showOrgMessage("Problem opening url: %v", err)
+			o.showMessage("Problem opening url: %v", err)
 		}
 		o.mode = NORMAL
 

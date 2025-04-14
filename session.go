@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
+//	"bytes"
+//	"encoding/gob"
 	"fmt"
 	"os"
 	"strings"
@@ -191,6 +191,7 @@ func (s *Session) GetWindowSize() error {
 	return nil
 }
 
+/*
 func (s *Session) enableRawMode() ([]byte, error) {
 
 	// Gets TermIOS data structure. From glibc, we find the cmd should be TCGETS
@@ -221,7 +222,6 @@ func (s *Session) enableRawMode() ([]byte, error) {
 
 	return buf.Bytes(), nil
 }
-
 func Restore(original []byte) error {
 
 	var termios unix.Termios
@@ -235,6 +235,7 @@ func Restore(original []byte) error {
 	}
 	return nil
 }
+*/
 
 func (s *Session) showOrgMessage(format string, a ...interface{}) {
 	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", s.textLines+2+TOP_MARGIN, s.divider, s.textLines+2+TOP_MARGIN)
