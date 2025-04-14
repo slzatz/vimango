@@ -54,7 +54,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row.dirty = false
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.command = ""
-			o.showMessage("")
+			//o.showMessage("")
 			return
 		}
 
@@ -387,7 +387,11 @@ func (o *Organizer) organizerProcessKey(c int) {
 					o.Database.updateTaskFolderByTid(tid, row.id)
 					o.showMessage("Current entry folder changed to %s", altRow.title)
 				case CONTEXT:
-					o.Database.updateTaskContextByTid(tid, row.id)
+					err := o.Database.updateTaskContextByTid(tid, row.id)
+          if err != nil {
+	          o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", row.id, tid, err)
+            return
+          }
 					o.showMessage("Current entry had context changed to %s", altRow.title)
 				}
 			} else {
@@ -398,7 +402,11 @@ func (o *Organizer) organizerProcessKey(c int) {
 					case FOLDER:
 						o.Database.updateTaskFolderByTid(tid, id)
 					case CONTEXT:
-						o.Database.updateTaskContextByTid(tid, id)
+						err := o.Database.updateTaskContextByTid(tid, id)
+            if err != nil {
+	            o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+              return
+            }
 					}
 					o.showMessage("Marked entries' %d changed/added to %s", o.altView, altRow.title)
 				}

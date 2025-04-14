@@ -2,7 +2,9 @@ package main
 
 import (
 	"database/sql"
+  "fmt"
 	"strings"
+  "time"
 	"regexp"
 )
 
@@ -434,6 +436,30 @@ func extractFilePath_(input string) string {
 	return match
 }
 
+func timeDelta(t string) string {
+	var t0 time.Time
+	if strings.Contains(t, "T") {
+		t0, _ = time.Parse("2006-01-02T15:04:05Z", t)
+	} else {
+		t0, _ = time.Parse("2006-01-02 15:04:05", t)
+	}
+	diff := time.Since(t0)
+
+	diff = diff / 1000000000
+	if diff <= 120 {
+		return fmt.Sprintf("%d seconds ago", diff)
+	} else if diff <= 60*120 {
+		return fmt.Sprintf("%d minutes ago", diff/60) // <120 minutes we report minute
+	} else if diff <= 48*60*60 {
+		return fmt.Sprintf("%d hours ago", diff/3600) // <48 hours report hours
+	} else if diff <= 24*60*60*60 {
+		return fmt.Sprintf("%d days ago", diff/3600/24) // <60 days report days
+	} else if diff <= 24*30*24*60*60 {
+		return fmt.Sprintf("%d months ago", diff/3600/24/30) // <24 months rep
+	} else {
+		return fmt.Sprintf("%d years ago", diff/3600/24/30/12)
+	}
+}
 /*
 type BufLinesEvent struct {
 	Buffer nvim.Buffer

@@ -292,9 +292,23 @@ func (o *Organizer) openKeyword(pos int) {
 }
 
 func (o *Organizer) write(pos int) {
-	if o.view == TASK {
-		o.Database.updateRows()
+  var updated_rows []int
+	if o.view != TASK {
+		//o.Database.updateRows()
+    return
 	}
+	for i, r := range o.rows {
+		if r.dirty {
+      o.Database.updateTitle(&r)
+      o.rows[i].dirty = false
+      updated_rows = append(updated_rows, r.id)
+		}
+  }
+	if len(updated_rows) == 0 {
+	  o.showMessage("There were no rows to update")
+	} else {
+	  o.showMessage("These ids were updated: %v", updated_rows)
+  }
 	o.mode = o.last_mode
 	o.command_line = ""
 }
@@ -657,19 +671,28 @@ func (o *Organizer) contexts(pos int) {
 		from that number to the server id and now there is not context tid that matches the task's context_tid
 	*/
 	if tid < 1 {
-		sess.showOrgMessage("Context is unsynced")
+		o.showMessage("Context is unsynced")
 		return
 	}
 
 	if len(o.marked_entries) > 0 {
-		for entry_id := range o.marked_entries {
-			o.Database.updateTaskContextByTid(tid, entry_id) //true = update fts_dn
+		for id := range o.marked_entries {
+			err := o.Database.updateTaskContextByTid(tid, id) 
+      if err != nil {
+		    o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+        return
+      }
 		}
-		sess.showOrgMessage("Marked entries moved into context %s", input)
+		o.showMessage("Marked entries moved into context %s", input)
 		return
 	}
-	o.Database.updateTaskContextByTid(tid, o.rows[o.fr].id)
-	sess.showOrgMessage("Moved current entry (since none were marked) into context %s", input)
+  id := o.rows[o.fr].id
+	err := o.Database.updateTaskContextByTid(tid, id)
+    if err != nil {
+	   o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+      return
+    }
+	o.showMessage("Moved current entry (since none were marked) into context %s", input)
 }
 
 func (o *Organizer) folders(pos int) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+  "fmt"
 	"strings"
 )
 
@@ -189,14 +190,21 @@ func (o *Organizer) insertChar(c int) {
 
 func (o *Organizer) writeTitle() {
 	row := &o.rows[o.fr]
-
+  var msg string
 	if !row.dirty {
 		sess.showOrgMessage("Row has not been changed")
 		return
 	}
 
 	if o.view == TASK {
-		o.Database.updateTitle()
+		err := o.Database.updateTitle(row)
+		if err != nil {
+			//sess.showOrgMessage("Error inserting into DB: %v", err)
+      msg = fmt.Sprintf("Error inserting into DB: %v", err)
+		} else {
+			//sess.showOrgMessage("New (new) entry written to db with id: %d", row.id)
+      msg = fmt.Sprintf("New (new) entry written to db with id: %d", row.id)
+    }
 	} else {
 		updateContainerTitle()
 	}
@@ -205,6 +213,7 @@ func (o *Organizer) writeTitle() {
 
 	//sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()
+	sess.showOrgMessage(msg)
 }
 
 func (o *Organizer) clearMarkedEntries() {

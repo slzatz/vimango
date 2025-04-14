@@ -74,7 +74,12 @@ func (e *Editor) writeNote() {
 		go updateCodeFile(e.id, text)
 	}
 
-	DB.updateNote(e.id, text)
+	err := DB.updateNote(e.id, text)
+  if err != nil {
+		sess.showEdMessage("Error in updateNote for entry with id %d: %v", e.id, err)
+    return
+  }
+	sess.showOrgMessage("Updated note and fts entry for entry %d", e.id) //////
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
@@ -356,7 +361,11 @@ func (e *Editor) quitActions() {
 	cmd := e.command_line
 	if cmd == "x" {
 		text := e.bufferToString()
-		DB.updateNote(e.id, text)
+		err := DB.updateNote(e.id, text)
+    if err != nil {
+		  sess.showEdMessage("Error in updateNote for entry with id %d: %v", e.id, err)
+    } 
+	  sess.showOrgMessage("Updated note and fts entry for entry %d", e.id) //////
 
 	} else if cmd == "q!" || cmd == "quit!" {
 		// do nothing = allow editor to be closed

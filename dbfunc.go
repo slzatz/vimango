@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/slzatz/vimango/vim"
 	//"github.com/lib/pq"
@@ -26,47 +25,6 @@ func (db *Database) entryTidFromId(id int) int {
 	return tid
 }
 
-/* appears not to be in use
-func keywordTidFromId(id int) int {
-	var tid int
-	_ = db.QueryRow("SELECT tid FROM keyword WHERE id=?;", id).Scan(&tid)
-	return tid
-}
-*/
-/***********************************new*********************************/
-
-func timeDelta(t string) string {
-	var t0 time.Time
-	if strings.Contains(t, "T") {
-		t0, _ = time.Parse("2006-01-02T15:04:05Z", t)
-	} else {
-		t0, _ = time.Parse("2006-01-02 15:04:05", t)
-	}
-	diff := time.Since(t0)
-
-	diff = diff / 1000000000
-	if diff <= 120 {
-		return fmt.Sprintf("%d seconds ago", diff)
-	} else if diff <= 60*120 {
-		return fmt.Sprintf("%d minutes ago", diff/60) // <120 minutes we report minute
-	} else if diff <= 48*60*60 {
-		return fmt.Sprintf("%d hours ago", diff/3600) // <48 hours report hours
-	} else if diff <= 24*60*60*60 {
-		return fmt.Sprintf("%d days ago", diff/3600/24) // <60 days report days
-	} else if diff <= 24*30*24*60*60 {
-		return fmt.Sprintf("%d months ago", diff/3600/24/30) // <24 months rep
-	} else {
-		return fmt.Sprintf("%d years ago", diff/3600/24/30/12)
-	}
-}
-
-/* appears not to be in use
-func keywordId(title string) int {
-	var id int
-	_ = db.QueryRow("SELECT id FROM keyword WHERE title=?;", title).Scan(&id)
-	return id
-}
-*/
 func (db *Database) keywordExists(title string) (int, bool) {
 	var tid sql.NullInt64
 	err := db.MainDB.QueryRow("SELECT tid FROM keyword WHERE title=?;", title).Scan(&tid)
@@ -144,7 +102,7 @@ func (db *Database) keywordList() map[string]struct{} {
 }
 func (db *Database) toggleStar(id int, state bool, table string) error {
 	s := fmt.Sprintf("UPDATE %s SET star=?, modified=datetime('now') WHERE id=?;",
-		org.view) //table
+		table) 
 	_, err := db.MainDB.Exec(s, !state, id)
   return err
 }
@@ -161,14 +119,10 @@ func (db *Database) toggleArchived(id int, state bool, table string) error {
   return err
 }
 
-func (db *Database) updateTaskContextByTid(tid, id int) {
+func (db *Database) updateTaskContextByTid(tid, id int) error {
 	_, err := db.MainDB.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
 		tid, id)
-
-	if err != nil {
-		sess.showOrgMessage("Error updating context for entry %d to tid %d: %v", id, tid, err)
-		return
-	}
+		return err
 }
 
 func (db *Database) updateTaskFolderByTid(tid, id int) {
@@ -181,7 +135,7 @@ func (db *Database) updateTaskFolderByTid(tid, id int) {
 	}
 }
 
-func (db *Database) updateNote(id int, text string) {
+func (db *Database) updateNote(id int, text string) error {
 
 	var nullableText sql.NullString
 	if len(text) != 0 {
@@ -191,21 +145,12 @@ func (db *Database) updateNote(id int, text string) {
 
 	_, err := db.MainDB.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
 		nullableText, id)
-	if err != nil {
-		sess.showOrgMessage("Error in updateNote for entry with id %d: %v", id, err)
-		return
-	}
+		return err
 
 	/***************fts virtual table update*********************/
-
 	entry_tid := db.entryTidFromId(id)
-
 	_, err = db.FtsDB.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid)
-	if err != nil {
-		sess.showOrgMessage("Error in updateNote updating fts for entry with id %d: %v", id, err)
-	}
-
-	sess.showOrgMessage("Updated note and fts entry for entry %d", id)
+	return err
 }
 
 func (db *Database) getSyncItems(max int) {
@@ -323,39 +268,34 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	return orgRows
 }
 
-func (db *Database) updateTitle() {
+func (db *Database) updateTitle(row *Row) error{
 
-	row := org.rows[org.fr]
+	//row := org.rows[org.fr]
 
 	if row.id == -1 {
-		// send pointer to insertRowinDB because updating row struct with new id
-		err := db.insertRowInDB(&org.rows[org.fr])
-		if err != nil {
-			sess.showOrgMessage("Error inserting into DB: %v", err)
-		} else {
-			sess.showOrgMessage("New entry written to db with id: %d", row.id)
-		}
-		return
-	}
+		err := db.insertRowInDB(row)
+    if err != nil {
+      return err
+	  }
+  } else {
 
 	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
 	if err != nil {
-		sess.showOrgMessage("Error in updateTitle for id %d: %v", row.id, err)
-		return
-	}
-
-	/***************fts virtual table update*********************/
-	entry_tid := db.entryTidFromId(row.id) /////////////////////////////////////////////////////
-
-	//_, err = fts_db.Exec("UPDATE fts SET title=? WHERE lm_id=?;", row.title, row.id)
-	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
-	if err != nil {
-		sess.showOrgMessage("Error in updateTitle update fts for id %d: %v", row.id, err)
-		return
+    return err
 	}
 }
+	/***************fts virtual table update*********************/
+	entry_tid := db.entryTidFromId(row.id) 
 
-func (db *Database) updateRows() {// need to db *Database this one
+	_, err := db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
+	if err != nil {
+    return err
+	}
+  return nil
+}
+
+/* not in use now just using updateTitle
+func (db *Database) updateRows() {
 	var updated_rows []int
 
 	for fr, row := range org.rows {
@@ -390,6 +330,7 @@ func (db *Database) updateRows() {// need to db *Database this one
 	}
 	sess.showOrgMessage("These ids were updated: %v", updated_rows)
 }
+*/
 
 func (db *Database) insertRowInDB(row *Row) error { // should return err
 

@@ -86,7 +86,7 @@ func (o *Organizer) star() {
   state := o.rows[o.fr].star
 	err := o.Database.toggleStar(id, state, o.view.String())
 	if err != nil {
-		o.AppUI.showOrgMessage("Error toggling %s id %d to star: %v", o.view, id, err)
+		o.showMessage("Error toggling %s id %d to star: %v", o.view, id, err)
 		return
   }
 	o.rows[o.fr].star = !state
