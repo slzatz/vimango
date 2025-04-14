@@ -368,7 +368,7 @@ func (o *Organizer) editNote(id int) {
 	}
 
 	if !active {
-		p = NewEditor()
+		p = app.NewEditor()
 		app.Windows = append(app.Windows, p)
 		p.id = id
     p.title = o.rows[o.fr].title

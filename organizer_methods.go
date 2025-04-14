@@ -199,10 +199,8 @@ func (o *Organizer) writeTitle() {
 	if o.view == TASK {
 		err := o.Database.updateTitle(row)
 		if err != nil {
-			//sess.showOrgMessage("Error inserting into DB: %v", err)
       msg = fmt.Sprintf("Error inserting into DB: %v", err)
 		} else {
-			//sess.showOrgMessage("New (new) entry written to db with id: %d", row.id)
       msg = fmt.Sprintf("New (new) entry written to db with id: %d", row.id)
     }
 	} else {
@@ -222,14 +220,3 @@ func (o *Organizer) clearMarkedEntries() {
 	}
 }
 
-/*
-std::string Organizer::outlineRowsToString(void) {
-  std::string s = "";
-  for (auto i: rows) {
-      s += i.title;
-      s += '\n';
-  }
-  s.pop_back(); //pop last return that we added
-  return s;
-}
-*/

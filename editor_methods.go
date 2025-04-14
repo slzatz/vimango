@@ -417,8 +417,8 @@ func (e *Editor) drawPlainRows(pab *strings.Builder) {
 func (e *Editor) drawCodeRows(pab *strings.Builder) {
 	note := e.generateWWStringFromBuffer()
 	var lang string
-	if DB.taskFolder(e.id) == "code" {
-		c := DB.taskContext(e.id)
+	if e.Database.taskFolder(e.id) == "code" {
+		c := e.Database.taskContext(e.id)
 		var ok bool
 		if lang, ok = Languages[c]; !ok {
 			lang = "markdown"
@@ -666,7 +666,6 @@ func (e *Editor) drawStatusBar() {
 	fmt.Fprintf(&ab, "\x1b[%dX", e.screencols)
 
 	ab.WriteString("\x1b[7m ") //switches to inverted colors
-	//title := DB.getTitle(e.id)
   title := e.title
 	if len(title) > 30 {
 		title = title[:30]

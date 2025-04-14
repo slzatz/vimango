@@ -70,11 +70,11 @@ func (e *Editor) saveNoteToFile() {
 func (e *Editor) writeNote() {
 	text := e.bufferToString()
 
-	if DB.taskFolder(e.id) == "code" {
+	if e.Database.taskFolder(e.id) == "code" {
 		go updateCodeFile(e.id, text)
 	}
 
-	err := DB.updateNote(e.id, text)
+	err := e.Database.updateNote(e.id, text)
   if err != nil {
 		sess.showEdMessage("Error in updateNote for entry with id %d: %v", e.id, err)
     return
@@ -173,7 +173,7 @@ func (e *Editor) compile() {
 
 	var dir string
 	var cmd *exec.Cmd
-	lang := Languages[DB.taskContext(e.id)]
+	lang := Languages[e.Database.taskContext(e.id)]
 	if lang == "cpp" {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
@@ -185,7 +185,7 @@ func (e *Editor) compile() {
 		sess.showEdMessage("You don't have to compile python")
 		return
 	} else {
-		sess.showEdMessage("I don't recognize %q", DB.taskContext(e.id))
+		sess.showEdMessage("I don't recognize %q", e.Database.taskContext(e.id))
 		return
 	}
 	cmd.Dir = dir
@@ -254,7 +254,7 @@ func (e *Editor) run() {
 	var obj string
 	var cmd *exec.Cmd
 	//if getFolderTid(e.id) == 18 {
-	if DB.taskContext(e.id) == "cpp" {
+	if e.Database.taskContext(e.id) == "cpp" {
 		obj = "./test_cpp"
 		dir = "/home/slzatz/clangd_examples/"
 	} else {
@@ -262,7 +262,7 @@ func (e *Editor) run() {
 		obj = "./go_fragments"
 		dir = "/home/slzatz/go_fragments/"
 	}
-	lang := Languages[DB.taskContext(e.id)]
+	lang := Languages[e.Database.taskContext(e.id)]
 	if lang == "cpp" {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
@@ -273,7 +273,7 @@ func (e *Editor) run() {
 		obj = "./main.py"
 		dir = "/home/slzatz/python_fragments/"
 	} else {
-		sess.showEdMessage("I don't recognize %q", DB.taskContext(e.id))
+		sess.showEdMessage("I don't recognize %q", e.Database.taskContext(e.id))
 		return
 	}
 
@@ -361,7 +361,7 @@ func (e *Editor) quitActions() {
 	cmd := e.command_line
 	if cmd == "x" {
 		text := e.bufferToString()
-		err := DB.updateNote(e.id, text)
+		err := e.Database.updateNote(e.id, text)
     if err != nil {
 		  sess.showEdMessage("Error in updateNote for entry with id %d: %v", e.id, err)
     } 
@@ -632,15 +632,15 @@ func (e *Editor) createPDF() {
 }
 
 func (e *Editor) printDocument() {
-	if DB.taskFolder(e.id) == "code" {
-		c := DB.taskContext(e.id)
+	if e.Database.taskFolder(e.id) == "code" {
+		c := e.Database.taskContext(e.id)
 		var ok bool
 		var lang string
 		if lang, ok = Languages[c]; !ok {
 			sess.showEdMessage("I don't recognize the language")
 			return
 		}
-		note := DB.readNoteIntoString(e.id)
+		note := e.Database.readNoteIntoString(e.id)
 		var buf bytes.Buffer
 		// github seems to work pretty well for printer output
 		_ = Highlight(&buf, note, lang, "html", "github")
