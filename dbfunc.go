@@ -551,9 +551,9 @@ func getTaskKeywordTids(id int) []int {
 }
 */
 
-func searchEntries(st string, showDeleted, help bool) []Row {
+func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 
-	rows, err := fts_db.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
+	rows, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
 		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
 
 	defer rows.Close()
@@ -607,7 +607,7 @@ func searchEntries(st string, showDeleted, help bool) []Row {
 	}
 	stmt += "task.tid = " + strconv.Itoa(ftsTids[max]) + " DESC"
 
-	rows, err = db.Query(stmt)
+	rows, err = db.MainDB.Query(stmt)
 	if err != nil {
 		sess.showOrgMessage("Error in Find query %q: %v", stmt[:10], err)
 		return []Row{}

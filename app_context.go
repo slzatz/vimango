@@ -18,7 +18,7 @@ type App struct {
 	Session   *Session // Session handles terminal and screen management
 	Organizer *Organizer // Organizer manages tasks and their display
 	Editor    *Editor // Editor manages text editing
-	Windows   []Window // Windows manages multiple windows in the application
+	Windows   []Window // Windows is slice of Window interfaces and manages multiple windows in the application
   Database  *Database // Database handles database connections and queries
 	
 	// Database connections and other config

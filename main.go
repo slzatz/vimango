@@ -19,10 +19,9 @@ var app *App
 var sess *Session
 var org *Organizer
 var p *Editor
-var db *sql.DB
+var db *sql.DB //may only be used in bulk_load
 var fts_db *sql.DB
 var config *dbConfig //should be easy to eliminate this global variable
-var windows []Window
 var DB *Database
 
 func main() {
@@ -45,10 +44,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Initialize windows array
-	app.Windows = make([]Window, 0)
-	windows = app.Windows // This is a slice, so need to make sure it's the same slice, not just a copy
-	
 	// Create markdown syntax highlighting style
 	markdown_style, _ := selectMDStyle("gruvbox.xml")
 	sess.markdown_style = markdown_style

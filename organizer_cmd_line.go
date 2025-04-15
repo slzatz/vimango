@@ -462,7 +462,7 @@ func (o *Organizer) refresh(unused int) {
 		if o.taskview == BY_FIND {
 			o.mode = FIND
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows = searchEntries(sess.fts_search_terms, o.show_deleted, false)
+			o.rows = o.Database.searchEntries(sess.fts_search_terms, o.show_deleted, false)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -537,7 +537,7 @@ func (o *Organizer) find(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
 	sess.showOrgMessage("Search for '%s'", searchTerms)
-	o.rows = searchEntries(searchTerms, o.show_deleted, false)
+	o.rows = o.Database.searchEntries(searchTerms, o.show_deleted, false)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false

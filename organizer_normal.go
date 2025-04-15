@@ -112,7 +112,7 @@ func (o *Organizer) info() {
 }
 
 func switchToEditorMode() {
-	if len(windows) == 0 {
+	if len(app.Windows) == 0 {
 		sess.showOrgMessage("There are no active editors")
 		return
 	}
