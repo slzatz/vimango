@@ -37,7 +37,8 @@ func CreateApp() *App {
 	return &App{
 		Session:   sess,
     Database: db,
-    Editor:    &Editor{}, // May not need this here
+    //Editor:    &Editor{}, // Not needed now but may want App.Editor to be a pointer to current Editor
+    // maybe new Editor should have the session field and session would know the active editor window
     Organizer: &Organizer{AppUI: sess, Database: db},
 		Windows:   make([]Window, 0),
 		Run:       true,
@@ -62,6 +63,7 @@ func (a *App) NewEditor() *Editor {
 		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
 		modified:           false,
     Database:           a.Database,
+    AppUI:              a.Session,
 	}
 }
 // FromFile returns a dbConfig struct parsed from a file.

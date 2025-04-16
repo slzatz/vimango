@@ -189,7 +189,7 @@ func (db *Database) deleteSyncItem(id int) {
 	sess.showOrgMessage("Deleted sync_log entry with id %d", id)
 }
 
-func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) []Row {
+func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) ([]Row, error) {
 
 	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.%s FROM task ", sort)
 
@@ -209,7 +209,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 		filter = 1
 	default:
 		sess.showOrgMessage("You asked for an unsupported db query")
-		return []Row{}
+		return []Row{}, nil //FIXME
 	}
 
 	if !showDeleted {
@@ -220,19 +220,14 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	} else {
 		s += fmt.Sprintf(" ORDER BY task.%s DESC LIMIT %d;", sort, max) //01162022
 	}
-	var rows *sql.Rows
-	var err error
-	/*
-		if filter == "" { //Recent
-			rows, err = db.Query(s)
-		} else {
-			rows, err = db.Query(s, filter)
-		}
-	*/
-	rows, err = db.MainDB.Query(s, filter)
+
+	//var rows *sql.Rows
+	//var err error
+
+	rows, err := db.MainDB.Query(s, filter)
 	if err != nil {
 		sess.showOrgMessage("Error in getItems: %v", err)
-		return []Row{}
+		return []Row{}, err
 	}
 
 	defer rows.Close()
@@ -253,7 +248,8 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 
 		if err != nil {
 			sess.showOrgMessage("Error in filterEntries: %v", err)
-			return orgRows
+			//return orgRows
+			return orgRows, err
 		}
 
 		if sort.Valid {
@@ -265,10 +261,10 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 		orgRows = append(orgRows, row)
 
 	}
-	return orgRows
+	return orgRows, nil
 }
 
-func (db *Database) updateTitle(row *Row) error{
+func (db *Database) updateTitle(row *Row) error {
 
 	//row := org.rows[org.fr]
 
@@ -640,7 +636,7 @@ func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 	return orgRows
 }
 
-func getContainers() {
+func (db *Database) getContainers() {
 	org.rows = nil
 	org.sort = "modified" //only time column that all containers have
 
@@ -669,7 +665,7 @@ func getContainers() {
 
 	//stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
 	stmt := fmt.Sprintf("SELECT id, title, star, deleted, modified FROM %s ORDER BY title COLLATE NOCASE ASC;", org.view)
-	rows, err := db.Query(stmt)
+	rows, err := db.MainDB.Query(stmt)
 	if err != nil {
 		sess.showOrgMessage("Error SELECTING id, title, star, deleted, modified FROM %s", org.view)
 		return
@@ -761,7 +757,7 @@ func getAltContainers() {
 
 }
 
-func getContainerInfo(id int) Container {
+func (db *Database) getContainerInfo(id int) Container {
 
 	/*
 		type Container struct {
@@ -803,7 +799,7 @@ func getContainerInfo(id int) Container {
 
 	var c Container
 
-	row := db.QueryRow(countQuery, id)
+	row := db.MainDB.QueryRow(countQuery, id)
 	err := row.Scan(&c.count)
 	if err != nil {
 		sess.showOrgMessage("Error in getContainerInfo: %v", err)
@@ -812,7 +808,7 @@ func getContainerInfo(id int) Container {
 
 	//stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", columns, table)
 	stmt := fmt.Sprintf("SELECT id, tid, title, star, deleted, modified FROM %s WHERE id=?;", org.view)
-	row = db.QueryRow(stmt, id)
+	row = db.MainDB.QueryRow(stmt, id)
 	var tid sql.NullInt64
 	err = row.Scan(
 		&c.id,

@@ -119,12 +119,13 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			o.filter = row.title
-			o.showMessage("'%s' will be opened", o.filter)
+			o.AppUI.showMessage(BL, "'%s' will be opened", o.filter)
 
 			o.clearMarkedEntries()
 			o.view = TASK
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+			//o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+			o.FilterEntries(MAX)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -186,7 +187,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if o.view == TASK {
 				o.drawPreview()
 			} else {
-				o.AppUI.displayContainerInfo()
+				o.displayContainerInfo()
 			}
 		}
 		s := vim.BufferLines(o.vbuf)[o.fr]

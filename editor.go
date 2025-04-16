@@ -38,5 +38,6 @@ type Editor struct {
 	modified           bool     // tracks if the buffer has been modified
   title              string   // title of the note
   Database          *Database // pointer to the database
+  AppUI             *Session  // pointer to the session
 }
 

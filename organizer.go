@@ -44,7 +44,11 @@ type Organizer struct {
 }
 
 func (o *Organizer) FilterEntries(max int) {
-    o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, max)
+  var err error
+  o.rows, err = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, max)
+  if err != nil {
+      o.showMessage("Error filtering entries: %v", err)
+  }
 }
 
 func (o *Organizer) getId() int {

@@ -139,7 +139,8 @@ func (o *Organizer) open(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -186,7 +187,8 @@ func (o *Organizer) openContext(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -231,7 +233,8 @@ func (o *Organizer) openFolder(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -276,7 +279,8 @@ func (o *Organizer) openKeyword(pos int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -482,7 +486,8 @@ func (o *Organizer) refresh(unused int) {
 		} else {
 			o.mode = o.last_mode
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+			//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	    o.FilterEntries(MAX)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -498,7 +503,7 @@ func (o *Organizer) refresh(unused int) {
 		//sess.showOrgMessage("Entries will be refreshed")
 	} else {
 		o.mode = o.last_mode
-		getContainers()
+		o.Database.getContainers()
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
@@ -508,9 +513,9 @@ func (o *Organizer) refresh(unused int) {
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		if unused != -1 {
-			sess.displayContainerInfo()
+			o.displayContainerInfo()
 		}
-		sess.showOrgMessage("view refreshed")
+		o.AppUI.showMessage(BL, "view refreshed")
 	}
 	o.clearMarkedEntries()
 }
@@ -643,7 +648,7 @@ func (o *Organizer) contexts(pos int) {
 	if pos == -1 {
 		sess.eraseRightScreen()
 		o.view = CONTEXT
-		getContainers()
+		o.Database.getContainers()
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
@@ -652,7 +657,7 @@ func (o *Organizer) contexts(pos int) {
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-		sess.displayContainerInfo()
+		o.displayContainerInfo()
 		sess.showOrgMessage("Retrieved contexts")
 		return
 	}
@@ -701,7 +706,7 @@ func (o *Organizer) folders(pos int) {
 	if pos == -1 {
 		sess.eraseRightScreen()
 		o.view = FOLDER
-		getContainers()
+		o.Database.getContainers()
 
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
@@ -711,7 +716,7 @@ func (o *Organizer) folders(pos int) {
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-		sess.displayContainerInfo()
+		o.displayContainerInfo()
 		sess.showOrgMessage("Retrieved folders")
 		return
 	}
@@ -747,7 +752,7 @@ func (o *Organizer) keywords(pos int) {
 	if pos == -1 {
 		sess.eraseRightScreen()
 		o.view = KEYWORD
-		getContainers()
+		o.Database.getContainers()
 
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
@@ -757,7 +762,7 @@ func (o *Organizer) keywords(pos int) {
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-		sess.displayContainerInfo()
+		o.displayContainerInfo()
 		sess.showOrgMessage("Retrieved keywords")
 		return
 	}
@@ -814,7 +819,8 @@ func (o *Organizer) recent(unused int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+  o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false

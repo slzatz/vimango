@@ -8,6 +8,15 @@ import (
 	"regexp"
 )
 
+type Location int
+
+const (
+	BL Location = iota //Bottom Left
+	BR
+	TL
+	TR
+)
+
 type Position struct {
 	rowNum int
 	start  int

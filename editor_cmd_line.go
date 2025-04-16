@@ -76,17 +76,17 @@ func (e *Editor) writeNote() {
 
 	err := e.Database.updateNote(e.id, text)
   if err != nil {
-		sess.showEdMessage("Error in updateNote for entry with id %d: %v", e.id, err)
+		e.AppUI.showMessage(BL, "Error in updating note (updateNote) for entry with id %d: %v", e.id, err)
     return
   }
-	sess.showOrgMessage("Updated note and fts entry for entry %d", e.id) //////
+	e.AppUI.showMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
 	e.bufferTick = vim.BufferGetLastChangedTick(e.vbuf)
 
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
-	sess.showEdMessage("isModified = %t", e.isModified())
+	e.AppUI.showMessage(BR, "isModified = %t", e.isModified())
 }
 
 func (e *Editor) readFile() {

@@ -257,6 +257,25 @@ func (s *Session) showEdMessage(format string, a ...interface{}) {
 	fmt.Print(str)
 }
 
+func (s *Session) showMessage(loc Location, format string, a ...interface{}) {
+  var max_length int
+
+  switch loc {
+  case BL:
+	  fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", s.textLines+2+TOP_MARGIN, s.divider, s.textLines+2+TOP_MARGIN)
+    max_length = s.divider
+  case BR:
+	  fmt.Printf("\x1b[%d;%dH\x1b[K", s.textLines+2+TOP_MARGIN, s.divider+1)
+	  max_length = s.screenCols - s.divider
+    }
+
+	str := fmt.Sprintf(format, a...)
+	if len(str) > max_length {
+		str = str[:max_length]
+	}
+	fmt.Print(str)
+}
+
 func (s *Session) returnCursor() {
 	var ab strings.Builder
 	if s.editorMode {
@@ -290,6 +309,7 @@ func (s *Session) returnCursor() {
 	fmt.Print(ab.String())
 }
 
+/* moved to Organizer in organizer_normal.go
 func (s *Session) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder
 	width := s.totaleditorcols - 10
@@ -300,6 +320,7 @@ func (s *Session) displayEntryInfo(e *NewEntry) {
 
 	//hide the cursor
 	ab.WriteString("\x1b[?25l")
+  // move the cursor
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, s.divider+7)
 
 	//erase set number of chars on each line
@@ -311,6 +332,9 @@ func (s *Session) displayEntryInfo(e *NewEntry) {
 
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, s.divider+7)
 
+  // \x1b[ 2*x is DECSACE to operate in rectable mode
+  // \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
+  // \x1b[ *x is DECSACE to exit rectangle mode
 	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
 		TOP_MARGIN+6, s.divider+7, TOP_MARGIN+4+length, s.divider+7+width)
 	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
@@ -343,6 +367,7 @@ func (s *Session) displayEntryInfo(e *NewEntry) {
 
 	fmt.Print(ab.String())
 }
+*/
 
 // used by containers
 func (s *Session) drawPreviewBox() {
@@ -387,20 +412,10 @@ func (s *Session) drawPreviewBox() {
 	fmt.Print(ab.String())
 }
 
+/*
 func (s *Session) displayContainerInfo() {
 
-	/*
-		type Container struct {
-			id       int
-			tid      int
-			title    string
-			star     bool
-			deleted  bool
-			modified string
-			count    int
-		}
-	*/
-	c := getContainerInfo(org.rows[org.fr].id)
+	c := DB.getContainerInfo(org.rows[org.fr].id)
 
 	if c.id == 0 {
 		return
@@ -449,6 +464,7 @@ func (s *Session) displayContainerInfo() {
 	fmt.Print(ab.String())
 	sess.drawPreviewBox()
 }
+*/
 
 func (s *Session) quitApp() {
 	//if lsp.name != "" {

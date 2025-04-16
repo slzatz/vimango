@@ -1,6 +1,7 @@
 package main
 
 import (
+  "fmt"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -77,7 +78,7 @@ func (o *Organizer) del() {
 		o.AppUI.showOrgMessage("Error toggling %s id %d to deleted: %v", o.view, id, err)
 		return
   }
-	o.rows[org.fr].deleted = !state
+	o.rows[o.fr].deleted = !state
 	o.AppUI.showOrgMessage("Toggle deleted for %s id %d succeeded (new)", o.view, id)
 }
 
@@ -107,8 +108,8 @@ func (o *Organizer) archive() {
 
 func (o *Organizer) info() {
 	e := o.Database.getEntryInfo(o.getId())
-	sess.displayEntryInfo(&e)
-	sess.drawPreviewBox()
+	o.displayEntryInfo(&e)
+	o.AppUI.drawPreviewBox()
 }
 
 func switchToEditorMode() {
@@ -164,3 +165,124 @@ func drawPreviewWithImages() {
 	org.drawPreviewWithImages()
 	sess.imagePreview = true
 }
+func (o *Organizer) displayEntryInfo(e *NewEntry) {
+	var ab strings.Builder
+	width := o.AppUI.totaleditorcols - 10
+	length := o.AppUI.textLines - 10
+
+	// \x1b[NC moves cursor forward by N columns
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+6)
+
+	//hide the cursor
+	ab.WriteString("\x1b[?25l")
+  // move the cursor
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+
+	//erase set number of chars on each line
+	erase_chars := fmt.Sprintf("\x1b[%dX", o.AppUI.totaleditorcols-10)
+	for i := 0; i < length-1; i++ {
+		ab.WriteString(erase_chars)
+		ab.WriteString(lf_ret)
+	}
+
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+
+  // \x1b[ 2*x is DECSACE to operate in rectable mode
+  // \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
+  // \x1b[ *x is DECSACE to exit rectangle mode
+	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
+		TOP_MARGIN+6, o.AppUI.divider+7, TOP_MARGIN+4+length, o.AppUI.divider+7+width)
+	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
+
+	fmt.Fprintf(&ab, "id: %d%s", e.id, lf_ret)
+	fmt.Fprintf(&ab, "tid: %d%s", e.tid, lf_ret)
+
+	title := fmt.Sprintf("title: %s", e.title)
+	if len(title) > width {
+		title = title[:width-3] + "..."
+	}
+	//coloring labels will take some work b/o gray background
+	//s.append(fmt::format("{}title:{} {}{}", COLOR_1, "\x1b[m", title, lf_ret));
+	fmt.Fprintf(&ab, "%s%s", title, lf_ret)
+
+	context := o.Database.filterTitle("context", e.context_tid)
+	fmt.Fprintf(&ab, "context: %s%s", context, lf_ret)
+
+	folder := o.Database.filterTitle("folder", e.folder_tid)
+	fmt.Fprintf(&ab, "folder: %s%s", folder, lf_ret)
+
+	fmt.Fprintf(&ab, "star: %t%s", e.star, lf_ret)
+	fmt.Fprintf(&ab, "deleted: %t%s", e.deleted, lf_ret)
+
+	fmt.Fprintf(&ab, "completed: %t%s", e.archived, lf_ret)
+	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
+	fmt.Fprintf(&ab, "added: %s%s", e.added, lf_ret)
+
+	fmt.Fprintf(&ab, "keywords: %s%s", DB.getTaskKeywords(e.id), lf_ret)
+
+	fmt.Print(ab.String())
+}
+
+func (o *Organizer) displayContainerInfo() {
+
+	/*
+		type Container struct {
+			id       int
+			tid      int
+			title    string
+			star     bool
+			deleted  bool
+			modified string
+			count    int
+		}
+	*/
+	c := o.Database.getContainerInfo(o.rows[o.fr].id)
+
+	if c.id == 0 {
+		return
+	}
+
+	var ab strings.Builder
+	width := o.AppUI.totaleditorcols - 10
+	length := o.AppUI.textLines - 10
+
+	// \x1b[NC moves cursor forward by N columns
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+6)
+
+	//hide the cursor
+	ab.WriteString("\x1b[?25l")
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+
+	//erase set number of chars on each line
+	erase_chars := fmt.Sprintf("\x1b[%dX", o.AppUI.totaleditorcols-10)
+	for i := 0; i < length-1; i++ {
+		ab.WriteString(erase_chars)
+		ab.WriteString(lf_ret)
+	}
+
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+
+	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
+		TOP_MARGIN+6, o.AppUI.divider+7, TOP_MARGIN+4+length, o.AppUI.divider+7+width)
+	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
+
+	//ab.append(COLOR_6); // Blue depending on theme
+
+	fmt.Fprintf(&ab, "id: %d%s", c.id, lf_ret)
+	fmt.Fprintf(&ab, "tid: %d%s", c.tid, lf_ret)
+
+	title := fmt.Sprintf("title: %s", c.title)
+	if len(title) > width {
+		title = title[:width-3] + "..."
+	}
+
+	fmt.Fprintf(&ab, "star: %t%s", c.star, lf_ret)
+	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, lf_ret)
+
+	fmt.Fprintf(&ab, "modified: %s%s", c.modified, lf_ret)
+	fmt.Fprintf(&ab, "entry count: %d%s", c.count, lf_ret)
+
+	fmt.Print(ab.String())
+	o.AppUI.drawPreviewBox()
+}
+
