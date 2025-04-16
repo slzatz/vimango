@@ -204,7 +204,16 @@ func (o *Organizer) writeTitle() {
       msg = fmt.Sprintf("New (new) entry written to db with id: %d", row.id)
     }
 	} else {
-		updateContainerTitle()
+    if !row.dirty {
+      o.AppUI.showMessage(BL, "Row has not been changed")
+      return
+      }
+		err := o.Database.updateContainerTitle(row)
+		if err != nil {
+      msg = fmt.Sprintf("Error inserting into DB: %v", err)
+		} else {
+      msg = fmt.Sprintf("New (new) container written to db with id: %d", row.id)
+    }
 	}
 
 	o.command = ""

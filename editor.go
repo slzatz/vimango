@@ -1,6 +1,9 @@
 package main
+import (
+  "fmt"
 
-import "github.com/slzatz/vimango/vim"
+  "github.com/slzatz/vimango/vim"
+) 
 
 //import "github.com/neovim/go-client/nvim"
 
@@ -41,3 +44,11 @@ type Editor struct {
   AppUI             *Session  // pointer to the session
 }
 
+func (e *Editor) ShowMessage(max_length int, format string, a ...interface{}) { //Sesseion struct
+
+	str := fmt.Sprintf(format, a...)
+	if len(str) > max_length {
+		str = str[:max_length]
+	}
+	fmt.Print(str)
+}

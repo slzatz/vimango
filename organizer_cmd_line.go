@@ -308,10 +308,11 @@ func (o *Organizer) write(pos int) {
       updated_rows = append(updated_rows, r.id)
 		}
   }
+  max_length := o.AppUI.PositionMessage(BL)
 	if len(updated_rows) == 0 {
-	  o.showMessage("There were no rows to update")
+	  o.ShowMessage(max_length, "There were no rows to update")
 	} else {
-	  o.showMessage("These ids were updated: %v", updated_rows)
+	  o.ShowMessage(max_length, "These ids were updated: %v", updated_rows)
   }
 	o.mode = o.last_mode
 	o.command_line = ""
@@ -319,7 +320,7 @@ func (o *Organizer) write(pos int) {
 
 func (o *Organizer) quitApp(_ int) {
 	if o.command_line == "q!" {
-		sess.run = false
+		app.Run = false
 		return
 	}
 	unsaved_changes := false
@@ -333,7 +334,7 @@ func (o *Organizer) quitApp(_ int) {
 		o.mode = NORMAL
 		sess.showOrgMessage("No db write since last change")
 	} else {
-		sess.run = false
+		app.Run = false
 	}
 }
 

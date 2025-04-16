@@ -18,9 +18,7 @@ type Session struct {
 	textLines        int // considering margins, bottom messages
 	divider          int
 	totaleditorcols  int
-	initialFileRow   int
-	temporaryTID     int
-	run              bool
+  // maybe everything above goes into a new struct called Screen
 	editorMode       bool
 	imagePreview     bool
 	imgSizeY         int
@@ -275,6 +273,30 @@ func (s *Session) showMessage(loc Location, format string, a ...interface{}) {
 	}
 	fmt.Print(str)
 }
+
+func (s *Session) PositionMessage(loc Location) int { //Screen struct
+  var max_length int
+
+  switch loc {
+  case BL:
+	  fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", s.textLines+2+TOP_MARGIN, s.divider, s.textLines+2+TOP_MARGIN)
+    max_length = s.divider
+  case BR:
+	  fmt.Printf("\x1b[%d;%dH\x1b[K", s.textLines+2+TOP_MARGIN, s.divider+1)
+	  max_length = s.screenCols - s.divider
+    }
+   return max_length
+}
+/*
+func (s *Session) ShowMessage(max_length int, format string, a ...interface{}) { //Sesseion struct
+
+	str := fmt.Sprintf(format, a...)
+	if len(str) > max_length {
+		str = str[:max_length]
+	}
+	fmt.Print(str)
+}
+*/
 
 func (s *Session) returnCursor() {
 	var ab strings.Builder

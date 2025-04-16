@@ -290,44 +290,6 @@ func (db *Database) updateTitle(row *Row) error {
   return nil
 }
 
-/* not in use now just using updateTitle
-func (db *Database) updateRows() {
-	var updated_rows []int
-
-	for fr, row := range org.rows {
-		if !row.dirty {
-			continue
-		}
-
-		if row.id == -1 {
-			// send pointer to insertRowinDB because updating row struct with new id
-			err := db.insertRowInDB(&org.rows[fr])
-			if err != nil {
-				sess.showOrgMessage("Error inserting into DB: %v", err) //could be overwritten
-			} else {
-				updated_rows = append(updated_rows, row.id)
-			}
-			continue
-		}
-
-		_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
-		if err != nil {
-			sess.showOrgMessage("Error in updateRows for id %d: %v", row.id, err)
-			return
-		}
-
-		row.dirty = false
-		updated_rows = append(updated_rows, row.id)
-	}
-
-	if len(updated_rows) == 0 {
-		sess.showOrgMessage("There were no rows to update")
-		return
-	}
-	sess.showOrgMessage("These ids were updated: %v", updated_rows)
-}
-*/
-
 func (db *Database) insertRowInDB(row *Row) error { // should return err
 
 	folder_tid := 1
@@ -887,41 +849,33 @@ func getNoteSearchPositions__(id int) [][]int {
 	return word_positions
 }
 
-func updateContainerTitle() {
-	row := &org.rows[org.fr]
-	if !row.dirty {
-		sess.showOrgMessage("Row has not been changed")
-		return
-	}
+func (db *Database) updateContainerTitle(row *Row) error {
 	if row.id == -1 {
-		insertContainer(row)
-		return
+		err := db.insertContainer(row)
+    return err
 	}
 	stmt := fmt.Sprintf("UPDATE %s SET title=?, modified=datetime('now') WHERE id=?", org.view)
-	_, err := db.Exec(stmt, row.title, row.id)
-	if err != nil {
-		sess.showOrgMessage("Error updating %s title for %d", org.view, row.id)
-	}
+	_, err := db.MainDB.Exec(stmt, row.title, row.id)
+  return err
 }
 
-func insertContainer(row *Row) int {
+func (db *Database) insertContainer(row *Row) error {
 	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, modified) ", org.view)
 	stmt += "VALUES (?, ?, False, datetime('now')) RETURNING id;"
 	var id int
-	err := db.QueryRow(stmt, row.title, row.star).Scan(&id)
+	err := db.MainDB.QueryRow(stmt, row.title, row.star).Scan(&id)
 	if err != nil {
-		sess.showOrgMessage("Error in insertContainer: %v", err)
-		return -1
+		//sess.showOrgMessage("Error in insertContainer: %v", err)
+		return err
 	}
 	row.id = id
 	row.dirty = false
 
-	return id
+	return nil
 }
 
 func (db *Database) deleteKeywords(id int) int {
-	entry_tid := db.entryTidFromId(id) /////////////////////////////////////////////////////
-	//res, err := db.Exec("DELETE FROM task_keyword WHERE task_id=?;", id)
+	entry_tid := db.entryTidFromId(id)
 	res, err := db.MainDB.Exec("DELETE FROM task_keyword WHERE task_tid=?;", entry_tid)
 	if err != nil {
 		sess.showOrgMessage("Error deleting from task_keyword: %v", err)

@@ -72,3 +72,12 @@ func (o *Organizer) showMessage(format string, a ...interface{}) {
 	}
 	fmt.Print(str)
 }
+
+func (o *Organizer) ShowMessage(max_length int, format string, a ...interface{}) { //Sesseion struct
+
+	str := fmt.Sprintf(format, a...)
+	if len(str) > max_length {
+		str = str[:max_length]
+	}
+	fmt.Print(str)
+}

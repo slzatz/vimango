@@ -93,7 +93,6 @@ func main() {
 	app.LoadInitialData()
 	
 	// Set run flag
-	sess.run = true
 	app.Run = true
 	
 	// Run the main loop

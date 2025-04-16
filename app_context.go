@@ -222,7 +222,8 @@ func (a *App) MainLoop() {
 	
 	// No need to sync windows as it's handled in main.go initialization
 	
-	for a.Run && sess.run {
+	//for a.Run && sess.run {
+	for a.Run {
 		key, err := terminal.ReadKey()
 		if err != nil {
 			sess.showOrgMessage("Readkey problem %w", err)
@@ -258,7 +259,7 @@ func (a *App) MainLoop() {
 				a.Organizer.drawStatusBar()
 			}
 		}
-		sess.returnCursor()
+		a.Session.returnCursor()
 	}
 	
 	// Clean up when the main loop exits
