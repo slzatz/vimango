@@ -61,7 +61,7 @@ func main() {
 	go func() {
 		for {
 			_ = <-signal_chan
-			sess.signalHandler()
+			sess.signalHandler() // this should probably be in the App struct
 		}
 	}()
 	
@@ -76,7 +76,7 @@ func main() {
 		os.Exit(1)
 	}
 	
-	sess.origTermCfg = origCfg
+	app.origTermCfg = origCfg
 	sess.editorMode = false
 	
 	// Get window size

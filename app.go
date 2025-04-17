@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io/ioutil"
+  "strings"
 	"time"
   "fmt"
-//  "os"
+  "os"
 	
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
+	"github.com/slzatz/vimango/rawmode"
 )
 
 // App encapsulates the global application state
@@ -28,6 +30,7 @@ type App struct {
 	LastSync      time.Time
 	SyncInProcess bool
 	Run           bool
+  origTermCfg   []byte // original terminal configuration
 }
 
 // CreateApp creates and initializes the application struct
@@ -78,6 +81,45 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+func (a *App) signalHandler() {
+	err := a.Session.GetWindowSize() // Should change to Screen
+	if err != nil {
+		//SafeExit(fmt.Errorf("couldn't get window size: %v", err))
+		os.Exit(1)
+	}
+	a.moveDividerPct(a.Session.edPct) // should change to Screen
+}
+
+// Most of the Sessions below (but not all) should become Screen
+func (a *App) moveDividerPct(pct int) {
+	// note below only necessary if window resized or font size changed
+	a.Session.textLines = a.Session.screenLines - 2 - TOP_MARGIN
+
+	if pct == 100 {
+		a.Session.divider = 1
+	} else {
+		a.Session.divider = a.Session.screenCols - pct*a.Session.screenCols/100
+	}
+	a.Session.totaleditorcols = a.Session.screenCols - a.Session.divider - 2
+	a.Session.eraseScreenRedrawLines()
+
+	if a.Session.divider > 10 {
+		a.Organizer.refreshScreen()
+		a.Organizer.drawStatusBar()
+	}
+
+	if a.Session.editorMode {
+		a.Session.positionWindows()
+		a.Session.eraseRightScreen() //erases editor area + statusbar + msg
+		a.Session.drawRightScreen()
+	} else if a.Organizer.view == TASK {
+		a.Organizer.drawPreview()
+	}
+	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Session.screenLines, a.Session.screenCols, a.Session.divider)
+
+	a.returnCursor()
 }
 
 // InitDatabases initializes database connections
@@ -193,7 +235,40 @@ func (a *App) LoadInitialData() {
 	a.Organizer.drawStatusBar()
 
 	a.Session.showOrgMessage("rows: %d  columns: %d", a.Session.screenLines, a.Session.screenCols)
-	a.Session.returnCursor()
+	a.returnCursor()
+}
+
+func (a *App) returnCursor() {
+	var ab strings.Builder
+	if a.Session.editorMode {
+		switch p.mode { //FIXME
+		case PREVIEW, SPELLING, VIEW_LOG:
+			// we don't need to position cursor and don't want cursor visible
+			fmt.Print(ab.String())
+			return
+		case EX_COMMAND, SEARCH:
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Session.textLines+TOP_MARGIN+2, len(p.command_line)+a.Session.divider+2)
+		default:
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", p.cy+p.top_margin, p.cx+p.left_margin+p.left_margin_offset+1)
+		}
+	} else {
+		switch a.Organizer.mode {
+		case FIND:
+			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;34m>", org.cy+TOP_MARGIN+1, LEFT_MARGIN) //blue
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", org.cy+TOP_MARGIN+1, org.cx+LEFT_MARGIN+1)
+		case COMMAND_LINE:
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Session.textLines+2+TOP_MARGIN, len(org.command_line)+LEFT_MARGIN+1)
+
+		default:
+			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;31m>", org.cy+TOP_MARGIN+1, LEFT_MARGIN)
+			// below restores the cursor position based on org.cx and org.cy + margin
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", org.cy+TOP_MARGIN+1, org.cx+LEFT_MARGIN+1)
+		}
+	}
+
+	ab.WriteString("\x1b[0m")   //return to default fg/bg
+	ab.WriteString("\x1b[?25h") //shows the cursor
+	fmt.Print(ab.String())
 }
 
 // Cleanup handles proper shutdown of resources
@@ -209,11 +284,27 @@ func (a *App) Cleanup() {
 	if a.Database.PG != nil {
 	  a.Database.PG.Close()
 	}
-	if a.Session != nil {
-		a.Session.quitApp()
-	}
+	//if a.Session != nil {
+	//	a.Session.quitApp()
+	//}
+    a.quitApp()
 }
 
+func (a *App) quitApp() {
+	//if lsp.name != "" {
+	//	shutdownLsp()
+	//}
+	fmt.Print("\x1b[2J\x1b[H") //clears the screen and sends cursor home
+	//sqlite3_close(S.db); //something should probably be done here
+	//PQfinish(conn);
+	//lsp_shutdown("all");
+
+	if err := rawmode.Restore(a.origTermCfg); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: disabling raw mode: %s\r\n", err)
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
 // MainLoop is the main application loop
 func (a *App) MainLoop() {
 	

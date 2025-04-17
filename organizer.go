@@ -73,8 +73,8 @@ func (o *Organizer) showMessage(format string, a ...interface{}) {
 	fmt.Print(str)
 }
 
-func (o *Organizer) ShowMessage(max_length int, format string, a ...interface{}) { //Sesseion struct
-
+func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
+  max_length := o.AppUI.PositionMessage(loc) //this needs to change to o.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]

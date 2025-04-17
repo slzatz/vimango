@@ -308,11 +308,10 @@ func (o *Organizer) write(pos int) {
       updated_rows = append(updated_rows, r.id)
 		}
   }
-  max_length := o.AppUI.PositionMessage(BL)
 	if len(updated_rows) == 0 {
-	  o.ShowMessage(max_length, "There were no rows to update")
+	  o.ShowMessage(BL, "There were no rows to update")
 	} else {
-	  o.ShowMessage(max_length, "These ids were updated: %v", updated_rows)
+	  o.ShowMessage(BL, "These ids were updated: %v", updated_rows)
   }
 	o.mode = o.last_mode
 	o.command_line = ""

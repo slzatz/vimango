@@ -23,7 +23,7 @@ type Session struct {
 	imagePreview     bool
 	imgSizeY         int
 	fts_search_terms string
-	origTermCfg      []byte //from GoKilo
+//	origTermCfg      []byte //from GoKilo
 	//cfg              Config
 	edPct      int // percent that editor space takes up of whole horiz screen real estate
 	style      [8]string
@@ -274,7 +274,7 @@ func (s *Session) showMessage(loc Location, format string, a ...interface{}) {
 	fmt.Print(str)
 }
 
-func (s *Session) PositionMessage(loc Location) int { //Screen struct
+func (s *Session) PositionMessage(loc Location) int { //Move to Screen struct
   var max_length int
 
   switch loc {
@@ -432,76 +432,6 @@ func (s *Session) drawPreviewBox() {
 	ab.WriteString("\x1b[0m")
 	ab.WriteString("\x1b[?25h")
 	fmt.Print(ab.String())
-}
-
-/*
-func (s *Session) displayContainerInfo() {
-
-	c := DB.getContainerInfo(org.rows[org.fr].id)
-
-	if c.id == 0 {
-		return
-	}
-
-	var ab strings.Builder
-	width := s.totaleditorcols - 10
-	length := s.textLines - 10
-
-	// \x1b[NC moves cursor forward by N columns
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", s.divider+6)
-
-	//hide the cursor
-	ab.WriteString("\x1b[?25l")
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, s.divider+7)
-
-	//erase set number of chars on each line
-	erase_chars := fmt.Sprintf("\x1b[%dX", s.totaleditorcols-10)
-	for i := 0; i < length-1; i++ {
-		ab.WriteString(erase_chars)
-		ab.WriteString(lf_ret)
-	}
-
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, s.divider+7)
-
-	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-		TOP_MARGIN+6, s.divider+7, TOP_MARGIN+4+length, s.divider+7+width)
-	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
-
-	//ab.append(COLOR_6); // Blue depending on theme
-
-	fmt.Fprintf(&ab, "id: %d%s", c.id, lf_ret)
-	fmt.Fprintf(&ab, "tid: %d%s", c.tid, lf_ret)
-
-	title := fmt.Sprintf("title: %s", c.title)
-	if len(title) > width {
-		title = title[:width-3] + "..."
-	}
-
-	fmt.Fprintf(&ab, "star: %t%s", c.star, lf_ret)
-	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, lf_ret)
-
-	fmt.Fprintf(&ab, "modified: %s%s", c.modified, lf_ret)
-	fmt.Fprintf(&ab, "entry count: %d%s", c.count, lf_ret)
-
-	fmt.Print(ab.String())
-	sess.drawPreviewBox()
-}
-*/
-
-func (s *Session) quitApp() {
-	//if lsp.name != "" {
-	//	shutdownLsp()
-	//}
-	fmt.Print("\x1b[2J\x1b[H") //clears the screen and sends cursor home
-	//sqlite3_close(S.db); //something should probably be done here
-	//PQfinish(conn);
-	//lsp_shutdown("all");
-
-	if err := rawmode.Restore(s.origTermCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: disabling raw mode: %s\r\n", err)
-		os.Exit(1)
-	}
-	os.Exit(0)
 }
 
 func (s *Session) signalHandler() {

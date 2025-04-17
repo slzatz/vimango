@@ -44,8 +44,8 @@ type Editor struct {
   AppUI             *Session  // pointer to the session
 }
 
-func (e *Editor) ShowMessage(max_length int, format string, a ...interface{}) { //Sesseion struct
-
+func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
+  max_length := e.AppUI.PositionMessage(loc) //this needs to change to e.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]
