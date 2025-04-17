@@ -61,7 +61,7 @@ func main() {
 	go func() {
 		for {
 			_ = <-signal_chan
-			sess.signalHandler() // this should probably be in the App struct
+			app.signalHandler() // this should probably be in the App struct
 		}
 	}()
 	

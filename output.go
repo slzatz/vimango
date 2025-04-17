@@ -146,7 +146,7 @@ func (o *Output) drawFrame() {
 	//'T' corner = w or right top corner = k
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", o.top_margin-1, o.left_margin+o.screencols+1)
 
-	if o.left_margin+o.screencols > sess.screenCols-4 {
+	if o.left_margin+o.screencols > app.Screen.screenCols-4 {
 		ab.WriteString("\x1b[37;1mk") //draw corner
 	} else {
 		ab.WriteString("\x1b[37;1mw")

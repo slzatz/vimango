@@ -75,11 +75,11 @@ func (o *Organizer) del() {
   state := o.rows[o.fr].deleted
 	err := o.Database.toggleDeleted(id, state, o.view.String())
 	if err != nil {
-		o.AppUI.showOrgMessage("Error toggling %s id %d to deleted: %v", o.view, id, err)
+		o.ShowMessage(BL, "Error toggling %s id %d to deleted: %v", o.view, id, err)
 		return
   }
 	o.rows[o.fr].deleted = !state
-	o.AppUI.showOrgMessage("Toggle deleted for %s id %d succeeded (new)", o.view, id)
+	o.ShowMessage(BL, "Toggle deleted for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) star() {
@@ -91,7 +91,7 @@ func (o *Organizer) star() {
 		return
   }
 	o.rows[o.fr].star = !state
-	o.AppUI.showOrgMessage("Toggle star for %s id %d succeeded (new)", o.view, id)
+	o.ShowMessage(BL, "Toggle star for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) archive() {
@@ -99,17 +99,17 @@ func (o *Organizer) archive() {
   state := o.rows[o.fr].archived
 	err := o.Database.toggleArchived(id, state, o.view.String())
 	if err != nil {
-		o.AppUI.showOrgMessage("Error toggling %s id %d to archived: %v", o.view, id, err)
+		o.ShowMessage(BL, "Error toggling %s id %d to archived: %v", o.view, id, err)
 		return
   }
 	o.rows[o.fr].archived = !state
-	o.AppUI.showOrgMessage("Toggle archive for %s id %d succeeded (new)", o.view, id)
+	o.ShowMessage(BL, "Toggle archive for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) info() {
 	e := o.Database.getEntryInfo(o.getId())
 	o.displayEntryInfo(&e)
-	o.AppUI.drawPreviewBox()
+	o.Screen.drawPreviewBox()
 }
 
 func switchToEditorMode() {
@@ -140,7 +140,7 @@ func controlK() {
 func controlZ() {
 	id := org.rows[org.fr].id
 	note := DB.readNoteIntoString(id)
-	note = generateWWString(note, org.AppUI.totaleditorcols)
+	note = generateWWString(note, org.Screen.totaleditorcols)
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
@@ -167,31 +167,31 @@ func drawPreviewWithImages() {
 }
 func (o *Organizer) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder
-	width := o.AppUI.totaleditorcols - 10
-	length := o.AppUI.textLines - 10
+	width := o.Screen.totaleditorcols - 10
+	length := o.Screen.textLines - 10
 
 	// \x1b[NC moves cursor forward by N columns
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+6)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+6)
 
 	//hide the cursor
 	ab.WriteString("\x1b[?25l")
   // move the cursor
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 
 	//erase set number of chars on each line
-	erase_chars := fmt.Sprintf("\x1b[%dX", o.AppUI.totaleditorcols-10)
+	erase_chars := fmt.Sprintf("\x1b[%dX", o.Screen.totaleditorcols-10)
 	for i := 0; i < length-1; i++ {
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}
 
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 
   // \x1b[ 2*x is DECSACE to operate in rectable mode
   // \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
   // \x1b[ *x is DECSACE to exit rectangle mode
 	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-		TOP_MARGIN+6, o.AppUI.divider+7, TOP_MARGIN+4+length, o.AppUI.divider+7+width)
+		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
 	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
 
 	fmt.Fprintf(&ab, "id: %d%s", e.id, lf_ret)
@@ -243,27 +243,27 @@ func (o *Organizer) displayContainerInfo() {
 	}
 
 	var ab strings.Builder
-	width := o.AppUI.totaleditorcols - 10
-	length := o.AppUI.textLines - 10
+	width := o.Screen.totaleditorcols - 10
+	length := o.Screen.textLines - 10
 
 	// \x1b[NC moves cursor forward by N columns
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.AppUI.divider+6)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+6)
 
 	//hide the cursor
 	ab.WriteString("\x1b[?25l")
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 
 	//erase set number of chars on each line
-	erase_chars := fmt.Sprintf("\x1b[%dX", o.AppUI.totaleditorcols-10)
+	erase_chars := fmt.Sprintf("\x1b[%dX", o.Screen.totaleditorcols-10)
 	for i := 0; i < length-1; i++ {
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}
 
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.AppUI.divider+7)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 
 	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-		TOP_MARGIN+6, o.AppUI.divider+7, TOP_MARGIN+4+length, o.AppUI.divider+7+width)
+		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
 	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
 
 	//ab.append(COLOR_6); // Blue depending on theme
@@ -283,6 +283,6 @@ func (o *Organizer) displayContainerInfo() {
 	fmt.Fprintf(&ab, "entry count: %d%s", c.count, lf_ret)
 
 	fmt.Print(ab.String())
-	o.AppUI.drawPreviewBox()
+	o.Screen.drawPreviewBox()
 }
 

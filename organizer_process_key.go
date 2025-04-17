@@ -29,7 +29,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		//org.fc = utf8.RuneCount(p.ss[org.fr][:pos[1]])
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
-		o.AppUI.imagePreview = false
+		o.Session.imagePreview = false
 		if o.view == TASK {
 			o.drawPreview()
 		}
@@ -82,7 +82,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 		if c == ctrlKey('l') && o.last_mode == ADD_CHANGE_FILTER {
 			o.mode = ADD_CHANGE_FILTER
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 		}
 
 		if c == '\r' {
@@ -119,7 +119,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			o.filter = row.title
-			o.AppUI.showMessage(BL, "'%s' will be opened", o.filter)
+			o.ShowMessage(BL, "'%s' will be opened", o.filter)
 
 			o.clearMarkedEntries()
 			o.view = TASK
@@ -131,7 +131,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				o.rows[0].dirty = false
 				o.showMessage("No results were returned")
 			}
-			o.AppUI.imagePreview = false
+			o.Session.imagePreview = false
 			o.readRowsIntoBuffer()
 			vim.CursorSetPosition(1, 0)
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -460,7 +460,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			o.fr--
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.altRowoff = 0
 			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			o.note = strings.Split(note, "\n")
@@ -474,7 +474,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				return
 			}
 			o.fr++
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.altRowoff = 0
 			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			//note = generateWWString(note, org.totaleditorcols)
@@ -491,14 +491,14 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if len(o.rows) == 0 {
 				return
 			}
-			if len(o.note) > o.altRowoff+o.AppUI.textLines {
-				if len(o.note) < o.altRowoff+2*o.AppUI.textLines {
-					o.altRowoff = len(o.note) - o.AppUI.textLines
+			if len(o.note) > o.altRowoff+o.Screen.textLines {
+				if len(o.note) < o.altRowoff+2*o.Screen.textLines {
+					o.altRowoff = len(o.note) - o.Screen.textLines
 				} else {
-					o.altRowoff += o.AppUI.textLines
+					o.altRowoff += o.Screen.textLines
 				}
 			}
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 
 			//org.altRowoff++
@@ -509,12 +509,12 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if len(o.rows) == 0 {
 				return
 			}
-			if o.altRowoff > o.AppUI.textLines {
-				o.altRowoff -= o.AppUI.textLines
+			if o.altRowoff > o.Screen.textLines {
+				o.altRowoff -= o.Screen.textLines
 			} else {
 				o.altRowoff = 0
 			}
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 
 			//if org.altRowoff > 0 {
@@ -548,32 +548,32 @@ func (o *Organizer) organizerProcessKey(c int) {
 			exCmd()
 		case ctrlKey('j'):
 			o.altRowoff++
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		//case ARROW_UP, 'k':
 		case ctrlKey('k'):
 			if o.altRowoff > 0 {
 				o.altRowoff--
 			}
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		case PAGE_DOWN:
-			if len(o.note) > o.altRowoff+o.AppUI.textLines {
-				if len(o.note) < o.altRowoff+2*o.AppUI.textLines {
-					o.altRowoff = len(o.note) - o.AppUI.textLines
+			if len(o.note) > o.altRowoff+o.Screen.textLines {
+				if len(o.note) < o.altRowoff+2*o.Screen.textLines {
+					o.altRowoff = len(o.note) - o.Screen.textLines
 				} else {
-					o.altRowoff += o.AppUI.textLines
+					o.altRowoff += o.Screen.textLines
 				}
 			}
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		case PAGE_UP:
-			if o.altRowoff > o.AppUI.textLines {
-				o.altRowoff -= o.AppUI.textLines
+			if o.altRowoff > o.Screen.textLines {
+				o.altRowoff -= o.Screen.textLines
 			} else {
 				o.altRowoff = 0
 			}
-			o.AppUI.eraseRightScreen()
+			o.Screen.eraseRightScreen()
 			o.drawPreviewWithoutImages()
 		}
 

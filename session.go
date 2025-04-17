@@ -13,11 +13,12 @@ import (
 )
 
 type Session struct {
-	screenCols       int
+  /*
 	screenLines      int //total number of screen lines
 	textLines        int // considering margins, bottom messages
 	divider          int
 	totaleditorcols  int
+  */
   // maybe everything above goes into a new struct called Screen
 	editorMode       bool
 	imagePreview     bool
@@ -25,11 +26,11 @@ type Session struct {
 	fts_search_terms string
 //	origTermCfg      []byte //from GoKilo
 	//cfg              Config
-	edPct      int // percent that editor space takes up of whole horiz screen real estate
+	//edPct      int // percent that editor space takes up of whole horiz screen real estate
 	style      [8]string
   markdown_style *chroma.Style
 	styleIndex int
-	ws         unix.Winsize //Row,Col,Xpixel,Ypixel unint16
+	//ws         unix.Winsize //Row,Col,Xpixel,Ypixel unint16
 	//images           map[string]*image.Image
 }
 
@@ -434,6 +435,7 @@ func (s *Session) drawPreviewBox() {
 	fmt.Print(ab.String())
 }
 
+/*
 func (s *Session) signalHandler() {
 	err := s.GetWindowSize()
 	if err != nil {
@@ -442,3 +444,4 @@ func (s *Session) signalHandler() {
 	}
 	moveDividerPct(s.edPct)
 }
+*/

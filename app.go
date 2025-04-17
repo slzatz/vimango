@@ -18,6 +18,7 @@ import (
 type App struct {
 	// Core components
 	Session   *Session // Session handles terminal and screen management
+  Screen    *Screen // Screen handles screen management
 	Organizer *Organizer // Organizer manages tasks and their display
 	Editor    *Editor // Editor manages text editing
 	Windows   []Window // Windows is slice of Window interfaces and manages multiple windows in the application
@@ -37,12 +38,14 @@ type App struct {
 func CreateApp() *App {
   db := &Database{}
   sess := &Session{}
+  screen := &Screen{}
 	return &App{
 		Session:   sess,
+    Screen:    screen,
     Database: db,
     //Editor:    &Editor{}, // Not needed now but may want App.Editor to be a pointer to current Editor
     // maybe new Editor should have the session field and session would know the active editor window
-    Organizer: &Organizer{AppUI: sess, Database: db},
+    Organizer: &Organizer{Session: sess, Screen: screen, Database: db},
 		Windows:   make([]Window, 0),
 		Run:       true,
 	}
@@ -65,8 +68,9 @@ func (a *App) NewEditor() *Editor {
 		output:             nil,
 		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
 		modified:           false,
+    Screen:             a.Screen,
+    Session:            a.Session,
     Database:           a.Database,
-    AppUI:              a.Session,
 	}
 }
 // FromFile returns a dbConfig struct parsed from a file.
@@ -84,44 +88,73 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 }
 
 func (a *App) signalHandler() {
-	err := a.Session.GetWindowSize() // Should change to Screen
+	err := a.Screen.GetWindowSize() // Should change to Screen
 	if err != nil {
 		//SafeExit(fmt.Errorf("couldn't get window size: %v", err))
 		os.Exit(1)
 	}
-	a.moveDividerPct(a.Session.edPct) // should change to Screen
+	a.moveDividerPct(a.Screen.edPct) // should change to Screen
 }
 
 // Most of the Sessions below (but not all) should become Screen
 func (a *App) moveDividerPct(pct int) {
 	// note below only necessary if window resized or font size changed
-	a.Session.textLines = a.Session.screenLines - 2 - TOP_MARGIN
+	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
 
 	if pct == 100 {
-		a.Session.divider = 1
+		a.Screen.divider = 1
 	} else {
-		a.Session.divider = a.Session.screenCols - pct*a.Session.screenCols/100
+		a.Screen.divider = a.Screen.screenCols - pct*a.Screen.screenCols/100
 	}
-	a.Session.totaleditorcols = a.Session.screenCols - a.Session.divider - 2
-	a.Session.eraseScreenRedrawLines()
+	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 2
+	a.Screen.eraseScreenRedrawLines()
 
-	if a.Session.divider > 10 {
+	if a.Screen.divider > 10 {
 		a.Organizer.refreshScreen()
 		a.Organizer.drawStatusBar()
 	}
 
 	if a.Session.editorMode {
-		a.Session.positionWindows()
-		a.Session.eraseRightScreen() //erases editor area + statusbar + msg
-		a.Session.drawRightScreen()
+		a.Screen.positionWindows()
+		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
+		a.Screen.drawRightScreen()
 	} else if a.Organizer.view == TASK {
 		a.Organizer.drawPreview()
 	}
-	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Session.screenLines, a.Session.screenCols, a.Session.divider)
+	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
 
 	a.returnCursor()
 }
 
+func (a *App) moveDividerAbs(num int) {
+	if num >= a.Screen.screenCols {
+		a.Screen.divider = 1
+	} else if num < 20 {
+		a.Screen.divider = a.Screen.screenCols - 20
+	} else {
+		a.Screen.divider = a.Screen.screenCols - num
+	}
+
+	a.Screen.edPct = 100 - 100*a.Screen.divider/a.Screen.screenCols
+	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 2
+	a.Screen.eraseScreenRedrawLines()
+
+	if a.Screen.divider > 10 {
+		a.Organizer.refreshScreen()
+		a.Organizer.drawStatusBar()
+	}
+
+	if a.Session.editorMode {
+		a.Screen.positionWindows()
+		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
+		a.Screen.drawRightScreen()
+	} else if a.Organizer.view == TASK {
+		a.Organizer.drawPreview()
+	}
+	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d edPct: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider, a.Screen.edPct)
+
+	a.returnCursor()
+}
 // InitDatabases initializes database connections
 func (a *App) InitDatabases(configPath string) error {
 	//var err error
@@ -208,24 +241,24 @@ func (a *App) InitApp() {
 // LoadInitialData loads the initial data for the organizer
 func (a *App) LoadInitialData() {
 	// Calculate layout dimensions
-	a.Session.textLines = a.Session.screenLines - 2 - TOP_MARGIN
-	a.Session.edPct = 60
+	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
+	a.Screen.edPct = 60
 	
 	// Set divider based on percentage
-	if a.Session.edPct == 100 {
-		a.Session.divider = 1
+	if a.Screen.edPct == 100 {
+		a.Screen.divider = 1
 	} else {
-		a.Session.divider = a.Session.screenCols - a.Session.edPct*a.Session.screenCols/100
+		a.Screen.divider = a.Screen.screenCols - a.Screen.edPct*a.Screen.screenCols/100
 	}
 	
-	a.Session.totaleditorcols = a.Session.screenCols - a.Session.divider - 1
-	a.Session.eraseScreenRedrawLines()
+	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 1
+	a.Screen.eraseScreenRedrawLines()
 	
 	a.Organizer.FilterEntries(MAX)
 	if len(a.Organizer.rows) == 0 {
 		a.Organizer.insertRow(0, "", true, false, false, BASE_DATE)
 		a.Organizer.rows[0].dirty = false
-		a.Session.showOrgMessage("No results were returned")
+		a.Organizer.ShowMessage(BL, "No results were returned")
 	}
 	
 	a.Organizer.readRowsIntoBuffer()
@@ -234,7 +267,7 @@ func (a *App) LoadInitialData() {
 	a.Organizer.refreshScreen()
 	a.Organizer.drawStatusBar()
 
-	a.Session.showOrgMessage("rows: %d  columns: %d", a.Session.screenLines, a.Session.screenCols)
+	a.Organizer.ShowMessage(BL, "rows: %d  columns: %d", a.Screen.screenLines, a.Screen.screenCols)
 	a.returnCursor()
 }
 
@@ -247,7 +280,7 @@ func (a *App) returnCursor() {
 			fmt.Print(ab.String())
 			return
 		case EX_COMMAND, SEARCH:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Session.textLines+TOP_MARGIN+2, len(p.command_line)+a.Session.divider+2)
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, len(p.command_line)+a.Screen.divider+2)
 		default:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", p.cy+p.top_margin, p.cx+p.left_margin+p.left_margin_offset+1)
 		}
@@ -257,7 +290,7 @@ func (a *App) returnCursor() {
 			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;34m>", org.cy+TOP_MARGIN+1, LEFT_MARGIN) //blue
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", org.cy+TOP_MARGIN+1, org.cx+LEFT_MARGIN+1)
 		case COMMAND_LINE:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Session.textLines+2+TOP_MARGIN, len(org.command_line)+LEFT_MARGIN+1)
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+2+TOP_MARGIN, len(org.command_line)+LEFT_MARGIN+1)
 
 		default:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;31m>", org.cy+TOP_MARGIN+1, LEFT_MARGIN)
@@ -346,11 +379,11 @@ func (a *App) MainLoop() {
       //app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
 			a.Organizer.scroll()
 			a.Organizer.refreshScreen()
-			if sess.divider > 10 {
+			if a.Screen.divider > 10 {
 				a.Organizer.drawStatusBar()
 			}
 		}
-		a.Session.returnCursor()
+		a.returnCursor()
 	}
 	
 	// Clean up when the main loop exits

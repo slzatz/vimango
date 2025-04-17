@@ -205,7 +205,7 @@ func (o *Organizer) writeTitle() {
     }
 	} else {
     if !row.dirty {
-      o.AppUI.showMessage(BL, "Row has not been changed")
+      o.ShowMessage(BL, "Row has not been changed")
       return
       }
 		err := o.Database.updateContainerTitle(row)

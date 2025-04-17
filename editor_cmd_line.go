@@ -48,23 +48,23 @@ var e_lookup_C = map[string]func(*Editor){
 func (e *Editor) saveNoteToFile() {
 	pos := strings.Index(e.command_line, " ")
 	if pos == -1 {
-		sess.showEdMessage("You need to provide a filename")
+		e.ShowMessage(BR, "You need to provide a filename")
 		return
 	}
 	filename := e.command_line[pos+1:]
 	f, err := os.Create(filename)
 	if err != nil {
-		sess.showEdMessage("Error creating file %s: %v", filename, err)
+		e.ShowMessage(BR, "Error creating file %s: %v", filename, err)
 		return
 	}
 	defer f.Close()
 
 	_, err = f.WriteString(strings.Join(e.ss, "\n"))
 	if err != nil {
-		sess.showEdMessage("Error writing file %s: %v", filename, err)
+		e.ShowMessage(BR, "Error writing file %s: %v", filename, err)
 		return
 	}
-	sess.showEdMessage("Note written to file %s", filename)
+	e.ShowMessage(BR, "Note written to file %s", filename)
 }
 
 func (e *Editor) writeNote() {
@@ -76,48 +76,48 @@ func (e *Editor) writeNote() {
 
 	err := e.Database.updateNote(e.id, text)
   if err != nil {
-		e.AppUI.showMessage(BL, "Error in updating note (updateNote) for entry with id %d: %v", e.id, err)
+		e.ShowMessage(BL, "Error in updating note (updateNote) for entry with id %d: %v", e.id, err)
     return
   }
-	e.AppUI.showMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
+	e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
 	e.bufferTick = vim.BufferGetLastChangedTick(e.vbuf)
 
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
-	e.AppUI.showMessage(BR, "isModified = %t", e.isModified())
+	e.ShowMessage(BR, "isModified = %t", e.isModified())
 }
 
 func (e *Editor) readFile() {
 	pos := strings.Index(e.command_line, " ")
 	if pos == -1 {
-		sess.showEdMessage("You need to provide a filename")
+		e.ShowMessage(BR, "You need to provide a filename")
 		return
 	}
 
 	filename := e.command_line[pos+1:]
 	err := e.readFileIntoNote(filename)
 	if err != nil {
-		sess.showEdMessage("%v", err)
+		e.ShowMessage(BR, "%v", err)
 		return
 	}
-	sess.showEdMessage("Note generated from file: %s", filename)
+	e.ShowMessage(BR, "Note generated from file: %s", filename)
 }
 
 // testing abs move but may revert to this one
 func (e *Editor) verticalResize__() {
 	pos := strings.LastIndex(e.command_line, " ")
 	if pos == -1 {
-		sess.showEdMessage("You need to provide a a number 0 - 100")
+		e.ShowMessage(BR, "You need to provide a a number 0 - 100")
 		return
 	}
 	pct, err := strconv.Atoi(e.command_line[pos+1:])
 	if err != nil {
-		sess.showEdMessage("You need to provide a number 0 - 100")
+		e.ShowMessage(BR, "You need to provide a number 0 - 100")
 		return
 	}
-	moveDividerPct(pct)
+	app.moveDividerPct(pct)
 }
 
 func (e *Editor) verticalResize() {
@@ -126,14 +126,14 @@ func (e *Editor) verticalResize() {
 	width, err := strconv.Atoi(opt)
 
 	if opt[0] == '+' || opt[0] == '-' {
-		width = sess.screenCols - sess.divider + width
+		width = e.Screen.screenCols - e.Screen.divider + width
 	}
 
 	if err != nil {
-		sess.showEdMessage("The format is :vert[ical] res[ize] N")
+		e.ShowMessage(BR, "The format is :vert[ical] res[ize] N")
 		return
 	}
-	moveDividerAbs(width)
+	app.moveDividerAbs(width)
 }
 
 func (e *Editor) resize() {
@@ -142,7 +142,7 @@ func (e *Editor) resize() {
 	if opt[0] == '+' || opt[0] == '-' {
 		num, err := strconv.Atoi(opt[1:])
 		if err != nil {
-			sess.showEdMessage("The format is [+/-]N")
+			e.ShowMessage(BR, "The format is [+/-]N")
 			return
 		}
 		for i := 0; i < num; i++ {
@@ -151,21 +151,21 @@ func (e *Editor) resize() {
 	} else {
 		num, err := strconv.Atoi(opt)
 		if err != nil {
-			sess.showEdMessage("The format is [+/-]N")
+			e.ShowMessage(BR, "The format is [+/-]N")
 			return
 		}
 
-		if sess.textLines-num < 3 || num < 2 {
+		if e.Screen.textLines-num < 3 || num < 2 {
 			return
 		}
 
 		e.screenlines = num
 		op := e.output
-		op.screenlines = sess.textLines - num - 1
+		op.screenlines = e.Screen.textLines - num - 1
 		op.top_margin = num + 3
 
-		sess.eraseRightScreen()
-		sess.drawRightScreen()
+		e.Screen.eraseRightScreen()
+		e.Screen.drawRightScreen()
 	}
 }
 
@@ -182,29 +182,29 @@ func (e *Editor) compile() {
 		//cmd = exec.Command("go", "build", "main.go")
 		cmd = exec.Command("go", "build")
 	} else if lang == "python" {
-		sess.showEdMessage("You don't have to compile python")
+		e.ShowMessage(BR, "You don't have to compile python")
 		return
 	} else {
-		sess.showEdMessage("I don't recognize %q", e.Database.taskContext(e.id))
+		e.ShowMessage(BR, "I don't recognize %q", e.Database.taskContext(e.id))
 		return
 	}
 	cmd.Dir = dir
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		sess.showEdMessage("Error in compile creating stdout pipe: %v", err)
+		e.ShowMessage(BR, "Error in compile creating stdout pipe: %v", err)
 		return
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		sess.showEdMessage("Error in compile creating stderr pipe: %v", err)
+		e.ShowMessage(BR, "Error in compile creating stderr pipe: %v", err)
 		return
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		sess.showEdMessage("Error in compile starting command: %v", err)
+		e.ShowMessage(BR, "Error in compile starting command: %v", err)
 		return
 	}
 
@@ -273,7 +273,7 @@ func (e *Editor) run() {
 		obj = "./main.py"
 		dir = "/home/slzatz/python_fragments/"
 	} else {
-		sess.showEdMessage("I don't recognize %q", e.Database.taskContext(e.id))
+		e.ShowMessage(BR, "I don't recognize %q", e.Database.taskContext(e.id))
 		return
 	}
 
@@ -282,19 +282,19 @@ func (e *Editor) run() {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		sess.showEdMessage("Error in run creating stdout pipe: %v", err)
+		e.ShowMessage(BR, "Error in run creating stdout pipe: %v", err)
 		return
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		sess.showEdMessage("Error in run creating stderr pipe: %v", err)
+		e.ShowMessage(BR, "Error in run creating stderr pipe: %v", err)
 		return
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		sess.showEdMessage("Error in run starting command: %v", err)
+		e.ShowMessage(BR, "Error in run starting command: %v", err)
 		return
 	}
 
@@ -337,7 +337,7 @@ func (e *Editor) syntax() {
 	}
 	e.drawText()
 	// no need to call drawFrame or drawStatusBar
-	sess.showEdMessage("Syntax highlighting is %v", e.highlightSyntax)
+	e.ShowMessage(BR, "Syntax highlighting is %v", e.highlightSyntax)
 }
 
 func (e *Editor) printNote() {
@@ -363,9 +363,9 @@ func (e *Editor) quitActions() {
 		text := e.bufferToString()
 		err := e.Database.updateNote(e.id, text)
     if err != nil {
-		  sess.showEdMessage("Error in updateNote for entry with id %d: %v", e.id, err)
+		  e.ShowMessage(BR, "Error in updateNote for entry with id %d: %v", e.id, err)
     } 
-	  sess.showOrgMessage("Updated note and fts entry for entry %d", e.id) //////
+	  e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
 
 	} else if cmd == "q!" || cmd == "quit!" {
 		// do nothing = allow editor to be closed
@@ -374,7 +374,7 @@ func (e *Editor) quitActions() {
 		e.mode = NORMAL
 		e.command = ""
 		e.command_line = ""
-		sess.showEdMessage("No write since last change")
+		e.ShowMessage(BR, "No write since last change")
 		return
 	}
 
@@ -403,7 +403,7 @@ func (e *Editor) quitActions() {
 	}
 
 	//if len(app.Windows) > 0 {
-	if sess.numberOfEditors() > 0 {
+	if e.Session.numberOfEditors() > 0 {
 		// easier to just go to first window which has to be an editor (at least right now)
 		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need the type assertion
@@ -414,25 +414,25 @@ func (e *Editor) quitActions() {
 
 		//p = app.Windows[0].(*Editor)
 		vim.BufferSetCurrent(p.vbuf)
-		sess.positionWindows()
-		sess.eraseRightScreen()
-		sess.drawRightScreen()
+		e.Screen.positionWindows()
+		e.Screen.eraseRightScreen()
+		e.Screen.drawRightScreen()
 
 	} else { // we've quit the last remaining editor(s)
 		// unless commented out earlier sess.p.quit <- causes panic
 		//sess.p = nil
-		sess.editorMode = false
+		e.Session.editorMode = false
 		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
-		sess.eraseRightScreen()
+		e.Screen.eraseRightScreen()
 
-		if sess.divider < 10 {
-			sess.edPct = 80
-			moveDividerPct(80)
+		if e.Screen.divider < 10 {
+			e.Screen.edPct = 80
+			app.moveDividerPct(80)
 		}
 
 		//org.readTitleIntoBuffer() // shouldn't be necessary
 		org.drawPreview()
-		sess.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
+		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 
 }
@@ -481,7 +481,7 @@ func (e *Editor) quitAll() {
 		}
 	}
 
-	if sess.numberOfEditors() > 0 { // we could not quit some editors because they were in modified state
+	if e.Session.numberOfEditors() > 0 { // we could not quit some editors because they were in modified state
 		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need this type assertion to have statement below
 				p = ed //p is the global representing the current editor
@@ -490,24 +490,24 @@ func (e *Editor) quitAll() {
 		}
 
 		vim.BufferSetCurrent(p.vbuf)
-		sess.positionWindows()
-		sess.eraseRightScreen()
-		sess.drawRightScreen()
-		sess.showEdMessage("Some editors had no write since the last change")
+		e.Screen.positionWindows()
+		e.Screen.eraseRightScreen()
+		e.Screen.drawRightScreen()
+		e.ShowMessage(BR, "Some editors had no write since the last change")
 
 	} else { // we've been able to quit all editors because none were in modified state
-		sess.editorMode = false
+		e.Session.editorMode = false
 		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
-		sess.eraseRightScreen()
+		e.Screen.eraseRightScreen()
 
-		if sess.divider < 10 {
-			sess.edPct = 80
-			moveDividerPct(80)
+		if e.Screen.divider < 10 {
+			e.Screen.edPct = 80
+			app.moveDividerPct(80)
 		}
 
 		//org.readTitleIntoBuffer() // shouldn't be necessary
 		org.drawPreview()
-		sess.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
+		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 }
 
@@ -539,7 +539,7 @@ func (e *Editor) number() {
 		e.left_margin_offset = 0
 	}
 	e.drawText()
-	sess.showEdMessage("Line numbering is %t", e.numberLines)
+	e.ShowMessage(BR, "Line numbering is %t", e.numberLines)
 }
 
 func (e *Editor) goFormat() {
@@ -548,19 +548,19 @@ func (e *Editor) goFormat() {
 	cmd := exec.Command("goimports")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		sess.showEdMessage("Problem in goimports stdout: %v", err)
+		e.ShowMessage(BR, "Problem in goimports stdout: %v", err)
 		return
 	}
 	buf_out := bufio.NewReader(stdout)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		sess.showEdMessage("Problem in goimports stdin: %v", err)
+		e.ShowMessage(BR, "Problem in goimports stdin: %v", err)
 		return
 	}
 	err = cmd.Start()
 	if err != nil {
-		sess.showEdMessage("Problem in cmd.Start (goimports) stdin: %v", err)
+		e.ShowMessage(BR, "Problem in cmd.Start (goimports) stdin: %v", err)
 		return
 	}
 
@@ -577,7 +577,7 @@ func (e *Editor) goFormat() {
 		ss = append(ss, s[:len(s)-1])
 	}
 	if len(ss) == 0 {
-		sess.showOrgMessage("Return from goimports has length zero - likely code errors")
+		e.ShowMessage(BL, "Return from goimports has length zero - likely code errors")
 		return
 	}
 
@@ -585,19 +585,19 @@ func (e *Editor) goFormat() {
 
 	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 	lines := vim.BufferGetLineCount(e.vbuf)
-	sess.showOrgMessage("Number of lines in the formatted text = %d", lines)
+	e.ShowMessage(BL, "Number of lines in the formatted text = %d", lines)
 	vim.CursorSetPosition(1, 0)
 	e.fr = 0
 	e.fc = 0
 	e.scroll()
 	e.drawText()
-	sess.returnCursor()
+	app.returnCursor()
 }
 
 func (e *Editor) createPDF() {
 	pos := strings.Index(e.command_line, " ")
 	if pos == -1 {
-		sess.showEdMessage("You need to provide a filename")
+		e.ShowMessage(BL, "You need to provide a filename")
 		return
 	}
 	filename := e.command_line[pos+1:]
@@ -627,7 +627,7 @@ func (e *Editor) createPDF() {
 	content := strings.Join(e.ss, "\n")
 	err := pf.Process([]byte(content))
 	if err != nil {
-		sess.showEdMessage("pdf error:%v", err)
+		e.ShowMessage(BL, "pdf error:%v", err)
 	}
 }
 
@@ -637,7 +637,7 @@ func (e *Editor) printDocument() {
 		var ok bool
 		var lang string
 		if lang, ok = Languages[c]; !ok {
-			sess.showEdMessage("I don't recognize the language")
+			e.ShowMessage(BR, "I don't recognize the language")
 			return
 		}
 		note := e.Database.readNoteIntoString(e.id)
@@ -647,21 +647,21 @@ func (e *Editor) printDocument() {
 
 		f, err := os.Create("output.html")
 		if err != nil {
-			sess.showEdMessage("Error creating output.html: %v", err)
+			e.ShowMessage(BR, "Error creating output.html: %v", err)
 			return
 		}
 		defer f.Close()
 
 		_, err = f.WriteString(buf.String())
 		if err != nil {
-			sess.showEdMessage("Error writing output.html: %s: %v", err)
+			e.ShowMessage(BR, "Error writing output.html: %s: %v", err)
 			return
 		}
 		cmd := exec.Command("wkhtmltopdf", "--enable-local-file-access",
 			"--no-background", "--minimum-font-size", "16", "output.html", "output.pdf")
 		err = cmd.Run()
 		if err != nil {
-			sess.showEdMessage("Error creating pdf from code: %v", err)
+			e.ShowMessage(BR, "Error creating pdf from code: %v", err)
 		}
 	} else {
 		content := strings.Join(e.ss, "\n")
@@ -684,12 +684,12 @@ func (e *Editor) printDocument() {
 
 		err := pf.Process([]byte(content))
 		if err != nil {
-			sess.showEdMessage("pdf error:%v", err)
+			e.ShowMessage(BR, "pdf error:%v", err)
 		}
 	}
 	cmd := exec.Command("lpr", "output.pdf")
 	err := cmd.Run()
 	if err != nil {
-		sess.showEdMessage("Error printing document: %v", err)
+		e.ShowMessage(BR, "Error printing document: %v", err)
 	}
 }

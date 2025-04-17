@@ -1124,6 +1124,7 @@ func updateCodeFile(id int, text string) {
 	f.Sync()
 }
 
+/*
 func moveDividerPct(pct int) {
 	// note below only necessary if window resized or font size changed
 	sess.textLines = sess.screenLines - 2 - TOP_MARGIN
@@ -1194,3 +1195,4 @@ func tempTid(table string) int {
 	//sess.showEdMessage("The minimum tid is: %d", tid)
 	return tid - 1
 }
+*/

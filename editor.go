@@ -41,11 +41,12 @@ type Editor struct {
 	modified           bool     // tracks if the buffer has been modified
   title              string   // title of the note
   Database          *Database // pointer to the database
-  AppUI             *Session  // pointer to the session
+  Session           *Session  // pointer to the session
+  Screen            *Screen  // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
-  max_length := e.AppUI.PositionMessage(loc) //this needs to change to e.Screen.PositionMessage(loc)
+  max_length := e.Screen.PositionMessage(loc) //this needs to change to e.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]

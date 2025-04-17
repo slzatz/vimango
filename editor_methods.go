@@ -66,14 +66,14 @@ func (e *Editor) setLinesMargins() { //also sets top margin
 
 	if e.output != nil {
 		if e.output.is_below {
-			e.screenlines = sess.textLines - LINKED_NOTE_HEIGHT - 1
+			e.screenlines = e.Screen.textLines - LINKED_NOTE_HEIGHT - 1
 			e.top_margin = TOP_MARGIN + 1
 		} else {
-			e.screenlines = sess.textLines
+			e.screenlines = e.Screen.textLines
 			e.top_margin = TOP_MARGIN + 1
 		}
 	} else {
-		e.screenlines = sess.textLines
+		e.screenlines = e.Screen.textLines
 		e.top_margin = TOP_MARGIN + 1
 	}
 }
@@ -697,7 +697,7 @@ func (e *Editor) drawFrame() {
 	//'T' corner = w or right top corner = k
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", e.top_margin-1, e.left_margin+e.screencols+1)
 
-	if e.left_margin+e.screencols > sess.screenCols-4 {
+	if e.left_margin+e.screencols > e.Screen.screenCols-4 {
 		ab.WriteString("\x1b[37;1mk") //draw corner
 	} else {
 		ab.WriteString("\x1b[37;1mw")
@@ -830,8 +830,8 @@ func (e *Editor) drawPreview() {
 					continue
 				}
 			} else {
-				maxWidth := e.screencols * int(sess.ws.Xpixel) / sess.screenCols
-				maxHeight := e.screenlines * int(sess.ws.Ypixel) / sess.screenLines
+				maxWidth := e.screencols * int(e.Screen.ws.Xpixel) / e.Screen.screenCols
+				maxHeight := e.screenlines * int(e.Screen.ws.Ypixel) / e.Screen.screenLines
 				img, _, err = loadImage(path, maxWidth-5, maxHeight-150)
 				if err != nil {
 					fmt.Printf("%sError:%s %s%s", BOLD, RESET, rows[fr], lf_ret)
@@ -839,7 +839,7 @@ func (e *Editor) drawPreview() {
 					continue
 				}
 			}
-			height := img.Bounds().Max.Y / (int(sess.ws.Ypixel) / sess.screenLines)
+			height := img.Bounds().Max.Y / (int(e.Screen.ws.Ypixel) / e.Screen.screenLines)
 			y += height
 			if y > e.screenlines-1 {
 				fmt.Printf("\x1b[3m\x1b[4mImage %s doesn't fit!\x1b[0m \x1b[%dG", path, e.left_margin+1)

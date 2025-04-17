@@ -39,7 +39,8 @@ type Organizer struct {
 	vbuf                vim.Buffer
 	bufferTick          int
   Database            *Database
-	AppUI               *Session
+	Session             *Session
+  Screen              *Screen // pointer to the screen
   //*Database
 }
 
@@ -65,16 +66,16 @@ func (o *Organizer) readRowsIntoBuffer() {
 }
 
 func (o *Organizer) showMessage(format string, a ...interface{}) {
-	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.AppUI.textLines+2+TOP_MARGIN, o.AppUI.divider, o.AppUI.textLines+2+TOP_MARGIN)
+	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.Screen.textLines+2+TOP_MARGIN, o.Screen.divider, o.Screen.textLines+2+TOP_MARGIN)
 	str := fmt.Sprintf(format, a...)
-	if len(str) > o.AppUI.divider {
-		str = str[:o.AppUI.divider]
+	if len(str) > o.Screen.divider {
+		str = str[:o.Screen.divider]
 	}
 	fmt.Print(str)
 }
 
 func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
-  max_length := o.AppUI.PositionMessage(loc) //this needs to change to o.Screen.PositionMessage(loc)
+  max_length := o.Screen.PositionMessage(loc) //this needs to change to o.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]

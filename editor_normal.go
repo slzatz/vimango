@@ -44,7 +44,7 @@ func (e *Editor) changeSplit(flag int) {
 	op := e.output
 	var outputHeight int
 	if flag == '=' {
-		outputHeight = sess.textLines / 2
+		outputHeight = e.Screen.textLines / 2
 	} else if flag == '_' {
 		outputHeight = 2
 	} else if flag == '+' {
@@ -52,33 +52,33 @@ func (e *Editor) changeSplit(flag int) {
 	} else if flag == '-' {
 		outputHeight = op.screenlines + 1
 	} else {
-		sess.showOrgMessage("flag = %v", flag)
+		e.ShowMessage(BR, "flag = %v", flag)
 		return
 	}
-	sess.showOrgMessage("flag = %v", flag)
+	e.ShowMessage(BR, "flag = %v", flag)
 
-	if outputHeight < 2 || outputHeight > sess.textLines-3 {
+	if outputHeight < 2 || outputHeight > e.Screen.textLines-3 {
 		return
 	}
 
-	e.screenlines = sess.textLines - outputHeight - 1
+	e.screenlines = e.Screen.textLines - outputHeight - 1
 	op.screenlines = outputHeight
-	op.top_margin = sess.textLines - outputHeight + 2
+	op.top_margin = e.Screen.textLines - outputHeight + 2
 
-	sess.eraseRightScreen()
-	sess.drawRightScreen()
+	e.Screen.eraseRightScreen()
+	e.Screen.drawRightScreen()
 }
 
 func (e *Editor) changeHSplit(flag int) {
 	var width int
 	if flag == '>' {
-		width = sess.screenCols - sess.divider + 1
-		moveDividerAbs(width)
+		width = e.Screen.screenCols - e.Screen.divider + 1
+		app.moveDividerAbs(width)
 	} else if flag == '<' {
-		width = sess.screenCols - sess.divider - 1
-		moveDividerAbs(width)
+		width = e.Screen.screenCols - e.Screen.divider - 1
+		app.moveDividerAbs(width)
 	} else {
-		sess.showOrgMessage("flag = %v", flag)
+		e.ShowMessage(BL, "flag = %v", flag)
 		return
 	}
 }
@@ -91,9 +91,9 @@ func (e *Editor) moveOutputWindowRight() {
 	//screenlines = total_screenlines - 1;
 	e.output.is_below = false
 
-	sess.positionWindows()
-	sess.eraseRightScreen()
-	sess.drawRightScreen()
+	e.Screen.positionWindows()
+	e.Screen.eraseRightScreen()
+	e.Screen.drawRightScreen()
 	//editorSetMessage("top_margin = %d", top_margin);
 
 }
@@ -106,9 +106,9 @@ func (e *Editor) moveOutputWindowBelow() {
 	//screenlines = total_screenlines - 1;
 	e.output.is_below = true
 
-	sess.positionWindows()
-	sess.eraseRightScreen()
-	sess.drawRightScreen()
+	e.Screen.positionWindows()
+	e.Screen.eraseRightScreen()
+	e.Screen.drawRightScreen()
 	//editorSetMessage("top_margin = %d", top_margin);
 }
 
@@ -142,24 +142,24 @@ func (e *Editor) controlK() {
 func (e *Editor) controlH() {
 	// below "if" really for testing
 	if e.isModified() {
-		sess.showEdMessage("Note you left has been modified")
+		e.ShowMessage(BR, "Note you left has been modified")
 	}
 
-	if sess.numberOfEditors() == 1 {
+	if e.Session.numberOfEditors() == 1 {
 
-		if sess.divider < 10 {
-			sess.edPct = 80
-			moveDividerPct(80)
+		if e.Screen.divider < 10 {
+			e.Screen.edPct = 80
+			app.moveDividerPct(80)
 		}
-		sess.editorMode = false
+		e.Session.editorMode = false
 		vim.BufferSetCurrent(org.vbuf)
 		org.drawPreview()
 		org.mode = NORMAL
-		sess.returnCursor()
+		app.returnCursor()
 		return
 	}
 
-	eds := sess.editors()
+	eds := e.Session.editors()
 	index := 0
 	for i, ed := range eds {
 		if ed == e {
@@ -168,7 +168,7 @@ func (e *Editor) controlH() {
 		}
 	}
 
-	sess.showEdMessage("index: %d; length: %d", index, len(eds))
+	e.ShowMessage(BL, "index: %d; length: %d", index, len(eds))
 
 	if index > 0 {
 		p = eds[index-1]
@@ -177,15 +177,15 @@ func (e *Editor) controlH() {
 		return
 	} else {
 
-		if sess.divider < 10 {
-			sess.edPct = 80
-			moveDividerPct(80)
+		if e.Screen.divider < 10 {
+			e.Screen.edPct = 80
+			app.moveDividerPct(80)
 		}
-		sess.editorMode = false
+		e.Session.editorMode = false
 		vim.BufferSetCurrent(org.vbuf)
 		org.drawPreview()
 		org.mode = NORMAL
-		sess.returnCursor()
+		app.returnCursor()
 		return
 	}
 }
@@ -193,10 +193,10 @@ func (e *Editor) controlH() {
 func controlL() {
 	// below "if" really for testing
 	if p.isModified() {
-		sess.showEdMessage("Note you left has been modified")
+		p.ShowMessage(BR, "Note you left has been modified")
 	}
 
-	eds := sess.editors()
+	eds := p.Session.editors()
 	index := 0
 	for i, e := range eds {
 		if e == p {
@@ -204,7 +204,7 @@ func controlL() {
 			break
 		}
 	}
-	sess.showEdMessage("index: %d; length: %d", index, len(eds))
+	p.ShowMessage(BR, "index: %d; length: %d", index, len(eds))
 
 	if index < len(eds)-1 {
 		p = eds[index+1]
@@ -222,7 +222,7 @@ func (e *Editor) decorateWordVisual(c int) {
 	}
 
 	if e.highlight[0][0] != e.highlight[1][0] {
-		sess.showEdMessage("The text must all be in the same row")
+		e.ShowMessage(BR, "The text must all be in the same row")
 		return
 	}
 
@@ -237,7 +237,7 @@ func (e *Editor) decorateWordVisual(c int) {
 	} else {
 		s = row[beg : end+1]
 	}
-	sess.showEdMessage("end = %d", end)
+	e.ShowMessage(BR, "end = %d", end)
 	if strings.HasPrefix(s, "**") {
 		if c == ctrlKey('b') {
 			undo = true
@@ -359,11 +359,11 @@ func (e *Editor) showMarkdownPreview() {
 }
 
 func (e *Editor) nextStyle() {
-	sess.styleIndex++
-	if sess.styleIndex > len(sess.style)-1 {
-		sess.styleIndex = 0
+	e.Session.styleIndex++
+	if e.Session.styleIndex > len(e.Session.style)-1 {
+		e.Session.styleIndex = 0
 	}
-	sess.showEdMessage("New style is %q", sess.style[sess.styleIndex])
+	e.ShowMessage(BR, "New style is %q", e.Session.style[e.Session.styleIndex])
 }
 
 func (e *Editor) readGoTemplate() {
@@ -373,7 +373,7 @@ func (e *Editor) readGoTemplate() {
 func (e *Editor) spellingCheck() {
 	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
 	if e.isModified() {
-		sess.showEdMessage("%sYou need to write the note before highlighting text%s", RED_BG, RESET)
+		e.ShowMessage(BR, "%sYou need to write the note before highlighting text%s", RED_BG, RESET)
 		return
 	}
 	e.highlightMispelledWords()
@@ -383,10 +383,10 @@ func (e *Editor) spellSuggest() {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
 	w := vim.Eval("expand('<cword>')")
 	if ok := h.Spell(w); ok {
-		sess.showEdMessage("%q is spelled correctly", w)
+		e.ShowMessage(BR, "%q is spelled correctly", w)
 		return
 	}
 	s := h.Suggest(w)
-	sess.showEdMessage("%q -> %s", w, strings.Join(s, "|"))
+	e.ShowMessage(BR, "%q -> %s", w, strings.Join(s, "|"))
 }
 
