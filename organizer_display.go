@@ -176,10 +176,6 @@ func (o *Organizer) drawAltRows() {
 }
 
 func (o *Organizer) drawPreviewWithImages() {
-
-	//delete any images
-	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
-
 	if len(o.note) == 0 {
 		return
 	}
@@ -252,8 +248,6 @@ func (o *Organizer) drawPreviewWithImages() {
 }
 
 func (o *Organizer) drawPreviewWithoutImages() {
-	//delete any images
-	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
 	if len(o.note) == 0 {
 		return
 	}
@@ -474,7 +468,7 @@ func (o *Organizer) drawPreview() {
 		//note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 	} else {
 		var buf bytes.Buffer
-		_ = Highlight(&buf, note, lang, "terminal16m", sess.style[sess.styleIndex])
+		_ = Highlight(&buf, note, lang, "terminal16m", o.Session.style[o.Session.styleIndex])
 		note = buf.String()
 	}
 
@@ -487,7 +481,7 @@ func (o *Organizer) drawPreview() {
 		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
 	}
 	o.note = strings.Split(note, "\n")
-	if lang != "markdown" || !sess.imagePreview {
+	if lang != "markdown" || !o.Session.imagePreview {
 		o.drawPreviewWithoutImages()
 	} else {
 		o.drawPreviewWithImages()

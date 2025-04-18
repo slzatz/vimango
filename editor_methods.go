@@ -431,9 +431,9 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 
 	var buf bytes.Buffer
 	if lang == "markdown" {
-	  _ = Highlight2(&buf, note, lang, "terminal16m", sess.markdown_style)
+	  _ = Highlight2(&buf, note, lang, "terminal16m", e.Session.markdown_style)
 	} else {
-	  _ = Highlight(&buf, note, lang, "terminal16m", sess.style[sess.styleIndex])
+	  _ = Highlight(&buf, note, lang, "terminal16m", e.Session.style[e.Session.styleIndex])
 	}
 	note = buf.String()
 

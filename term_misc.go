@@ -71,8 +71,8 @@ func loadWebImage(URL string) (img image.Image, imgFmt string, err error) {
 		return
 	}
 	img, imgFmt, err = image.Decode(response.Body)
-	if img.Bounds().Max.Y > sess.imgSizeY {
-		img = imaging.Resize(img, 0, sess.imgSizeY, imaging.Lanczos)
+	if img.Bounds().Max.Y > app.Session.imgSizeY {
+		img = imaging.Resize(img, 0, app.Session.imgSizeY, imaging.Lanczos)
 	}
 	return
 }

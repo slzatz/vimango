@@ -147,11 +147,11 @@ func bulkInsert2(dbase *sql.DB, query string, args []interface{}) (err error) {
 func bulkLoad(reportOnly bool) (log string) {
 
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.Postgres.Host,
-		config.Postgres.Port,
-		config.Postgres.User,
-		config.Postgres.Password,
-		config.Postgres.DB,
+		app.Config.Postgres.Host,
+		app.Config.Postgres.Port,
+		app.Config.Postgres.User,
+		app.Config.Postgres.Password,
+		app.Config.Postgres.DB,
 	)
 
 	var lg strings.Builder
@@ -254,13 +254,13 @@ func bulkLoad(reportOnly bool) (log string) {
 		server_contexts = append(server_contexts, c)
 	}
 	c := server_contexts[0]
-	_, err = db.Exec("UPDATE context SET title=?, star=?, modified=datetime('now') WHERE tid=?;", c.title, c.star, c.tid)
+	_, err = app.Database.MainDB.Exec("UPDATE context SET title=?, star=?, modified=datetime('now') WHERE tid=?;", c.title, c.star, c.tid)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error updating sqlite context with tid: %v: %v\n", c.tid, err)
 	}
 
 	for _, c := range server_contexts[1:] {
-		_, err := db.Exec("INSERT INTO context (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+		_, err := app.Database.MainDB.Exec("INSERT INTO context (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting context into sqlite: %v\n", err)
@@ -287,12 +287,12 @@ func bulkLoad(reportOnly bool) (log string) {
 		server_folders = append(server_folders, c)
 	}
 	c = server_folders[0]
-	_, err = db.Exec("UPDATE folder SET title=?, star=?, modified=datetime('now') WHERE tid=?;", c.title, c.star, c.tid)
+	_, err = app.Database.MainDB.Exec("UPDATE folder SET title=?, star=?, modified=datetime('now') WHERE tid=?;", c.title, c.star, c.tid)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error updating sqlite folder with tid: %v: %v\n", c.tid, err)
 	}
 	for _, c := range server_folders[1:] {
-		_, err := db.Exec("INSERT INTO folder (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+		_, err := app.Database.MainDB.Exec("INSERT INTO folder (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting folder into sqlite: %v\n", err)
@@ -320,7 +320,7 @@ func bulkLoad(reportOnly bool) (log string) {
 	}
 
 	for _, c := range server_keywords {
-		_, err := db.Exec("INSERT INTO keyword (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
+		_, err := app.Database.MainDB.Exec("INSERT INTO keyword (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);",
 			c.tid, c.title, c.star)
 		if err != nil {
 			fmt.Fprintf(&lg, "Error inserting new keyword %q into sqlite: %v", truncate(c.title, 15), err)
@@ -343,7 +343,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 		e := entries[i*n : m]
 		query, args := createBulkInsertQuery2(len(e), e)
-		err = bulkInsert2(db, query, args)
+		err = bulkInsert2(app.Database.MainDB, query, args)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v\n", err)
 		}
@@ -366,7 +366,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 		e := taskKeywordPairs[i*n : m]
 		query, args := createBulkInsertQueryTaskKeywordPairs(len(e), e)
-		err = bulkInsert2(db, query, args)
+		err = bulkInsert2(app.Database.MainDB, query, args)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v\n", err)
 		}
@@ -421,7 +421,7 @@ func bulkLoad(reportOnly bool) (log string) {
 		}
 		e := entries[i*n : m]
 		query, args := createBulkInsertQueryFTS3(len(e), e)
-		err = bulkInsert2(fts_db, query, args)
+		err = bulkInsert2(app.Database.FtsDB, query, args)
 		if err != nil {
 			fmt.Fprintf(&lg, "%v\n", err)
 		}
@@ -441,18 +441,18 @@ func bulkLoad(reportOnly bool) (log string) {
 		app.Organizer.ShowMessage(BL, "Error with getting current time from server: %w", err)
 		return
 	}
-	_, err = db.Exec("UPDATE sync SET timestamp=$1 WHERE machine='server';", server_ts)
+	_, err = app.Database.MainDB.Exec("UPDATE sync SET timestamp=$1 WHERE machine='server';", server_ts)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error updating client with server timestamp: %w", err)
 		return
 	}
-	_, err = db.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
+	_, err = app.Database.MainDB.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error updating client with client timestamp: %w", err)
 		return
 	}
 	var client_ts string
-	row = db.QueryRow("SELECT datetime('now');")
+	row = app.Database.MainDB.QueryRow("SELECT datetime('now');")
 	err = row.Scan(&client_ts)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error with getting current time from client: %w", err)

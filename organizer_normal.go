@@ -139,7 +139,7 @@ func controlK() {
 
 func controlZ() {
 	id := org.rows[org.fr].id
-	note := DB.readNoteIntoString(id)
+	note := app.Database.readNoteIntoString(id)
 	note = generateWWString(note, org.Screen.totaleditorcols)
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
@@ -218,7 +218,7 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) {
 	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
 	fmt.Fprintf(&ab, "added: %s%s", e.added, lf_ret)
 
-	fmt.Fprintf(&ab, "keywords: %s%s", DB.getTaskKeywords(e.id), lf_ret)
+	fmt.Fprintf(&ab, "keywords: %s%s", app.Database.getTaskKeywords(e.id), lf_ret)
 
 	fmt.Print(ab.String())
 }

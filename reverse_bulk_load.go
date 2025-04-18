@@ -74,11 +74,11 @@ func createBulkInsertQueryTaskKeywordPairsReverse(n int, tk []TaskKeywordPairs) 
 func reverseBulkLoad(reportOnly bool) (log string) {
 
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.Postgres.Host,
-		config.Postgres.Port,
-		config.Postgres.User,
-		config.Postgres.Password,
-		config.Postgres.DB,
+		app.Config.Postgres.Host,
+		app.Config.Postgres.Port,
+		app.Config.Postgres.User,
+		app.Config.Postgres.Password,
+		app.Config.Postgres.DB,
 	)
 
 	var lg strings.Builder
@@ -114,7 +114,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "Starting initial sync at %v\n", t0.Format("2006-01-02 15:04:05"))
 
 	var contextCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM context WHERE deleted=false;").Scan(&contextCount)
+	err = app.Database.MainDB.QueryRow("SELECT COUNT(*) FROM context WHERE deleted=false;").Scan(&contextCount)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for client contexts: %v", err)
 		return
@@ -122,7 +122,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "- `Contexts`: %d\n", contextCount)
 
 	var folderCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM folder WHERE deleted=false;").Scan(&folderCount)
+	err = app.Database.MainDB.QueryRow("SELECT COUNT(*) FROM folder WHERE deleted=false;").Scan(&folderCount)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for client folders: %v", err)
 		return
@@ -130,7 +130,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "- `Folders`: %d\n", folderCount)
 
 	var keywordCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM keyword WHERE deleted=false;").Scan(&keywordCount)
+	err = app.Database.MainDB.QueryRow("SELECT COUNT(*) FROM keyword WHERE deleted=false;").Scan(&keywordCount)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for client keywords: %v", err)
 		return
@@ -138,7 +138,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "- `Keywords`: %d\n", keywordCount)
 
 	var taskCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM task WHERE deleted=false;").Scan(&taskCount)
+	err = app.Database.MainDB.QueryRow("SELECT COUNT(*) FROM task WHERE deleted=false;").Scan(&taskCount)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for client entries: %v", err)
 		return
@@ -146,7 +146,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	fmt.Fprintf(&lg, "- `Entries`: %d\n", taskCount)
 
 	var taskKeywordCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM task_keyword;").Scan(&taskKeywordCount)
+	err = app.Database.MainDB.QueryRow("SELECT COUNT(*) FROM task_keyword;").Scan(&taskKeywordCount)
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in COUNT(*) for task_keywords: %v", err)
 		return
@@ -162,7 +162,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 
 	//client contexts -> server
 	// shouldn't need deleted = false but doesn't hurt if something deleted never got synched
-	rows, err := db.Query("SELECT tid, title, star FROM context WHERE deleted=false ORDER BY tid;")
+	rows, err := app.Database.MainDB.Query("SELECT tid, title, star FROM context WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client contexts: %v", err)
 		return
@@ -190,7 +190,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 	}
 
 	//client folder -> server
-	rows, err = db.Query("SELECT tid, title, star FROM folder WHERE deleted=false ORDER BY tid;")
+	rows, err = app.Database.MainDB.Query("SELECT tid, title, star FROM folder WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_folders: %v", err)
 		return
@@ -217,7 +217,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 
 	//client keyword -> server
 	// note that the original database does not have a keyword created column
-	rows, err = db.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
+	rows, err = app.Database.MainDB.Query("SELECT tid, title, star FROM keyword WHERE deleted=false ORDER BY tid;")
 	//rows, err = db.Query("SELECT tid, name, star FROM keyword WHERE deleted=false ORDER BY tid;")
 	if err != nil {
 		fmt.Fprintf(&lg, "Error in SELECT for client_keywords: %v", err)
@@ -246,7 +246,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 
 	/* for the code below need to add guard that entries and keywords might be zero */
 	//client entries -> server
-	entries := getEntriesBulkReverse(db, taskCount, &lg)
+	entries := getEntriesBulkReverse(app.Database.MainDB, taskCount, &lg)
 
 	i := 0
 	n := 100
@@ -270,7 +270,7 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 		i += 1
 	}
 
-	taskKeywordPairs := getTaskKeywordPairsBulk(db, taskKeywordCount, &lg)
+	taskKeywordPairs := getTaskKeywordPairsBulk(app.Database.MainDB, taskKeywordCount, &lg)
 	i = 0
 	n = 100
 	done = false
@@ -315,18 +315,18 @@ func reverseBulkLoad(reportOnly bool) (log string) {
 		app.Organizer.ShowMessage(BL, "Error with getting current time from server: %w", err)
 		return
 	}
-	_, err = db.Exec("UPDATE sync SET timestamp=$1 WHERE machine='server';", server_ts)
+	_, err = app.Database.MainDB.Exec("UPDATE sync SET timestamp=$1 WHERE machine='server';", server_ts)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error updating client with server timestamp: %w", err)
 		return
 	}
-	_, err = db.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
+	_, err = app.Database.MainDB.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error updating client with client timestamp: %w", err)
 		return
 	}
 	var client_ts string
-	row = db.QueryRow("SELECT datetime('now');")
+	row = app.Database.MainDB.QueryRow("SELECT datetime('now');")
 	err = row.Scan(&client_ts)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error with getting current time from client: %w", err)

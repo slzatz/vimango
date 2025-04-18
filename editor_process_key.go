@@ -12,24 +12,24 @@ import (
 )
 
 //note that bool returned is whether to redraw
-func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to redraw
+func (e *Editor) editorProcessKey(c int) bool {
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
 		vim.Key("<esc>")
-		p.command = ""
-		p.command_line = ""
+		e.command = ""
+		e.command_line = ""
 
-		if p.mode == PREVIEW {
+		if e.mode == PREVIEW {
 			// don't need to call CursorGetPosition - no change in pos
 			// delete any images
 			fmt.Print("\x1b_Ga=d\x1b\\")
-			p.ShowMessage(BR, "")
-			p.mode = NORMAL
+			e.ShowMessage(BR, "")
+			e.mode = NORMAL
 			return true
 		}
 
-		p.mode = NORMAL
+		e.mode = NORMAL
 
 		/*
 			if previously in visual mode some text may be highlighted so need to return true
@@ -38,86 +38,86 @@ func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to re
 		*/
 
 		pos := vim.CursorGetPosition() //set screen cx and cy from pos
-		p.fr = pos[0] - 1
-		p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
-		p.ShowMessage(BR, "")
+		e.fr = pos[0] - 1
+		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+		e.ShowMessage(BR, "")
 		return true
 	}
 
 	// the switch below deals with intercepting c before sending the char to vim
-	switch p.mode {
+	switch e.mode {
 
 	// in PREVIEW and VIEW_LOG don't send keys to vim
 	case PREVIEW:
 		switch c {
 		case ARROW_DOWN, ctrlKey('j'):
-			p.previewLineOffset++
+			e.previewLineOffset++
 		case ARROW_UP, ctrlKey('k'):
-			if p.previewLineOffset > 0 {
-				p.previewLineOffset--
+			if e.previewLineOffset > 0 {
+				e.previewLineOffset--
 			}
 		}
-		p.drawPreview()
+		e.drawPreview()
 		return false
 
 	case VIEW_LOG:
 		switch c {
 		case PAGE_DOWN, ARROW_DOWN, 'j':
-			p.previewLineOffset++
-			p.drawOverlay()
+			e.previewLineOffset++
+			e.drawOverlay()
 			return false
 		case PAGE_UP, ARROW_UP, 'k':
-			if p.previewLineOffset > 0 {
-				p.previewLineOffset--
-				p.drawOverlay()
+			if e.previewLineOffset > 0 {
+				e.previewLineOffset--
+				e.drawOverlay()
 				return false
 			}
 		}
 		if c == DEL_KEY || c == BACKSPACE {
-			if len(p.command_line) > 0 {
-				p.command_line = p.command_line[:len(p.command_line)-1]
+			if len(e.command_line) > 0 {
+				e.command_line = e.command_line[:len(e.command_line)-1]
 			}
 		} else {
-			p.command_line += string(c)
+			e.command_line += string(c)
 		}
 		return false
 		// end case VIEW_LOG
 
 	case NORMAL:
 		// characters below make up first char of non-vim commands
-		if len(p.command) == 0 {
+		if len(e.command) == 0 {
 			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
-				p.command = string(c)
+				e.command = string(c)
 			}
 		} else {
-			p.command += string(c)
+			e.command += string(c)
 		}
 
-		if len(p.command) > 0 {
-			if cmd, found := e_lookup2[p.command]; found {
+		if len(e.command) > 0 {
+			if cmd, found := e_lookup2[e.command]; found {
 				switch cmd := cmd.(type) {
 				case func(*Editor):
-					cmd(p)
-				case func():
-					cmd()
+					cmd(e)
+				//case func():
+				//	cmd()
 				case func(*Editor, int):
-					cmd(p, c)
+					cmd(e, c)
 				case func(*Editor) bool:
-					cmd(p)
+					cmd(e)
 				}
 				vim.Key("<esc>")
 				//keep tripping over this
 				//these commands should return a redraw bool = false
-				if strings.Index(" m l c d xz= su", p.command) != -1 {
-					p.command = ""
+				if strings.Index(" m l c d xz= su", e.command) != -1 {
+					e.command = ""
 					return false
 				}
 
-				p.command = ""
-				p.ss = vim.BufferLines(p.vbuf)
+				e.command = ""
+				e.ss = vim.BufferLines(e.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
-				p.fr = pos[0] - 1
-				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
+				e.fr = pos[0] - 1
+				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 				return true
 			} else {
 				return false
@@ -128,14 +128,14 @@ func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to re
 	case VISUAL:
 		// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
 		if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
-			p.decorateWordVisual(c)
+			e.decorateWordVisual(c)
 			vim.Key("<esc>")
-			p.mode = NORMAL
-			p.command = ""
-			p.ss = vim.BufferLines(p.vbuf)
+			e.mode = NORMAL
+			e.command = ""
+			e.ss = vim.BufferLines(e.vbuf)
 			pos := vim.CursorGetPosition() //set screen cx and cy from pos
-			p.fr = pos[0] - 1
-			p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
+			e.fr = pos[0] - 1
+			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 			return true
 		}
 
@@ -145,59 +145,59 @@ func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to re
 			// Index doesn't work for vert resize
 			// and LastIndex doesn't work for run
 			// so total kluge below
-			//if p.command_line[0] == '%'
-			if strings.Index(p.command_line, "s/") != -1 {
-				if strings.LastIndex(p.command_line, "/") < strings.LastIndex(p.command_line, "c") {
-					p.ShowMessage(BR, "We don't support [c]onfirm")
-					p.mode = NORMAL
+			//if e.command_line[0] == '%'
+			if strings.Index(e.command_line, "s/") != -1 {
+				if strings.LastIndex(e.command_line, "/") < strings.LastIndex(e.command_line, "c") {
+					e.ShowMessage(BR, "We don't support [c]onfirm")
+					e.mode = NORMAL
 					return false
 				}
 
-				vim.Input(":" + p.command_line + "\r")
-				p.mode = NORMAL
-				p.command = ""
-				p.ss = vim.BufferLines(p.vbuf)
+				vim.Input(":" + e.command_line + "\r")
+				e.mode = NORMAL
+				e.command = ""
+				e.ss = vim.BufferLines(e.vbuf)
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
-				p.fr = pos[0] - 1
-				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
-				p.ShowMessage(BL, "search and replace: %s", p.command_line)
+				e.fr = pos[0] - 1
+				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+				e.ShowMessage(BL, "search and replace: %s", e.command_line)
 				return true
 			}
 			var pos int
 			var cmd string
-			if strings.HasPrefix(p.command_line, "vert") {
-				pos = strings.LastIndex(p.command_line, " ")
+			if strings.HasPrefix(e.command_line, "vert") {
+				pos = strings.LastIndex(e.command_line, " ")
 			} else {
-				pos = strings.Index(p.command_line, " ")
+				pos = strings.Index(e.command_line, " ")
 			}
 			if pos != -1 {
-				cmd = p.command_line[:pos]
+				cmd = e.command_line[:pos]
 			} else {
-				cmd = p.command_line
+				cmd = e.command_line
 			}
 
 			if cmd0, found := e_lookup_C[cmd]; found {
-				cmd0(p)
-				p.command_line = ""
-				p.mode = NORMAL
+				cmd0(e)
+				e.command_line = ""
+				e.mode = NORMAL
 				tabCompletion.idx = 0
 				tabCompletion.list = nil
 				return false
 			}
 
-			p.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
-			p.mode = NORMAL
-			p.command_line = ""
+			e.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
+			e.mode = NORMAL
+			e.command_line = ""
 			return false
 		} //end 'r'
 
 		if c == '\t' {
-			pos := strings.Index(p.command_line, " ")
+			pos := strings.Index(e.command_line, " ")
 			if tabCompletion.list == nil {
-				p.ShowMessage(BL, "tab")
+				e.ShowMessage(BL, "tab")
 				var s string
 				if pos != -1 {
-					s = p.command_line[pos+1:]
+					s = e.command_line[pos+1:]
 					//cl := p.command_line
 					dir := filepath.Dir(s)
 					if dir == "~" {
@@ -210,7 +210,7 @@ func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to re
 
 					partial := filepath.Base(s)
 					paths, _ := ioutil.ReadDir(dir)
-					p.ShowMessage(BL, "dir: %s  base: %s", dir, partial)
+					e.ShowMessage(BL, "dir: %s  base: %s", dir, partial)
 
 					for _, path := range paths {
 						if strings.HasPrefix(path.Name(), partial) {
@@ -227,36 +227,36 @@ func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to re
 					tabCompletion.idx = 0
 				}
 			}
-			p.command_line = p.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
-			p.ShowMessage(BR, ":%s", p.command_line)
+			e.command_line = e.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
+			e.ShowMessage(BR, ":%s", e.command_line)
 			return false
 		}
 
 		// process the key typed in COMMAND_LINE mode
 		if c == DEL_KEY || c == BACKSPACE {
-			if len(p.command_line) > 0 {
-				p.command_line = p.command_line[:len(p.command_line)-1]
+			if len(e.command_line) > 0 {
+				e.command_line = e.command_line[:len(e.command_line)-1]
 			}
 		} else {
-			p.command_line += string(c)
+			e.command_line += string(c)
 		}
 
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
 
-		p.ShowMessage(BR, ":%s", p.command_line)
+		e.ShowMessage(BR, ":%s", e.command_line)
 		return false
 		//end case EX_COMMAND
 
 	case SEARCH:
 		if c == DEL_KEY || c == BACKSPACE {
-			if len(p.command_line) > 0 {
-				p.command_line = p.command_line[:len(p.command_line)-1]
+			if len(e.command_line) > 0 {
+				e.command_line = e.command_line[:len(e.command_line)-1]
 			}
 		} else {
-			p.command_line += string(c)
+			e.command_line += string(c)
 		}
-		p.ShowMessage(BR, "%s%s", p.searchPrefix, p.command_line)
+		e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
 		//process the key in vim below so no return
 		//end SEARCH
 	} //end switch
@@ -275,37 +275,37 @@ func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to re
 		return false
 	}
 	// the only way to get into EX_COMMAND or SEARCH; 8 => SEARCH
-	if mode == 8 && p.mode != SEARCH {
-		p.command_line = ""
-		p.command = ""
+	if mode == 8 && e.mode != SEARCH {
+		e.command_line = ""
+		e.command = ""
 		if c == ':' {
-			p.mode = EX_COMMAND
+			e.mode = EX_COMMAND
 			// 'park' vim in NORMAL mode and don't feed it keys
 			vim.Key("<esc>")
-			p.ShowMessage(BR, ":")
+			e.ShowMessage(BR, ":")
 		} else {
-			p.mode = SEARCH
-			p.searchPrefix = string(c)
-			p.ShowMessage(BL, p.searchPrefix)
+			e.mode = SEARCH
+			e.searchPrefix = string(c)
+			e.ShowMessage(BL, e.searchPrefix)
 		}
 		return false
-	} else if mode == 16 && p.mode != INSERT {
-		p.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
+	} else if mode == 16 && e.mode != INSERT {
+		e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 	}
 
 	if mode == 2 { //VISUAL_MODE
 		vmode := vim.VisualGetType()
-		p.mode = visualModeMap[vmode]
-		p.highlightInfo()
+		e.mode = visualModeMap[vmode]
+		e.highlightInfo()
 	} else {
-		p.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		e.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 	}
 
 	//below is done for everything except SEARCH and EX_COMMAND
-	p.ss = vim.BufferLines(p.vbuf)
+	e.ss = vim.BufferLines(e.vbuf)
 	pos := vim.CursorGetPosition() //set screen cx and cy from pos
-	p.fr = pos[0] - 1
-	p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
+	e.fr = pos[0] - 1
+	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 
 	return true
 }

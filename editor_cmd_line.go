@@ -71,7 +71,7 @@ func (e *Editor) writeNote() {
 	text := e.bufferToString()
 
 	if e.Database.taskFolder(e.id) == "code" {
-		go updateCodeFile(e.id, text)
+		go e.Database.updateCodeFile(e.id, text)
 	}
 
 	err := e.Database.updateNote(e.id, text)
@@ -350,10 +350,10 @@ func (e *Editor) modified() {
 	var result bool
 	err := v.BufferOption(0, "modified", &result) //or e.vbuf
 	if err != nil {
-		sess.showEdMessage("%s", err)
+		e.ShowMessage(BL, "%s", err)
 		return
 	}
-	sess.showEdMessage("Modified = %t", result)
+	e.ShowMessage(BL, "Modified = %t", result)
 }
 */
 

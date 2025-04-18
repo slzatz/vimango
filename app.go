@@ -211,6 +211,13 @@ func (a *App) InitDatabases(configPath string) error {
 // InitApp initializes the application components
 func (a *App) InitApp() {
 	
+	markdown_style, _ := selectMDStyle("gruvbox.xml")
+	a.Session.markdown_style = markdown_style
+	a.Session.style = [8]string{"dracula", "fruity", "gruvbox", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"}
+	a.Session.styleIndex = 2
+	a.Session.imagePreview = false
+	a.Session.imgSizeY = 800
+
 	a.Organizer.cx = 0
 	a.Organizer.cy = 0
 	a.Organizer.fc = 0
@@ -360,12 +367,12 @@ func (a *App) MainLoop() {
 			k = key.Special
 		}
 
-		if sess.editorMode {
+		if a.Session.editorMode {
 			// Use our new context-based method
 			//textChange := app.Editor.ProcessKey(app, k) // This is where the main loop will call the new method in editor_context.go
 			textChange := p.editorProcessKey(k)
 
-			if !sess.editorMode {
+			if !a.Session.editorMode {
 				continue
 			}
 

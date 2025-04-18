@@ -365,14 +365,14 @@ func (o *Organizer) editNote(id int) {
 		if e, ok := w.(*Editor); ok {
 			if e.id == id {
 				active = true
-				p = e
+				p = e // should become app.p = e or app.Session.p = e
 				break
 			}
 		}
 	}
 
 	if !active {
-		p = app.NewEditor()
+		p = app.NewEditor() // should become p := app.NewEditor()
 		app.Windows = append(app.Windows, p)
 		p.id = id
     p.title = o.rows[o.fr].title
@@ -395,7 +395,7 @@ func (o *Organizer) editNote(id int) {
 	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
 	o.Screen.drawRightScreen()
 	p.mode = NORMAL
-
+  // either app.p = p or app.Session.p = p
 	o.command = ""
 	o.mode = NORMAL
 }
@@ -867,7 +867,7 @@ func (o *Organizer) updateContainer(unused int) {
 	case "kk":
 		o.altView = KEYWORD
 	}
-	getAltContainers() //O.mode = NORMAL is in get_containers
+	o.Database.getAltContainers() //O.mode = NORMAL is in get_containers
 	if len(o.altRows) != 0 {
 		o.mode = ADD_CHANGE_FILTER
 		o.ShowMessage(BL, "Select context to add to marked or current entry")
@@ -944,7 +944,7 @@ func (o *Organizer) setImage(pos int) {
 
 func (o *Organizer) printDocument(unused int) {
 	id := o.rows[o.fr].id
-	note := DB.readNoteIntoString(id)
+	note := o.Database.readNoteIntoString(id)
 	if o.Database.taskFolder(id) == "code" {
 		c := o.Database.taskContext(id)
 		var ok bool

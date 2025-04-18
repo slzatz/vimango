@@ -13,7 +13,7 @@ var e_lookup2 = map[string]interface{}{
 	"\x17L":              (*Editor).moveOutputWindowRight,
 	"\x17J":              (*Editor).moveOutputWindowBelow,
 	"\x08":               (*Editor).controlH,
-	"\x0c":               controlL,
+	"\x0c":               (*Editor).controlL,
 	"\x0a":               (*Editor).controlJ,
 	"\x0b":               (*Editor).controlK,
 	"\x02":               (*Editor).decorateWord,
@@ -190,21 +190,21 @@ func (e *Editor) controlH() {
 	}
 }
 
-func controlL() {
+func (e *Editor) controlL() {
 	// below "if" really for testing
-	if p.isModified() {
-		p.ShowMessage(BR, "Note you left has been modified")
+	if e.isModified() {
+		e.ShowMessage(BR, "Note you left has been modified")
 	}
 
-	eds := p.Session.editors()
+	eds := e.Session.editors()
 	index := 0
-	for i, e := range eds {
-		if e == p {
+	for i, z := range eds {
+		if z == e {
 			index = i
 			break
 		}
 	}
-	p.ShowMessage(BR, "index: %d; length: %d", index, len(eds))
+	e.ShowMessage(BR, "index: %d; length: %d", index, len(eds))
 
 	if index < len(eds)-1 {
 		p = eds[index+1]

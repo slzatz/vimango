@@ -659,7 +659,7 @@ func (db *Database) getContainers() {
 
 }
 
-func getAltContainers() {
+func (db *Database) getAltContainers() {
 	org.altRows = nil
 
 	/*
@@ -690,7 +690,7 @@ func getAltContainers() {
 
 	//stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
 	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", org.altView)
-	rows, err := db.Query(stmt)
+	rows, err := db.MainDB.Query(stmt)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star FROM %s", org.altView)
 		return
@@ -816,6 +816,7 @@ func (db *Database) addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bo
 	}
 }
 
+/*
 // not in use but worked
 func getNoteSearchPositions__(id int) [][]int {
 	row := fts_db.QueryRow("SELECT rowid FROM fts WHERE lm_id=?;", id)
@@ -846,6 +847,7 @@ func getNoteSearchPositions__(id int) [][]int {
 	}
 	return word_positions
 }
+*/
 
 func (db *Database) updateContainerTitle(row *Row) error {
 	if row.id == -1 {
@@ -1096,9 +1098,9 @@ func generateWWString(text string, width int) string {
 	return ab.String()
 }
 
-func updateCodeFile(id int, text string) {
+func (db *Database) updateCodeFile(id int, text string) {
 	var filePath string
-	lang := Languages[DB.taskContext(id)]
+	lang := Languages[db.taskContext(id)]
 	if lang == "cpp" {
 		filePath = "/home/slzatz/clangd_examples/test.cpp"
 	} else if lang == "go" {
@@ -1106,7 +1108,7 @@ func updateCodeFile(id int, text string) {
 	} else if lang == "python" {
 		filePath = "/home/slzatz/python_fragments/main.py"
 	} else {
-		app.Organizer.ShowMessage(BL, "I don't recognize %q", DB.taskContext(id))
+		app.Organizer.ShowMessage(BL, "I don't recognize %q", db.taskContext(id))
 		return
 	}
 
@@ -1121,76 +1123,3 @@ func updateCodeFile(id int, text string) {
 	f.WriteString(text)
 	f.Sync()
 }
-
-/*
-func moveDividerPct(pct int) {
-	// note below only necessary if window resized or font size changed
-	sess.textLines = sess.screenLines - 2 - TOP_MARGIN
-
-	if pct == 100 {
-		sess.divider = 1
-	} else {
-		sess.divider = sess.screenCols - pct*sess.screenCols/100
-	}
-	sess.totaleditorcols = sess.screenCols - sess.divider - 2
-	sess.eraseScreenRedrawLines()
-
-	if sess.divider > 10 {
-		org.refreshScreen()
-		org.drawStatusBar()
-	}
-
-	if sess.editorMode {
-		sess.positionWindows()
-		sess.eraseRightScreen() //erases editor area + statusbar + msg
-		sess.drawRightScreen()
-	} else if org.view == TASK {
-		org.drawPreview()
-	}
-	sess.showOrgMessage("rows: %d  cols: %d  divider: %d", sess.screenLines, sess.screenCols, sess.divider)
-
-	sess.returnCursor()
-}
-
-func moveDividerAbs(num int) {
-	if num >= sess.screenCols {
-		sess.divider = 1
-	} else if num < 20 {
-		sess.divider = sess.screenCols - 20
-	} else {
-		sess.divider = sess.screenCols - num
-	}
-
-	sess.edPct = 100 - 100*sess.divider/sess.screenCols
-	sess.totaleditorcols = sess.screenCols - sess.divider - 2
-	sess.eraseScreenRedrawLines()
-
-	if sess.divider > 10 {
-		org.refreshScreen()
-		org.drawStatusBar()
-	}
-
-	if sess.editorMode {
-		sess.positionWindows()
-		sess.eraseRightScreen() //erases editor area + statusbar + msg
-		sess.drawRightScreen()
-	} else if org.view == TASK {
-		org.drawPreview()
-	}
-	sess.showOrgMessage("rows: %d  cols: %d  divider: %d edPct: %d", sess.screenLines, sess.screenCols, sess.divider, sess.edPct)
-
-	sess.returnCursor()
-}
-
-func tempTid(table string) int {
-	var tid int
-	err := db.QueryRow(fmt.Sprintf("SELECT MIN(tid) FROM %s;", table)).Scan(&tid)
-	// if there are no keywords etc this will err; could make the variable sql.NullInt64
-	if err != nil {
-		sess.showEdMessage("error in tid from %s: %v", table, err)
-		return 0
-	}
-	//sess.showEdMessage("The minimum tid is: %d", tid)
-	return tid - 1
-}
-*/

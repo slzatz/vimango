@@ -1,8 +1,6 @@
 package main
 
 import (
-//	"bytes"
-//	"encoding/gob"
 	"fmt"
 	"os"
 	"strings"
@@ -21,27 +19,6 @@ type Screen struct {
 	edPct            int // percent that editor space takes up of whole horiz screen real estate
 	ws               unix.Winsize //Row,Col,Xpixel,Ypixel unint16
 	//images           map[string]*image.Image
-}
-
-
-func (s *Screen) numberOfEditors() int {
-	i := 0
-	for _, w := range app.Windows {
-		if _, ok := w.(*Editor); ok {
-			i++
-		}
-	}
-	return i
-}
-
-func (s *Screen) editors() []*Editor {
-	eds := []*Editor{}
-	for _, w := range app.Windows {
-		if e, ok := w.(*Editor); ok {
-			eds = append(eds, e)
-		}
-	}
-	return eds
 }
 
 func (s *Screen) eraseScreenRedrawLines() {
@@ -182,40 +159,6 @@ func (s *Screen) PositionMessage(loc Location) int { //Keep it Screen struct
     }
    return max_length
 }
-/*
-func (s *Screen) returnCursor() {
-	var ab strings.Builder
-	if sess.editorMode {
-		switch p.mode {
-		case PREVIEW, SPELLING, VIEW_LOG:
-			// we don't need to position cursor and don't want cursor visible
-			fmt.Print(ab.String())
-			return
-		case EX_COMMAND, SEARCH:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", s.textLines+TOP_MARGIN+2, len(p.command_line)+s.divider+2)
-		default:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", p.cy+p.top_margin, p.cx+p.left_margin+p.left_margin_offset+1)
-		}
-	} else {
-		switch org.mode {
-		case FIND:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;34m>", org.cy+TOP_MARGIN+1, LEFT_MARGIN) //blue
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", org.cy+TOP_MARGIN+1, org.cx+LEFT_MARGIN+1)
-		case COMMAND_LINE:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", s.textLines+2+TOP_MARGIN, len(org.command_line)+LEFT_MARGIN+1)
-
-		default:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;31m>", org.cy+TOP_MARGIN+1, LEFT_MARGIN)
-			// below restores the cursor position based on org.cx and org.cy + margin
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", org.cy+TOP_MARGIN+1, org.cx+LEFT_MARGIN+1)
-		}
-	}
-
-	ab.WriteString("\x1b[0m")   //return to default fg/bg
-	ab.WriteString("\x1b[?25h") //shows the cursor
-	fmt.Print(ab.String())
-}
-*/
 
 // used by containers
 func (s *Screen) drawPreviewBox() {
@@ -260,73 +203,3 @@ func (s *Screen) drawPreviewBox() {
 	fmt.Print(ab.String())
 }
 
-/*
-func (s *Screen) moveDividerPct(pct int) {
-	// note below only necessary if window resized or font size changed
-	s.textLines = s.screenLines - 2 - TOP_MARGIN
-
-	if pct == 100 {
-		s.divider = 1
-	} else {
-		s.divider = s.screenCols - pct*s.screenCols/100
-	}
-	s.totaleditorcols = s.screenCols - s.divider - 2
-	s.eraseScreenRedrawLines()
-
-	if s.divider > 10 {
-		org.refreshScreen()
-		org.drawStatusBar()
-	}
-
-	if sess.editorMode {
-		s.positionWindows()
-		s.eraseRightScreen() //erases editor area + statusbar + msg
-		s.drawRightScreen()
-	} else if org.view == TASK {
-		org.drawPreview()
-	}
-	sess.showOrgMessage("rows: %d  cols: %d  divider: %d", s.screenLines, s.screenCols, s.divider)
-
-	s.returnCursor()
-}
-*/
-
-func (s *Screen) moveDividerAbs(num int) {
-	if num >= s.screenCols {
-		s.divider = 1
-	} else if num < 20 {
-		s.divider = s.screenCols - 20
-	} else {
-		s.divider = s.screenCols - num
-	}
-
-	s.edPct = 100 - 100*s.divider/s.screenCols
-	s.totaleditorcols = s.screenCols - s.divider - 2
-	s.eraseScreenRedrawLines()
-
-	if s.divider > 10 {
-		org.refreshScreen()
-		org.drawStatusBar()
-	}
-
-	if sess.editorMode {
-		s.positionWindows()
-		s.eraseRightScreen() //erases editor area + statusbar + msg
-		s.drawRightScreen()
-	} else if org.view == TASK {
-		org.drawPreview()
-	}
-	app.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d edPct: %d", s.screenLines, s.screenCols, s.divider, s.edPct)
-
-	app.returnCursor()
-}
-
-
-func (s *Screen) signalHandler() {
-	err := s.GetWindowSize()
-	if err != nil {
-		//SafeExit(fmt.Errorf("couldn't get window size: %v", err))
-		os.Exit(1)
-	}
-	app.moveDividerPct(s.edPct)
-}
