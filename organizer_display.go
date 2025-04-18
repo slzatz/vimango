@@ -234,7 +234,7 @@ func (o *Organizer) drawPreviewWithImages() {
 				continue
 			}
 		}
-		height := img.Bounds().Max.Y / (int(sess.ws.Ypixel) / sess.screenLines)
+		height := img.Bounds().Max.Y / (int(o.Screen.ws.Ypixel) / o.Screen.screenLines)
 		y += height
 		if y > o.Screen.textLines-1 {
 			fmt.Printf("\x1b[3m\x1b[4mImage %s doesn't fit!\x1b[0m \x1b[%dG", path, o.Screen.divider+1)
@@ -433,7 +433,7 @@ func (o *Organizer) drawSearchRows() {
 
 func (o *Organizer) drawPreview() {
 	if len(o.rows) == 0 {
-		sess.eraseRightScreen()
+		o.Screen.eraseRightScreen()
 		return
 	}
 	id := o.rows[o.fr].id
@@ -445,7 +445,7 @@ func (o *Organizer) drawPreview() {
 	}
 	//note = generateWWString(note, o.totaleditorcols)
 	//note = WordWrap(note, o.totaleditorcols)
-	sess.eraseRightScreen() //includes erasing images 11062021
+	o.Screen.eraseRightScreen() //includes erasing images 11062021
 
 	var lang string
 	if o.Database.taskFolder(id) == "code" {

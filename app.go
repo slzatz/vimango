@@ -350,7 +350,7 @@ func (a *App) MainLoop() {
 	for a.Run {
 		key, err := terminal.ReadKey()
 		if err != nil {
-			sess.showOrgMessage("Readkey problem %w", err)
+			a.Organizer.ShowMessage(BL, "Readkey problem %w", err)
 		}
 
 		var k int

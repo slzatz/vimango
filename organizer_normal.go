@@ -117,9 +117,9 @@ func switchToEditorMode() {
 		sess.showOrgMessage("There are no active editors")
 		return
 	}
-	sess.eraseRightScreen()
-	sess.drawRightScreen()
-	sess.editorMode = true
+	app.Screen.eraseRightScreen()
+	app.Screen.drawRightScreen()
+	app.Session.editorMode = true
 	vim.BufferSetCurrent(p.vbuf)
 }
 
@@ -151,7 +151,7 @@ func controlZ() {
 	note = strings.TrimSpace(note)
 	note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
 	org.note = strings.Split(note, "\n")
-	sess.eraseRightScreen()
+	app.Screen.eraseRightScreen()
 	if !sess.imagePreview {
 		org.drawPreviewWithoutImages()
 	} else {
@@ -161,7 +161,7 @@ func controlZ() {
 	sess.showOrgMessage("\x1b[1mType a number to choose a link\x1b[0m")
 }
 func drawPreviewWithImages() {
-	sess.eraseRightScreen()
+	app.Screen.eraseRightScreen()
 	org.drawPreviewWithImages()
 	sess.imagePreview = true
 }

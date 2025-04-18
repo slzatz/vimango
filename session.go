@@ -65,6 +65,7 @@ func (s *Session) editors() []*Editor {
 	return eds
 }
 
+/*
 func (s *Session) eraseScreenRedrawLines() {
 	fmt.Fprint(os.Stdout, "\x1b[2J") //Erase the screen
 	fmt.Fprint(os.Stdout, "\x1b(0")  //Enter line drawing mode
@@ -190,7 +191,6 @@ func (s *Session) GetWindowSize() error {
 	return nil
 }
 
-/*
 func (s *Session) enableRawMode() ([]byte, error) {
 
 	// Gets TermIOS data structure. From glibc, we find the cmd should be TCGETS
@@ -234,7 +234,6 @@ func Restore(original []byte) error {
 	}
 	return nil
 }
-*/
 
 func (s *Session) showOrgMessage(format string, a ...interface{}) {
 	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", s.textLines+2+TOP_MARGIN, s.divider, s.textLines+2+TOP_MARGIN)
@@ -288,7 +287,7 @@ func (s *Session) PositionMessage(loc Location) int { //Move to Screen struct
     }
    return max_length
 }
-/*
+
 func (s *Session) ShowMessage(max_length int, format string, a ...interface{}) { //Sesseion struct
 
 	str := fmt.Sprintf(format, a...)

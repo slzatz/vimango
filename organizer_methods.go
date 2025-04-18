@@ -131,10 +131,10 @@ func (o *Organizer) scroll() {
 		o.fr, o.fc, o.coloff, o.rowoff, o.cx, o.cy = 0, 0, 0, 0, 0, 0
 		return
 	}
-	titlecols := sess.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
 
-	if o.fr > sess.textLines+o.rowoff-1 {
-		o.rowoff = o.fr - sess.textLines + 1
+	if o.fr > o.Screen.textLines+o.rowoff-1 {
+		o.rowoff = o.fr - o.Screen.textLines + 1
 	}
 
 	if o.fr < o.rowoff {
@@ -160,8 +160,8 @@ func (o *Organizer) altScroll() {
 	}
 	prevRowoff := o.altRowoff
 
-	if o.altFr > sess.textLines+o.altRowoff-1 {
-		o.altRowoff = o.altFr - sess.textLines + 1
+	if o.altFr > o.Screen.textLines+o.altRowoff-1 {
+		o.altRowoff = o.altFr - o.Screen.textLines + 1
 	}
 
 	if o.altFr < o.altRowoff {
@@ -169,7 +169,7 @@ func (o *Organizer) altScroll() {
 	}
 
 	if prevRowoff != o.altRowoff {
-		sess.eraseRightScreen()
+		o.Screen.eraseRightScreen()
 	}
 }
 
@@ -192,7 +192,7 @@ func (o *Organizer) writeTitle() {
 	row := &o.rows[o.fr]
   var msg string
 	if !row.dirty {
-		sess.showOrgMessage("Row has not been changed")
+		o.ShowMessage(BR, "Row has not been changed")
 		return
 	}
 
@@ -220,7 +220,7 @@ func (o *Organizer) writeTitle() {
 
 	//sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()
-	sess.showOrgMessage(msg)
+	o.ShowMessage(BR, msg)
 }
 
 func (o *Organizer) clearMarkedEntries() {

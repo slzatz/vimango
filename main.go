@@ -77,10 +77,10 @@ func main() {
 	}
 	
 	app.origTermCfg = origCfg
-	sess.editorMode = false
+	app.Session.editorMode = false
 	
 	// Get window size
-	err = sess.GetWindowSize()
+	err = app.Screen.GetWindowSize()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error getting window size: %v", err)
 		os.Exit(1)

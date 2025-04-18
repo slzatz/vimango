@@ -130,7 +130,7 @@ func (db *Database) updateTaskFolderByTid(tid, id int) {
 		tid, id)
 
 	if err != nil {
-		sess.showOrgMessage("Error updating folder for entry %d to tid %d: %v", id, tid, err)
+		app.Organizer.ShowMessage(BL, "Error updating folder for entry %d to tid %d: %v", id, tid, err)
 		return
 	}
 }
@@ -156,7 +156,7 @@ func (db *Database) updateNote(id int, text string) error {
 func (db *Database) getSyncItems(max int) {
 	rows, err := db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
 	if err != nil {
-		sess.showOrgMessage("Error in getSyncItems: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in getSyncItems: %v", err)
 		return
 	}
 
@@ -170,7 +170,7 @@ func (db *Database) getSyncItems(max int) {
 		err = rows.Scan(&row.id, &row.title, &sort)
 
 		if err != nil {
-			sess.showOrgMessage("Error in getSyncItems: %v", err)
+			app.Organizer.ShowMessage(BL, "Error in getSyncItems: %v", err)
 			return
 		}
 
@@ -183,10 +183,10 @@ func (db *Database) getSyncItems(max int) {
 func (db *Database) deleteSyncItem(id int) {
 	_, err := db.MainDB.Exec("DELETE FROM sync_log  WHERE id=?;", id)
 	if err != nil {
-		sess.showOrgMessage("Error deleting sync_log entry with id %d: %v", id, err)
+		app.Organizer.ShowMessage(BL, "Error deleting sync_log entry with id %d: %v", id, err)
 		return
 	}
-	sess.showOrgMessage("Deleted sync_log entry with id %d", id)
+	app.Organizer.ShowMessage(BL, "Deleted sync_log entry with id %d", id)
 }
 
 func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) ([]Row, error) {
@@ -208,7 +208,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 		s += "WHERE 1=?"
 		filter = 1
 	default:
-		sess.showOrgMessage("You asked for an unsupported db query")
+		app.Organizer.ShowMessage(BL, "You asked for an unsupported db query")
 		return []Row{}, nil //FIXME
 	}
 
@@ -226,7 +226,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 
 	rows, err := db.MainDB.Query(s, filter)
 	if err != nil {
-		sess.showOrgMessage("Error in getItems: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in getItems: %v", err)
 		return []Row{}, err
 	}
 
@@ -247,7 +247,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 		)
 
 		if err != nil {
-			sess.showOrgMessage("Error in filterEntries: %v", err)
+			app.Organizer.ShowMessage(BL, "Error in filterEntries: %v", err)
 			//return orgRows
 			return orgRows, err
 		}
@@ -306,7 +306,7 @@ func (db *Database) insertRowInDB(row *Row) error { // should return err
 		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
 		row.title, folder_tid, context_tid, row.star).Scan(&id)
 	if err != nil {
-		sess.showOrgMessage("Error inserting into DB: %v", err)
+		app.Organizer.ShowMessage(BL, "Error inserting into DB: %v", err)
 		//return -1
 		return err
 	}
@@ -319,9 +319,7 @@ func (db *Database) insertSyncEntry(title, note string) {
 	_, err := db.MainDB.Exec("INSERT INTO sync_log (title, note, modified) VALUES (?, ?, datetime('now'));",
 		title, note)
 	if err != nil {
-		sess.showOrgMessage("Error inserting sync log into db: %v", err)
-	} else {
-		sess.showOrgMessage("Wrote sync log to db")
+		app.Organizer.ShowMessage(BL, "Wrote sync log to db")
 	}
 }
 
@@ -334,7 +332,7 @@ func (db *Database) readNoteIntoString(id int) string {
 	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
-		sess.showOrgMessage("Error retrieving note for id %d: %v", id, err)
+		app.Organizer.ShowMessage(BL, "Error retrieving note for id %d: %v", id, err)
 		return ""
 	}
 	return note.String
@@ -349,7 +347,7 @@ func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
-		sess.showOrgMessage("Error opening note for editing: %v", err)
+		app.Organizer.ShowMessage(BL, "Error opening note for editing: %v", err)
 		return
 	}
 	e.ss = strings.Split(note.String, "\n")
@@ -407,7 +405,7 @@ func (db *Database) getEntryInfo(id int) NewEntry {
 	)
 	e.tid = int(tid.Int64)
 	if err != nil {
-		sess.showOrgMessage("Error in getEntryInfo for id %d: %v", id, err)
+		app.Organizer.ShowMessage(BL, "Error in getEntryInfo for id %d: %v", id, err)
 		return NewEntry{}
 	}
 	return e
@@ -468,7 +466,7 @@ func (db *Database) getTaskKeywords(id int) string {
 	rows, err := db.MainDB.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
 		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
 	if err != nil {
-		sess.showOrgMessage("Error in getTaskKeywords for entry id %d: %v", id, err)
+		app.Organizer.ShowMessage(BL, "Error in getTaskKeywords for entry id %d: %v", id, err)
 		return ""
 	}
 	defer rows.Close()
@@ -529,7 +527,7 @@ func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 		)
 
 		if err != nil {
-			sess.showOrgMessage("Error trying to retrieve search info from fts_db - term: %s; %v", st, err)
+			app.Organizer.ShowMessage(BL, "Error trying to retrieve search info from fts_db - term: %s; %v", st, err)
 			return []Row{}
 		}
 		ftsTids = append(ftsTids, ftsTid)
@@ -567,7 +565,7 @@ func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 
 	rows, err = db.MainDB.Query(stmt)
 	if err != nil {
-		sess.showOrgMessage("Error in Find query %q: %v", stmt[:10], err)
+		app.Organizer.ShowMessage(BL, "Error in Find query %q: %v", stmt[:10], err)
 		return []Row{}
 	}
 	var orgRows []Row
@@ -586,7 +584,7 @@ func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 		)
 
 		if err != nil {
-			sess.showOrgMessage("Error in searchEntries reading rows")
+			app.Organizer.ShowMessage(BL, "Error in searchEntries reading rows")
 			return []Row{}
 		}
 
@@ -629,7 +627,7 @@ func (db *Database) getContainers() {
 	stmt := fmt.Sprintf("SELECT id, title, star, deleted, modified FROM %s ORDER BY title COLLATE NOCASE ASC;", org.view)
 	rows, err := db.MainDB.Query(stmt)
 	if err != nil {
-		sess.showOrgMessage("Error SELECTING id, title, star, deleted, modified FROM %s", org.view)
+		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star, deleted, modified FROM %s", org.view)
 		return
 	}
 	defer rows.Close()
@@ -651,7 +649,7 @@ func (db *Database) getContainers() {
 		org.rows = append(org.rows, r)
 	}
 	if len(org.rows) == 0 {
-		sess.showOrgMessage("No results were returned")
+		app.Organizer.ShowMessage(BL, "No results were returned")
 		org.mode = NO_ROWS
 	}
 
@@ -694,7 +692,7 @@ func getAltContainers() {
 	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", org.altView)
 	rows, err := db.Query(stmt)
 	if err != nil {
-		sess.showOrgMessage("Error SELECTING id, title, star FROM %s", org.altView)
+		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star FROM %s", org.altView)
 		return
 	}
 	defer rows.Close()
@@ -755,7 +753,7 @@ func (db *Database) getContainerInfo(id int) Container {
 		countQuery = "SELECT COUNT(*) FROM task_keyword WHERE keyword_tid=(SELECT tid FROM keyword WHERE id=?);"
 		//columns = "id, tid, name, star, deleted, modified"
 	default:
-		sess.showOrgMessage("Somehow you are in a view I can't handle")
+		app.Organizer.ShowMessage(BL, "Somehow you are in a view I can't handle")
 		return Container{}
 	}
 
@@ -764,7 +762,7 @@ func (db *Database) getContainerInfo(id int) Container {
 	row := db.MainDB.QueryRow(countQuery, id)
 	err := row.Scan(&c.count)
 	if err != nil {
-		sess.showOrgMessage("Error in getContainerInfo: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in getContainerInfo: %v", err)
 		return Container{}
 	}
 
@@ -783,7 +781,7 @@ func (db *Database) getContainerInfo(id int) Container {
 	c.tid = int(tid.Int64)
 
 	if err != nil {
-		sess.showOrgMessage("Error in getContainerInfo: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in getContainerInfo: %v", err)
 		return Container{}
 	}
 	return c
@@ -796,13 +794,13 @@ func (db *Database) addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bo
 		entry_tid, keyword_tid)
 
 	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeywordByTid = INSERT or IGNORE INTO task_keyword: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByTid = INSERT or IGNORE INTO task_keyword: %v", err)
 		return
 	}
 
 	_, err = db.MainDB.Exec("UPDATE task SET modified = datetime('now') WHERE id=?;", entry_id)
 	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeywordByTid - Update task modified: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByTid - Update task modified: %v", err)
 		return
 	}
 
@@ -814,7 +812,7 @@ func (db *Database) addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bo
 	//_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE lm_id=?;", s, entry_id)
 	_, err = db.FtsDB.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
 	if err != nil {
-		sess.showOrgMessage("Error in addTaskKeywordByTid - fts Update: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByTid - fts Update: %v", err)
 	}
 }
 
@@ -827,11 +825,11 @@ func getNoteSearchPositions__(id int) [][]int {
 		return [][]int{}
 	}
 	var word_positions [][]int
-	for i, term := range strings.Split(sess.fts_search_terms, " ") {
+	for i, term := range strings.Split(app.Session.fts_search_terms, " ") {
 		word_positions = append(word_positions, []int{})
 		rows, err := fts_db.Query("SELECT offset FROM fts_v WHERE doc=? AND term=? AND col='note';", rowid, term)
 		if err != nil {
-			sess.showOrgMessage("Error in getNoteSearchPositions - 'SELECT offset FROM fts_v': %v", err)
+			app.Organizer.ShowMessage(BL, "Error in getNoteSearchPositions - 'SELECT offset FROM fts_v': %v", err)
 			return [][]int{}
 		}
 		defer rows.Close()
@@ -840,7 +838,7 @@ func getNoteSearchPositions__(id int) [][]int {
 			var offset int
 			err = rows.Scan(&offset)
 			if err != nil {
-				sess.showOrgMessage("Error in getNoteSearchPositions - 'rows.Scan(&offset)': %v", err)
+				app.Organizer.ShowMessage(BL, "Error in getNoteSearchPositions - 'rows.Scan(&offset)': %v", err)
 				continue
 			}
 			word_positions[i] = append(word_positions[i], offset)
@@ -878,20 +876,20 @@ func (db *Database) deleteKeywords(id int) int {
 	entry_tid := db.entryTidFromId(id)
 	res, err := db.MainDB.Exec("DELETE FROM task_keyword WHERE task_tid=?;", entry_tid)
 	if err != nil {
-		sess.showOrgMessage("Error deleting from task_keyword: %v", err)
+		app.Organizer.ShowMessage(BL, "Error deleting from task_keyword: %v", err)
 		return -1
 	}
 	rowsAffected, _ := res.RowsAffected()
 	_, err = db.MainDB.Exec("UPDATE task SET modified=datetime('now') WHERE id=?;", id)
 	if err != nil {
-		sess.showOrgMessage("Error updating entry modified column in deleteKeywords: %v", err)
+		app.Organizer.ShowMessage(BL, "Error updating entry modified column in deleteKeywords: %v", err)
 		return -1
 	}
 
 	//_, err = fts_db.Exec("UPDATE fts SET tag='' WHERE lm_id=?", id)
 	_, err = db.FtsDB.Exec("UPDATE fts SET tag='' WHERE tid=?", entry_tid)
 	if err != nil {
-		sess.showOrgMessage("Error updating fts in deleteKeywords: %v", err)
+		app.Organizer.ShowMessage(BL, "Error updating fts in deleteKeywords: %v", err)
 		return -1
 	}
 	return int(rowsAffected)
@@ -903,7 +901,7 @@ func highlightTerms__(text string, word_positions [][]int) string {
 	delimiters := " |,.;?:()[]{}&#/`-'\"—_<>$~@=&*^%+!\t\n\\" //must have \f if using it as placeholder
 
 	for _, v := range word_positions {
-		sess.showEdMessage("%v", word_positions)
+		app.Organizer.ShowMessage(BR,"%v", word_positions)
 
 		// start and end are positions in the text
 		// word_num is what word number we are at in the text
@@ -960,12 +958,12 @@ func (db *Database) highlightTerms2(id int) string {
 	//row := fts_db.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
 	//	"FROM fts WHERE lm_id=$1 AND fts MATCH $2;", id, sess.fts_search_terms)
 	row := db.FtsDB.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
-		"FROM fts WHERE tid=$1 AND fts MATCH $2;", entry_tid, sess.fts_search_terms)
+		"FROM fts WHERE tid=$1 AND fts MATCH $2;", entry_tid, app.Session.fts_search_terms)
 
 	var note sql.NullString
 	err := row.Scan(&note)
 	if err != nil {
-		sess.showOrgMessage("Error in SELECT highlight(fts ...:%v", err)
+		app.Organizer.ShowMessage(BL, "Error in SELECT highlight(fts ...:%v", err)
 		return ""
 	}
 	return note.String
@@ -1108,13 +1106,13 @@ func updateCodeFile(id int, text string) {
 	} else if lang == "python" {
 		filePath = "/home/slzatz/python_fragments/main.py"
 	} else {
-		sess.showEdMessage("I don't recognize %q", DB.taskContext(id))
+		app.Organizer.ShowMessage(BL, "I don't recognize %q", DB.taskContext(id))
 		return
 	}
 
 	f, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
-		sess.showEdMessage("error opening file %s: %w", filePath, err)
+		app.Organizer.ShowMessage(BL, "error opening file %s: %w", filePath, err)
 		return
 	}
 	defer f.Close()

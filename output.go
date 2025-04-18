@@ -125,9 +125,9 @@ func (o *Output) setLinesMargins() { //also sets top margin
 
 	if o.is_below {
 		o.screenlines = LINKED_NOTE_HEIGHT
-		o.top_margin = sess.textLines - LINKED_NOTE_HEIGHT + 2
+		o.top_margin = app.Screen.textLines - LINKED_NOTE_HEIGHT + 2
 	} else {
-		o.screenlines = sess.textLines
+		o.screenlines = app.Screen.textLines
 		o.top_margin = TOP_MARGIN + 1
 	}
 }

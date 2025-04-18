@@ -389,11 +389,11 @@ func (o *Organizer) editNote(id int) {
 
 	}
 
-	sess.positionWindows()
-	sess.eraseRightScreen() //erases editor area + statusbar + msg
+	o.Screen.positionWindows()
+	o.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 	//delete any images
 	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
-	sess.drawRightScreen()
+	o.Screen.drawRightScreen()
 	p.mode = NORMAL
 
 	o.command = ""
@@ -410,7 +410,7 @@ func (o *Organizer) verticalResize(pos int) {
 	}
 
 	if err != nil {
-		sess.showEdMessage("The format is :vert[ical] res[ize] N")
+		o.ShowMessage(BL, "The format is :vert[ical] res[ize] N")
 		return
 	}
 	app.moveDividerAbs(width)
@@ -453,8 +453,8 @@ func (o *Organizer) newEntry(unused int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.command = ""
 	//o.repeat = 0
-	sess.showOrgMessage("\x1b[1m-- INSERT --\x1b[0m")
-	sess.eraseRightScreen() //erases the note area
+	o.ShowMessage(BL, "\x1b[1m-- INSERT --\x1b[0m")
+	o.Screen.eraseRightScreen() //erases the note area
 	o.mode = INSERT
 	vim.CursorSetPosition(1, 0)
 	vim.Input("i")
@@ -465,18 +465,18 @@ func (o *Organizer) refresh(unused int) {
 		if o.taskview == BY_FIND {
 			o.mode = FIND
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows = o.Database.searchEntries(sess.fts_search_terms, o.show_deleted, false)
+			o.rows = o.Database.searchEntries(o.Session.fts_search_terms, o.show_deleted, false)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
-				sess.showOrgMessage("No results were returned")
+				o.ShowMessage(BL, "No results were returned")
 			}
 			/*
 				if unused != -1 { //complete kluge has to do with refreshing when syncing
 					o.drawPreview()
 				}
 			*/
-			sess.imagePreview = false
+			o.Session.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.readRowsIntoBuffer() ////////////////////////////////////////////
 			vim.CursorSetPosition(1, 0)
@@ -490,9 +490,9 @@ func (o *Organizer) refresh(unused int) {
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
-				sess.showOrgMessage("No results were returned")
+				o.ShowMessage(BL, "No results were returned")
 			}
-			sess.imagePreview = false
+			o.Session.imagePreview = false
 			//o.readTitleIntoBuffer() /////////////////////////////////////////////
 			o.readRowsIntoBuffer() ////////////////////////////////////////////
 			vim.CursorSetPosition(1, 0)
@@ -506,7 +506,7 @@ func (o *Organizer) refresh(unused int) {
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
-			sess.showOrgMessage("No results were returned")
+			o.ShowMessage(BL, "No results were returned")
 		}
 		o.readRowsIntoBuffer() ////////////////////////////////////////////
 		vim.CursorSetPosition(1, 0)
@@ -522,15 +522,15 @@ func (o *Organizer) refresh(unused int) {
 func (o *Organizer) find(pos int) {
 
 	if pos == -1 {
-		sess.showOrgMessage("You did not enter something to find!")
+		o.ShowMessage(BL, "You did not enter something to find!")
 		o.mode = o.last_mode
 		return
 	}
 
 	searchTerms := strings.ToLower(o.command_line[pos+1:])
-	sess.fts_search_terms = searchTerms
+	o.Session.fts_search_terms = searchTerms
 	if len(searchTerms) < 3 {
-		sess.showOrgMessage("You need to provide at least 3 characters to search on")
+		o.ShowMessage(BL, "You need to provide at least 3 characters to search on")
 		return
 	}
 
@@ -540,13 +540,13 @@ func (o *Organizer) find(pos int) {
 	o.mode = FIND
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
-	sess.showOrgMessage("Search for '%s'", searchTerms)
+	o.ShowMessage(BL, "Search for '%s'", searchTerms)
 	o.rows = o.Database.searchEntries(searchTerms, o.show_deleted, false)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 	}
-	sess.imagePreview = false
+	o.Session.imagePreview = false
 	o.readRowsIntoBuffer() ////////////////////////////////////////////
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -645,19 +645,19 @@ func (o *Organizer) contexts(pos int) {
 	o.mode = NORMAL
 
 	if pos == -1 {
-		sess.eraseRightScreen()
+		o.Screen.eraseRightScreen()
 		o.view = CONTEXT
 		o.Database.getContainers()
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
-			sess.showOrgMessage("No results were returned")
+			o.ShowMessage(BL, "No results were returned")
 		}
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		o.displayContainerInfo()
-		sess.showOrgMessage("Retrieved contexts")
+		o.ShowMessage(BL, "Retrieved contexts")
 		return
 	}
 
@@ -665,7 +665,7 @@ func (o *Organizer) contexts(pos int) {
 	var tid int
 	var ok bool
 	if tid, ok = o.Database.contextExists(input); !ok {
-		sess.showOrgMessage("%s is not a valid context!", input)
+		o.ShowMessage(BL, "%s is not a valid context!", input)
 		return
 	}
 	/*
@@ -703,20 +703,20 @@ func (o *Organizer) folders(pos int) {
 	o.mode = NORMAL
 
 	if pos == -1 {
-		sess.eraseRightScreen()
+		o.Screen.eraseRightScreen()
 		o.view = FOLDER
 		o.Database.getContainers()
 
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
-			sess.showOrgMessage("No results were returned")
+			o.ShowMessage(BL, "No results were returned")
 		}
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		o.displayContainerInfo()
-		sess.showOrgMessage("Retrieved folders")
+		o.ShowMessage(BL, "Retrieved folders")
 		return
 	}
 
@@ -724,12 +724,12 @@ func (o *Organizer) folders(pos int) {
 	var ok bool
 	var tid int
 	if tid, ok = o.Database.folderExists(input); !ok {
-		sess.showOrgMessage("%s is not a valid folder!", input)
+		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		return
 	}
 
 	if tid < 1 {
-		sess.showOrgMessage("Folder is unsynced")
+		o.ShowMessage(BL, "Folder is unsynced")
 		return
 	}
 
@@ -737,11 +737,11 @@ func (o *Organizer) folders(pos int) {
 		for entry_id, _ := range o.marked_entries {
 			o.Database.updateTaskFolderByTid(tid, entry_id)
 		}
-		sess.showOrgMessage("Marked entries moved into folder %s", input)
+		o.ShowMessage(BL, "Marked entries moved into folder %s", input)
 		return
 	}
 o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
-	sess.showOrgMessage("Moved current entry (since none were marked) into folder %s", input)
+	o.ShowMessage(BL, "Moved current entry (since none were marked) into folder %s", input)
 }
 
 func (o *Organizer) keywords(pos int) {
@@ -749,26 +749,26 @@ func (o *Organizer) keywords(pos int) {
 	o.mode = NORMAL
 
 	if pos == -1 {
-		sess.eraseRightScreen()
+		o.Screen.eraseRightScreen()
 		o.view = KEYWORD
 		o.Database.getContainers()
 
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
-			sess.showOrgMessage("No results were returned")
+			o.ShowMessage(BL, "No results were returned")
 		}
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		o.displayContainerInfo()
-		sess.showOrgMessage("Retrieved keywords")
+		o.ShowMessage(BL, "Retrieved keywords")
 		return
 	}
 
 	// not necessary if handled in sync (but not currently handled there)
 	if len(o.marked_entries) == 0 && o.Database.entryTidFromId(o.rows[o.fr].id) < 1 {
-		sess.showOrgMessage("The entry has not been synced yet!")
+		o.ShowMessage(BL, "The entry has not been synced yet!")
 		o.mode = o.last_mode
 		return
 	}
@@ -777,13 +777,13 @@ func (o *Organizer) keywords(pos int) {
 	var ok bool
 	var tid int
 	if tid, ok = o.Database.keywordExists(input); !ok {
-		sess.showOrgMessage("%s is not a valid keyword!", input)
+		o.ShowMessage(BL, "%s is not a valid keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
 
 	if tid < 1 {
-		sess.showOrgMessage("%q is an unsynced keyword!", input)
+		o.ShowMessage(BL, "%q is an unsynced keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
@@ -798,20 +798,20 @@ func (o *Organizer) keywords(pos int) {
 			o.Database.addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
 		}
 		if len(unsynced) > 0 {
-			sess.showOrgMessage("Added keyword %s to marked entries except for previously unsynced entries: %s", input, strings.Join(unsynced, ", "))
+			o.ShowMessage(BL, "Added keyword %s to marked entries except for previously unsynced entries: %s", input, strings.Join(unsynced, ", "))
 		} else {
-			sess.showOrgMessage("Added keyword %s to marked entries", input)
+			o.ShowMessage(BL, "Added keyword %s to marked entries", input)
 		}
 		return
 	}
 
 	// get here if no marked entries
 	o.Database.addTaskKeywordByTid(tid, o.rows[o.fr].id, true)
-	sess.showOrgMessage("Added keyword %s to current entry (since none were marked)", input)
+	o.ShowMessage(BL, "Added keyword %s to current entry (since none were marked)", input)
 }
 
 func (o *Organizer) recent(unused int) {
-	sess.showOrgMessage("Will retrieve recent items")
+	o.ShowMessage(BL, "Will retrieve recent items")
 	o.clearMarkedEntries()
 	o.filter = ""
 	o.taskview = BY_RECENT
@@ -823,9 +823,9 @@ func (o *Organizer) recent(unused int) {
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		o.ShowMessage(BL, "No results were returned")
 	}
-	sess.imagePreview = false
+	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -837,7 +837,7 @@ func (o *Organizer) deleteKeywords(unused int) {
 	res := o.Database.deleteKeywords(id)
 	o.mode = o.last_mode
 	if res != -1 {
-		sess.showOrgMessage("%d keyword(s) deleted from entry %d", res, id)
+		o.ShowMessage(BL, "%d keyword(s) deleted from entry %d", res, id)
 	}
 }
 
@@ -850,15 +850,15 @@ func (o *Organizer) showAll(unused int) {
 	o.show_completed = !o.show_completed
 	o.refresh(0)
 	if o.show_deleted {
-		sess.showOrgMessage("Showing completed/deleted")
+		o.ShowMessage(BL, "Showing completed/deleted")
 	} else {
-		sess.showOrgMessage("Hiding completed/deleted")
+		o.ShowMessage(BL, "Hiding completed/deleted")
 	}
 }
 
 func (o *Organizer) updateContainer(unused int) {
 	//o.current_task_id = o.rows[o.fr].id
-	sess.eraseRightScreen()
+	o.Screen.eraseRightScreen()
 	switch o.command_line {
 	case "cc":
 		o.altView = CONTEXT
@@ -870,7 +870,7 @@ func (o *Organizer) updateContainer(unused int) {
 	getAltContainers() //O.mode = NORMAL is in get_containers
 	if len(o.altRows) != 0 {
 		o.mode = ADD_CHANGE_FILTER
-		sess.showOrgMessage("Select context to add to marked or current entry")
+		o.ShowMessage(BL, "Select context to add to marked or current entry")
 	}
 }
 
@@ -878,7 +878,7 @@ func (o *Organizer) deleteMarks(unused int) {
 	o.clearMarkedEntries()
 	o.mode = NORMAL
 	o.command_line = ""
-	sess.showOrgMessage("Marks cleared")
+	o.ShowMessage(BL, "Marks cleared")
 }
 
 func (o *Organizer) copyEntry(unused int) {
@@ -886,18 +886,18 @@ func (o *Organizer) copyEntry(unused int) {
 	o.mode = NORMAL
 	o.command_line = ""
 	o.refresh(0)
-	sess.showOrgMessage("Entry copied")
+	o.ShowMessage(BL, "Entry copied")
 }
 
 func (o *Organizer) savelog(unused int) {
 	if o.last_mode == PREVIEW_SYNC_LOG {
 		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
 		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
-		sess.showOrgMessage("Sync log save to database")
+		o.ShowMessage(BL, "Sync log save to database")
 		o.command_line = ""
 		o.mode = PREVIEW_SYNC_LOG
 	} else {
-		sess.showOrgMessage("There is no sync log to save")
+		o.ShowMessage(BL, "There is no sync log to save")
 		o.command_line = ""
 		o.mode = o.last_mode
 	}
@@ -905,37 +905,37 @@ func (o *Organizer) savelog(unused int) {
 
 func (o *Organizer) save(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You need to provide a filename")
+		o.ShowMessage(BL, "You need to provide a filename")
 		return
 	}
 	filename := o.command_line[pos+1:]
 	f, err := os.Create(filename)
 	if err != nil {
-		sess.showOrgMessage("Error creating file %s: %v", filename, err)
+		o.ShowMessage(BL, "Error creating file %s: %v", filename, err)
 		return
 	}
 	defer f.Close()
 
 	_, err = f.WriteString(strings.Join(o.note, "\n"))
 	if err != nil {
-		sess.showOrgMessage("Error writing file %s: %v", filename, err)
+		o.ShowMessage(BL, "Error writing file %s: %v", filename, err)
 		return
 	}
-	sess.showOrgMessage("Note written to file %s", filename)
+	o.ShowMessage(BL, "Note written to file %s", filename)
 }
 
 func (o *Organizer) setImage(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You need to provide an option ('on' or 'off')")
+		o.ShowMessage(BL, "You need to provide an option ('on' or 'off')")
 		return
 	}
 	opt := o.command_line[pos+1:]
 	if opt == "on" {
-		sess.imagePreview = true
+		o.Session.imagePreview = true
 	} else if opt == "off" {
-		sess.imagePreview = false
+		o.Session.imagePreview = false
 	} else {
-		sess.showOrgMessage("Your choice of options is 'on' or 'off'")
+		o.ShowMessage(BL, "Your choice of options is 'on' or 'off'")
 	}
 	o.mode = o.last_mode
 	o.drawPreview()
@@ -950,7 +950,7 @@ func (o *Organizer) printDocument(unused int) {
 		var ok bool
 		var lang string
 		if lang, ok = Languages[c]; !ok {
-			sess.showOrgMessage("I don't recognize the language")
+			o.ShowMessage(BL, "I don't recognize the language")
 			return
 		}
 		//note := readNoteIntoString(id)
@@ -960,21 +960,21 @@ func (o *Organizer) printDocument(unused int) {
 
 		f, err := os.Create("output.html")
 		if err != nil {
-			sess.showOrgMessage("Error creating output.html: %v", err)
+			o.ShowMessage(BL, "Error creating output.html: %v", err)
 			return
 		}
 		defer f.Close()
 
 		_, err = f.WriteString(buf.String())
 		if err != nil {
-			sess.showOrgMessage("Error writing output.html: %s: %v", err)
+			o.ShowMessage(BL, "Error writing output.html: %s: %v", err)
 			return
 		}
 		cmd := exec.Command("wkhtmltopdf", "--enable-local-file-access",
 			"--no-background", "--minimum-font-size", "16", "output.html", "output.pdf")
 		err = cmd.Run()
 		if err != nil {
-			sess.showOrgMessage("Error creating pdf from code: %v", err)
+			o.ShowMessage(BL, "Error creating pdf from code: %v", err)
 		}
 	} else {
   
@@ -996,13 +996,13 @@ func (o *Organizer) printDocument(unused int) {
 
 		err := pf.Process([]byte(note))
 		if err != nil {
-			sess.showEdMessage("pdf error:%v", err)
+			o.ShowMessage(BL, "pdf error:%v", err)
 		}
 	}
 	cmd := exec.Command("lpr", "output.pdf")
 	err := cmd.Run()
 	if err != nil {
-		sess.showEdMessage("Error printing document: %v", err)
+		o.ShowMessage(BL, "Error printing document: %v", err)
 	}
 	o.mode = o.last_mode
 	o.command_line = ""
@@ -1055,7 +1055,7 @@ func (o *Organizer) printList2(unused int) {
 	cmd := exec.Command("lpr", "output.pdf")
 	err := cmd.Run()
 	if err != nil {
-		sess.showEdMessage("Error printing document: %v", err)
+		o.ShowMessage(BL, "Error printing document: %v", err)
 	}
 	o.mode = o.last_mode
 	o.command_line = ""
@@ -1063,7 +1063,7 @@ func (o *Organizer) printList2(unused int) {
 
 func (o *Organizer) sortEntries(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You need to provide a column to sort by")
+		o.ShowMessage(BL, "You need to provide a column to sort by")
 		return
 	}
 	sort := o.command_line[pos+1:]
@@ -1074,7 +1074,7 @@ func (o *Organizer) sortEntries(pos int) {
 			o.sort = sort
 		}
 	} else {
-		sess.showOrgMessage("The sort columns are modified, added, created and priority")
+		o.ShowMessage(BL, "The sort columns are modified, added, created and priority")
 		return
 	}
 	o.refresh(0)
