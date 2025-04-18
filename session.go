@@ -5,12 +5,13 @@ import (
 )
 
 type Session struct {
+  activeEditor     *Editor
 	editorMode       bool
 	imagePreview     bool
 	imgSizeY         int
 	fts_search_terms string
-	style      [8]string
-  markdown_style *chroma.Style
+	style            [8]string
+  markdown_style   *chroma.Style
 	styleIndex int
 }
 
