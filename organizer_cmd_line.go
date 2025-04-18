@@ -89,7 +89,7 @@ func (o *Organizer) log(unused int) {
 	// show first row's note
 	o.Screen.eraseRightScreen()
 	if len(o.rows) == 0 {
-		sess.showOrgMessage("%sThere are no saved sync logs%s", BOLD, RESET)
+		o.ShowMessage(BL, "%sThere are no saved sync logs%s", BOLD, RESET)
 		return
 	}
 	note := o.Database.readSyncLog(o.rows[o.fr].id)
@@ -101,7 +101,7 @@ func (o *Organizer) log(unused int) {
 
 func (o *Organizer) open(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You did not provide a context or folder!")
+		o.ShowMessage(BL, "You did not provide a context or folder!")
 		//o.mode = NORMAL
 		o.mode = o.last_mode
 		return
@@ -121,19 +121,19 @@ func (o *Organizer) open(pos int) {
 	}
 
 	if !ok {
-		sess.showOrgMessage("%s is not a valid context or folder!", input)
+		o.ShowMessage(BL, "%s is not a valid context or folder!", input)
 		o.mode = o.last_mode
 		return
 	}
 
 	if tid < 1 {
-		sess.showOrgMessage("%q is an unsynced context or folder!", input)
+		o.ShowMessage(BL, "%q is an unsynced context or folder!", input)
 		o.mode = o.last_mode
 		return
 	}
 
 	o.filter = input
-	sess.showOrgMessage("'%s' will be opened", o.filter)
+	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
 	o.view = TASK
@@ -144,9 +144,9 @@ func (o *Organizer) open(pos int) {
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		o.ShowMessage(BL, "No results were returned")
 	}
-	sess.imagePreview = false
+	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -157,7 +157,7 @@ func (o *Organizer) open(pos int) {
 
 func (o *Organizer) openContext(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You did not provide a context!")
+		o.ShowMessage(BL, "You did not provide a context!")
 		o.mode = o.last_mode
 		return
 	}
@@ -166,19 +166,19 @@ func (o *Organizer) openContext(pos int) {
 	var tid int
 	var ok bool
 	if tid, ok = o.Database.contextExists(input); !ok {
-		sess.showOrgMessage("%s is not a valid context!", input)
+		o.ShowMessage(BL, "%s is not a valid context!", input)
 		o.mode = o.last_mode
 		return
 	}
 	if tid < 1 {
-		sess.showOrgMessage("%q is an unsynced context!", input)
+		o.ShowMessage(BL, "%q is an unsynced context!", input)
 		o.mode = o.last_mode
 		return
 	}
 
 	o.filter = input
 
-	sess.showOrgMessage("'%s' will be opened", o.filter)
+	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
 	//o.folder = ""
@@ -192,9 +192,9 @@ func (o *Organizer) openContext(pos int) {
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		o.ShowMessage(BL, "No results were returned")
 	}
-	sess.imagePreview = false
+	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -205,7 +205,7 @@ func (o *Organizer) openContext(pos int) {
 
 func (o *Organizer) openFolder(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You did not provide a folder!")
+		o.ShowMessage(BL, "You did not provide a folder!")
 		o.mode = o.last_mode
 		return
 	}
@@ -214,19 +214,19 @@ func (o *Organizer) openFolder(pos int) {
 	var ok bool
 	var tid int
 	if tid, ok = o.Database.folderExists(input); !ok {
-		sess.showOrgMessage("%s is not a valid folder!", input)
+		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		o.mode = o.last_mode
 		return
 	}
 	if tid < 1 {
-		sess.showOrgMessage("%q is an unsynced folder!", input)
+		o.ShowMessage(BL, "%q is an unsynced folder!", input)
 		o.mode = o.last_mode
 		return
 	}
 
 	o.filter = input
 
-	sess.showOrgMessage("'%s' will be opened", o.filter)
+	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
 	o.taskview = BY_FOLDER
@@ -238,9 +238,9 @@ func (o *Organizer) openFolder(pos int) {
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		o.ShowMessage(BL, "No results were returned")
 	}
-	sess.imagePreview = false
+	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -251,7 +251,7 @@ func (o *Organizer) openFolder(pos int) {
 
 func (o *Organizer) openKeyword(pos int) {
 	if pos == -1 {
-		sess.showOrgMessage("You did not provide a keyword!")
+		o.ShowMessage(BL, "You did not provide a keyword!")
 		o.mode = o.last_mode
 		return
 	}
@@ -259,20 +259,20 @@ func (o *Organizer) openKeyword(pos int) {
 	var ok bool
 	var tid int
 	if tid, ok = o.Database.keywordExists(input); !ok {
-		sess.showOrgMessage("%s is not a valid keyword!", input)
+		o.ShowMessage(BL, "%s is not a valid keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
 	// this guard may not be necessary for keywords
 	if tid < 1 {
-		sess.showOrgMessage("%q is an unsynced keyword!", input)
+		o.ShowMessage(BL, "%q is an unsynced keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
 
 	o.filter = input
 
-	sess.showOrgMessage("'%s' will be opened", o.filter)
+	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 
 	o.clearMarkedEntries()
 	o.taskview = BY_KEYWORD
@@ -284,9 +284,9 @@ func (o *Organizer) openKeyword(pos int) {
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
-		sess.showOrgMessage("No results were returned")
+		o.ShowMessage(BL, "No results were returned")
 	}
-	sess.imagePreview = false
+	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -331,7 +331,7 @@ func (o *Organizer) quitApp(_ int) {
 	}
 	if unsaved_changes {
 		o.mode = NORMAL
-		sess.showOrgMessage("No db write since last change")
+		o.ShowMessage(BL, "No db write since last change")
 	} else {
 		app.Run = false
 	}
@@ -342,7 +342,7 @@ func (o *Organizer) editNote(id int) {
 	if o.view != TASK {
 		o.command = ""
 		o.mode = o.last_mode
-		sess.showOrgMessage("Only entries have notes to edit!")
+		o.ShowMessage(BL, "Only entries have notes to edit!")
 		return
 	}
 
@@ -351,14 +351,14 @@ func (o *Organizer) editNote(id int) {
 		id = o.getId()
 	}
 	if id == -1 {
-		sess.showOrgMessage("You need to save item before you can create a note")
+		o.ShowMessage(BL, "You need to save item before you can create a note")
 		o.command = ""
 		o.mode = o.last_mode
 		return
 	}
 
 	//sess.showOrgMessage("Edit note %d", id)
-	sess.editorMode = true
+	o.Session.editorMode = true
 
 	active := false
 	for _, w := range app.Windows {

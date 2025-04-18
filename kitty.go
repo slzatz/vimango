@@ -86,13 +86,13 @@ func displayImage(img image.Image) {
 	buf := new(bytes.Buffer)
 	err := png.Encode(buf, img)
 	if err != nil {
-		sess.showOrgMessage("Error encoding image: %v", err)
+		app.Organizer.ShowMessage(BL, "Error encoding image: %v", err)
 		return
 	}
 
 	err = KittyCopyPNGInline(os.Stdout, buf, int64(buf.Len()))
 	if err != nil {
-		sess.showOrgMessage("Error in KittyCopyPNG...: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in KittyCopyPNG...: %v", err)
 	}
 }
 

@@ -1,14 +1,6 @@
 package main
 
 import (
-//	"bytes"
-//	"encoding/gob"
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/slzatz/vimango/rawmode"
-	"golang.org/x/sys/unix"
 	"github.com/alecthomas/chroma/v2"
 )
 
@@ -298,6 +290,7 @@ func (s *Session) ShowMessage(max_length int, format string, a ...interface{}) {
 }
 */
 
+/*
 func (s *Session) returnCursor() {
 	var ab strings.Builder
 	if s.editorMode {
@@ -330,6 +323,7 @@ func (s *Session) returnCursor() {
 	ab.WriteString("\x1b[?25h") //shows the cursor
 	fmt.Print(ab.String())
 }
+*/
 
 /* moved to Organizer in organizer_normal.go
 func (s *Session) displayEntryInfo(e *NewEntry) {
@@ -391,6 +385,7 @@ func (s *Session) displayEntryInfo(e *NewEntry) {
 }
 */
 
+/*
 // used by containers
 func (s *Session) drawPreviewBox() {
 	width := s.totaleditorcols - 10
@@ -433,6 +428,7 @@ func (s *Session) drawPreviewBox() {
 	ab.WriteString("\x1b[?25h")
 	fmt.Print(ab.String())
 }
+*/
 
 /*
 func (s *Session) signalHandler() {

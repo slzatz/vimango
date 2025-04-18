@@ -12,7 +12,7 @@ import (
 )
 
 //note that bool returned is whether to redraw
-func editorProcessKey(c int) bool { //bool returned is whether to redraw
+func (p *Editor) editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
@@ -24,7 +24,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			// don't need to call CursorGetPosition - no change in pos
 			// delete any images
 			fmt.Print("\x1b_Ga=d\x1b\\")
-			sess.showEdMessage("")
+			p.ShowMessage(BR, "")
 			p.mode = NORMAL
 			return true
 		}
@@ -40,7 +40,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		pos := vim.CursorGetPosition() //set screen cx and cy from pos
 		p.fr = pos[0] - 1
 		p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
-		sess.showEdMessage("")
+		p.ShowMessage(BR, "")
 		return true
 	}
 
@@ -148,7 +148,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			//if p.command_line[0] == '%'
 			if strings.Index(p.command_line, "s/") != -1 {
 				if strings.LastIndex(p.command_line, "/") < strings.LastIndex(p.command_line, "c") {
-					sess.showEdMessage("We don't support [c]onfirm")
+					p.ShowMessage(BR, "We don't support [c]onfirm")
 					p.mode = NORMAL
 					return false
 				}
@@ -160,7 +160,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				pos := vim.CursorGetPosition() //set screen cx and cy from pos
 				p.fr = pos[0] - 1
 				p.fc = utf8.RuneCountInString(p.ss[p.fr][:pos[1]])
-				sess.showOrgMessage("search and replace: %s", p.command_line)
+				p.ShowMessage(BL, "search and replace: %s", p.command_line)
 				return true
 			}
 			var pos int
@@ -185,7 +185,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				return false
 			}
 
-			sess.showEdMessage("\x1b[41mNot an editor command: %s\x1b[0m", cmd)
+			p.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
 			p.mode = NORMAL
 			p.command_line = ""
 			return false
@@ -194,7 +194,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		if c == '\t' {
 			pos := strings.Index(p.command_line, " ")
 			if tabCompletion.list == nil {
-				sess.showOrgMessage("tab")
+				p.ShowMessage(BL, "tab")
 				var s string
 				if pos != -1 {
 					s = p.command_line[pos+1:]
@@ -210,7 +210,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 
 					partial := filepath.Base(s)
 					paths, _ := ioutil.ReadDir(dir)
-					sess.showOrgMessage("dir: %s  base: %s", dir, partial)
+					p.ShowMessage(BL, "dir: %s  base: %s", dir, partial)
 
 					for _, path := range paths {
 						if strings.HasPrefix(path.Name(), partial) {
@@ -228,7 +228,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 				}
 			}
 			p.command_line = p.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
-			sess.showEdMessage(":%s", p.command_line)
+			p.ShowMessage(BR, ":%s", p.command_line)
 			return false
 		}
 
@@ -244,7 +244,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		tabCompletion.idx = 0
 		tabCompletion.list = nil
 
-		sess.showEdMessage(":%s", p.command_line)
+		p.ShowMessage(BR, ":%s", p.command_line)
 		return false
 		//end case EX_COMMAND
 
@@ -256,7 +256,7 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 		} else {
 			p.command_line += string(c)
 		}
-		sess.showEdMessage("%s%s", p.searchPrefix, p.command_line)
+		p.ShowMessage(BR, "%s%s", p.searchPrefix, p.command_line)
 		//process the key in vim below so no return
 		//end SEARCH
 	} //end switch
@@ -282,15 +282,15 @@ func editorProcessKey(c int) bool { //bool returned is whether to redraw
 			p.mode = EX_COMMAND
 			// 'park' vim in NORMAL mode and don't feed it keys
 			vim.Key("<esc>")
-			sess.showEdMessage(":")
+			p.ShowMessage(BR, ":")
 		} else {
 			p.mode = SEARCH
 			p.searchPrefix = string(c)
-			sess.showEdMessage(p.searchPrefix)
+			p.ShowMessage(BL, p.searchPrefix)
 		}
 		return false
 	} else if mode == 16 && p.mode != INSERT {
-		sess.showEdMessage("\x1b[1m-- INSERT --\x1b[0m")
+		p.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 	}
 
 	if mode == 2 { //VISUAL_MODE

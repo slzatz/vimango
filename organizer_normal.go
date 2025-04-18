@@ -37,7 +37,7 @@ var new_lookup = map[string]func(*Organizer)(){
 }
 
 func exCmd() {
-	sess.showOrgMessage(":")
+	org.ShowMessage(BL, ":")
 	org.command_line = ""
 	org.last_mode = org.mode //at the least picks up NORMAL and NO_ROWS
 	org.mode = COMMAND_LINE
@@ -54,7 +54,7 @@ func _asterisk() {
 
 func mark() {
 	if org.view != TASK {
-		sess.showOrgMessage("You can only mark tasks")
+		org.ShowMessage(BL, "You can only mark tasks")
 		return
 	}
 
@@ -63,7 +63,7 @@ func mark() {
 	} else {
 		org.marked_entries[org.rows[org.fr].id] = struct{}{}
 	}
-	sess.showOrgMessage("Toggle mark for item %d", org.rows[org.fr].id)
+	org.ShowMessage(BL, "Toggle mark for item %d", org.rows[org.fr].id)
 }
 
 func _n() {
@@ -114,7 +114,7 @@ func (o *Organizer) info() {
 
 func switchToEditorMode() {
 	if len(app.Windows) == 0 {
-		sess.showOrgMessage("There are no active editors")
+		org.ShowMessage(BL, "There are no active editors")
 		return
 	}
 	app.Screen.eraseRightScreen()
@@ -152,18 +152,18 @@ func controlZ() {
 	note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
 	org.note = strings.Split(note, "\n")
 	app.Screen.eraseRightScreen()
-	if !sess.imagePreview {
+	if !app.Session.imagePreview {
 		org.drawPreviewWithoutImages()
 	} else {
 		org.drawPreviewWithImages()
 	}
 	org.mode = LINKS
-	sess.showOrgMessage("\x1b[1mType a number to choose a link\x1b[0m")
+	org.ShowMessage(BL, "\x1b[1mType a number to choose a link\x1b[0m")
 }
 func drawPreviewWithImages() {
 	app.Screen.eraseRightScreen()
 	org.drawPreviewWithImages()
-	sess.imagePreview = true
+	app.Session.imagePreview = true
 }
 func (o *Organizer) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder

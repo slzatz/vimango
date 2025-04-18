@@ -170,7 +170,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		// Send the keystroke to vim
 		if z, found := termcodes[c]; found {
 			vim.Key(z)
-			sess.showEdMessage("%s", z)
+			o.ShowMessage(BR, "%s", z)
 		} else {
 			vim.Input(string(c))
 		}
@@ -307,7 +307,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 					tabCompletion.idx = 0
 				}
 			} else {
-				sess.showEdMessage("tab")
+				o.ShowMessage(BR, "tab")
 				cmd := o.command_line[:pos]
 				option := o.command_line[pos+1:]
 				var filterMap = make(map[string]struct{})

@@ -363,7 +363,7 @@ func (a *App) MainLoop() {
 		if sess.editorMode {
 			// Use our new context-based method
 			//textChange := app.Editor.ProcessKey(app, k) // This is where the main loop will call the new method in editor_context.go
-			textChange := editorProcessKey(k)
+			textChange := p.editorProcessKey(k)
 
 			if !sess.editorMode {
 				continue

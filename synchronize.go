@@ -1262,24 +1262,24 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	row = a.Database.PG.QueryRow("SELECT now();")
 	err = row.Scan(&server_ts)
 	if err != nil {
-		sess.showOrgMessage("Error with getting current time from server: %w", err)
+		app.Organizer.ShowMessage(BL, "Error with getting current time from server: %w", err)
 		return
 	}
 	_, err = a.Database.MainDB.Exec("UPDATE sync SET timestamp=$1 WHERE machine='server';", server_ts)
 	if err != nil {
-		sess.showOrgMessage("Error updating client with server timestamp: %w", err)
+		app.Organizer.ShowMessage(BL, "Error updating client with server timestamp: %w", err)
 		return
 	}
 	_, err = a.Database.MainDB.Exec("UPDATE sync SET timestamp=datetime('now') WHERE machine='client';")
 	if err != nil {
-		sess.showOrgMessage("Error updating client with client timestamp: %w", err)
+		app.Organizer.ShowMessage(BL, "Error updating client with client timestamp: %w", err)
 		return
 	}
 	var client_ts string
 	row = a.Database.MainDB.QueryRow("SELECT datetime('now');")
 	err = row.Scan(&client_ts)
 	if err != nil {
-		sess.showOrgMessage("Error with getting current time from client: %w", err)
+		app.Organizer.ShowMessage(BL, "Error with getting current time from client: %w", err)
 		return
 	}
 	fmt.Fprintf(&lg, "\nClient UTC timestamp: %s\n", client_ts)
