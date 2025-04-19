@@ -171,9 +171,10 @@ func (e *Editor) controlH() {
 	e.ShowMessage(BL, "index: %d; length: %d", index, len(eds))
 
 	if index > 0 {
-		p = eds[index-1]
-		vim.BufferSetCurrent(p.vbuf)
-		p.mode = NORMAL
+		ae := eds[index-1] 
+		vim.BufferSetCurrent(ae.vbuf)
+		ae.mode = NORMAL
+    e.Session.activeEditor = ae
 		return
 	} else {
 
@@ -207,9 +208,10 @@ func (e *Editor) controlL() {
 	e.ShowMessage(BR, "index: %d; length: %d", index, len(eds))
 
 	if index < len(eds)-1 {
-		p = eds[index+1]
-		p.mode = NORMAL
-		vim.BufferSetCurrent(p.vbuf)
+		ae := eds[index+1]
+		ae.mode = NORMAL
+		vim.BufferSetCurrent(ae.vbuf)
+    e.Session.activeEditor = ae
 	}
 
 	return

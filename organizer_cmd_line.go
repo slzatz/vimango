@@ -338,7 +338,7 @@ func (o *Organizer) quitApp(_ int) {
 }
 
 func (o *Organizer) editNote(id int) {
-
+  var ae *Editor
 	if o.view != TASK {
 		o.command = ""
 		o.mode = o.last_mode
@@ -365,28 +365,28 @@ func (o *Organizer) editNote(id int) {
 		if e, ok := w.(*Editor); ok {
 			if e.id == id {
 				active = true
-				p = e // should become app.p = e or app.Session.p = e
+				ae = e // should become o.Session.activeEditor = e
 				break
 			}
 		}
 	}
 
 	if !active {
-		p = app.NewEditor() // should become p := app.NewEditor()
-		app.Windows = append(app.Windows, p)
-		p.id = id
-    p.title = o.rows[o.fr].title
-		p.top_margin = TOP_MARGIN + 1
+		ae = app.NewEditor() // should become p := o.Session.NewEditor() in NewEditor should set activeEditor
+		app.Windows = append(app.Windows, ae)
+		ae.id = id
+    ae.title = o.rows[o.fr].title
+		ae.top_margin = TOP_MARGIN + 1
 
 		if o.Database.taskFolder(o.rows[o.fr].id) == "code" {
-			p.output = &Output{}
-			p.output.is_below = true
-			p.output.id = id
-			app.Windows = append(app.Windows, p.output)
+			ae.output = &Output{}
+			ae.output.is_below = true
+			ae.output.id = id
+			app.Windows = append(app.Windows, ae.output)
 		}
-		o.Database.readNoteIntoBuffer(p, id)
-		p.bufferTick = vim.BufferGetLastChangedTick(p.vbuf)
-
+		o.Database.readNoteIntoBuffer(ae, id)
+		ae.bufferTick = vim.BufferGetLastChangedTick(ae.vbuf)
+    o.Session.activeEditor = ae
 	}
 
 	o.Screen.positionWindows()
@@ -394,8 +394,9 @@ func (o *Organizer) editNote(id int) {
 	//delete any images
 	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
 	o.Screen.drawRightScreen()
-	p.mode = NORMAL
+	ae.mode = NORMAL
   // either app.p = p or app.Session.p = p
+  o.Session.activeEditor = ae
 	o.command = ""
 	o.mode = NORMAL
 }
@@ -1018,8 +1019,8 @@ func (o *Organizer) printList(unused int) {
 	vim.BufferSetCurrent(tempBuf)
 	vim.Execute("ha")
 
-	if p != nil {
-		vim.BufferSetCurrent(p.vbuf)
+	if o.Session.activeEditor != nil {
+		vim.BufferSetCurrent(o.Session.activeEditor.vbuf)
 	}
 	o.mode = o.last_mode
 	o.command_line = ""

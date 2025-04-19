@@ -282,15 +282,16 @@ func (a *App) LoadInitialData() {
 func (a *App) returnCursor() {
 	var ab strings.Builder
 	if a.Session.editorMode {
-		switch p.mode { //FIXME
+    ae := a.Session.activeEditor
+		switch ae.mode {
 		case PREVIEW, SPELLING, VIEW_LOG:
 			// we don't need to position cursor and don't want cursor visible
 			fmt.Print(ab.String())
 			return
 		case EX_COMMAND, SEARCH:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, len(p.command_line)+a.Screen.divider+2)
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, len(ae.command_line)+a.Screen.divider+2)
 		default:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", p.cy+p.top_margin, p.cx+p.left_margin+p.left_margin_offset+1)
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", ae.cy+ae.top_margin, ae.cx+ae.left_margin+ae.left_margin_offset+1)
 		}
 	} else {
 		switch a.Organizer.mode {
@@ -350,15 +351,15 @@ func (a *App) quitApp() {
 func (a *App) MainLoop() {
 	
 	// Set global reference for backward compatibility
-	p = a.Editor
-	
+	//p = a.Editor
+  org := a.Organizer
 	// No need to sync windows as it's handled in main.go initialization
 	
 	//for a.Run && sess.run {
 	for a.Run {
 		key, err := terminal.ReadKey()
 		if err != nil {
-			a.Organizer.ShowMessage(BL, "Readkey problem %w", err)
+			org.ShowMessage(BL, "Readkey problem %w", err)
 		}
 
 		var k int
@@ -369,26 +370,25 @@ func (a *App) MainLoop() {
 		}
 
 		if a.Session.editorMode {
-			// Use our new context-based method
-			//textChange := app.Editor.ProcessKey(app, k) // This is where the main loop will call the new method in editor_context.go
-			textChange := p.editorProcessKey(k)
+      ae := a.Session.activeEditor	
+			textChange := ae.editorProcessKey(k)
 
 			if !a.Session.editorMode {
 				continue
 			}
 
 			if textChange {
-				p.scroll()
-				p.drawText()
-				p.drawStatusBar()
+				ae.scroll()
+				ae.drawText()
+				ae.drawStatusBar()
 			}
 		} else {
-			a.Organizer.organizerProcessKey(k)
+			org.organizerProcessKey(k)
       //app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
-			a.Organizer.scroll()
-			a.Organizer.refreshScreen()
+			org.scroll()
+			org.refreshScreen()
 			if a.Screen.divider > 10 {
-				a.Organizer.drawStatusBar()
+				org.drawStatusBar()
 			}
 		}
 		a.returnCursor()

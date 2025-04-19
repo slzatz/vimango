@@ -16,12 +16,9 @@ var app *App
 
 // For backward compatibility - these can be removed in a follow-up refactoring
 var org *Organizer
-var p *Editor
 
 func main() {
-	// Create new app context
 	app = CreateApp()
-
 	// Set global references for backward compatibility
   org = app.Organizer
 

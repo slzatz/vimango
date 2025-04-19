@@ -112,7 +112,7 @@ func (o *Organizer) info() {
 	o.Screen.drawPreviewBox()
 }
 
-func switchToEditorMode() {
+func switchToEditorMode() { //FIXME
 	if len(app.Windows) == 0 {
 		org.ShowMessage(BL, "There are no active editors")
 		return
@@ -120,7 +120,7 @@ func switchToEditorMode() {
 	app.Screen.eraseRightScreen()
 	app.Screen.drawRightScreen()
 	app.Session.editorMode = true
-	vim.BufferSetCurrent(p.vbuf)
+	vim.BufferSetCurrent(app.Session.activeEditor.vbuf)
 }
 
 func controlJ() {

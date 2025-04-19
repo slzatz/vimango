@@ -407,13 +407,13 @@ func (e *Editor) quitActions() {
 		// easier to just go to first window which has to be an editor (at least right now)
 		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need the type assertion
-				p = ed //p is the global current editor
+				e.Session.activeEditor = ed 
 				break
 			}
 		}
 
 		//p = app.Windows[0].(*Editor)
-		vim.BufferSetCurrent(p.vbuf)
+		vim.BufferSetCurrent(e.Session.activeEditor.vbuf)
 		e.Screen.positionWindows()
 		e.Screen.eraseRightScreen()
 		e.Screen.drawRightScreen()
@@ -484,12 +484,12 @@ func (e *Editor) quitAll() {
 	if e.Session.numberOfEditors() > 0 { // we could not quit some editors because they were in modified state
 		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need this type assertion to have statement below
-				p = ed //p is the global representing the current editor
+				e.Session.activeEditor = ed //p is the global representing the current editor
 				break
 			}
 		}
 
-		vim.BufferSetCurrent(p.vbuf)
+		vim.BufferSetCurrent(e.Session.activeEditor.vbuf)
 		e.Screen.positionWindows()
 		e.Screen.eraseRightScreen()
 		e.Screen.drawRightScreen()
