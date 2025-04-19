@@ -125,7 +125,7 @@ const (
 	VISUAL
 	REPLACE      // only explicit in organizer mode
 	FILE_DISPLAY // only organizer mode
-	NO_ROWS
+	//NO_ROWS
 	VISUAL_BLOCK      // only editor mode
 	SEARCH            // only editor mode
 	FIND              // only organizer mode

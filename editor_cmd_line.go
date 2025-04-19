@@ -422,7 +422,7 @@ func (e *Editor) quitActions() {
 		// unless commented out earlier sess.p.quit <- causes panic
 		//sess.p = nil
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
+		vim.BufferSetCurrent(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
 		e.Screen.eraseRightScreen()
 
 		if e.Screen.divider < 10 {
@@ -431,7 +431,7 @@ func (e *Editor) quitActions() {
 		}
 
 		//org.readTitleIntoBuffer() // shouldn't be necessary
-		org.drawPreview()
+		app.Organizer.drawPreview()
 		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 
@@ -497,7 +497,7 @@ func (e *Editor) quitAll() {
 
 	} else { // we've been able to quit all editors because none were in modified state
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(org.vbuf) ///////////////////////////////////////////////////////////
+		vim.BufferSetCurrent(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
 		e.Screen.eraseRightScreen()
 
 		if e.Screen.divider < 10 {
@@ -506,7 +506,7 @@ func (e *Editor) quitAll() {
 		}
 
 		//org.readTitleIntoBuffer() // shouldn't be necessary
-		org.drawPreview()
+		app.Organizer.drawPreview()
 		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 }

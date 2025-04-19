@@ -153,16 +153,17 @@ func (db *Database) updateNote(id int, text string) error {
 	return err
 }
 
-func (db *Database) getSyncItems(max int) {
-	rows, err := db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
+func (db *Database) getSyncItems(sort string, max int) []Row {
+	rows, err := db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", sort, sort, max))
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error in getSyncItems: %v", err)
-		return
+		return []Row{}
 	}
 
 	defer rows.Close()
 
-	org.rows = nil
+	//org.rows = nil
+  var  orgRows []Row
 	for rows.Next() {
 		var row Row
 		var sort string
@@ -171,13 +172,15 @@ func (db *Database) getSyncItems(max int) {
 
 		if err != nil {
 			app.Organizer.ShowMessage(BL, "Error in getSyncItems: %v", err)
-			return
+			return []Row{}
 		}
 
 		row.sort = timeDelta(sort)
-		org.rows = append(org.rows, row)
+    orgRows = append(orgRows, row)
+		//org.rows = append(org.rows, row)
 
 	}
+  return orgRows
 }
 
 func (db *Database) deleteSyncItem(id int) {
@@ -264,23 +267,20 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	return orgRows, nil
 }
 
-func (db *Database) updateTitle(row *Row) error {
-
-	//row := org.rows[org.fr]
-
+/*
+// not in use
+func (db *Database) updateTitle_(row *Row) error {
 	if row.id == -1 {
 		err := db.insertRowInDB(row)
     if err != nil {
       return err
 	  }
   } else {
-
 	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
 	if err != nil {
     return err
 	}
 }
-	/***************fts virtual table update*********************/
 	entry_tid := db.entryTidFromId(row.id) 
 
 	_, err := db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
@@ -289,7 +289,49 @@ func (db *Database) updateTitle(row *Row) error {
 	}
   return nil
 }
+*/
 
+func (db *Database) updateTitle(row *Row) error {
+	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
+	if err != nil {
+    return err
+	}
+
+	/***************fts virtual table update*********************/
+	entry_tid := db.entryTidFromId(row.id) 
+
+	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
+	if err != nil {
+    return err
+	}
+  return nil
+}
+
+func (db *Database) insertTitle(row *Row, context_tid, folder_tid int) error { // should return err
+
+	var id int
+	err := db.MainDB.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
+		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
+		row.title, folder_tid, context_tid, row.star).Scan(&id)
+	if err != nil {
+		app.Organizer.ShowMessage(BL, "Error inserting into DB: %v", err)
+		//return -1
+		return err
+	}
+	row.id = id
+	row.dirty = false
+
+	/***************fts virtual table update*********************/
+	entry_tid := db.entryTidFromId(id) 
+
+	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
+	if err != nil {
+    return err
+	}
+  return nil
+}
+
+/*
 func (db *Database) insertRowInDB(row *Row) error { // should return err
 
 	folder_tid := 1
@@ -314,6 +356,7 @@ func (db *Database) insertRowInDB(row *Row) error { // should return err
 	row.dirty = false
 	return nil
 }
+*/
 
 func (db *Database) insertSyncEntry(title, note string) {
 	_, err := db.MainDB.Exec("INSERT INTO sync_log (title, note, modified) VALUES (?, ?, datetime('now'));",
@@ -357,6 +400,7 @@ func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
 }
 
+/*
 // not in use
 func (db *Database) readSyncLogIntoAltRows(id int) {
 	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
@@ -372,6 +416,7 @@ func (db *Database) readSyncLogIntoAltRows(id int) {
 		org.altRows = append(org.altRows, r)
 	}
 }
+*/
 
 func (db *Database) readSyncLog(id int) string {
 	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
@@ -507,7 +552,7 @@ func getTaskKeywordTids(id int) []int {
 }
 */
 
-func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
+func (db *Database) searchEntries(st, sort string, showDeleted, help bool) []Row {
 
 	rows, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
 		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
@@ -539,7 +584,7 @@ func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 	}
 
 	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
-	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.%s FROM task WHERE ", org.sort)
+	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.%s FROM task WHERE ", sort)
 	if help {
 		stmt += "task.context_tid = 16 and task.tid IN ("
 	} else {
@@ -596,104 +641,39 @@ func (db *Database) searchEntries(st string, showDeleted, help bool) []Row {
 	return orgRows
 }
 
-func (db *Database) getContainers() {
-	org.rows = nil
-	org.sort = "modified" //only time column that all containers have
-
-	/*
-		var table string
-		var columns string
-		var orderBy string //only needs to be change for keyword
-		switch org.view {
-		case CONTEXT:
-			table = "context"
-			columns = "id, title, star, deleted, modified"
-			orderBy = "title"
-		case FOLDER:
-			table = "folder"
-			columns = "id, title, star, deleted, modified"
-			orderBy = "title"
-		case KEYWORD:
-			table = "keyword"
-			columns = "id, title, star, deleted, modified"
-			orderBy = "titltitltitle"
-		default:
-			sess.showOrgMessage("Somehow you are in a view I can't handle")
-			return
-		}
-	*/
-
-	//stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
-	stmt := fmt.Sprintf("SELECT id, title, star, deleted, modified FROM %s ORDER BY title COLLATE NOCASE ASC;", org.view)
+func (db *Database) getContainers(view View) []Row {
+	stmt := fmt.Sprintf("SELECT id, title, star, deleted, modified FROM %s ORDER BY title COLLATE NOCASE ASC;", view)
 	rows, err := db.MainDB.Query(stmt)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star, deleted, modified FROM %s", org.view)
-		return
+		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star, deleted, modified FROM %s", view)
+		return []Row{}
 	}
 	defer rows.Close()
+
+  var orgRows []Row
 	for rows.Next() {
 		var r Row
-		//var modified string
 		var sort string
 		rows.Scan(
 			&r.id,
 			&r.title,
 			&r.star,
 			&r.deleted,
-			//&modified,
 			&sort,
 		)
-
-		//r.modified = timeDelta(modified)
 		r.sort = timeDelta(sort)
-		org.rows = append(org.rows, r)
+		orgRows = append(orgRows, r)
 	}
-	if len(org.rows) == 0 {
-		app.Organizer.ShowMessage(BL, "No results were returned")
-		org.mode = NO_ROWS
-	}
-
-	// below should be somewhere else
-	org.fc, org.fr, org.rowoff = 0, 0, 0
-	org.filter = ""
-
+ return orgRows
 }
 
-func (db *Database) getAltContainers() {
-	org.altRows = nil
-
-	/*
-		var table string
-		var columns string
-		var orderBy string //only needs to be change for keyword
-
-		switch org.altView {
-		case CONTEXT:
-			table = "context"
-			//columns = "id, title, \"default\""
-			columns = "id, title, star"
-			orderBy = "title"
-		case FOLDER:
-			table = "folder"
-			//columns = "id, title, private"
-			columns = "id, title, star"
-			orderBy = "title"
-		case KEYWORD:
-			table = "keyword"
-			columns = "id, title, star"
-			orderBy = "title"
-		default:
-			sess.showOrgMessage("Somehow you are in a view I can't handle")
-			return
-		}
-	*/
-
-	//stmt := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s COLLATE NOCASE ASC;", columns, table, orderBy)
-	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", org.altView)
+func (db *Database) getAltContainers(altView View) []AltRow {
+	var orgAltRows []AltRow 
+	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", altView)
 	rows, err := db.MainDB.Query(stmt)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star FROM %s", org.altView)
-		return
+		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star FROM %s", altView)
+		return []AltRow{}
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -704,17 +684,9 @@ func (db *Database) getAltContainers() {
 			&r.star,
 		)
 
-		org.altRows = append(org.altRows, r)
+		orgAltRows = append(orgAltRows, r)
 	}
-	/*
-		if len(org.altRows) == 0 {
-			sess.showOrgMessage("No results were returned")
-		}
-	*/
-
-	// below should ? be somewhere else
-	org.altFr = 0
-
+  return orgAltRows
 }
 
 func (db *Database) getContainerInfo(id int) Container {

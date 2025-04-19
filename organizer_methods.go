@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+/*
 func (o *Organizer) getMode() Mode {
 	if len(o.rows) > 0 {
 		return NORMAL
@@ -12,6 +13,7 @@ func (o *Organizer) getMode() Mode {
 		return NO_ROWS
 	}
 }
+*/
 
 func (o *Organizer) moveAltCursor(key int) {
 
@@ -197,12 +199,33 @@ func (o *Organizer) writeTitle() {
 	}
 
 	if o.view == TASK {
-		err := o.Database.updateTitle(row)
-		if err != nil {
-      msg = fmt.Sprintf("Error inserting into DB: %v", err)
-		} else {
-      msg = fmt.Sprintf("New (new) entry written to db with id: %d", row.id)
-    }
+    if row.id != -1 {
+      err := o.Database.updateTitle(row)
+      if err != nil {
+        o.ShowMessage(BL, "Error updating title: id %d: %v", row.id, err)
+      } else {
+        o.ShowMessage(BL, "Updated title for id: %d", row.id)
+      }
+     } else { 
+         var context_tid, folder_tid int
+         switch o.taskview {
+          case BY_CONTEXT:
+            context_tid, _ = o.Database.contextExists(o.filter)
+            folder_tid = 1
+          case BY_FOLDER:
+            folder_tid, _ = o.Database.folderExists(o.filter)
+            context_tid = 1
+          default:  
+            context_tid = 1
+            folder_tid = 1
+          }
+        err :=o.Database.insertTitle(row, context_tid, folder_tid)
+        if err != nil {
+          o.ShowMessage(BL, "Error inserting new title id %d: %v", row.id, err)
+        } else {
+          o.ShowMessage(BL, "New (new) title written to db with id: %d", row.id)
+        }
+     }
 	} else {
     if !row.dirty {
       o.ShowMessage(BL, "Row has not been changed")

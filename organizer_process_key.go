@@ -416,7 +416,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 	case FIND:
 		if c == ':' {
-			exCmd()
+			o.exCmd()
 			return
 		}
 
@@ -538,14 +538,14 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if len(o.rows) == 0 {
 				return
 			}
-			mark()
+			o.mark()
 		}
 
 	case PREVIEW_SYNC_LOG:
 
 		switch c {
 		case ':':
-			exCmd()
+			o.exCmd()
 		case ctrlKey('j'):
 			o.altRowoff++
 			o.Screen.eraseRightScreen()

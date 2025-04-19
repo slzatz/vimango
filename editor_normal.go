@@ -152,9 +152,9 @@ func (e *Editor) controlH() {
 			app.moveDividerPct(80)
 		}
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(org.vbuf)
-		org.drawPreview()
-		org.mode = NORMAL
+		vim.BufferSetCurrent(app.Organizer.vbuf)
+		app.Organizer.drawPreview()
+		app.Organizer.mode = NORMAL
 		app.returnCursor()
 		return
 	}
@@ -183,9 +183,9 @@ func (e *Editor) controlH() {
 			app.moveDividerPct(80)
 		}
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(org.vbuf)
-		org.drawPreview()
-		org.mode = NORMAL
+		vim.BufferSetCurrent(app.Organizer.vbuf)
+		app.Organizer.drawPreview()
+		app.Organizer.mode = NORMAL
 		app.returnCursor()
 		return
 	}

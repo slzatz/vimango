@@ -79,7 +79,9 @@ var cmd_lookup = map[string]func(*Organizer, int){
 }
 
 func (o *Organizer) log(unused int) {
-	o.Database.getSyncItems(MAX)
+
+	//db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
+	o.rows = o.Database.getSyncItems(o.sort, MAX) //getSyncItems should have an err returned too
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.altRowoff = 0
 	o.mode = SYNC_LOG //kluge INSERT, NORMAL, ...
@@ -280,7 +282,7 @@ func (o *Organizer) openKeyword(pos int) {
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-	o.FilterEntries(MAX)
+o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -298,12 +300,35 @@ func (o *Organizer) openKeyword(pos int) {
 func (o *Organizer) write(pos int) {
   var updated_rows []int
 	if o.view != TASK {
-		//o.Database.updateRows()
     return
 	}
 	for i, r := range o.rows {
 		if r.dirty {
-      o.Database.updateTitle(&r)
+      if r.id != -1 {
+        err := o.Database.updateTitle(&r)
+        if err != nil {
+          o.ShowMessage(BL, "Error updating title: id %d: %v", r.id, err)
+          continue
+        }
+       } else { 
+           var context_tid, folder_tid int
+           switch o.taskview {
+            case BY_CONTEXT:
+              context_tid, _ = o.Database.contextExists(o.filter)
+              folder_tid = 1
+            case BY_FOLDER:
+              folder_tid, _ = o.Database.folderExists(o.filter)
+              context_tid = 1
+            default:  
+              context_tid = 1
+              folder_tid = 1
+            }
+          err :=o.Database.insertTitle(&r, context_tid, folder_tid)
+          if err != nil {
+            o.ShowMessage(BL, "Error inserting title id %d: %v", r.id, err)
+            continue
+          }
+	     }
       o.rows[i].dirty = false
       updated_rows = append(updated_rows, r.id)
 		}
@@ -466,7 +491,7 @@ func (o *Organizer) refresh(unused int) {
 		if o.taskview == BY_FIND {
 			o.mode = FIND
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows = o.Database.searchEntries(o.Session.fts_search_terms, o.show_deleted, false)
+			o.rows = o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted, false)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -494,8 +519,7 @@ func (o *Organizer) refresh(unused int) {
 				o.ShowMessage(BL, "No results were returned")
 			}
 			o.Session.imagePreview = false
-			//o.readTitleIntoBuffer() /////////////////////////////////////////////
-			o.readRowsIntoBuffer() ////////////////////////////////////////////
+			o.readRowsIntoBuffer()
 			vim.CursorSetPosition(1, 0)
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
@@ -503,13 +527,17 @@ func (o *Organizer) refresh(unused int) {
 		//sess.showOrgMessage("Entries will be refreshed")
 	} else {
 		o.mode = o.last_mode
-		o.Database.getContainers()
+    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.rows = o.Database.getContainers(o.view)
 		if len(o.rows) == 0 {
+      //o.mode = NO_ROWS  //I don't think NO_ROWS exists any more 
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
-		o.readRowsIntoBuffer() ////////////////////////////////////////////
+	  o.fc, o.fr, o.rowoff = 0, 0, 0
+	  o.filter = ""
+		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 		if unused != -1 {
@@ -542,7 +570,7 @@ func (o *Organizer) find(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
 	o.ShowMessage(BL, "Search for '%s'", searchTerms)
-	o.rows = o.Database.searchEntries(searchTerms, o.show_deleted, false)
+	o.rows = o.Database.searchEntries(searchTerms, o.sort, o.show_deleted, false)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -648,12 +676,15 @@ func (o *Organizer) contexts(pos int) {
 	if pos == -1 {
 		o.Screen.eraseRightScreen()
 		o.view = CONTEXT
-		o.Database.getContainers()
+    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.rows = o.Database.getContainers(o.view)
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
+	  o.fc, o.fr, o.rowoff = 0, 0, 0
+	  o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -706,13 +737,16 @@ func (o *Organizer) folders(pos int) {
 	if pos == -1 {
 		o.Screen.eraseRightScreen()
 		o.view = FOLDER
-		o.Database.getContainers()
+    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.rows = o.Database.getContainers(o.view)
 
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
+	  o.fc, o.fr, o.rowoff = 0, 0, 0
+	  o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -752,13 +786,16 @@ func (o *Organizer) keywords(pos int) {
 	if pos == -1 {
 		o.Screen.eraseRightScreen()
 		o.view = KEYWORD
-		o.Database.getContainers()
+    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.rows = o.Database.getContainers(o.view)
 
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
+	  o.fc, o.fr, o.rowoff = 0, 0, 0
+	  o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -868,8 +905,9 @@ func (o *Organizer) updateContainer(unused int) {
 	case "kk":
 		o.altView = KEYWORD
 	}
-	o.Database.getAltContainers() //O.mode = NORMAL is in get_containers
+	o.altRows = o.Database.getAltContainers(o.altView) //O.mode = NORMAL is in get_containers
 	if len(o.altRows) != 0 {
+	  o.altFr = 0
 		o.mode = ADD_CHANGE_FILTER
 		o.ShowMessage(BL, "Select context to add to marked or current entry")
 	}

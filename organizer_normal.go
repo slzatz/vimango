@@ -11,64 +11,73 @@ import (
 var n_lookup = map[string]func(){
 	//"dd": noop,
 	"dd":                       noop, //delete
-	"m":                        mark,
-	":":                        exCmd,
-	string(ctrlKey('l')):       switchToEditorMode,
-	string([]byte{0x17, 0x17}): switchToEditorMode,
+	"m":                        noop, //mark
+	":":                        noop, //exCmd
+	string(ctrlKey('l')):       noop, //ctrl-l switchToEditorMode
+	//string([]byte{0x17, 0x17}): switchToEditorMode,
 	string(0x4):                noop, //ctrl-d delete
 	//string(0x2):                starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
 	string(0x1):          noop, //ctrl-b starEntry
 	string(0x18):         noop,   //ctrl-x archive
 	string(ctrlKey('i')): noop, //{{0x9}} entryInfo
-	string(ctrlKey('j')): controlJ,
-	string(ctrlKey('k')): controlK,
+	//string(ctrlKey('j')): controlJ,
+	//string(ctrlKey('k')): controlK,
 	string(ctrlKey('z')): controlZ,
-	string(ctrlKey('n')): drawPreviewWithImages,
-	" m":                 drawPreviewWithImages,
+	//string(ctrlKey('n')): drawPreviewWithImages,
+	//" m":                 drawPreviewWithImages,
 }
 
 var new_lookup = map[string]func(*Organizer)(){
-	//"dd": noop,
-	"dd":                 (*Organizer).del, //delete
+	//"dd":                 (*Organizer).del, //delete
 	string(0x4):          (*Organizer).del, //ctrl-d delete
 	string(0x1):          (*Organizer).star, //ctrl-b starEntry
 	string(0x18):         (*Organizer).archive,   //ctrl-x archive
 	string(ctrlKey('i')): (*Organizer).info, //{{0x9}} entryInfo
+	"m":                  (*Organizer).mark,
+	string(ctrlKey('l')): (*Organizer).switchToEditorMode,
+	":":                  (*Organizer).exCmd,
+	string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
+	string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
+	string(ctrlKey('n')): (*Organizer).previewWithImages,
 }
 
-func exCmd() {
-	org.ShowMessage(BL, ":")
-	org.command_line = ""
-	org.last_mode = org.mode //at the least picks up NORMAL and NO_ROWS
-	org.mode = COMMAND_LINE
+func (o *Organizer) exCmd() {
+	o.ShowMessage(BL, ":")
+	o.command_line = ""
+	o.last_mode = o.mode //at the least picks up NORMAL and NO_ROWS
+	o.mode = COMMAND_LINE
 }
 
 func noop() {
 	return
 }
 
+/*
 func _asterisk() {
 	org.getWordUnderCursor()
 	org.findNextWord()
 }
+*/
 
-func mark() {
-	if org.view != TASK {
-		org.ShowMessage(BL, "You can only mark tasks")
+func (o *Organizer) mark() {
+	if o.view != TASK {
+		o.ShowMessage(BL, "You can only mark tasks")
 		return
 	}
 
-	if _, found := org.marked_entries[org.rows[org.fr].id]; found {
-		delete(org.marked_entries, org.rows[org.fr].id)
+	if _, found := o.marked_entries[o.rows[o.fr].id]; found {
+		delete(o.marked_entries, o.rows[o.fr].id)
 	} else {
-		org.marked_entries[org.rows[org.fr].id] = struct{}{}
+		o.marked_entries[o.rows[o.fr].id] = struct{}{}
 	}
-	org.ShowMessage(BL, "Toggle mark for item %d", org.rows[org.fr].id)
+	o.ShowMessage(BL, "Toggle mark for item %d", o.rows[o.fr].id)
 }
 
+/*
 func _n() {
 	org.findNextWord()
 }
+*/
 
 func (o *Organizer) del() {
   id := o.rows[o.fr].id
@@ -112,28 +121,28 @@ func (o *Organizer) info() {
 	o.Screen.drawPreviewBox()
 }
 
-func switchToEditorMode() { //FIXME
+func (o *Organizer) switchToEditorMode() {
 	if len(app.Windows) == 0 {
-		org.ShowMessage(BL, "There are no active editors")
+		o.ShowMessage(BL, "There are no active editors")
 		return
 	}
-	app.Screen.eraseRightScreen()
-	app.Screen.drawRightScreen()
-	app.Session.editorMode = true
+	o.Screen.eraseRightScreen()
+	o.Screen.drawRightScreen()
+	o.Session.editorMode = true
 	vim.BufferSetCurrent(app.Session.activeEditor.vbuf)
 }
 
-func controlJ() {
+func (o *Organizer) scrollPreviewDown() {
 	//if len(org.note) > org.altRowoff+org.textLines {
-	org.altRowoff++
-	org.drawPreview()
+	o.altRowoff++
+	o.drawPreview()
 	//}
 }
 
-func controlK() {
-	if org.altRowoff > 0 {
-		org.altRowoff--
-		org.drawPreview()
+func (o *Organizer) scrollPreviewUp() {
+	if o.altRowoff > 0 {
+		o.altRowoff--
+		o.drawPreview()
 	}
 }
 
@@ -160,10 +169,10 @@ func controlZ() {
 	org.mode = LINKS
 	org.ShowMessage(BL, "\x1b[1mType a number to choose a link\x1b[0m")
 }
-func drawPreviewWithImages() {
-	app.Screen.eraseRightScreen()
-	org.drawPreviewWithImages()
-	app.Session.imagePreview = true
+func (o *Organizer) previewWithImages() {
+	o.Screen.eraseRightScreen()
+	o.drawPreviewWithImages()
+	o.Session.imagePreview = true
 }
 func (o *Organizer) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder
