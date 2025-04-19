@@ -38,6 +38,8 @@ type Organizer struct {
 	highlight           [2]int
 	vbuf                vim.Buffer
 	bufferTick          int
+  normalCmds         map[string]func(*Organizer)
+  exCmds             map[string]func(*Organizer, int)
   Database            *Database
 	Session             *Session
   Screen              *Screen // pointer to the screen

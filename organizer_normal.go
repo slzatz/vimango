@@ -27,20 +27,6 @@ var n_lookup = map[string]func(){
 	//" m":                 drawPreviewWithImages,
 }
 
-var new_lookup = map[string]func(*Organizer)(){
-	//"dd":                 (*Organizer).del, //delete
-	string(0x4):          (*Organizer).del, //ctrl-d delete
-	string(0x1):          (*Organizer).star, //ctrl-b starEntry
-	string(0x18):         (*Organizer).archive,   //ctrl-x archive
-	string(ctrlKey('i')): (*Organizer).info, //{{0x9}} entryInfo
-	"m":                  (*Organizer).mark,
-	string(ctrlKey('l')): (*Organizer).switchToEditorMode,
-	":":                  (*Organizer).exCmd,
-	string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
-	string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
-	string(ctrlKey('n')): (*Organizer).previewWithImages,
-}
-
 func (o *Organizer) exCmd() {
 	o.ShowMessage(BL, ":")
 	o.command_line = ""

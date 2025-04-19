@@ -144,15 +144,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 			//sess.showEdMessage(org.command)
 		}
 
-    if cmd, found := new_lookup[o.command]; found {
+    if cmd, found := o.normalCmds[o.command]; found {
       cmd(o) 
-			o.command = ""
-			vim.Key("<esc>")
-			return
-		}
-
-		if cmd, found := n_lookup[o.command]; found {
-			 cmd()
 			o.command = ""
 			vim.Key("<esc>")
 			return
@@ -271,17 +264,17 @@ func (o *Organizer) organizerProcessKey(c int) {
 			pos := strings.LastIndex(o.command_line, " ")
 			if pos == -1 {
 				s = o.command_line
-				if cmd, found = cmd_lookup[s]; found {
+				if cmd, found = o.exCmds[s]; found {
 					cmd(o, pos)
 				}
 			} else {
 				s = o.command_line[:pos]
-				if cmd, found = cmd_lookup[s]; found {
+				if cmd, found = o.exCmds[s]; found {
 					cmd(o, pos)
 				} else {
 					pos := strings.Index(o.command_line, " ")
 					s = o.command_line[:pos]
-					if cmd, found = cmd_lookup[s]; found {
+					if cmd, found = o.exCmds[s]; found {
 						cmd(o, pos)
 					}
 				}

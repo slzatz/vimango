@@ -45,7 +45,11 @@ func CreateApp() *App {
     Database: db,
     //Editor:    &Editor{}, // Not needed now but may want App.Editor to be a pointer to current Editor
     // maybe new Editor should have the session field and session would know the active editor window
-    Organizer: &Organizer{Session: sess, Screen: screen, Database: db},
+    Organizer: &Organizer{Session: sess,
+                          Screen: screen,
+                          Database: db,
+                          normalCmds: make(map[string]func(*Organizer)),
+                          exCmds: make(map[string]func(*Organizer, int))},
 		Windows:   make([]Window, 0),
 		Run:       true,
 	}
@@ -233,6 +237,9 @@ func (a *App) InitApp() {
 	a.Organizer.mode = NORMAL
 	a.Organizer.last_mode = NORMAL
 	a.Organizer.view = TASK
+
+  a.Organizer.normalCmds = a.setOrganizerNormalCmds()
+  a.Organizer.exCmds = a.setOrganizerExCmds()
 	
 	if a.Config.Options.Type == "folder" {
 		a.Organizer.taskview = BY_FOLDER
@@ -278,6 +285,87 @@ func (a *App) LoadInitialData() {
 	a.Organizer.ShowMessage(BL, "rows: %d  columns: %d", a.Screen.screenLines, a.Screen.screenCols)
 	a.returnCursor()
 }
+
+func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
+  return map[string]func(*Organizer){
+	//"dd":                 (*Organizer).del, //delete
+    string(0x4):          (*Organizer).del, //ctrl-d delete
+    string(0x1):          (*Organizer).star, //ctrl-b starEntry
+    string(0x18):         (*Organizer).archive,   //ctrl-x archive
+    string(ctrlKey('i')): (*Organizer).info, //{{0x9}} entryInfo
+    "m":                  (*Organizer).mark,
+    string(ctrlKey('l')): (*Organizer).switchToEditorMode,
+    ":":                  (*Organizer).exCmd,
+    string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
+    string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
+    string(ctrlKey('n')): (*Organizer).previewWithImages,
+  }
+}
+
+func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
+  return map[string]func(*Organizer, int){
+    "open":            (*Organizer).open,
+    "o":               (*Organizer).open,
+    "opencontext":     (*Organizer).openContext,
+    "oc":              (*Organizer).openContext,
+    "openfolder":      (*Organizer).openFolder,
+    "of":              (*Organizer).openFolder,
+    "openkeyword":     (*Organizer).openKeyword,
+    "ok":              (*Organizer).openKeyword,
+    "quit":            (*Organizer).quitApp,
+    "q":               (*Organizer).quitApp,
+    "q!":              (*Organizer).quitApp,
+    "e":               (*Organizer).editNote,
+    "vertical resize": (*Organizer).verticalResize,
+    "vert res":        (*Organizer).verticalResize,
+    "test":            (*Organizer).sync3,
+    "sync":            (*Organizer).sync3,
+    "bulktest":        (*Organizer).initialBulkLoad,
+    "bulkload":        (*Organizer).initialBulkLoad,
+    "reverseload":     (*Organizer).reverse,
+    "reversetest":     (*Organizer).reverse,
+    "new":             (*Organizer).newEntry,
+    "n":               (*Organizer).newEntry,
+    "refresh":         (*Organizer).refresh,
+    "r":               (*Organizer).refresh,
+    "find":            (*Organizer).find,
+    "contexts":        (*Organizer).contexts,
+    "context":         (*Organizer).contexts,
+    "c":               (*Organizer).contexts,
+    "folders":         (*Organizer).folders,
+    "folder":          (*Organizer).folders,
+    "f":               (*Organizer).folders,
+    "keywords":        (*Organizer).keywords,
+    "keyword":         (*Organizer).keywords,
+    "k":               (*Organizer).keywords,
+    "recent":          (*Organizer).recent,
+    "log":             (*Organizer).log,
+    "deletekeywords":  (*Organizer).deleteKeywords,
+    "delkw":           (*Organizer).deleteKeywords,
+    "delk":            (*Organizer).deleteKeywords,
+    "showall":         (*Organizer).showAll,
+    "show":            (*Organizer).showAll,
+    "cc":              (*Organizer).updateContainer,
+    "ff":              (*Organizer).updateContainer,
+    "kk":              (*Organizer).updateContainer,
+    "write":           (*Organizer).write,
+    "w":               (*Organizer).write,
+    "deletemarks":     (*Organizer).deleteMarks,
+    "delmarks":        (*Organizer).deleteMarks,
+    "delm":            (*Organizer).deleteMarks,
+    "copy":            (*Organizer).copyEntry,
+    "savelog":         (*Organizer).savelog,
+    "save":            (*Organizer).save,
+    "image":           (*Organizer).setImage,
+    "images":          (*Organizer).setImage,
+    "print":           (*Organizer).printDocument,
+    "ha":              (*Organizer).printList,
+    "ha2":             (*Organizer).printList2,
+    "printlist":       (*Organizer).printList2,
+    "pl":              (*Organizer).printList2,
+    "sort":            (*Organizer).sortEntries,
+  }
+} 
 
 func (a *App) returnCursor() {
 	var ab strings.Builder
