@@ -689,7 +689,7 @@ func (db *Database) getAltContainers(altView View) []AltRow {
   return orgAltRows
 }
 
-func (db *Database) getContainerInfo(id int) Container {
+func (db *Database) getContainerInfo(id int, view View) Container {
 
 	/*
 		type Container struct {
@@ -709,7 +709,7 @@ func (db *Database) getContainerInfo(id int) Container {
 	}
 
 	var countQuery string
-	switch org.view {
+	switch view {
 	case CONTEXT:
 		//table = "context"
 		// Note: the join for context and folder is on the context/folder *tid*
@@ -739,7 +739,7 @@ func (db *Database) getContainerInfo(id int) Container {
 	}
 
 	//stmt := fmt.Sprintf("SELECT %s FROM %s WHERE id=?;", columns, table)
-	stmt := fmt.Sprintf("SELECT id, tid, title, star, deleted, modified FROM %s WHERE id=?;", org.view)
+	stmt := fmt.Sprintf("SELECT id, tid, title, star, deleted, modified FROM %s WHERE id=?;", view)
 	row = db.MainDB.QueryRow(stmt, id)
 	var tid sql.NullInt64
 	err = row.Scan(
@@ -821,18 +821,18 @@ func getNoteSearchPositions__(id int) [][]int {
 }
 */
 
-func (db *Database) updateContainerTitle(row *Row) error {
+func (db *Database) updateContainerTitle(row *Row, view View) error {
 	if row.id == -1 {
-		err := db.insertContainer(row)
+		err := db.insertContainer(row, view)
     return err
 	}
-	stmt := fmt.Sprintf("UPDATE %s SET title=?, modified=datetime('now') WHERE id=?", org.view)
+	stmt := fmt.Sprintf("UPDATE %s SET title=?, modified=datetime('now') WHERE id=?", view)
 	_, err := db.MainDB.Exec(stmt, row.title, row.id)
   return err
 }
 
-func (db *Database) insertContainer(row *Row) error {
-	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, modified) ", org.view)
+func (db *Database) insertContainer(row *Row, view View) error {
+	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, modified) ", view)
 	stmt += "VALUES (?, ?, False, datetime('now')) RETURNING id;"
 	var id int
 	err := db.MainDB.QueryRow(stmt, row.title, row.star).Scan(&id)

@@ -231,7 +231,7 @@ func (o *Organizer) writeTitle() {
       o.ShowMessage(BL, "Row has not been changed")
       return
       }
-		err := o.Database.updateContainerTitle(row)
+		err := o.Database.updateContainerTitle(row, o.view)
 		if err != nil {
       msg = fmt.Sprintf("Error inserting into DB: %v", err)
 		} else {

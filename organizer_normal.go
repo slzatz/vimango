@@ -4,28 +4,9 @@ import (
   "fmt"
 	"strings"
 
-	"github.com/charmbracelet/glamour"
+//	"github.com/charmbracelet/glamour"
 	"github.com/slzatz/vimango/vim"
 )
-
-var n_lookup = map[string]func(){
-	//"dd": noop,
-	"dd":                       noop, //delete
-	"m":                        noop, //mark
-	":":                        noop, //exCmd
-	string(ctrlKey('l')):       noop, //ctrl-l switchToEditorMode
-	//string([]byte{0x17, 0x17}): switchToEditorMode,
-	string(0x4):                noop, //ctrl-d delete
-	//string(0x2):                starEntry,     //ctrl-b -probably want this go backwards (unimplemented) and use ctrl-e for this
-	string(0x1):          noop, //ctrl-b starEntry
-	string(0x18):         noop,   //ctrl-x archive
-	string(ctrlKey('i')): noop, //{{0x9}} entryInfo
-	//string(ctrlKey('j')): controlJ,
-	//string(ctrlKey('k')): controlK,
-	string(ctrlKey('z')): controlZ,
-	//string(ctrlKey('n')): drawPreviewWithImages,
-	//" m":                 drawPreviewWithImages,
-}
 
 func (o *Organizer) exCmd() {
 	o.ShowMessage(BL, ":")
@@ -34,14 +15,9 @@ func (o *Organizer) exCmd() {
 	o.mode = COMMAND_LINE
 }
 
+/*
 func noop() {
 	return
-}
-
-/*
-func _asterisk() {
-	org.getWordUnderCursor()
-	org.findNextWord()
 }
 */
 
@@ -58,12 +34,6 @@ func (o *Organizer) mark() {
 	}
 	o.ShowMessage(BL, "Toggle mark for item %d", o.rows[o.fr].id)
 }
-
-/*
-func _n() {
-	org.findNextWord()
-}
-*/
 
 func (o *Organizer) del() {
   id := o.rows[o.fr].id
@@ -132,6 +102,8 @@ func (o *Organizer) scrollPreviewUp() {
 	}
 }
 
+/*
+// this rendered links and I should go back to take a look at it
 func controlZ() {
 	id := org.rows[org.fr].id
 	note := app.Database.readNoteIntoString(id)
@@ -155,6 +127,8 @@ func controlZ() {
 	org.mode = LINKS
 	org.ShowMessage(BL, "\x1b[1mType a number to choose a link\x1b[0m")
 }
+*/
+
 func (o *Organizer) previewWithImages() {
 	o.Screen.eraseRightScreen()
 	o.drawPreviewWithImages()
@@ -231,7 +205,7 @@ func (o *Organizer) displayContainerInfo() {
 			count    int
 		}
 	*/
-	c := o.Database.getContainerInfo(o.rows[o.fr].id)
+	c := o.Database.getContainerInfo(o.rows[o.fr].id, o.view)
 
 	if c.id == 0 {
 		return

@@ -14,13 +14,8 @@ import (
 // Global app struct
 var app *App
 
-// For backward compatibility - these can be removed in a follow-up refactoring
-var org *Organizer
-
 func main() {
 	app = CreateApp()
-	// Set global references for backward compatibility
-  org = app.Organizer
 
 	// Initialize Vim
 	vim.Init(0)
