@@ -3,55 +3,55 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
-  "strings"
+	"os"
+	"strings"
 	"time"
-  "fmt"
-  "os"
-	
+
+	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
-	"github.com/slzatz/vimango/rawmode"
 )
 
 // App encapsulates the global application state
 type App struct {
 	// Core components
-	Session   *Session // Session handles terminal and screen management
-  Screen    *Screen // Screen handles screen management
+	Session   *Session   // Session handles terminal and screen management
+	Screen    *Screen    // Screen handles screen management
 	Organizer *Organizer // Organizer manages tasks and their display
-	Editor    *Editor // Editor manages text editing
-	Windows   []Window // Windows is slice of Window interfaces and manages multiple windows in the application
-  Database  *Database // Database handles database connections and queries
-	
+	Editor    *Editor    // Editor manages text editing
+	Database  *Database  // Database handles database connections and queries
+
 	// Database connections and other config
-	Config  *dbConfig
-	
+	Config *dbConfig
+
 	// Application state
 	LastSync      time.Time
 	SyncInProcess bool
 	Run           bool
-  origTermCfg   []byte // original terminal configuration
+	origTermCfg   []byte // original terminal configuration
 }
 
 // CreateApp creates and initializes the application struct
 func CreateApp() *App {
-  db := &Database{}
-  sess := &Session{}
-  screen := &Screen{}
+	db := &Database{}
+	sess := &Session{}
+	screen := &Screen{Session: sess}
+	windows := make([]Window, 0) // slice of Window interfaces
+	sess.Windows = windows
 	return &App{
-		Session:   sess,
-    Screen:    screen,
-    Database: db,
-    //Editor:    &Editor{}, // Not needed now but may want App.Editor to be a pointer to current Editor
-    // maybe new Editor should have the session field and session would know the active editor window
-    Organizer: &Organizer{Session: sess,
-                          Screen: screen,
-                          Database: db,
-                          normalCmds: make(map[string]func(*Organizer)),
-                          exCmds: make(map[string]func(*Organizer, int))},
-		Windows:   make([]Window, 0),
-		Run:       true,
+		Session:  sess,
+		Screen:   screen,
+		Database: db,
+		//Editor:    &Editor{}, // Not needed now but may want App.Editor to be a pointer to current Editor
+		// maybe new Editor should have the session field and session would know the active editor window
+		Organizer: &Organizer{Session: sess,
+			Screen:     screen,
+			Database:   db,
+			normalCmds: make(map[string]func(*Organizer)),
+			exCmds:     make(map[string]func(*Organizer, int))},
+		Run: true,
 	}
 }
 
@@ -72,9 +72,9 @@ func (a *App) NewEditor() *Editor {
 		output:             nil,
 		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
 		modified:           false,
-    Screen:             a.Screen,
-    Session:            a.Session,
-    Database:           a.Database,
+		Screen:             a.Screen,
+		Session:            a.Session,
+		Database:           a.Database,
 	}
 }
 
@@ -160,28 +160,29 @@ func (a *App) moveDividerAbs(num int) {
 
 	a.returnCursor()
 }
+
 // InitDatabases initializes database connections
 func (a *App) InitDatabases(configPath string) error {
 	//var err error
-	
+
 	// Read config file
 	config, err := a.FromFile(configPath)
 	if err != nil {
 		return err
 	}
-	
+
 	// Initialize main database
 	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
-	
+
 	// Enable foreign keys
 	_, err = a.Database.MainDB.Exec("PRAGMA foreign_keys=ON;")
 	if err != nil {
 		return err
 	}
-	
+
 	// Initialize FTS database
 	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
 	if err != nil {
@@ -209,13 +210,13 @@ func (a *App) InitDatabases(configPath string) error {
 		//fmt.Fprintf("postgres ping failure!: %v", err)
 		return err
 	}
-  a.Config = config
+	a.Config = config
 	return nil
 }
 
 // InitApp initializes the application components
 func (a *App) InitApp() {
-	
+
 	markdown_style, _ := selectMDStyle("gruvbox.xml")
 	a.Session.markdown_style = markdown_style
 	a.Session.style = [8]string{"dracula", "fruity", "gruvbox", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"}
@@ -238,15 +239,15 @@ func (a *App) InitApp() {
 	a.Organizer.last_mode = NORMAL
 	a.Organizer.view = TASK
 
-  a.Organizer.normalCmds = a.setOrganizerNormalCmds()
-  a.Organizer.exCmds = a.setOrganizerExCmds()
-	
+	a.Organizer.normalCmds = a.setOrganizerNormalCmds()
+	a.Organizer.exCmds = a.setOrganizerExCmds()
+
 	if a.Config.Options.Type == "folder" {
 		a.Organizer.taskview = BY_FOLDER
 	} else {
 		a.Organizer.taskview = BY_CONTEXT
 	}
-	
+
 	a.Organizer.filter = a.Config.Options.Title
 	a.Organizer.marked_entries = make(map[int]struct{})
 	a.Organizer.vbuf = vim.BufferNew(0)
@@ -258,27 +259,27 @@ func (a *App) LoadInitialData() {
 	// Calculate layout dimensions
 	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
 	a.Screen.edPct = 60
-	
+
 	// Set divider based on percentage
 	if a.Screen.edPct == 100 {
 		a.Screen.divider = 1
 	} else {
 		a.Screen.divider = a.Screen.screenCols - a.Screen.edPct*a.Screen.screenCols/100
 	}
-	
+
 	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 1
 	a.Screen.eraseScreenRedrawLines()
-	
+
 	a.Organizer.FilterEntries(MAX)
 	if len(a.Organizer.rows) == 0 {
 		a.Organizer.insertRow(0, "", true, false, false, BASE_DATE)
 		a.Organizer.rows[0].dirty = false
 		a.Organizer.ShowMessage(BL, "No results were returned")
 	}
-	
+
 	a.Organizer.readRowsIntoBuffer()
 	a.Organizer.bufferTick = vim.BufferGetLastChangedTick(a.Organizer.vbuf)
-	a.Organizer.drawPreview() 
+	a.Organizer.drawPreview()
 	a.Organizer.refreshScreen()
 	a.Organizer.drawStatusBar()
 
@@ -287,90 +288,90 @@ func (a *App) LoadInitialData() {
 }
 
 func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
-  return map[string]func(*Organizer){
-	//"dd":                 (*Organizer).del, //delete
-    string(0x4):          (*Organizer).del, //ctrl-d delete
-    string(0x1):          (*Organizer).star, //ctrl-b starEntry
-    string(0x18):         (*Organizer).archive,   //ctrl-x archive
-    string(ctrlKey('i')): (*Organizer).info, //{{0x9}} entryInfo
-    "m":                  (*Organizer).mark,
-    string(ctrlKey('l')): (*Organizer).switchToEditorMode,
-    ":":                  (*Organizer).exCmd,
-    string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
-    string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
-    string(ctrlKey('n')): (*Organizer).previewWithImages,
-  }
+	return map[string]func(*Organizer){
+		//"dd":                 (*Organizer).del, //delete
+		string(0x4):          (*Organizer).del,     //ctrl-d delete
+		string(0x1):          (*Organizer).star,    //ctrl-b starEntry
+		string(0x18):         (*Organizer).archive, //ctrl-x archive
+		string(ctrlKey('i')): (*Organizer).info,    //{{0x9}} entryInfo
+		"m":                  (*Organizer).mark,
+		string(ctrlKey('l')): (*Organizer).switchToEditorMode,
+		":":                  (*Organizer).exCmd,
+		string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
+		string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
+		string(ctrlKey('n')): (*Organizer).previewWithImages,
+	}
 }
 
 func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
-  return map[string]func(*Organizer, int){
-    "open":            (*Organizer).open,
-    "o":               (*Organizer).open,
-    "opencontext":     (*Organizer).openContext,
-    "oc":              (*Organizer).openContext,
-    "openfolder":      (*Organizer).openFolder,
-    "of":              (*Organizer).openFolder,
-    "openkeyword":     (*Organizer).openKeyword,
-    "ok":              (*Organizer).openKeyword,
-    "quit":            (*Organizer).quitApp,
-    "q":               (*Organizer).quitApp,
-    "q!":              (*Organizer).quitApp,
-    "e":               (*Organizer).editNote,
-    "vertical resize": (*Organizer).verticalResize,
-    "vert res":        (*Organizer).verticalResize,
-    "test":            (*Organizer).sync3,
-    "sync":            (*Organizer).sync3,
-    "bulktest":        (*Organizer).initialBulkLoad,
-    "bulkload":        (*Organizer).initialBulkLoad,
-    "reverseload":     (*Organizer).reverse,
-    "reversetest":     (*Organizer).reverse,
-    "new":             (*Organizer).newEntry,
-    "n":               (*Organizer).newEntry,
-    "refresh":         (*Organizer).refresh,
-    "r":               (*Organizer).refresh,
-    "find":            (*Organizer).find,
-    "contexts":        (*Organizer).contexts,
-    "context":         (*Organizer).contexts,
-    "c":               (*Organizer).contexts,
-    "folders":         (*Organizer).folders,
-    "folder":          (*Organizer).folders,
-    "f":               (*Organizer).folders,
-    "keywords":        (*Organizer).keywords,
-    "keyword":         (*Organizer).keywords,
-    "k":               (*Organizer).keywords,
-    "recent":          (*Organizer).recent,
-    "log":             (*Organizer).log,
-    "deletekeywords":  (*Organizer).deleteKeywords,
-    "delkw":           (*Organizer).deleteKeywords,
-    "delk":            (*Organizer).deleteKeywords,
-    "showall":         (*Organizer).showAll,
-    "show":            (*Organizer).showAll,
-    "cc":              (*Organizer).updateContainer,
-    "ff":              (*Organizer).updateContainer,
-    "kk":              (*Organizer).updateContainer,
-    "write":           (*Organizer).write,
-    "w":               (*Organizer).write,
-    "deletemarks":     (*Organizer).deleteMarks,
-    "delmarks":        (*Organizer).deleteMarks,
-    "delm":            (*Organizer).deleteMarks,
-    "copy":            (*Organizer).copyEntry,
-    "savelog":         (*Organizer).savelog,
-    "save":            (*Organizer).save,
-    "image":           (*Organizer).setImage,
-    "images":          (*Organizer).setImage,
-    "print":           (*Organizer).printDocument,
-    "ha":              (*Organizer).printList,
-    "ha2":             (*Organizer).printList2,
-    "printlist":       (*Organizer).printList2,
-    "pl":              (*Organizer).printList2,
-    "sort":            (*Organizer).sortEntries,
-  }
-} 
+	return map[string]func(*Organizer, int){
+		"open":            (*Organizer).open,
+		"o":               (*Organizer).open,
+		"opencontext":     (*Organizer).openContext,
+		"oc":              (*Organizer).openContext,
+		"openfolder":      (*Organizer).openFolder,
+		"of":              (*Organizer).openFolder,
+		"openkeyword":     (*Organizer).openKeyword,
+		"ok":              (*Organizer).openKeyword,
+		"quit":            (*Organizer).quitApp,
+		"q":               (*Organizer).quitApp,
+		"q!":              (*Organizer).quitApp,
+		"e":               (*Organizer).editNote,
+		"vertical resize": (*Organizer).verticalResize,
+		"vert res":        (*Organizer).verticalResize,
+		"test":            (*Organizer).sync3,
+		"sync":            (*Organizer).sync3,
+		"bulktest":        (*Organizer).initialBulkLoad,
+		"bulkload":        (*Organizer).initialBulkLoad,
+		"reverseload":     (*Organizer).reverse,
+		"reversetest":     (*Organizer).reverse,
+		"new":             (*Organizer).newEntry,
+		"n":               (*Organizer).newEntry,
+		"refresh":         (*Organizer).refresh,
+		"r":               (*Organizer).refresh,
+		"find":            (*Organizer).find,
+		"contexts":        (*Organizer).contexts,
+		"context":         (*Organizer).contexts,
+		"c":               (*Organizer).contexts,
+		"folders":         (*Organizer).folders,
+		"folder":          (*Organizer).folders,
+		"f":               (*Organizer).folders,
+		"keywords":        (*Organizer).keywords,
+		"keyword":         (*Organizer).keywords,
+		"k":               (*Organizer).keywords,
+		"recent":          (*Organizer).recent,
+		"log":             (*Organizer).log,
+		"deletekeywords":  (*Organizer).deleteKeywords,
+		"delkw":           (*Organizer).deleteKeywords,
+		"delk":            (*Organizer).deleteKeywords,
+		"showall":         (*Organizer).showAll,
+		"show":            (*Organizer).showAll,
+		"cc":              (*Organizer).updateContainer,
+		"ff":              (*Organizer).updateContainer,
+		"kk":              (*Organizer).updateContainer,
+		"write":           (*Organizer).write,
+		"w":               (*Organizer).write,
+		"deletemarks":     (*Organizer).deleteMarks,
+		"delmarks":        (*Organizer).deleteMarks,
+		"delm":            (*Organizer).deleteMarks,
+		"copy":            (*Organizer).copyEntry,
+		"savelog":         (*Organizer).savelog,
+		"save":            (*Organizer).save,
+		"image":           (*Organizer).setImage,
+		"images":          (*Organizer).setImage,
+		"print":           (*Organizer).printDocument,
+		"ha":              (*Organizer).printList,
+		"ha2":             (*Organizer).printList2,
+		"printlist":       (*Organizer).printList2,
+		"pl":              (*Organizer).printList2,
+		"sort":            (*Organizer).sortEntries,
+	}
+}
 
 func (a *App) returnCursor() {
 	var ab strings.Builder
 	if a.Session.editorMode {
-    ae := a.Session.activeEditor
+		ae := a.Session.activeEditor
 		switch ae.mode {
 		case PREVIEW, SPELLING, VIEW_LOG:
 			// we don't need to position cursor and don't want cursor visible
@@ -407,17 +408,17 @@ func (a *App) Cleanup() {
 	if a.Database.MainDB != nil {
 		a.Database.MainDB.Close()
 	}
-	
+
 	if a.Database.FtsDB != nil {
 		a.Database.FtsDB.Close()
 	}
 	if a.Database.PG != nil {
-	  a.Database.PG.Close()
+		a.Database.PG.Close()
 	}
 	//if a.Session != nil {
 	//	a.Session.quitApp()
 	//}
-    a.quitApp()
+	a.quitApp()
 }
 
 func (a *App) quitApp() {
@@ -435,14 +436,15 @@ func (a *App) quitApp() {
 	}
 	os.Exit(0)
 }
+
 // MainLoop is the main application loop
 func (a *App) MainLoop() {
-	
+
 	// Set global reference for backward compatibility
 	//p = a.Editor
-  org := a.Organizer
+	org := a.Organizer
 	// No need to sync windows as it's handled in main.go initialization
-	
+
 	//for a.Run && sess.run {
 	for a.Run {
 		key, err := terminal.ReadKey()
@@ -458,7 +460,7 @@ func (a *App) MainLoop() {
 		}
 
 		if a.Session.editorMode {
-      ae := a.Session.activeEditor	
+			ae := a.Session.activeEditor
 			textChange := ae.editorProcessKey(k)
 
 			if !a.Session.editorMode {
@@ -472,7 +474,7 @@ func (a *App) MainLoop() {
 			}
 		} else {
 			org.organizerProcessKey(k)
-      //app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
+			//app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
 			org.scroll()
 			org.refreshScreen()
 			if a.Screen.divider > 10 {
@@ -481,7 +483,7 @@ func (a *App) MainLoop() {
 		}
 		a.returnCursor()
 	}
-	
+
 	// Clean up when the main loop exits
 	a.Cleanup()
 }

@@ -1,10 +1,10 @@
 package main
 
 import (
-  "fmt"
+	"fmt"
 	"strings"
 
-//	"github.com/charmbracelet/glamour"
+	//	"github.com/charmbracelet/glamour"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -36,37 +36,37 @@ func (o *Organizer) mark() {
 }
 
 func (o *Organizer) del() {
-  id := o.rows[o.fr].id
-  state := o.rows[o.fr].deleted
+	id := o.rows[o.fr].id
+	state := o.rows[o.fr].deleted
 	err := o.Database.toggleDeleted(id, state, o.view.String())
 	if err != nil {
 		o.ShowMessage(BL, "Error toggling %s id %d to deleted: %v", o.view, id, err)
 		return
-  }
+	}
 	o.rows[o.fr].deleted = !state
 	o.ShowMessage(BL, "Toggle deleted for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) star() {
-  id := o.rows[o.fr].id
-  state := o.rows[o.fr].star
+	id := o.rows[o.fr].id
+	state := o.rows[o.fr].star
 	err := o.Database.toggleStar(id, state, o.view.String())
 	if err != nil {
 		o.showMessage("Error toggling %s id %d to star: %v", o.view, id, err)
 		return
-  }
+	}
 	o.rows[o.fr].star = !state
 	o.ShowMessage(BL, "Toggle star for %s id %d succeeded (new)", o.view, id)
 }
 
 func (o *Organizer) archive() {
-  id := o.rows[o.fr].id
-  state := o.rows[o.fr].archived
+	id := o.rows[o.fr].id
+	state := o.rows[o.fr].archived
 	err := o.Database.toggleArchived(id, state, o.view.String())
 	if err != nil {
 		o.ShowMessage(BL, "Error toggling %s id %d to archived: %v", o.view, id, err)
 		return
-  }
+	}
 	o.rows[o.fr].archived = !state
 	o.ShowMessage(BL, "Toggle archive for %s id %d succeeded (new)", o.view, id)
 }
@@ -78,7 +78,7 @@ func (o *Organizer) info() {
 }
 
 func (o *Organizer) switchToEditorMode() {
-	if len(app.Windows) == 0 {
+	if len(o.Session.Windows) == 0 {
 		o.ShowMessage(BL, "There are no active editors")
 		return
 	}
@@ -144,7 +144,7 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) {
 
 	//hide the cursor
 	ab.WriteString("\x1b[?25l")
-  // move the cursor
+	// move the cursor
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 
 	//erase set number of chars on each line
@@ -156,9 +156,9 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) {
 
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 
-  // \x1b[ 2*x is DECSACE to operate in rectable mode
-  // \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
-  // \x1b[ *x is DECSACE to exit rectangle mode
+	// \x1b[ 2*x is DECSACE to operate in rectable mode
+	// \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
+	// \x1b[ *x is DECSACE to exit rectangle mode
 	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
 		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
 	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
@@ -254,4 +254,3 @@ func (o *Organizer) displayContainerInfo() {
 	fmt.Print(ab.String())
 	o.Screen.drawPreviewBox()
 }
-

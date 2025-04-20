@@ -219,7 +219,7 @@ func (o *Organizer) openKeyword(pos int) {
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-o.FilterEntries(MAX)
+	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -235,46 +235,46 @@ o.FilterEntries(MAX)
 }
 
 func (o *Organizer) write(pos int) {
-  var updated_rows []int
+	var updated_rows []int
 	if o.view != TASK {
-    return
+		return
 	}
 	for i, r := range o.rows {
 		if r.dirty {
-      if r.id != -1 {
-        err := o.Database.updateTitle(&r)
-        if err != nil {
-          o.ShowMessage(BL, "Error updating title: id %d: %v", r.id, err)
-          continue
-        }
-       } else { 
-           var context_tid, folder_tid int
-           switch o.taskview {
-            case BY_CONTEXT:
-              context_tid, _ = o.Database.contextExists(o.filter)
-              folder_tid = 1
-            case BY_FOLDER:
-              folder_tid, _ = o.Database.folderExists(o.filter)
-              context_tid = 1
-            default:  
-              context_tid = 1
-              folder_tid = 1
-            }
-          err :=o.Database.insertTitle(&r, context_tid, folder_tid)
-          if err != nil {
-            o.ShowMessage(BL, "Error inserting title id %d: %v", r.id, err)
-            continue
-          }
-	     }
-      o.rows[i].dirty = false
-      updated_rows = append(updated_rows, r.id)
+			if r.id != -1 {
+				err := o.Database.updateTitle(&r)
+				if err != nil {
+					o.ShowMessage(BL, "Error updating title: id %d: %v", r.id, err)
+					continue
+				}
+			} else {
+				var context_tid, folder_tid int
+				switch o.taskview {
+				case BY_CONTEXT:
+					context_tid, _ = o.Database.contextExists(o.filter)
+					folder_tid = 1
+				case BY_FOLDER:
+					folder_tid, _ = o.Database.folderExists(o.filter)
+					context_tid = 1
+				default:
+					context_tid = 1
+					folder_tid = 1
+				}
+				err := o.Database.insertTitle(&r, context_tid, folder_tid)
+				if err != nil {
+					o.ShowMessage(BL, "Error inserting title id %d: %v", r.id, err)
+					continue
+				}
+			}
+			o.rows[i].dirty = false
+			updated_rows = append(updated_rows, r.id)
 		}
-  }
+	}
 	if len(updated_rows) == 0 {
-	  o.ShowMessage(BL, "There were no rows to update")
+		o.ShowMessage(BL, "There were no rows to update")
 	} else {
-	  o.ShowMessage(BL, "These ids were updated: %v", updated_rows)
-  }
+		o.ShowMessage(BL, "These ids were updated: %v", updated_rows)
+	}
 	o.mode = o.last_mode
 	o.command_line = ""
 }
@@ -300,7 +300,7 @@ func (o *Organizer) quitApp(_ int) {
 }
 
 func (o *Organizer) editNote(id int) {
-  var ae *Editor
+	var ae *Editor
 	if o.view != TASK {
 		o.command = ""
 		o.mode = o.last_mode
@@ -323,7 +323,7 @@ func (o *Organizer) editNote(id int) {
 	o.Session.editorMode = true
 
 	active := false
-	for _, w := range app.Windows {
+	for _, w := range o.Session.Windows {
 		if e, ok := w.(*Editor); ok {
 			if e.id == id {
 				active = true
@@ -335,20 +335,20 @@ func (o *Organizer) editNote(id int) {
 
 	if !active {
 		ae = app.NewEditor() // should become p := o.Session.NewEditor() in NewEditor should set activeEditor
-		app.Windows = append(app.Windows, ae)
+		o.Session.Windows = append(o.Session.Windows, ae)
 		ae.id = id
-    ae.title = o.rows[o.fr].title
+		ae.title = o.rows[o.fr].title
 		ae.top_margin = TOP_MARGIN + 1
 
 		if o.Database.taskFolder(o.rows[o.fr].id) == "code" {
 			ae.output = &Output{}
 			ae.output.is_below = true
 			ae.output.id = id
-			app.Windows = append(app.Windows, ae.output)
+			o.Session.Windows = append(o.Session.Windows, ae.output)
 		}
 		o.Database.readNoteIntoBuffer(ae, id)
 		ae.bufferTick = vim.BufferGetLastChangedTick(ae.vbuf)
-    o.Session.activeEditor = ae
+		o.Session.activeEditor = ae
 	}
 
 	o.Screen.positionWindows()
@@ -357,8 +357,8 @@ func (o *Organizer) editNote(id int) {
 	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
 	o.Screen.drawRightScreen()
 	ae.mode = NORMAL
-  // either app.p = p or app.Session.p = p
-  o.Session.activeEditor = ae
+	// either app.p = p or app.Session.p = p
+	o.Session.activeEditor = ae
 	o.command = ""
 	o.mode = NORMAL
 }
@@ -449,7 +449,7 @@ func (o *Organizer) refresh(unused int) {
 			o.mode = o.last_mode
 			o.fc, o.fr, o.rowoff = 0, 0, 0
 			//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-	    o.FilterEntries(MAX)
+			o.FilterEntries(MAX)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -464,16 +464,16 @@ func (o *Organizer) refresh(unused int) {
 		//sess.showOrgMessage("Entries will be refreshed")
 	} else {
 		o.mode = o.last_mode
-    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
 		o.rows = o.Database.getContainers(o.view)
 		if len(o.rows) == 0 {
-      //o.mode = NO_ROWS  //I don't think NO_ROWS exists any more 
+			//o.mode = NO_ROWS  //I don't think NO_ROWS exists any more
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
-	  o.fc, o.fr, o.rowoff = 0, 0, 0
-	  o.filter = ""
+		o.fc, o.fr, o.rowoff = 0, 0, 0
+		o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -525,12 +525,12 @@ func (o *Organizer) sync3(unused int) {
 	if o.command_line == "test" {
 		// true => reportOnly
 		log = app.Synchronize(true) //Synchronize should return an error:wa
-    err = nil //FIXME
+		err = nil                   //FIXME
 	} else {
 		log = app.Synchronize(false)
-    err = nil //FIXME
+		err = nil //FIXME
 	}
-	
+
 	if err != nil {
 		o.ShowMessage(BL, "Synchronization error: %v", err)
 		return
@@ -613,15 +613,15 @@ func (o *Organizer) contexts(pos int) {
 	if pos == -1 {
 		o.Screen.eraseRightScreen()
 		o.view = CONTEXT
-    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
 		o.rows = o.Database.getContainers(o.view)
 		if len(o.rows) == 0 {
 			o.insertRow(0, "", true, false, false, BASE_DATE)
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
-	  o.fc, o.fr, o.rowoff = 0, 0, 0
-	  o.filter = ""
+		o.fc, o.fr, o.rowoff = 0, 0, 0
+		o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -650,21 +650,21 @@ func (o *Organizer) contexts(pos int) {
 
 	if len(o.marked_entries) > 0 {
 		for id := range o.marked_entries {
-			err := o.Database.updateTaskContextByTid(tid, id) 
-      if err != nil {
-		    o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
-        return
-      }
+			err := o.Database.updateTaskContextByTid(tid, id)
+			if err != nil {
+				o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+				return
+			}
 		}
 		o.showMessage("Marked entries moved into context %s", input)
 		return
 	}
-  id := o.rows[o.fr].id
+	id := o.rows[o.fr].id
 	err := o.Database.updateTaskContextByTid(tid, id)
-    if err != nil {
-	   o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
-      return
-    }
+	if err != nil {
+		o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+		return
+	}
 	o.showMessage("Moved current entry (since none were marked) into context %s", input)
 }
 
@@ -674,7 +674,7 @@ func (o *Organizer) folders(pos int) {
 	if pos == -1 {
 		o.Screen.eraseRightScreen()
 		o.view = FOLDER
-    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
 		o.rows = o.Database.getContainers(o.view)
 
 		if len(o.rows) == 0 {
@@ -682,8 +682,8 @@ func (o *Organizer) folders(pos int) {
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
-	  o.fc, o.fr, o.rowoff = 0, 0, 0
-	  o.filter = ""
+		o.fc, o.fr, o.rowoff = 0, 0, 0
+		o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -712,7 +712,7 @@ func (o *Organizer) folders(pos int) {
 		o.ShowMessage(BL, "Marked entries moved into folder %s", input)
 		return
 	}
-o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
+	o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
 	o.ShowMessage(BL, "Moved current entry (since none were marked) into folder %s", input)
 }
 
@@ -723,7 +723,7 @@ func (o *Organizer) keywords(pos int) {
 	if pos == -1 {
 		o.Screen.eraseRightScreen()
 		o.view = KEYWORD
-    o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
 		o.rows = o.Database.getContainers(o.view)
 
 		if len(o.rows) == 0 {
@@ -731,8 +731,8 @@ func (o *Organizer) keywords(pos int) {
 			o.rows[0].dirty = false
 			o.ShowMessage(BL, "No results were returned")
 		}
-	  o.fc, o.fr, o.rowoff = 0, 0, 0
-	  o.filter = ""
+		o.fc, o.fr, o.rowoff = 0, 0, 0
+		o.filter = ""
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -794,7 +794,7 @@ func (o *Organizer) recent(unused int) {
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-  o.FilterEntries(MAX)
+	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
@@ -844,7 +844,7 @@ func (o *Organizer) updateContainer(unused int) {
 	}
 	o.altRows = o.Database.getAltContainers(o.altView) //O.mode = NORMAL is in get_containers
 	if len(o.altRows) != 0 {
-	  o.altFr = 0
+		o.altFr = 0
 		o.mode = ADD_CHANGE_FILTER
 		o.ShowMessage(BL, "Select context to add to marked or current entry")
 	}
@@ -953,17 +953,17 @@ func (o *Organizer) printDocument(unused int) {
 			o.ShowMessage(BL, "Error creating pdf from code: %v", err)
 		}
 	} else {
-  
-  params := mdtopdf.PdfRendererParams{
-      Orientation: "",
-      Papersz: "",
-      PdfFile: "output.pdf",
-      TracerFile: "trace.log",
-      Opts: nil,
-      Theme: mdtopdf.LIGHT,
-  }
 
-	pf := mdtopdf.NewPdfRenderer(params)
+		params := mdtopdf.PdfRendererParams{
+			Orientation: "",
+			Papersz:     "",
+			PdfFile:     "output.pdf",
+			TracerFile:  "trace.log",
+			Opts:        nil,
+			Theme:       mdtopdf.LIGHT,
+		}
+
+		pf := mdtopdf.NewPdfRenderer(params)
 
 		//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
 		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,

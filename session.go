@@ -13,11 +13,12 @@ type Session struct {
 	style            [8]string
 	markdown_style   *chroma.Style
 	styleIndex       int
+	Windows          []Window //slice of Window interfaces (Output, Editor)
 }
 
 func (s *Session) numberOfEditors() int {
 	i := 0
-	for _, w := range app.Windows {
+	for _, w := range s.Windows {
 		if _, ok := w.(*Editor); ok {
 			i++
 		}
@@ -27,7 +28,7 @@ func (s *Session) numberOfEditors() int {
 
 func (s *Session) editors() []*Editor {
 	eds := []*Editor{}
-	for _, w := range app.Windows {
+	for _, w := range s.Windows {
 		if e, ok := w.(*Editor); ok {
 			eds = append(eds, e)
 		}

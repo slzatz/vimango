@@ -10,14 +10,15 @@ import (
 )
 
 type Screen struct {
-	screenCols       int
-	screenLines      int //total number of screen lines
-	textLines        int // considering margins, bottom messages
-	divider          int
-	totaleditorcols  int
-	imgSizeY         int
-	edPct            int // percent that editor space takes up of whole horiz screen real estate
-	ws               unix.Winsize //Row,Col,Xpixel,Ypixel unint16
+	screenCols      int
+	screenLines     int //total number of screen lines
+	textLines       int // considering margins, bottom messages
+	divider         int
+	totaleditorcols int
+	imgSizeY        int
+	edPct           int          // percent that editor space takes up of whole horiz screen real estate
+	ws              unix.Winsize //Row,Col,Xpixel,Ypixel unint16
+	Session         *Session
 	//images           map[string]*image.Image
 }
 
@@ -91,16 +92,16 @@ func (s *Screen) eraseRightScreen() {
 }
 
 func (s *Screen) drawRightScreen() {
-	for _, w := range app.Windows {
+	for _, w := range s.Session.Windows {
 		w.drawText()
 		w.drawFrame()
-		w.drawStatusBar() 
+		w.drawStatusBar()
 	}
 }
 
 func (s *Screen) positionWindows() {
 	windowSlots := 0
-	for _, w := range app.Windows {
+	for _, w := range s.Session.Windows {
 		switch v := w.(type) {
 		case *Output:
 			if !v.is_below {
@@ -114,7 +115,7 @@ func (s *Screen) positionWindows() {
 
 	cols := -1 + (s.screenCols-s.divider)/windowSlots
 	i := -1 //i = number of columns of windows -1
-	for _, w := range app.Windows {
+	for _, w := range s.Session.Windows {
 		switch v := w.(type) {
 		case *Output:
 			if !v.is_below {
@@ -147,17 +148,17 @@ func (s *Screen) GetWindowSize() error { //should be updateWindowDimensions
 }
 
 func (s *Screen) PositionMessage(loc Location) int { //Keep it Screen struct
-  var max_length int
+	var max_length int
 
-  switch loc {
-  case BL:
-	  fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", s.textLines+2+TOP_MARGIN, s.divider, s.textLines+2+TOP_MARGIN)
-    max_length = s.divider
-  case BR:
-	  fmt.Printf("\x1b[%d;%dH\x1b[K", s.textLines+2+TOP_MARGIN, s.divider+1)
-	  max_length = s.screenCols - s.divider
-    }
-   return max_length
+	switch loc {
+	case BL:
+		fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", s.textLines+2+TOP_MARGIN, s.divider, s.textLines+2+TOP_MARGIN)
+		max_length = s.divider
+	case BR:
+		fmt.Printf("\x1b[%d;%dH\x1b[K", s.textLines+2+TOP_MARGIN, s.divider+1)
+		max_length = s.screenCols - s.divider
+	}
+	return max_length
 }
 
 // used by containers
@@ -202,4 +203,3 @@ func (s *Screen) drawPreviewBox() {
 	ab.WriteString("\x1b[?25h")
 	fmt.Print(ab.String())
 }
-
