@@ -9,14 +9,14 @@ import (
 
 	"github.com/slzatz/vimango/vim"
 	//"github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Database struct {
-	MainDB  *sql.DB // Main database connection 
-	FtsDB   *sql.DB
-	PG   *sql.DB
+	MainDB *sql.DB // Main database connection
+	FtsDB  *sql.DB
+	PG     *sql.DB
 }
 
 func (db *Database) entryTidFromId(id int) int {
@@ -102,27 +102,27 @@ func (db *Database) keywordList() map[string]struct{} {
 }
 func (db *Database) toggleStar(id int, state bool, table string) error {
 	s := fmt.Sprintf("UPDATE %s SET star=?, modified=datetime('now') WHERE id=?;",
-		table) 
+		table)
 	_, err := db.MainDB.Exec(s, !state, id)
-  return err
+	return err
 }
 
 func (db *Database) toggleDeleted(id int, state bool, table string) error {
 	s := fmt.Sprintf("UPDATE %s SET deleted=?, modified=datetime('now') WHERE id=?;", table)
 	_, err := db.MainDB.Exec(s, !state, id)
-  return err
+	return err
 }
 
 func (db *Database) toggleArchived(id int, state bool, table string) error {
 	s := fmt.Sprintf("UPDATE %s SET archived=?, modified=datetime('now') WHERE id=?;", table)
 	_, err := db.MainDB.Exec(s, !state, id)
-  return err
+	return err
 }
 
 func (db *Database) updateTaskContextByTid(tid, id int) error {
 	_, err := db.MainDB.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
 		tid, id)
-		return err
+	return err
 }
 
 func (db *Database) updateTaskFolderByTid(tid, id int) {
@@ -145,7 +145,7 @@ func (db *Database) updateNote(id int, text string) error {
 
 	_, err := db.MainDB.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
 		nullableText, id)
-		return err
+	return err
 
 	/***************fts virtual table update*********************/
 	entry_tid := db.entryTidFromId(id)
@@ -163,7 +163,7 @@ func (db *Database) getSyncItems(sort string, max int) []Row {
 	defer rows.Close()
 
 	//org.rows = nil
-  var  orgRows []Row
+	var orgRows []Row
 	for rows.Next() {
 		var row Row
 		var sort string
@@ -176,11 +176,11 @@ func (db *Database) getSyncItems(sort string, max int) []Row {
 		}
 
 		row.sort = timeDelta(sort)
-    orgRows = append(orgRows, row)
+		orgRows = append(orgRows, row)
 		//org.rows = append(org.rows, row)
 
 	}
-  return orgRows
+	return orgRows
 }
 
 func (db *Database) deleteSyncItem(id int) {
@@ -281,7 +281,7 @@ func (db *Database) updateTitle_(row *Row) error {
     return err
 	}
 }
-	entry_tid := db.entryTidFromId(row.id) 
+	entry_tid := db.entryTidFromId(row.id)
 
 	_, err := db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
 	if err != nil {
@@ -294,17 +294,17 @@ func (db *Database) updateTitle_(row *Row) error {
 func (db *Database) updateTitle(row *Row) error {
 	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
 	if err != nil {
-    return err
+		return err
 	}
 
 	/***************fts virtual table update*********************/
-	entry_tid := db.entryTidFromId(row.id) 
+	entry_tid := db.entryTidFromId(row.id)
 
 	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
 	if err != nil {
-    return err
+		return err
 	}
-  return nil
+	return nil
 }
 
 func (db *Database) insertTitle(row *Row, context_tid, folder_tid int) error { // should return err
@@ -322,13 +322,13 @@ func (db *Database) insertTitle(row *Row, context_tid, folder_tid int) error { /
 	row.dirty = false
 
 	/***************fts virtual table update*********************/
-	entry_tid := db.entryTidFromId(id) 
+	entry_tid := db.entryTidFromId(id)
 
 	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
 	if err != nil {
-    return err
+		return err
 	}
-  return nil
+	return nil
 }
 
 /*
@@ -500,7 +500,6 @@ func (db *Database) getTitle(id int) string {
 	return title
 }
 
-
 func (db *Database) getTaskKeywords(id int) string {
 
 	entry_tid := db.entryTidFromId(id) /////////////////////////////////////////////////////
@@ -650,7 +649,7 @@ func (db *Database) getContainers(view View) []Row {
 	}
 	defer rows.Close()
 
-  var orgRows []Row
+	var orgRows []Row
 	for rows.Next() {
 		var r Row
 		var sort string
@@ -664,11 +663,11 @@ func (db *Database) getContainers(view View) []Row {
 		r.sort = timeDelta(sort)
 		orgRows = append(orgRows, r)
 	}
- return orgRows
+	return orgRows
 }
 
 func (db *Database) getAltContainers(altView View) []AltRow {
-	var orgAltRows []AltRow 
+	var orgAltRows []AltRow
 	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", altView)
 	rows, err := db.MainDB.Query(stmt)
 	if err != nil {
@@ -686,7 +685,7 @@ func (db *Database) getAltContainers(altView View) []AltRow {
 
 		orgAltRows = append(orgAltRows, r)
 	}
-  return orgAltRows
+	return orgAltRows
 }
 
 func (db *Database) getContainerInfo(id int, view View) Container {
@@ -824,11 +823,11 @@ func getNoteSearchPositions__(id int) [][]int {
 func (db *Database) updateContainerTitle(row *Row, view View) error {
 	if row.id == -1 {
 		err := db.insertContainer(row, view)
-    return err
+		return err
 	}
 	stmt := fmt.Sprintf("UPDATE %s SET title=?, modified=datetime('now') WHERE id=?", view)
 	_, err := db.MainDB.Exec(stmt, row.title, row.id)
-  return err
+	return err
 }
 
 func (db *Database) insertContainer(row *Row, view View) error {
@@ -875,7 +874,7 @@ func highlightTerms__(text string, word_positions [][]int) string {
 	delimiters := " |,.;?:()[]{}&#/`-'\"—_<>$~@=&*^%+!\t\n\\" //must have \f if using it as placeholder
 
 	for _, v := range word_positions {
-		app.Organizer.ShowMessage(BR,"%v", word_positions)
+		app.Organizer.ShowMessage(BR, "%v", word_positions)
 
 		// start and end are positions in the text
 		// word_num is what word number we are at in the text
@@ -927,7 +926,7 @@ func (db *Database) highlightTerms2(id int) string {
 	if id == -1 {
 		return "" // id given to new and unsaved entries
 	}
-	entry_tid := db.entryTidFromId(id) 
+	entry_tid := db.entryTidFromId(id)
 
 	//row := fts_db.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
 	//	"FROM fts WHERE lm_id=$1 AND fts MATCH $2;", id, sess.fts_search_terms)
@@ -1076,7 +1075,7 @@ func (db *Database) updateCodeFile(id int, text string) {
 	if lang == "cpp" {
 		filePath = "/home/slzatz/clangd_examples/test.cpp"
 	} else if lang == "go" {
-		filePath = "/home/slzatz/go_fragments/main.go"
+		filePath = "/home/slzatz/vmgo_go_code/main.go"
 	} else if lang == "python" {
 		filePath = "/home/slzatz/python_fragments/main.py"
 	} else {

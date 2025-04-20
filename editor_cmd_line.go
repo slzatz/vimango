@@ -24,24 +24,24 @@ var e_lookup_C = map[string]func(*Editor){
 	"vert res":        (*Editor).verticalResize,
 	"resize":          (*Editor).resize,
 	"res":             (*Editor).resize,
-	"compile":         (*Editor).compile,
-	"c":               (*Editor).compile,
-	"run":             (*Editor).run,
-	"r":               (*Editor).run,
-	"save":            (*Editor).saveNoteToFile,
-	"savefile":        (*Editor).saveNoteToFile,
-	"syntax":          (*Editor).syntax,
-	"number":          (*Editor).number,
-	"num":             (*Editor).number,
-	"ha":              (*Editor).printNote,
-	"quit":            (*Editor).quitActions,
-	"q":               (*Editor).quitActions,
-	"quit!":           (*Editor).quitActions,
-	"q!":              (*Editor).quitActions,
-	"x":               (*Editor).quitActions,
-	"fmt":             (*Editor).goFormat,
-	"pdf":             (*Editor).createPDF,
-	"print":           (*Editor).printDocument,
+	//"compile":         (*Editor).compile, //with go run and python don't need a separate compile step
+	//"c":               (*Editor).compile,
+	"run":      (*Editor).run,
+	"r":        (*Editor).run,
+	"save":     (*Editor).saveNoteToFile,
+	"savefile": (*Editor).saveNoteToFile,
+	"syntax":   (*Editor).syntax,
+	"number":   (*Editor).number,
+	"num":      (*Editor).number,
+	"ha":       (*Editor).printNote,
+	"quit":     (*Editor).quitActions,
+	"q":        (*Editor).quitActions,
+	"quit!":    (*Editor).quitActions,
+	"q!":       (*Editor).quitActions,
+	"x":        (*Editor).quitActions,
+	"fmt":      (*Editor).goFormat,
+	"pdf":      (*Editor).createPDF,
+	"print":    (*Editor).printDocument,
 	//"spell":  (*Editor).spell,
 }
 
@@ -75,10 +75,10 @@ func (e *Editor) writeNote() {
 	}
 
 	err := e.Database.updateNote(e.id, text)
-  if err != nil {
+	if err != nil {
 		e.ShowMessage(BL, "Error in updating note (updateNote) for entry with id %d: %v", e.id, err)
-    return
-  }
+		return
+	}
 	e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
 
 	//explicitly writes note to set isModified to false
@@ -178,9 +178,9 @@ func (e *Editor) compile() {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
 	} else if lang == "go" {
-		dir = "/home/slzatz/go_fragments/"
+		dir = "/home/slzatz/vmgo_go_code/"
 		//cmd = exec.Command("go", "build", "main.go")
-		cmd = exec.Command("go", "build")
+		cmd = exec.Command("go", "run")
 	} else if lang == "python" {
 		e.ShowMessage(BR, "You don't have to compile python")
 		return
@@ -245,39 +245,30 @@ func (e *Editor) compile() {
 func (e *Editor) run() {
 
 	var args []string
+	//var combinedArgs []string
+	var name string
+	var dir string
+	var cmd *exec.Cmd
+
 	pos := strings.Index(e.command_line, " ")
 	if pos != -1 {
 		args = strings.Split(e.command_line[pos+1:], " ")
 	}
 
-	var dir string
-	var obj string
-	var cmd *exec.Cmd
-	//if getFolderTid(e.id) == 18 {
-	if e.Database.taskContext(e.id) == "cpp" {
-		obj = "./test_cpp"
-		dir = "/home/slzatz/clangd_examples/"
-	} else {
-		//obj = "./main"
-		obj = "./go_fragments"
-		dir = "/home/slzatz/go_fragments/"
-	}
 	lang := Languages[e.Database.taskContext(e.id)]
-	if lang == "cpp" {
-		dir = "/home/slzatz/clangd_examples/"
-		cmd = exec.Command("make")
-	} else if lang == "go" {
-		dir = "/home/slzatz/go_fragments/"
-		cmd = exec.Command("go", "build", "main.go")
+	if lang == "go" {
+		dir = "/home/slzatz/vmgo_go_code/"
+		name = "go"
+		args = append([]string{"run", "main.go"}, args...)
 	} else if lang == "python" {
-		obj = "./main.py"
-		dir = "/home/slzatz/python_fragments/"
+		dir = "/home/slzatz/vmgo_python_code/"
+		name = "python"
+		args = append([]string{"main.py"}, args...)
 	} else {
 		e.ShowMessage(BR, "I don't recognize %q", e.Database.taskContext(e.id))
 		return
 	}
-
-	cmd = exec.Command(obj, args...)
+	cmd = exec.Command(name, args...)
 	cmd.Dir = dir
 
 	stdout, err := cmd.StdoutPipe()
@@ -302,7 +293,7 @@ func (e *Editor) run() {
 	buffer_err := bufio.NewReader(stderr)
 
 	var rows []string
-	rows = append(rows, "%-----------------------")
+	rows = append(rows, "------------------------")
 
 	for {
 		bytes, _, err := buffer_out.ReadLine()
@@ -362,10 +353,10 @@ func (e *Editor) quitActions() {
 	if cmd == "x" {
 		text := e.bufferToString()
 		err := e.Database.updateNote(e.id, text)
-    if err != nil {
-		  e.ShowMessage(BR, "Error in updateNote for entry with id %d: %v", e.id, err)
-    } 
-	  e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
+		if err != nil {
+			e.ShowMessage(BR, "Error in updateNote for entry with id %d: %v", e.id, err)
+		}
+		e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
 
 	} else if cmd == "q!" || cmd == "quit!" {
 		// do nothing = allow editor to be closed
@@ -407,7 +398,7 @@ func (e *Editor) quitActions() {
 		// easier to just go to first window which has to be an editor (at least right now)
 		for _, w := range app.Windows {
 			if ed, ok := w.(*Editor); ok { //need the type assertion
-				e.Session.activeEditor = ed 
+				e.Session.activeEditor = ed
 				break
 			}
 		}
@@ -602,14 +593,14 @@ func (e *Editor) createPDF() {
 	}
 	filename := e.command_line[pos+1:]
 
-  params := mdtopdf.PdfRendererParams{
-      Orientation: "",
-      Papersz: "",
-      PdfFile: filename,
-      TracerFile: "trace.log",
-      Opts: nil,
-      Theme: mdtopdf.LIGHT,
-  }
+	params := mdtopdf.PdfRendererParams{
+		Orientation: "",
+		Papersz:     "",
+		PdfFile:     filename,
+		TracerFile:  "trace.log",
+		Opts:        nil,
+		Theme:       mdtopdf.LIGHT,
+	}
 
 	//pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log", nil, mdtopdf.LIGHT)
 	pf := mdtopdf.NewPdfRenderer(params)
@@ -666,18 +657,18 @@ func (e *Editor) printDocument() {
 	} else {
 		content := strings.Join(e.ss, "\n")
 
-  params := mdtopdf.PdfRendererParams{
-      Orientation: "",
-      Papersz: "",
-      PdfFile: "output.pdf",
-      TracerFile: "trace.log",
-      Opts: nil,
-      Theme: mdtopdf.LIGHT,
-  }
+		params := mdtopdf.PdfRendererParams{
+			Orientation: "",
+			Papersz:     "",
+			PdfFile:     "output.pdf",
+			TracerFile:  "trace.log",
+			Opts:        nil,
+			Theme:       mdtopdf.LIGHT,
+		}
 
-	pf := mdtopdf.NewPdfRenderer(params)
+		pf := mdtopdf.NewPdfRenderer(params)
 
-	        //pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
+		//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
 		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
 			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}

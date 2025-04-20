@@ -5,14 +5,14 @@ import (
 )
 
 type Session struct {
-  activeEditor     *Editor
+	activeEditor     *Editor
 	editorMode       bool
 	imagePreview     bool
 	imgSizeY         int
 	fts_search_terms string
 	style            [8]string
-  markdown_style   *chroma.Style
-	styleIndex int
+	markdown_style   *chroma.Style
+	styleIndex       int
 }
 
 func (s *Session) numberOfEditors() int {
@@ -34,4 +34,3 @@ func (s *Session) editors() []*Editor {
 	}
 	return eds
 }
-
