@@ -39,13 +39,13 @@ type Editor struct {
 	highlightPositions []Position
 	suggestions        []string //spelling suggestions
 	bufferTick         int
-	modified           bool                     // tracks if the buffer has been modified
-	title              string                   // title of the note
-	normalCmds         map[string]interface{}   // map of normal commands
-	exCmds             map[string]func(*Editor) // map of ex commands
-	Database           *Database                // pointer to the database
-	Session            *Session                 // pointer to the session
-	Screen             *Screen                  // pointer to the screen
+	modified           bool                          // tracks if the buffer has been modified
+	title              string                        // title of the note
+	normalCmds         map[string]func(*Editor, int) // map of normal commands
+	exCmds             map[string]func(*Editor)      // map of ex commands
+	Database           *Database                     // pointer to the database
+	Session            *Session                      // pointer to the session
+	Screen             *Screen                       // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct

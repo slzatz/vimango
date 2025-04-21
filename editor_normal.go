@@ -9,14 +9,14 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setEditorNormalCmds() map[string]interface{} {
-	return map[string]interface{}{
+func (a *App) setEditorNormalCmds() map[string]func(*Editor, int) {
+	return map[string]func(*Editor, int){
 		"\x17L":              (*Editor).moveOutputWindowRight,
 		"\x17J":              (*Editor).moveOutputWindowBelow,
-		"\x08":               (*Editor).controlH,
-		"\x0c":               (*Editor).controlL,
-		"\x0a":               (*Editor).controlJ,
-		"\x0b":               (*Editor).controlK,
+		"\x08":               (*Editor).moveLeft,         //Ctrl-H
+		"\x0c":               (*Editor).moveRight,        //Ctrl-L
+		"\x0a":               (*Editor).scrollOutputDown, //Ctrl-J
+		"\x0b":               (*Editor).scrollOutputUp,   //Ctrl-K
 		"\x02":               (*Editor).decorateWord,
 		leader + "b":         (*Editor).decorateWord,
 		"\x05":               (*Editor).decorateWord,
@@ -85,7 +85,7 @@ func (e *Editor) changeHSplit(flag int) {
 	}
 }
 
-func (e *Editor) moveOutputWindowRight() {
+func (e *Editor) moveOutputWindowRight(_ int) {
 	if e.output == nil { // && e.is_subeditor && e.is_below) {
 		return
 	}
@@ -100,7 +100,7 @@ func (e *Editor) moveOutputWindowRight() {
 
 }
 
-func (e *Editor) moveOutputWindowBelow() {
+func (e *Editor) moveOutputWindowBelow(_ int) {
 	if e.output == nil { // && e.is_subeditor && e.is_below) {
 		return
 	}
@@ -115,7 +115,7 @@ func (e *Editor) moveOutputWindowBelow() {
 }
 
 // should scroll output down
-func (e *Editor) controlJ() {
+func (e *Editor) scrollOutputDown(_ int) {
 	op := e.output
 	if op == nil {
 		e.command = ""
@@ -128,8 +128,8 @@ func (e *Editor) controlJ() {
 	e.command = ""
 }
 
-// should scroll output up
-func (e *Editor) controlK() {
+// scroll output window up
+func (e *Editor) scrollOutputUp(_ int) {
 	if e.output == nil {
 		e.command = ""
 		return
@@ -141,7 +141,7 @@ func (e *Editor) controlK() {
 	e.command = ""
 }
 
-func (e *Editor) controlH() {
+func (e *Editor) moveLeft(_ int) {
 	// below "if" really for testing
 	if e.isModified() {
 		e.ShowMessage(BR, "Note you left has been modified")
@@ -193,7 +193,7 @@ func (e *Editor) controlH() {
 	}
 }
 
-func (e *Editor) controlL() {
+func (e *Editor) moveRight(_ int) {
 	// below "if" really for testing
 	if e.isModified() {
 		e.ShowMessage(BR, "Note you left has been modified")
@@ -333,7 +333,7 @@ func (e *Editor) decorateWord(c int) {
 	vim.Input("ciw" + w + "\x1b")
 }
 
-func (e *Editor) showMarkdownPreview() {
+func (e *Editor) showMarkdownPreview(_ int) {
 	if len(e.ss) == 0 {
 		return
 	}
@@ -362,7 +362,7 @@ func (e *Editor) showMarkdownPreview() {
 	e.drawPreview()
 }
 
-func (e *Editor) nextStyle() {
+func (e *Editor) nextStyle(_ int) {
 	e.Session.styleIndex++
 	if e.Session.styleIndex > len(e.Session.style)-1 {
 		e.Session.styleIndex = 0
@@ -370,11 +370,11 @@ func (e *Editor) nextStyle() {
 	e.ShowMessage(BR, "New style is %q", e.Session.style[e.Session.styleIndex])
 }
 
-func (e *Editor) readGoTemplate() {
+func (e *Editor) readGoTemplate(_ int) {
 	e.readFileIntoNote("go.template")
 }
 
-func (e *Editor) spellingCheck() {
+func (e *Editor) spellingCheck(_ int) {
 	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
 	if e.isModified() {
 		e.ShowMessage(BR, "%sYou need to write the note before highlighting text%s", RED_BG, RESET)
@@ -383,7 +383,7 @@ func (e *Editor) spellingCheck() {
 	e.highlightMispelledWords()
 }
 
-func (e *Editor) spellSuggest() {
+func (e *Editor) spellSuggest(_ int) {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
 	w := vim.Eval("expand('<cword>')")
 	if ok := h.Spell(w); ok {

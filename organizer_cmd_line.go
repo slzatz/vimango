@@ -80,7 +80,7 @@ func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
 	}
 }
 
-func (o *Organizer) log(unused int) {
+func (o *Organizer) log(_ int) {
 
 	//db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
 	o.rows = o.Database.getSyncItems(o.sort, MAX) //getSyncItems should have an err returned too
@@ -464,7 +464,7 @@ func (o *Organizer) verticalResize__(pos int) {
 }
 */
 
-func (o *Organizer) newEntry(unused int) {
+func (o *Organizer) newEntry(_ int) {
 	row := Row{
 		id: -1,
 		//title:    " ",
@@ -488,7 +488,7 @@ func (o *Organizer) newEntry(unused int) {
 	vim.Input("i")
 }
 
-func (o *Organizer) refresh(unused int) {
+func (o *Organizer) refresh(_ int) {
 	if o.view == TASK {
 		if o.taskview == BY_FIND {
 			o.mode = FIND
@@ -542,9 +542,9 @@ func (o *Organizer) refresh(unused int) {
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-		if unused != -1 {
-			o.displayContainerInfo()
-		}
+		//if unused != -1 {
+		o.displayContainerInfo()
+		//}
 		o.ShowMessage(BL, "view refreshed")
 	}
 	o.clearMarkedEntries()
@@ -584,7 +584,7 @@ func (o *Organizer) find(pos int) {
 	o.drawPreview()
 }
 
-func (o *Organizer) sync3(unused int) {
+func (o *Organizer) sync3(_ int) {
 	var log string
 	var err error
 	if o.command_line == "test" {
@@ -620,7 +620,7 @@ func (o *Organizer) sync3(unused int) {
 	o.mode = PREVIEW_SYNC_LOG
 }
 
-func (o *Organizer) initialBulkLoad(unused int) {
+func (o *Organizer) initialBulkLoad(_ int) {
 	var log string
 	if o.command_line == "bulktest" {
 		// true => reportOnly
@@ -646,7 +646,7 @@ func (o *Organizer) initialBulkLoad(unused int) {
 	o.mode = PREVIEW_SYNC_LOG
 }
 
-func (o *Organizer) reverse(unused int) {
+func (o *Organizer) reverse(_ int) {
 	var log string
 	if o.command_line == "reversetest" {
 		// true => reportOnly
@@ -850,7 +850,7 @@ func (o *Organizer) keywords(pos int) {
 	o.ShowMessage(BL, "Added keyword %s to current entry (since none were marked)", input)
 }
 
-func (o *Organizer) recent(unused int) {
+func (o *Organizer) recent(_ int) {
 	o.ShowMessage(BL, "Will retrieve recent items")
 	o.clearMarkedEntries()
 	o.filter = ""
@@ -872,7 +872,7 @@ func (o *Organizer) recent(unused int) {
 	o.drawPreview()
 }
 
-func (o *Organizer) deleteKeywords(unused int) {
+func (o *Organizer) deleteKeywords(_ int) {
 	id := o.getId()
 	res := o.Database.deleteKeywords(id)
 	o.mode = o.last_mode
@@ -881,7 +881,7 @@ func (o *Organizer) deleteKeywords(unused int) {
 	}
 }
 
-func (o *Organizer) showAll(unused int) {
+func (o *Organizer) showAll(_ int) {
 
 	if o.view != TASK {
 		return
@@ -896,7 +896,7 @@ func (o *Organizer) showAll(unused int) {
 	}
 }
 
-func (o *Organizer) updateContainer(unused int) {
+func (o *Organizer) updateContainer(_ int) {
 	//o.current_task_id = o.rows[o.fr].id
 	o.Screen.eraseRightScreen()
 	switch o.command_line {
@@ -915,14 +915,14 @@ func (o *Organizer) updateContainer(unused int) {
 	}
 }
 
-func (o *Organizer) deleteMarks(unused int) {
+func (o *Organizer) deleteMarks(_ int) {
 	o.clearMarkedEntries()
 	o.mode = NORMAL
 	o.command_line = ""
 	o.ShowMessage(BL, "Marks cleared")
 }
 
-func (o *Organizer) copyEntry(unused int) {
+func (o *Organizer) copyEntry(_ int) {
 	//copyEntry()
 	o.mode = NORMAL
 	o.command_line = ""
@@ -930,7 +930,7 @@ func (o *Organizer) copyEntry(unused int) {
 	o.ShowMessage(BL, "Entry copied")
 }
 
-func (o *Organizer) savelog(unused int) {
+func (o *Organizer) savelog(_ int) {
 	if o.last_mode == PREVIEW_SYNC_LOG {
 		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
 		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
@@ -983,7 +983,7 @@ func (o *Organizer) setImage(pos int) {
 	o.command_line = ""
 }
 
-func (o *Organizer) printDocument(unused int) {
+func (o *Organizer) printDocument(_ int) {
 	id := o.rows[o.fr].id
 	note := o.Database.readNoteIntoString(id)
 	if o.Database.taskFolder(id) == "code" {
@@ -1049,7 +1049,7 @@ func (o *Organizer) printDocument(unused int) {
 	o.command_line = ""
 }
 
-func (o *Organizer) printList(unused int) {
+func (o *Organizer) printList(_ int) {
 	var ss []string
 	for i, row := range o.rows {
 		ss = append(ss, fmt.Sprintf("%2d. %s", i+1, row.title))
@@ -1066,7 +1066,7 @@ func (o *Organizer) printList(unused int) {
 	o.command_line = ""
 }
 
-func (o *Organizer) printList2(unused int) {
+func (o *Organizer) printList2(_ int) {
 	pdf := gofpdf.New("P", "mm", "Letter", "")
 	pdf.AddPage()
 	pdf.SetFont("Arial", "B", 12)

@@ -95,16 +95,19 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 		if len(e.command) > 0 {
 			if cmd, found := e.normalCmds[e.command]; found {
-				switch cmd := cmd.(type) {
-				case func(*Editor):
-					cmd(e)
-				//case func():
-				//	cmd()
-				case func(*Editor, int):
-					cmd(e, c)
-				case func(*Editor) bool:
-					cmd(e)
-				}
+				cmd(e, c)
+				/*
+					switch cmd := cmd.(type) {
+					case func(*Editor):
+						cmd(e)
+					//case func():
+					//	cmd()
+					case func(*Editor, int):
+						cmd(e, c)
+					case func(*Editor) bool:
+						cmd(e)
+					}
+				*/
 				vim.Key("<esc>")
 				//keep tripping over this
 				//these commands should return a redraw bool = false
