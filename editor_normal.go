@@ -9,31 +9,33 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-var e_lookup2 = map[string]interface{}{
-	"\x17L":              (*Editor).moveOutputWindowRight,
-	"\x17J":              (*Editor).moveOutputWindowBelow,
-	"\x08":               (*Editor).controlH,
-	"\x0c":               (*Editor).controlL,
-	"\x0a":               (*Editor).controlJ,
-	"\x0b":               (*Editor).controlK,
-	"\x02":               (*Editor).decorateWord,
-	leader + "b":         (*Editor).decorateWord,
-	"\x05":               (*Editor).decorateWord,
-	string(ctrlKey('i')): (*Editor).decorateWord,
-	"\x17=":              (*Editor).changeSplit,
-	"\x17_":              (*Editor).changeSplit,
-	"\x17-":              (*Editor).changeSplit,
-	"\x17+":              (*Editor).changeSplit,
-	"\x17>":              (*Editor).changeHSplit,
-	"\x17<":              (*Editor).changeHSplit,
-	leader + "m":         (*Editor).showMarkdownPreview,
-	leader + "y":         (*Editor).nextStyle,
-	leader + "t":         (*Editor).readGoTemplate,
-	leader + "sp":        (*Editor).spellingCheck,
-	leader + "su":        (*Editor).spellSuggest,
-	//leader + "l": (*Editor).showVimMessageLog,
-	//leader + "xx": (*Editor).test,
-	//"z=": (*Editor).spellSuggest,
+func (a *App) setEditorNormalCmds() map[string]interface{} {
+	return map[string]interface{}{
+		"\x17L":              (*Editor).moveOutputWindowRight,
+		"\x17J":              (*Editor).moveOutputWindowBelow,
+		"\x08":               (*Editor).controlH,
+		"\x0c":               (*Editor).controlL,
+		"\x0a":               (*Editor).controlJ,
+		"\x0b":               (*Editor).controlK,
+		"\x02":               (*Editor).decorateWord,
+		leader + "b":         (*Editor).decorateWord,
+		"\x05":               (*Editor).decorateWord,
+		string(ctrlKey('i')): (*Editor).decorateWord,
+		"\x17=":              (*Editor).changeSplit,
+		"\x17_":              (*Editor).changeSplit,
+		"\x17-":              (*Editor).changeSplit,
+		"\x17+":              (*Editor).changeSplit,
+		"\x17>":              (*Editor).changeHSplit,
+		"\x17<":              (*Editor).changeHSplit,
+		leader + "m":         (*Editor).showMarkdownPreview,
+		leader + "y":         (*Editor).nextStyle,
+		leader + "t":         (*Editor).readGoTemplate,
+		leader + "sp":        (*Editor).spellingCheck,
+		leader + "su":        (*Editor).spellSuggest,
+		//leader + "l": (*Editor).showVimMessageLog,
+		//leader + "xx": (*Editor).test,
+		//"z=": (*Editor).spellSuggest,
+	}
 }
 
 func (e *Editor) changeSplit(flag int) {
@@ -171,10 +173,10 @@ func (e *Editor) controlH() {
 	e.ShowMessage(BL, "index: %d; length: %d", index, len(eds))
 
 	if index > 0 {
-		ae := eds[index-1] 
+		ae := eds[index-1]
 		vim.BufferSetCurrent(ae.vbuf)
 		ae.mode = NORMAL
-    e.Session.activeEditor = ae
+		e.Session.activeEditor = ae
 		return
 	} else {
 
@@ -211,7 +213,7 @@ func (e *Editor) controlL() {
 		ae := eds[index+1]
 		ae.mode = NORMAL
 		vim.BufferSetCurrent(ae.vbuf)
-    e.Session.activeEditor = ae
+		e.Session.activeEditor = ae
 	}
 
 	return
@@ -391,4 +393,3 @@ func (e *Editor) spellSuggest() {
 	s := h.Suggest(w)
 	e.ShowMessage(BR, "%q -> %s", w, strings.Join(s, "|"))
 }
-

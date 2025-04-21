@@ -11,7 +11,7 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-//note that bool returned is whether to redraw
+// note that bool returned is whether to redraw
 func (e *Editor) editorProcessKey(c int) bool {
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
@@ -94,7 +94,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 		}
 
 		if len(e.command) > 0 {
-			if cmd, found := e_lookup2[e.command]; found {
+			if cmd, found := e.normalCmds[e.command]; found {
 				switch cmd := cmd.(type) {
 				case func(*Editor):
 					cmd(e)
@@ -176,7 +176,8 @@ func (e *Editor) editorProcessKey(c int) bool {
 				cmd = e.command_line
 			}
 
-			if cmd0, found := e_lookup_C[cmd]; found {
+			//if cmd0, found := e_lookup_C[cmd]; found {
+			if cmd0, found := e.exCmds[cmd]; found {
 				cmd0(e)
 				e.command_line = ""
 				e.mode = NORMAL

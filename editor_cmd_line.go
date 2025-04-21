@@ -13,36 +13,38 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-var e_lookup_C = map[string]func(*Editor){
-	"write":           (*Editor).writeNote,
-	"w":               (*Editor).writeNote,
-	"wa":              (*Editor).writeAll,
-	"qa":              (*Editor).quitAll,
-	"read":            (*Editor).readFile,
-	"readfile":        (*Editor).readFile,
-	"vertical resize": (*Editor).verticalResize,
-	"vert res":        (*Editor).verticalResize,
-	"resize":          (*Editor).resize,
-	"res":             (*Editor).resize,
-	//"compile":         (*Editor).compile, //with go run and python don't need a separate compile step
-	//"c":               (*Editor).compile,
-	"run":      (*Editor).run,
-	"r":        (*Editor).run,
-	"save":     (*Editor).saveNoteToFile,
-	"savefile": (*Editor).saveNoteToFile,
-	"syntax":   (*Editor).syntax,
-	"number":   (*Editor).number,
-	"num":      (*Editor).number,
-	"ha":       (*Editor).printNote,
-	"quit":     (*Editor).quitActions,
-	"q":        (*Editor).quitActions,
-	"quit!":    (*Editor).quitActions,
-	"q!":       (*Editor).quitActions,
-	"x":        (*Editor).quitActions,
-	"fmt":      (*Editor).goFormat,
-	"pdf":      (*Editor).createPDF,
-	"print":    (*Editor).printDocument,
-	//"spell":  (*Editor).spell,
+func (a *App) setEditorExCmds() map[string]func(*Editor) {
+	return map[string]func(*Editor){
+		"write":           (*Editor).writeNote,
+		"w":               (*Editor).writeNote,
+		"wa":              (*Editor).writeAll,
+		"qa":              (*Editor).quitAll,
+		"read":            (*Editor).readFile,
+		"readfile":        (*Editor).readFile,
+		"vertical resize": (*Editor).verticalResize,
+		"vert res":        (*Editor).verticalResize,
+		"resize":          (*Editor).resize,
+		"res":             (*Editor).resize,
+		//"compile":         (*Editor).compile, //with go run and python don't need a separate compile step
+		//"c":               (*Editor).compile,
+		"run":      (*Editor).run,
+		"r":        (*Editor).run,
+		"save":     (*Editor).saveNoteToFile,
+		"savefile": (*Editor).saveNoteToFile,
+		"syntax":   (*Editor).syntax,
+		"number":   (*Editor).number,
+		"num":      (*Editor).number,
+		"ha":       (*Editor).printNote,
+		"quit":     (*Editor).quitActions,
+		"q":        (*Editor).quitActions,
+		"quit!":    (*Editor).quitActions,
+		"q!":       (*Editor).quitActions,
+		"x":        (*Editor).quitActions,
+		"fmt":      (*Editor).goFormat,
+		"pdf":      (*Editor).createPDF,
+		"print":    (*Editor).printDocument,
+		//"spell":  (*Editor).spell,
+	}
 }
 
 func (e *Editor) saveNoteToFile() {

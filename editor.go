@@ -1,9 +1,10 @@
 package main
-import (
-  "fmt"
 
-  "github.com/slzatz/vimango/vim"
-) 
+import (
+	"fmt"
+
+	"github.com/slzatz/vimango/vim"
+)
 
 //import "github.com/neovim/go-client/nvim"
 
@@ -38,15 +39,17 @@ type Editor struct {
 	highlightPositions []Position
 	suggestions        []string //spelling suggestions
 	bufferTick         int
-	modified           bool     // tracks if the buffer has been modified
-  title              string   // title of the note
-  Database          *Database // pointer to the database
-  Session           *Session  // pointer to the session
-  Screen            *Screen  // pointer to the screen
+	modified           bool                     // tracks if the buffer has been modified
+	title              string                   // title of the note
+	normalCmds         map[string]interface{}   // map of normal commands
+	exCmds             map[string]func(*Editor) // map of ex commands
+	Database           *Database                // pointer to the database
+	Session            *Session                 // pointer to the session
+	Screen             *Screen                  // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
-  max_length := e.Screen.PositionMessage(loc) //this needs to change to e.Screen.PositionMessage(loc)
+	max_length := e.Screen.PositionMessage(loc) //this needs to change to e.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]
