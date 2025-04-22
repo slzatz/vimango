@@ -466,8 +466,7 @@ func (o *Organizer) verticalResize__(pos int) {
 
 func (o *Organizer) newEntry(_ int) {
 	row := Row{
-		id: -1,
-		//title:    " ",
+		id:    -1,
 		star:  false,
 		dirty: true,
 		sort:  time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
@@ -480,15 +479,15 @@ func (o *Organizer) newEntry(_ int) {
 
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.command = ""
-	//o.repeat = 0
 	o.ShowMessage(BL, "\x1b[1m-- INSERT --\x1b[0m")
-	o.Screen.eraseRightScreen() //erases the note area
+	o.Screen.eraseRightScreen()
 	o.mode = INSERT
 	vim.CursorSetPosition(1, 0)
 	vim.Input("i")
 }
 
-func (o *Organizer) refresh(_ int) {
+// flag is -1 if called as an ex command and 0 if called by another Organizer method
+func (o *Organizer) refresh(flag int) {
 	if o.view == TASK {
 		if o.taskview == BY_FIND {
 			o.mode = FIND
@@ -499,21 +498,14 @@ func (o *Organizer) refresh(_ int) {
 				o.rows[0].dirty = false
 				o.ShowMessage(BL, "No results were returned")
 			}
-			/*
-				if unused != -1 { //complete kluge has to do with refreshing when syncing
-					o.drawPreview()
-				}
-			*/
 			o.Session.imagePreview = false
-			//o.readTitleIntoBuffer() /////////////////////////////////////////////
-			o.readRowsIntoBuffer() ////////////////////////////////////////////
+			o.readRowsIntoBuffer()
 			vim.CursorSetPosition(1, 0)
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
 		} else {
 			o.mode = o.last_mode
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 			o.FilterEntries(MAX)
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
@@ -526,7 +518,6 @@ func (o *Organizer) refresh(_ int) {
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.drawPreview()
 		}
-		//sess.showOrgMessage("Entries will be refreshed")
 	} else {
 		o.mode = o.last_mode
 		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
@@ -542,9 +533,9 @@ func (o *Organizer) refresh(_ int) {
 		o.readRowsIntoBuffer()
 		vim.CursorSetPosition(1, 0)
 		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-		//if unused != -1 {
-		o.displayContainerInfo()
-		//}
+		if flag != -1 {
+			o.displayContainerInfo()
+		}
 		o.ShowMessage(BL, "view refreshed")
 	}
 	o.clearMarkedEntries()
@@ -578,7 +569,7 @@ func (o *Organizer) find(pos int) {
 		o.rows[0].dirty = false
 	}
 	o.Session.imagePreview = false
-	o.readRowsIntoBuffer() ////////////////////////////////////////////
+	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.drawPreview()
