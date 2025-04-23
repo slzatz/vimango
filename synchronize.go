@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/lib/pq" //should go eventually
-//	_ "github.com/lib/pq" //should go eventually
-//	_ "github.com/mattn/go-sqlite3"
+	// _ "github.com/lib/pq" //should go eventually
+	// _ "github.com/mattn/go-sqlite3"
 )
 
 type EntryPlusTag struct {
@@ -210,20 +210,20 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	if a.SyncInProcess {
 		return "Synchronization already in process"
 	}
-	
+
 	a.SyncInProcess = true
 	defer func() { a.SyncInProcess = false }()
-	
-  /*
-	// Use config from app context
-	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		a.Config.Postgres.Host,
-		a.Config.Postgres.Port,
-		a.Config.Postgres.User,
-		a.Config.Postgres.Password,
-		a.Config.Postgres.DB,
-	)
-*/
+
+	/*
+		// Use config from app context
+		connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			a.Config.Postgres.Host,
+			a.Config.Postgres.Port,
+			a.Config.Postgres.User,
+			a.Config.Postgres.Password,
+			a.Config.Postgres.DB,
+		)
+	*/
 	var lg strings.Builder
 	var success bool
 	defer func() {
@@ -599,7 +599,7 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 	}
 	if len(client_deleted_folders) > 0 {
 		nn += len(client_deleted_folders)
-		fmt.Fprintf(&lg, "- Deleted client `Folders`: %d\n", len(client_updated_folders))
+		fmt.Fprintf(&lg, "- Deleted client `Folders`: %d\n", len(client_deleted_folders))
 		for _, e := range client_deleted_folders {
 			fmt.Fprintf(&lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
 		}
