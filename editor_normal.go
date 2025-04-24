@@ -337,26 +337,15 @@ func (e *Editor) showMarkdownPreview(_ int) {
 	if len(e.ss) == 0 {
 		return
 	}
-
-	//note := readNoteIntoString(e.id)
-
-	//note = generateWWString(note, e.screencols, -1, "\n")
 	note := e.generateWWStringFromBuffer2()
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)
+	note = WordWrap(note, e.Screen.totaleditorcols)
 	note = strings.TrimSpace(note)
-	note = strings.ReplaceAll(note, "^^^", "\n")              ///////////////04052022
-	note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n") //headings seem to place \x1b[0m after the return
-	note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
-
-	// for some` reason get extra line at top
-	//ix := strings.Index(note, "\n") //works for ix = -1
-	//e.renderedNote = note[ix+1:]
 	e.renderedNote = note
-
 	e.mode = PREVIEW
 	e.previewLineOffset = 0
 	e.drawPreview()
