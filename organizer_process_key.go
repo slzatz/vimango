@@ -144,8 +144,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 			//sess.showEdMessage(org.command)
 		}
 
-    if cmd, found := o.normalCmds[o.command]; found {
-      cmd(o) 
+		if cmd, found := o.normalCmds[o.command]; found {
+			cmd(o)
 			o.command = ""
 			vim.Key("<esc>")
 			return
@@ -243,7 +243,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row.dirty = true
 			o.bufferTick = tick
 		}
-		mode := vim.GetMode()    // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
+		mode := vim.GetMode()  // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
 		o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		o.command = ""
 		visPos := vim.VisualGetRange()
@@ -382,10 +382,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 					o.showMessage("Current entry folder changed to %s", altRow.title)
 				case CONTEXT:
 					err := o.Database.updateTaskContextByTid(tid, row.id)
-          if err != nil {
-	          o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", row.id, tid, err)
-            return
-          }
+					if err != nil {
+						o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", row.id, tid, err)
+						return
+					}
 					o.showMessage("Current entry had context changed to %s", altRow.title)
 				}
 			} else {
@@ -397,10 +397,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 						o.Database.updateTaskFolderByTid(tid, id)
 					case CONTEXT:
 						err := o.Database.updateTaskContextByTid(tid, id)
-            if err != nil {
-	            o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
-              return
-            }
+						if err != nil {
+							o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+							return
+						}
 					}
 					o.showMessage("Marked entries' %d changed/added to %s", o.altView, altRow.title)
 				}
@@ -415,6 +415,16 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 		if c >= '0' && c <= '9' {
 			vim.Input(string(c))
+			return
+		}
+
+		if c == ctrlKey('j') {
+			o.scrollPreviewDown()
+			return
+		}
+
+		if c == ctrlKey('k') {
+			o.scrollPreviewUp()
 			return
 		}
 
@@ -523,7 +533,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				o.Database.deleteSyncItem(o.rows[o.fr].id)
 			} else {
 				for id := range o.marked_entries {
-				  o.Database.deleteSyncItem(id)
+					o.Database.deleteSyncItem(id)
 				}
 			}
 			o.log(0)

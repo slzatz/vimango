@@ -437,7 +437,7 @@ func (o *Organizer) drawPreview() {
 	} else {
 		note = o.Database.highlightTerms2(id)
 	}
-	o.Screen.eraseRightScreen() //includes erasing images 11062021
+	o.Screen.eraseRightScreen()
 
 	var lang string
 	if o.Database.taskFolder(id) == "code" {
@@ -456,7 +456,6 @@ func (o *Organizer) drawPreview() {
 			glamour.WithWordWrap(0),
 		)
 		note, _ = r.Render(note)
-		note = WordWrap(note, o.Screen.totaleditorcols)
 		// glamour seems to add a '\n' at the start
 		note = strings.TrimSpace(note)
 	} else {
@@ -469,10 +468,10 @@ func (o *Organizer) drawPreview() {
 		// could use strings.Count to make sure they are balanced
 		// n0 = strings.Count(o.note, "^^")
 		// n1 = strings.Count(o.note, "%%")
-		// ...
 		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
 		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
 	}
+	note = WordWrap(note, o.Screen.totaleditorcols)
 	o.note = strings.Split(note, "\n")
 	if lang != "markdown" || !o.Session.imagePreview {
 		o.drawPreviewWithoutImages()

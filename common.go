@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
-  "fmt"
-	"strings"
-  "time"
+	"fmt"
 	"regexp"
+	"strings"
+	"time"
 )
 
 type Location int
@@ -79,26 +79,6 @@ var navKeys = map[int]struct{}{
 	'G':         z0,
 }
 
-var Lsps = map[string]string{
-	"go":  "gopls",
-	"cpp": "clangd",
-	"py":  "python-language-server",
-}
-
-/*
-var termcodes = map[int]string{
-	ARROW_UP:    "\x80ku", // could also do with vimKey as <Right>, <Left>, <Up>, <Down>
-	ARROW_DOWN:  "\x80kd",
-	ARROW_RIGHT: "\x80kr",
-	ARROW_LEFT:  "\x80kl",
-	BACKSPACE:   "\x80kb", //? also works "\x08"
-	HOME_KEY:    "\x80kh",
-	DEL_KEY:     "\x80kD",
-	PAGE_UP:     "\x80kP",
-	PAGE_DOWN:   "\x80kN",
-}
-*/
-
 var termcodes = map[int]string{
 	ARROW_UP:    "<up>", // could also do with vimKey as <Right>, <Left>, <Up>, <Down>
 	ARROW_DOWN:  "<down>",
@@ -111,6 +91,12 @@ var termcodes = map[int]string{
 	PAGE_DOWN:   "<pagedown>",
 	//0x6:         "<c-f>",
 	//<end> <tab> <insert> <cr> or <enter> <f1> ... <f12>
+}
+
+var Lsps = map[string]string{
+	"go":  "gopls",
+	"cpp": "clangd",
+	"py":  "python-language-server",
 }
 
 type Mode int
@@ -300,7 +286,7 @@ type Container struct {
 	count    int
 }
 
-//type outlineKey int
+// type outlineKey int
 const (
 	BACKSPACE  = iota + 127
 	ARROW_LEFT = iota + 999 //would have to be < 127 to be chars
@@ -360,7 +346,7 @@ func (v View) String() string {
 	}[v]
 }
 
-//type TaskView int
+// type TaskView int
 const (
 	BY_CONTEXT = iota
 	BY_FOLDER
@@ -387,61 +373,61 @@ func getStringInBetween(str string, start string, end string) string {
 func extractFilePath(input string) string {
 	// Normalize line breaks
 	normalized := strings.ReplaceAll(input, "\n", "")
-	
+
 	// Split by the arrow
 	parts := strings.Split(normalized, "→")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	// Get everything after the arrow
 	afterArrow := strings.TrimSpace(parts[1])
-	
+
 	// Strip ANSI escape codes
 	ansiEscapeRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 	cleanedText := ansiEscapeRegex.ReplaceAllString(afterArrow, "")
-	
+
 	// Enhanced regex for complex paths and URLs
 	// This handles:
 	// 1. URLs with multiple path segments
 	// 2. Wikipedia-style URLs with dimensions in the path
 	// 3. Traditional file paths and simple URLs
 	pathRegex := regexp.MustCompile(`((?:https?://)[^\s]+?/[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:/[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp))?(?:\?[^\s]*)?|(?:/|[A-Za-z]:\\|[A-Za-z0-9_\-\.]+/)[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:\?[^\s]*)?)`)
-	
+
 	match := pathRegex.FindString(cleanedText)
-	
+
 	// If no match yet, try a more permissive regex focused on URLs
 	if match == "" {
 		urlRegex := regexp.MustCompile(`https?://[^\s]+?\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:/[^\s]*?)?`)
 		match = urlRegex.FindString(cleanedText)
 	}
-	
+
 	return match
 }
 
 func extractFilePath_(input string) string {
 	// First, normalize line breaks to handle word wrapping
 	normalized := strings.ReplaceAll(input, "\n", "")
-	
+
 	// Split by the arrow
 	parts := strings.Split(normalized, "→")
 	if len(parts) < 2 {
 		return ""
 	}
-	
+
 	// Get everything after the arrow
 	afterArrow := strings.TrimSpace(parts[1])
-	
+
 	// Strip ANSI escape codes that might be surrounding the path
 	// ANSI escape codes typically start with ESC[ (represented as \x1b[ or \033[)
 	// and end with a letter (m is common for color codes)
 	ansiEscapeRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 	cleanedText := ansiEscapeRegex.ReplaceAllString(afterArrow, "")
-	
+
 	// Match URLs and file paths
 	pathRegex := regexp.MustCompile(`((?:https?://|/|[A-Za-z]:\\|[A-Za-z0-9_\-\.]+/)[^\s]+?(?:\.(jpg|jpeg|png|gif|bmp|tiff|webp)(?:[\?#][^\s]*)?))`)
 	match := pathRegex.FindString(cleanedText)
-	
+
 	return match
 }
 
@@ -469,6 +455,7 @@ func timeDelta(t string) string {
 		return fmt.Sprintf("%d years ago", diff/3600/24/30/12)
 	}
 }
+
 /*
 type BufLinesEvent struct {
 	Buffer nvim.Buffer
