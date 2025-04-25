@@ -219,7 +219,7 @@ func (a *App) InitDatabases(configPath string) error {
 // InitApp initializes the application components
 func (a *App) InitApp() {
 
-	markdown_style, _ := selectMDStyle("gruvbox.xml")
+	markdown_style, _ := selectMDStyle(a.Config.Chroma.Style)
 	a.Session.markdown_style = markdown_style
 	a.Session.style = [8]string{"dracula", "fruity", "gruvbox", "monokai", "native", "paraiso-dark", "rrt", "solarized-dark256"}
 	a.Session.styleIndex = 2

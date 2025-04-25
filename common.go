@@ -48,6 +48,10 @@ type dbConfig struct {
 		Type  string `json:"type"`
 		Title string `json:"title"`
 	} `json:"options"`
+
+	Chroma struct {
+		Style string `json:"style"`
+	} `json:"chroma"`
 }
 
 var z0 = struct{}{}

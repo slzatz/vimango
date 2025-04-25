@@ -1,10 +1,10 @@
 package main
 
-// appears that chroma is being used for syntax highlighting and printing
+// chroma is being used for syntax highlighting
 
 import (
 	"io"
-  "os"
+	"os"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
@@ -13,10 +13,10 @@ import (
 )
 
 func selectMDStyle(style string) (*chroma.Style, error) {
-//	style, ok := styles.Registry[cli.Style]
-//	if ok {
-//		return style, nil
-//	}
+	//	style, ok := styles.Registry[cli.Style]
+	//	if ok {
+	//		return style, nil
+	//	}
 	r, err := os.Open(style)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,6 @@ func Highlight(w io.Writer, source, lexer, formatter, style string) error {
 	}
 	return f.Format(w, s, it)
 }
-
 
 func Highlight2(w io.Writer, source string, lexer string, formatter string, style *chroma.Style) error {
 	l := lexers.Get(lexer)
