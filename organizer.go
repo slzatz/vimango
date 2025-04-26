@@ -1,9 +1,9 @@
 package main
 
 import (
-  "fmt"
+	"fmt"
 
-  "github.com/slzatz/vimango/vim"
+	"github.com/slzatz/vimango/vim"
 )
 
 type Organizer struct {
@@ -38,20 +38,19 @@ type Organizer struct {
 	highlight           [2]int
 	vbuf                vim.Buffer
 	bufferTick          int
-  normalCmds         map[string]func(*Organizer)
-  exCmds             map[string]func(*Organizer, int)
-  Database            *Database
+	normalCmds          map[string]func(*Organizer)
+	exCmds              map[string]func(*Organizer, int)
+	Database            *Database
 	Session             *Session
-  Screen              *Screen // pointer to the screen
-  //*Database
+	Screen              *Screen
 }
 
 func (o *Organizer) FilterEntries(max int) {
-  var err error
-  o.rows, err = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, max)
-  if err != nil {
-      o.showMessage("Error filtering entries: %v", err)
-  }
+	var err error
+	o.rows, err = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, max)
+	if err != nil {
+		o.showMessage("Error filtering entries: %v", err)
+	}
 }
 
 func (o *Organizer) getId() int {
@@ -76,8 +75,8 @@ func (o *Organizer) showMessage(format string, a ...interface{}) {
 	fmt.Print(str)
 }
 
-func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
-  max_length := o.Screen.PositionMessage(loc) //this needs to change to o.Screen.PositionMessage(loc)
+func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) {
+	max_length := o.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]

@@ -256,9 +256,7 @@ func (a *App) InitApp() {
 	vim.BufferSetCurrent(a.Organizer.vbuf)
 }
 
-// LoadInitialData loads the initial data for the organizer
 func (a *App) LoadInitialData() {
-	// Calculate layout dimensions
 	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
 	a.Screen.edPct = 60
 
@@ -305,14 +303,14 @@ func (a *App) returnCursor() {
 		}
 	} else {
 		switch a.Organizer.mode {
-		case FIND:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;34m>", a.Organizer.cy+TOP_MARGIN+1, LEFT_MARGIN) //blue
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Organizer.cy+TOP_MARGIN+1, a.Organizer.cx+LEFT_MARGIN+1)
 		case COMMAND_LINE:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+2+TOP_MARGIN, len(a.Organizer.command_line)+LEFT_MARGIN+1)
-
 		default:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;31m>", a.Organizer.cy+TOP_MARGIN+1, LEFT_MARGIN)
+			if a.Organizer.taskview == BY_FIND {
+				fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;34m>", a.Organizer.cy+TOP_MARGIN+1, LEFT_MARGIN) //blue
+			} else {
+				fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1;31m>", a.Organizer.cy+TOP_MARGIN+1, LEFT_MARGIN)
+			}
 			// below restores the cursor position based on org.cx and org.cy + margin
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Organizer.cy+TOP_MARGIN+1, a.Organizer.cx+LEFT_MARGIN+1)
 		}
@@ -323,22 +321,16 @@ func (a *App) returnCursor() {
 	fmt.Print(ab.String())
 }
 
-// Cleanup handles proper shutdown of resources
 func (a *App) Cleanup() {
-	//if a.DB != nil {
 	if a.Database.MainDB != nil {
 		a.Database.MainDB.Close()
 	}
-
 	if a.Database.FtsDB != nil {
 		a.Database.FtsDB.Close()
 	}
 	if a.Database.PG != nil {
 		a.Database.PG.Close()
 	}
-	//if a.Session != nil {
-	//	a.Session.quitApp()
-	//}
 	a.quitApp()
 }
 
@@ -347,8 +339,6 @@ func (a *App) quitApp() {
 	//	shutdownLsp()
 	//}
 	fmt.Print("\x1b[2J\x1b[H") //clears the screen and sends cursor home
-	//sqlite3_close(S.db); //something should probably be done here
-	//PQfinish(conn);
 	//lsp_shutdown("all");
 
 	if err := rawmode.Restore(a.origTermCfg); err != nil {
@@ -358,28 +348,19 @@ func (a *App) quitApp() {
 	os.Exit(0)
 }
 
-// MainLoop is the main application loop
 func (a *App) MainLoop() {
-
-	// Set global reference for backward compatibility
-	//p = a.Editor
 	org := a.Organizer
-	// No need to sync windows as it's handled in main.go initialization
-
-	//for a.Run && sess.run {
 	for a.Run {
 		key, err := terminal.ReadKey()
 		if err != nil {
 			org.ShowMessage(BL, "Readkey problem %w", err)
 		}
-
 		var k int
 		if key.Regular != 0 {
 			k = int(key.Regular)
 		} else {
 			k = key.Special
 		}
-
 		if a.Session.editorMode {
 			ae := a.Session.activeEditor
 			textChange := ae.editorProcessKey(k)
@@ -387,7 +368,6 @@ func (a *App) MainLoop() {
 			if !a.Session.editorMode {
 				continue
 			}
-
 			if textChange {
 				ae.scroll()
 				ae.drawText()
@@ -395,7 +375,6 @@ func (a *App) MainLoop() {
 			}
 		} else {
 			org.organizerProcessKey(k)
-			//app.Organizer.ProcessKey(app, k) // This is where the main loop will call the new method
 			org.scroll()
 			org.refreshScreen()
 			if a.Screen.divider > 10 {
@@ -404,7 +383,5 @@ func (a *App) MainLoop() {
 		}
 		a.returnCursor()
 	}
-
-	// Clean up when the main loop exits
 	a.Cleanup()
 }

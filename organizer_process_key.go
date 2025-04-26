@@ -54,6 +54,9 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row.dirty = false
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.command = ""
+			if o.taskview == BY_FIND {
+				row.ftsTitle = row.title
+			}
 			//o.showMessage("")
 			return
 		}
@@ -91,6 +94,9 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row := &o.rows[o.fr]
 			if row.dirty {
 				o.writeTitle()
+				if o.taskview == BY_FIND {
+					row.ftsTitle = row.title
+				}
 				vim.Key("<esc>")
 				row.dirty = false
 				o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
@@ -407,50 +413,6 @@ func (o *Organizer) organizerProcessKey(c int) {
 			}
 		}
 
-	case FIND:
-		if c == ':' {
-			o.exCmd()
-			return
-		}
-
-		if c >= '0' && c <= '9' {
-			vim.Input(string(c))
-			return
-		}
-
-		if c == ctrlKey('j') {
-			o.scrollPreviewDown()
-			return
-		}
-
-		if c == ctrlKey('k') {
-			o.scrollPreviewUp()
-			return
-		}
-
-		if _, found := navKeys[c]; found {
-			if z, found := termcodes[c]; found {
-				vim.Key(z)
-			} else {
-				vim.Input(string(c))
-			}
-			pos := vim.CursorGetPosition()
-			o.fc = pos[1]
-			if o.fr != pos[0]-1 {
-				o.fr = pos[0] - 1
-				o.fc = 0
-				vim.CursorSetPosition(o.fr+1, 0)
-				o.drawPreview()
-			}
-		} else {
-			o.mode = NORMAL
-			o.command = ""
-			o.organizerProcessKey(c)
-		}
-		//sess.showOrgMessage("Find: fr %d fc %d", org.fr, org.fc)
-
-		//probably should be a org.view not org.mode but
-		// for the moment this kluge works
 	case SYNC_LOG:
 
 		switch c {

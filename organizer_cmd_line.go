@@ -490,7 +490,8 @@ func (o *Organizer) newEntry(_ int) {
 func (o *Organizer) refresh(flag int) {
 	if o.view == TASK {
 		if o.taskview == BY_FIND {
-			o.mode = FIND
+			o.mode = NORMAL ///////////////////////////
+			//o.mode = FIND ////////////////////////////////////
 			o.fc, o.fr, o.rowoff = 0, 0, 0
 			o.rows = o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted, false)
 			if len(o.rows) == 0 {
@@ -559,7 +560,8 @@ func (o *Organizer) find(pos int) {
 	o.filter = ""
 	o.taskview = BY_FIND
 	o.view = TASK
-	o.mode = FIND
+	//o.mode = FIND ///////////////////////////////////////////////////////
+	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
 	o.ShowMessage(BL, "Search for '%s'", searchTerms)

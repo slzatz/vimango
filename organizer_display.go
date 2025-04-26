@@ -27,16 +27,71 @@ func (o *Organizer) refreshScreen() {
 	}
 	// put cursor at upper left after erasing
 	ab.WriteString(fmt.Sprintf("\x1b[%d;%dH", TOP_MARGIN+1, LEFT_MARGIN+1))
-
 	fmt.Print(ab.String())
-
-	if o.mode == FIND {
+	if o.taskview == BY_FIND {
 		o.drawSearchRows()
 	} else if o.mode == ADD_CHANGE_FILTER {
 		o.drawAltRows()
 	} else {
 		o.drawRows()
 	}
+}
+
+func (o *Organizer) drawActiveRow(ab *strings.Builder, y int) {
+	var j, k int //to swap highlight if org.highlight[1] < org.highlight[0]
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	length := len(o.rows[o.fr].title) - o.coloff
+	if length > titlecols {
+		length = titlecols
+	}
+	if o.rows[o.fr].star {
+		ab.WriteString(CYAN_BOLD)
+	}
+	if o.rows[o.fr].archived && o.rows[o.fr].deleted {
+		ab.WriteString(GREEN)
+	} else if o.rows[o.fr].archived {
+		ab.WriteString(YELLOW)
+	} else if o.rows[o.fr].deleted {
+		ab.WriteString(RED)
+	}
+	ab.WriteString(DARK_GRAY_BG)
+	if o.rows[o.fr].dirty {
+		ab.WriteString(BLACK + WHITE_BG)
+	}
+	if o.mode == VISUAL {
+		// below in case org.highlight[1] < org.highlight[0]
+		if o.highlight[1] > o.highlight[0] {
+			j, k = 0, 1
+		} else {
+			k, j = 0, 1
+		}
+
+		ab.WriteString(o.rows[o.fr].title[o.coloff : o.highlight[j]-o.coloff])
+		ab.WriteString(LIGHT_GRAY_BG)
+		ab.WriteString(o.rows[o.fr].title[o.highlight[j] : o.highlight[k]-o.coloff])
+
+		ab.WriteString(DARK_GRAY_BG)
+		ab.WriteString(o.rows[o.fr].title[o.highlight[k]:])
+
+	} else {
+		// current row is only row that is scrolled if org.coloff != 0
+		beg := o.coloff
+		if len(o.rows[o.fr].title[beg:]) > length {
+			ab.WriteString(o.rows[o.fr].title[beg : beg+length])
+		} else {
+			ab.WriteString(o.rows[o.fr].title[beg:])
+		}
+	}
+	// the spaces make it look like the whole row is highlighted
+	//note len can't be greater than titlecols so always positive
+	ab.WriteString(strings.Repeat(" ", titlecols-length+1))
+
+	// believe the +2 is just to give some space from the end of long titles
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, o.Screen.divider-TIME_COL_WIDTH+2)
+	ab.WriteString(o.rows[o.fr].sort)
+	ab.WriteString(RESET)
+	ab.WriteString(lf_ret)
 }
 
 func (o *Organizer) drawRows() {
@@ -364,6 +419,69 @@ func (o *Organizer) drawStatusBar() {
 }
 
 func (o *Organizer) drawSearchRows() {
+	if len(o.rows) == 0 {
+		return
+	}
+	var ab strings.Builder
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
+
+	for y := 0; y < o.Screen.textLines; y++ {
+		fr := y + o.rowoff
+		if fr > len(o.rows)-1 {
+			break
+		}
+		if fr == o.fr {
+			o.drawActiveRow(&ab, y)
+			continue
+		}
+
+		if o.rows[fr].star {
+			ab.WriteString("\x1b[1m") //bold
+			ab.WriteString("\x1b[1;36m")
+		}
+
+		if o.rows[fr].archived && o.rows[fr].deleted {
+			ab.WriteString(GREEN) //green foreground
+		} else if o.rows[fr].archived {
+			ab.WriteString(YELLOW) //yellow foreground
+		} else if o.rows[fr].deleted {
+			ab.WriteString(RED) //red foreground
+		}
+		if len(o.rows[fr].title) <= titlecols { // we know it fits
+			ab.WriteString(o.rows[fr].ftsTitle)
+			// note below doesn't handle two highlighted terms in same line
+			// and it might cause display issues if second highlight isn't fully escaped
+			// need to come back and deal with this
+			// coud check if LastIndex"\x1b[49m" or Index(fts_title[pos+1:titlecols+15] contained another escape
+		} else {
+			pos := strings.Index(o.rows[fr].ftsTitle, "\x1b[49m")                          //\x1b[48;5;31m', '\x1b[49m'
+			if pos > 0 && pos < titlecols+11 && len(o.rows[fr].ftsTitle) >= titlecols+15 { //length of highlight escape last check ? shouldn't be necessary added 04032021
+				ab.WriteString(o.rows[fr].ftsTitle[:titlecols+15]) //titlecols + 15); // length of highlight escape + remove formatting escape
+			} else {
+				ab.WriteString(o.rows[fr].title[:titlecols])
+			}
+		}
+		var length int
+		if len(o.rows[fr].title) <= titlecols {
+			length = len(o.rows[fr].title)
+		} else {
+			length = titlecols
+		}
+
+		spaces := titlecols - length
+		ab.WriteString(strings.Repeat(" ", spaces))
+
+		ab.WriteString("\x1b[0m") // return background to normal
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+2, o.Screen.divider-TIME_COL_WIDTH+2)
+		//ab.WriteString(o.rows[fr].modified)
+		ab.WriteString(o.rows[fr].sort)
+		ab.WriteString(lf_ret)
+
+		fmt.Print(ab.String())
+	}
+}
+func (o *Organizer) drawSearchRows_() {
 
 	if len(o.rows) == 0 {
 		return
@@ -380,6 +498,18 @@ func (o *Organizer) drawSearchRows() {
 			break
 		}
 		var length int
+		// if a line is long you only draw what fits on the screen
+		//below solves problem when deleting chars from a scrolled long line
+		if fr == o.fr {
+			length = len(o.rows[fr].title) - o.coloff
+			ab.WriteString(DARK_GRAY_BG)
+			if length > titlecols {
+				ab.WriteString(o.rows[fr].title[:titlecols])
+				length = titlecols
+			} else {
+				ab.WriteString(o.rows[fr].title)
+			}
+		}
 
 		if o.rows[fr].star {
 			ab.WriteString("\x1b[1m") //bold
@@ -387,31 +517,32 @@ func (o *Organizer) drawSearchRows() {
 		}
 
 		if o.rows[fr].archived && o.rows[fr].deleted {
-			ab.WriteString("\x1b[32m") //green foreground
+			ab.WriteString(GREEN) //green foreground
 		} else if o.rows[fr].archived {
-			ab.WriteString("\x1b[33m") //yellow foreground
+			ab.WriteString(YELLOW) //yellow foreground
 		} else if o.rows[fr].deleted {
-			ab.WriteString("\x1b[31m") //red foreground
+			ab.WriteString(RED) //red foreground
 		}
-
-		if len(o.rows[fr].title) <= titlecols { // we know it fits
-			ab.WriteString(o.rows[fr].ftsTitle)
-			// note below doesn't handle two highlighted terms in same line
-			// and it might cause display issues if second highlight isn't fully escaped
-			// need to come back and deal with this
-			// coud check if LastIndex"\x1b[49m" or Index(fts_title[pos+1:titlecols+15] contained another escape
-		} else {
-			pos := strings.Index(o.rows[fr].ftsTitle, "\x1b[49m")                          //\x1b[48;5;31m', '\x1b[49m'
-			if pos > 0 && pos < titlecols+11 && len(o.rows[fr].ftsTitle) >= titlecols+15 { //length of highlight escape last check ? shouldn't be necessary added 04032021
-				ab.WriteString(o.rows[fr].ftsTitle[:titlecols+15]) //titlecols + 15); // length of highlight escape + remove formatting escape
+		if fr != o.fr {
+			if len(o.rows[fr].title) <= titlecols { // we know it fits
+				ab.WriteString(o.rows[fr].ftsTitle)
+				// note below doesn't handle two highlighted terms in same line
+				// and it might cause display issues if second highlight isn't fully escaped
+				// need to come back and deal with this
+				// coud check if LastIndex"\x1b[49m" or Index(fts_title[pos+1:titlecols+15] contained another escape
 			} else {
-				ab.WriteString(o.rows[fr].title[:titlecols])
+				pos := strings.Index(o.rows[fr].ftsTitle, "\x1b[49m")                          //\x1b[48;5;31m', '\x1b[49m'
+				if pos > 0 && pos < titlecols+11 && len(o.rows[fr].ftsTitle) >= titlecols+15 { //length of highlight escape last check ? shouldn't be necessary added 04032021
+					ab.WriteString(o.rows[fr].ftsTitle[:titlecols+15]) //titlecols + 15); // length of highlight escape + remove formatting escape
+				} else {
+					ab.WriteString(o.rows[fr].title[:titlecols])
+				}
 			}
-		}
-		if len(o.rows[fr].title) <= titlecols {
-			length = len(o.rows[fr].title)
-		} else {
-			length = titlecols
+			if len(o.rows[fr].title) <= titlecols {
+				length = len(o.rows[fr].title)
+			} else {
+				length = titlecols
+			}
 		}
 		spaces := titlecols - length
 		ab.WriteString(strings.Repeat(" ", spaces))
@@ -421,8 +552,9 @@ func (o *Organizer) drawSearchRows() {
 		//ab.WriteString(o.rows[fr].modified)
 		ab.WriteString(o.rows[fr].sort)
 		ab.WriteString(lf_ret)
+
+		fmt.Print(ab.String())
 	}
-	fmt.Print(ab.String())
 }
 
 func (o *Organizer) drawPreview() {
@@ -432,7 +564,8 @@ func (o *Organizer) drawPreview() {
 	}
 	id := o.rows[o.fr].id
 	var note string
-	if o.mode != FIND {
+	//if o.mode != FIND {
+	if o.taskview != BY_FIND {
 		note = o.Database.readNoteIntoString(id)
 	} else {
 		note = o.Database.highlightTerms2(id)
@@ -464,7 +597,8 @@ func (o *Organizer) drawPreview() {
 		note = buf.String()
 	}
 
-	if o.mode == FIND {
+	//if o.mode == FIND {
+	if o.taskview == BY_FIND {
 		// could use strings.Count to make sure they are balanced
 		// n0 = strings.Count(o.note, "^^")
 		// n1 = strings.Count(o.note, "%%")
