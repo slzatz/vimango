@@ -103,7 +103,56 @@ func (o *Organizer) log(_ int) {
 	o.ShowMessage(BL, "")
 }
 
+func (o *Organizer) openContainer() {
+	//var tid int
+	row := o.rows[o.fr]
+	var ok bool
+	switch o.view {
+	case CONTEXT:
+		o.taskview = BY_CONTEXT
+		_, ok = o.Database.contextExists(row.title)
+	case FOLDER:
+		o.taskview = BY_FOLDER
+		_, ok = o.Database.folderExists(row.title)
+	case KEYWORD:
+		o.taskview = BY_KEYWORD
+		// this guard to see if synced may not be necessary for keyword
+		_, ok = o.Database.keywordExists(row.title)
+	}
+
+	// if it's a new context|folder|keyword we can't filter tasks by it
+	//if tid < 1 {
+	if !ok {
+		o.showMessage("You need to sync before you can use %q", row.title)
+		return
+	}
+	o.filter = row.title
+	o.ShowMessage(BL, "'%s' will be opened", o.filter)
+
+	o.clearMarkedEntries()
+	o.view = TASK
+	o.mode = NORMAL
+	o.fc, o.fr, o.rowoff = 0, 0, 0
+	//o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
+	o.FilterEntries(MAX)
+	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
+		o.showMessage("No results were returned")
+	}
+	o.Session.imagePreview = false
+	o.readRowsIntoBuffer()
+	vim.CursorSetPosition(1, 0)
+	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	o.drawPreview()
+	o.command_line = ""
+}
+
 func (o *Organizer) open(pos int) {
+	if o.view != TASK {
+		o.openContainer()
+		return
+	}
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not provide a context or folder!")
 		//o.mode = NORMAL
@@ -204,7 +253,6 @@ func (o *Organizer) openContext(pos int) {
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 	o.altRowoff = 0
 	o.drawPreview()
-	return
 }
 
 func (o *Organizer) openFolder(pos int) {

@@ -14,7 +14,7 @@ func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
 		string(0x4):          (*Organizer).del,     //ctrl-d delete
 		string(0x1):          (*Organizer).star,    //ctrl-b starEntry
 		string(0x18):         (*Organizer).archive, //ctrl-x archive
-		string(ctrlKey('i')): (*Organizer).info,    //{{0x9}} entryInfo
+		string(ctrlKey('i')): (*Organizer).info,    //{{0x9}} not this is same as '/t' (tab)
 		"m":                  (*Organizer).mark,
 		string(ctrlKey('l')): (*Organizer).switchToEditorMode,
 		":":                  (*Organizer).exCmd,
@@ -22,6 +22,16 @@ func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
 		string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
 		string(ctrlKey('n')): (*Organizer).previewWithImages,
 	}
+}
+
+// if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
+var noopKeys = map[int]struct{}{
+	int([]byte(leader)[0]): {},
+	'V':                    {},
+	ctrlKey('v'):           {},
+	'O':                    {},
+	'o':                    {},
+	'J':                    {},
 }
 
 func (o *Organizer) exCmd() {
@@ -88,6 +98,9 @@ func (o *Organizer) archive() {
 }
 
 func (o *Organizer) info() {
+	if o.view != TASK {
+		return
+	}
 	e := o.Database.getEntryInfo(o.getId())
 	o.displayEntryInfo(&e)
 	o.Screen.drawPreviewBox()

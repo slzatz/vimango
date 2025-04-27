@@ -54,10 +54,6 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row.dirty = false
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.command = ""
-			//if o.taskview == BY_FIND {
-			//	row.ftsTitle = row.title
-			//}
-			//o.showMessage("")
 			return
 		}
 
@@ -94,55 +90,11 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row := &o.rows[o.fr]
 			if row.dirty {
 				o.writeTitle() // now updates ftsTitle if taskview == BY_FIND
-				//if o.taskview == BY_FIND {
-				//		row.ftsTitle = row.title
-				//	}
 				vim.Key("<esc>")
 				row.dirty = false
 				o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 				return
 			}
-			// if not row.dirty nothing happens in TASK but if in a CONTAINER view open the entries with that container
-			var tid int
-			switch o.view {
-			case TASK:
-				return
-			case CONTEXT:
-				o.taskview = BY_CONTEXT
-				tid, _ = o.Database.contextExists(row.title)
-			case FOLDER:
-				o.taskview = BY_FOLDER
-				tid, _ = o.Database.folderExists(row.title)
-			case KEYWORD:
-				o.taskview = BY_KEYWORD
-				// this guard to see if synced may not be necessary for keyword
-				tid, _ = o.Database.keywordExists(row.title)
-			}
-
-			// if it's a new context|folder|keyword we can't filter tasks by it
-			if tid < 1 {
-				o.showMessage("You need to sync before you can use %q", row.title)
-				return
-			}
-			o.filter = row.title
-			o.ShowMessage(BL, "'%s' will be opened", o.filter)
-
-			o.clearMarkedEntries()
-			o.view = TASK
-			o.fc, o.fr, o.rowoff = 0, 0, 0
-			//o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-			o.FilterEntries(MAX)
-			if len(o.rows) == 0 {
-				o.insertRow(0, "", true, false, false, BASE_DATE)
-				o.rows[0].dirty = false
-				o.showMessage("No results were returned")
-			}
-			o.Session.imagePreview = false
-			o.readRowsIntoBuffer()
-			vim.CursorSetPosition(1, 0)
-			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-			o.drawPreview()
-			return
 		}
 
 		if _, err := strconv.Atoi(string(c)); err != nil {
@@ -159,7 +111,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 		// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o' ctrl-V (22)
 		// being passed to vim
-		if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
+		//if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
+		if _, ok := noopKeys[c]; ok {
 			if c != int([]byte(leader)[0]) {
 				o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
 			}
