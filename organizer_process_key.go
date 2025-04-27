@@ -47,16 +47,16 @@ func (o *Organizer) organizerProcessKey(c int) {
 	case INSERT:
 
 		if c == '\r' {
-			o.writeTitle()
+			o.writeTitle() // now updates ftsTitle if taskview == BY_FIND
 			vim.Key("<esc>")
 			o.mode = NORMAL
 			row := &o.rows[o.fr]
 			row.dirty = false
 			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
 			o.command = ""
-			if o.taskview == BY_FIND {
-				row.ftsTitle = row.title
-			}
+			//if o.taskview == BY_FIND {
+			//	row.ftsTitle = row.title
+			//}
 			//o.showMessage("")
 			return
 		}
@@ -93,10 +93,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 			o.command = ""
 			row := &o.rows[o.fr]
 			if row.dirty {
-				o.writeTitle()
-				if o.taskview == BY_FIND {
-					row.ftsTitle = row.title
-				}
+				o.writeTitle() // now updates ftsTitle if taskview == BY_FIND
+				//if o.taskview == BY_FIND {
+				//		row.ftsTitle = row.title
+				//	}
 				vim.Key("<esc>")
 				row.dirty = false
 				o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)

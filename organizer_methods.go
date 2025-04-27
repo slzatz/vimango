@@ -1,7 +1,7 @@
 package main
 
 import (
-  "fmt"
+	"fmt"
 	"strings"
 )
 
@@ -100,7 +100,7 @@ func (o *Organizer) changeCase() {
 }
 */
 
-//func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, modified string) {
+// func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, modified string) {
 func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, archived bool, sort string) {
 	/* note since only inserting blank line at top, don't really need at, s and also don't need size_t*/
 
@@ -192,51 +192,70 @@ func (o *Organizer) insertChar(c int) {
 
 func (o *Organizer) writeTitle() {
 	row := &o.rows[o.fr]
-  var msg string
+	var msg string
 	if !row.dirty {
 		o.ShowMessage(BR, "Row has not been changed")
 		return
 	}
 
 	if o.view == TASK {
-    if row.id != -1 {
-      err := o.Database.updateTitle(row)
-      if err != nil {
-        o.ShowMessage(BL, "Error updating title: id %d: %v", row.id, err)
-      } else {
-        o.ShowMessage(BL, "Updated title for id: %d", row.id)
-      }
-     } else { 
-         var context_tid, folder_tid int
-         switch o.taskview {
-          case BY_CONTEXT:
-            context_tid, _ = o.Database.contextExists(o.filter)
-            folder_tid = 1
-          case BY_FOLDER:
-            folder_tid, _ = o.Database.folderExists(o.filter)
-            context_tid = 1
-          default:  
-            context_tid = 1
-            folder_tid = 1
-          }
-        err :=o.Database.insertTitle(row, context_tid, folder_tid)
-        if err != nil {
-          o.ShowMessage(BL, "Error inserting new title id %d: %v", row.id, err)
-        } else {
-          o.ShowMessage(BL, "New (new) title written to db with id: %d", row.id)
-        }
-     }
+		if row.id != -1 {
+			err := o.Database.updateTitle(row)
+			if err != nil {
+				o.ShowMessage(BL, "Error updating title: id %d: %v", row.id, err)
+			} else {
+				o.ShowMessage(BL, "Updated title for id: %d", row.id)
+			}
+			// update fts title
+			if o.taskview == BY_FIND {
+				err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row)
+				if err != nil {
+					row.ftsTitle = row.title
+					o.ShowMessage(BL, "Error updating fts title: id %d: %v", row.id, err)
+				} else {
+					o.ShowMessage(BL, "Updated fts title for id: %d", row.id)
+				}
+			}
+		} else {
+			var context_tid, folder_tid int
+			switch o.taskview {
+			case BY_CONTEXT:
+				context_tid, _ = o.Database.contextExists(o.filter)
+				folder_tid = 1
+			case BY_FOLDER:
+				folder_tid, _ = o.Database.folderExists(o.filter)
+				context_tid = 1
+			default:
+				context_tid = 1
+				folder_tid = 1
+			}
+			err := o.Database.insertTitle(row, context_tid, folder_tid)
+			if err != nil {
+				o.ShowMessage(BL, "Error inserting new title id %d: %v", row.id, err)
+			} else {
+				o.ShowMessage(BL, "New (new) title written to db with id: %d", row.id)
+			}
+			if o.taskview == BY_FIND {
+				err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row)
+				if err != nil {
+					row.ftsTitle = row.title
+					o.ShowMessage(BL, "Error updating fts title: id %d: %v", row.id, err)
+				} else {
+					o.ShowMessage(BL, "Updated fts title for id: %d", row.id)
+				}
+			}
+		}
 	} else {
-    if !row.dirty {
-      o.ShowMessage(BL, "Row has not been changed")
-      return
-      }
+		if !row.dirty {
+			o.ShowMessage(BL, "Row has not been changed")
+			return
+		}
 		err := o.Database.updateContainerTitle(row, o.view)
 		if err != nil {
-      msg = fmt.Sprintf("Error inserting into DB: %v", err)
+			msg = fmt.Sprintf("Error inserting into DB: %v", err)
 		} else {
-      msg = fmt.Sprintf("New (new) container written to db with id: %d", row.id)
-    }
+			msg = fmt.Sprintf("New (new) container written to db with id: %d", row.id)
+		}
 	}
 
 	o.command = ""
@@ -251,4 +270,3 @@ func (o *Organizer) clearMarkedEntries() {
 		delete(o.marked_entries, k)
 	}
 }
-

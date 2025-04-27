@@ -267,30 +267,6 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	return orgRows, nil
 }
 
-/*
-// not in use
-func (db *Database) updateTitle_(row *Row) error {
-	if row.id == -1 {
-		err := db.insertRowInDB(row)
-    if err != nil {
-      return err
-	  }
-  } else {
-	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
-	if err != nil {
-    return err
-	}
-}
-	entry_tid := db.entryTidFromId(row.id)
-
-	_, err := db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
-	if err != nil {
-    return err
-	}
-  return nil
-}
-*/
-
 func (db *Database) updateTitle(row *Row) error {
 	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
 	if err != nil {
@@ -528,34 +504,48 @@ func (db *Database) getTaskKeywords(id int) string {
 	return strings.Join(kk, ",")
 }
 
-/* Doesn't appear to be used
+/*
+	Doesn't appear to be used
+
 func getTaskKeywordTids(id int) []int {
 
-	entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
+		entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
 
-	keyword_tids := []int{}
-	rows, err := db.Query("SELECT keyword_tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
-		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
-	if err != nil {
-		sess.showOrgMessage("Error in getTaskKeywordIds for entry id %d: %v", id, err)
+		keyword_tids := []int{}
+		rows, err := db.Query("SELECT keyword_tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
+			"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
+		if err != nil {
+			sess.showOrgMessage("Error in getTaskKeywordIds for entry id %d: %v", id, err)
+			return keyword_tids
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var tid int
+			err = rows.Scan(&tid)
+			keyword_tids = append(keyword_tids, tid)
+		}
 		return keyword_tids
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var tid int
-		err = rows.Scan(&tid)
-		keyword_tids = append(keyword_tids, tid)
-	}
-	return keyword_tids
-}
 */
+func (db *Database) updateFtsTitle(st string, row *Row) error {
+	tid := db.entryTidFromId(row.id)
+	r := db.FtsDB.QueryRow("SELECT highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') FROM fts WHERE fts MATCH ? and tid=?;", st, tid)
+	var ftsTitle string
+	err := r.Scan(&ftsTitle)
+	if err != nil {
+		return err
+	}
+	row.ftsTitle = ftsTitle
+	return nil
+}
 
-func (db *Database) searchEntries(st, sort string, showDeleted, help bool) []Row {
-
+func (db *Database) searchEntries(st, sort string, showDeleted, help bool) ([]Row, error) {
 	rows, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
 		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
-
+	if err != nil {
+		return []Row{}, err
+	}
 	defer rows.Close()
 
 	var ftsTids []int
@@ -571,15 +561,14 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) []Row
 		)
 
 		if err != nil {
-			app.Organizer.ShowMessage(BL, "Error trying to retrieve search info from fts_db - term: %s; %v", st, err)
-			return []Row{}
+			return []Row{}, err
 		}
 		ftsTids = append(ftsTids, ftsTid)
 		ftsTitles[ftsTid] = ftsTitle
 	}
 
 	if len(ftsTids) == 0 {
-		return []Row{}
+		return []Row{}, nil
 	}
 
 	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
@@ -609,8 +598,7 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) []Row
 
 	rows, err = db.MainDB.Query(stmt)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in Find query %q: %v", stmt[:10], err)
-		return []Row{}
+		return []Row{}, err
 	}
 	var orgRows []Row
 	for rows.Next() {
@@ -628,8 +616,7 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) []Row
 		)
 
 		if err != nil {
-			app.Organizer.ShowMessage(BL, "Error in searchEntries reading rows")
-			return []Row{}
+			return []Row{}, err
 		}
 
 		row.sort = timeDelta(sort)
@@ -637,7 +624,7 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) []Row
 
 		orgRows = append(orgRows, row)
 	}
-	return orgRows
+	return orgRows, nil
 }
 
 func (db *Database) getContainers(view View) []Row {
