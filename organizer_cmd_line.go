@@ -103,8 +103,7 @@ func (o *Organizer) log(_ int) {
 	o.ShowMessage(BL, "")
 }
 
-func (o *Organizer) openContainer() {
-	//var tid int
+func (o *Organizer) openContainerSelection() {
 	row := o.rows[o.fr]
 	var ok bool
 	switch o.view {
@@ -120,20 +119,20 @@ func (o *Organizer) openContainer() {
 		_, ok = o.Database.keywordExists(row.title)
 	}
 
-	// if it's a new context|folder|keyword we can't filter tasks by it
-	//if tid < 1 {
 	if !ok {
 		o.showMessage("You need to sync before you can use %q", row.title)
 		return
 	}
 	o.filter = row.title
-	o.ShowMessage(BL, "'%s' will be opened", o.filter)
+	o.generateNoteList()
+}
 
+func (o *Organizer) generateNoteList() {
+	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 	o.clearMarkedEntries()
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	//o.rows = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
@@ -144,68 +143,37 @@ func (o *Organizer) openContainer() {
 	o.readRowsIntoBuffer()
 	vim.CursorSetPosition(1, 0)
 	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	o.altRowoff = 0
 	o.drawPreview()
-	o.command_line = ""
 }
 
 func (o *Organizer) open(pos int) {
 	if o.view != TASK {
-		o.openContainer()
+		o.openContainerSelection()
 		return
 	}
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not provide a context or folder!")
-		//o.mode = NORMAL
 		o.mode = o.last_mode
 		return
 	}
-
-	var tid int
 	var ok bool
 	input := o.command_line[pos+1:]
-	if tid, ok = o.Database.contextExists(input); ok {
+	if _, ok = o.Database.contextExists(input); ok {
 		o.taskview = BY_CONTEXT
 	}
-
 	if !ok {
-		if tid, ok = o.Database.folderExists(input); ok {
+		if _, ok = o.Database.folderExists(input); ok {
 			o.taskview = BY_FOLDER
 		}
 	}
-
 	if !ok {
 		o.ShowMessage(BL, "%s is not a valid context or folder!", input)
 		o.mode = o.last_mode
 		return
 	}
-
-	if tid < 1 {
-		o.ShowMessage(BL, "%q is an unsynced context or folder!", input)
-		o.mode = o.last_mode
-		return
-	}
-
 	o.filter = input
-	o.ShowMessage(BL, "'%s' will be opened", o.filter)
-
-	o.clearMarkedEntries()
-	o.view = TASK
-	o.mode = NORMAL
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-	o.FilterEntries(MAX)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-		o.ShowMessage(BL, "No results were returned")
-	}
-	o.Session.imagePreview = false
-	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-	o.altRowoff = 0
-	o.drawPreview()
-	return
+	o.generateNoteList()
 }
 
 func (o *Organizer) openContext(pos int) {
@@ -214,33 +182,19 @@ func (o *Organizer) openContext(pos int) {
 		o.mode = o.last_mode
 		return
 	}
-
 	input := o.command_line[pos+1:]
-	var tid int
-	var ok bool
-	if tid, ok = o.Database.contextExists(input); !ok {
-		o.ShowMessage(BL, "%s is not a valid context!", input)
+	if _, ok := o.Database.contextExists(input); !ok {
+		o.ShowMessage(BL, "%s is either not a valid context or has not been synced!", input)
 		o.mode = o.last_mode
 		return
 	}
-	if tid < 1 {
-		o.ShowMessage(BL, "%q is an unsynced context!", input)
-		o.mode = o.last_mode
-		return
-	}
-
 	o.filter = input
-
 	o.ShowMessage(BL, "'%s' will be opened", o.filter)
-
 	o.clearMarkedEntries()
-	//o.folder = ""
-	//o.keyword = ""
 	o.taskview = BY_CONTEXT
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
