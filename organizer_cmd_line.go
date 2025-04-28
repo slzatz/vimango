@@ -188,25 +188,9 @@ func (o *Organizer) openContext(pos int) {
 		o.mode = o.last_mode
 		return
 	}
-	o.filter = input
-	o.ShowMessage(BL, "'%s' will be opened", o.filter)
-	o.clearMarkedEntries()
 	o.taskview = BY_CONTEXT
-	o.view = TASK
-	o.mode = NORMAL
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.FilterEntries(MAX)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-		o.ShowMessage(BL, "No results were returned")
-	}
-	o.Session.imagePreview = false
-	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-	o.altRowoff = 0
-	o.drawPreview()
+	o.filter = input
+	o.generateNoteList()
 }
 
 func (o *Organizer) openFolder(pos int) {
@@ -215,44 +199,15 @@ func (o *Organizer) openFolder(pos int) {
 		o.mode = o.last_mode
 		return
 	}
-
 	input := o.command_line[pos+1:]
-	var ok bool
-	var tid int
-	if tid, ok = o.Database.folderExists(input); !ok {
+	if _, ok := o.Database.folderExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		o.mode = o.last_mode
 		return
 	}
-	if tid < 1 {
-		o.ShowMessage(BL, "%q is an unsynced folder!", input)
-		o.mode = o.last_mode
-		return
-	}
-
-	o.filter = input
-
-	o.ShowMessage(BL, "'%s' will be opened", o.filter)
-
-	o.clearMarkedEntries()
 	o.taskview = BY_FOLDER
-	o.view = TASK
-	o.mode = NORMAL
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-	o.FilterEntries(MAX)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-		o.ShowMessage(BL, "No results were returned")
-	}
-	o.Session.imagePreview = false
-	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-	o.altRowoff = 0
-	o.drawPreview()
-	return
+	o.filter = input
+	o.generateNoteList()
 }
 
 func (o *Organizer) openKeyword(pos int) {
@@ -262,43 +217,14 @@ func (o *Organizer) openKeyword(pos int) {
 		return
 	}
 	input := o.command_line[pos+1:]
-	var ok bool
-	var tid int
-	if tid, ok = o.Database.keywordExists(input); !ok {
+	if _, ok := o.Database.keywordExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
 		o.mode = o.last_mode
 		return
 	}
-	// this guard may not be necessary for keywords
-	if tid < 1 {
-		o.ShowMessage(BL, "%q is an unsynced keyword!", input)
-		o.mode = o.last_mode
-		return
-	}
-
-	o.filter = input
-
-	o.ShowMessage(BL, "'%s' will be opened", o.filter)
-
-	o.clearMarkedEntries()
 	o.taskview = BY_KEYWORD
-	o.view = TASK
-	o.mode = NORMAL
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-	o.FilterEntries(MAX)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-		o.ShowMessage(BL, "No results were returned")
-	}
-	o.Session.imagePreview = false
-	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
-	o.altRowoff = 0
-	o.drawPreview()
-	return
+	o.filter = input
+	o.generateNoteList()
 }
 
 func (o *Organizer) write(pos int) {
