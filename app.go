@@ -43,10 +43,9 @@ func CreateApp() *App {
 		Screen:   screen,
 		Database: db,
 		Organizer: &Organizer{Session: sess,
-			Screen:     screen,
-			Database:   db,
-			normalCmds: make(map[string]func(*Organizer)),
-			exCmds:     make(map[string]func(*Organizer, int))},
+			Screen:   screen,
+			Database: db,
+		},
 		Run: true,
 	}
 }
@@ -74,9 +73,13 @@ func (a *App) NewEditor() *Editor {
 		modified:           false,
 		exCmds:             exCmds,
 		normalCmds:         normalCmds,
-		Screen:             a.Screen,
-		Session:            a.Session,
-		Database:           a.Database,
+		tabCompletion: struct {
+			list  []string
+			index int
+		}{list: nil, index: 0},
+		Screen:   a.Screen,
+		Session:  a.Session,
+		Database: a.Database,
 	}
 }
 
@@ -240,9 +243,11 @@ func (a *App) InitApp() {
 	a.Organizer.mode = NORMAL
 	a.Organizer.last_mode = NORMAL
 	a.Organizer.view = TASK
-
+	a.Organizer.tabCompletion.list = nil
+	a.Organizer.tabCompletion.index = 0
 	a.Organizer.normalCmds = a.setOrganizerNormalCmds()
 	a.Organizer.exCmds = a.setOrganizerExCmds()
+	a.Organizer.filterList = a.setFilterList()
 
 	if a.Config.Options.Type == "folder" {
 		a.Organizer.taskview = BY_FOLDER

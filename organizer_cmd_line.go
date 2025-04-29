@@ -19,6 +19,7 @@ func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
 	return map[string]func(*Organizer, int){
 		"open":            (*Organizer).open,
 		"o":               (*Organizer).open,
+		"cd":              (*Organizer).open,
 		"opencontext":     (*Organizer).openContext,
 		"oc":              (*Organizer).openContext,
 		"openfolder":      (*Organizer).openFolder,

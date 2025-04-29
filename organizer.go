@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/slzatz/vimango/vim"
 )
@@ -40,9 +41,35 @@ type Organizer struct {
 	bufferTick          int
 	normalCmds          map[string]func(*Organizer)
 	exCmds              map[string]func(*Organizer, int)
-	Database            *Database
-	Session             *Session
-	Screen              *Screen
+	filterList          []FilterNames
+	tabCompletion       struct {
+		list  []FilterNames
+		index int
+	}
+	Database *Database
+	Session  *Session
+	Screen   *Screen
+}
+
+type FilterNames struct {
+	Text string
+	Char rune
+}
+
+func (a *App) setFilterList() []FilterNames {
+	fnlist := []FilterNames{}
+	filterMap := a.Database.contextList()
+	for v, _ := range filterMap {
+		fnlist = append(fnlist, FilterNames{Text: v, Char: 'c'})
+	}
+	filterMap = a.Database.folderList()
+	for v, _ := range filterMap {
+		fnlist = append(fnlist, FilterNames{Text: v, Char: 'f'})
+	}
+	sort.Slice(fnlist, func(i, j int) bool {
+		return fnlist[i].Text < fnlist[j].Text
+	})
+	return fnlist
 }
 
 func (o *Organizer) FilterEntries(max int) {

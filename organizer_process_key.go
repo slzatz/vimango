@@ -3,17 +3,11 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/slzatz/vimango/vim"
 )
-
-var tabCompletion struct {
-	idx  int
-	list []string
-}
 
 func (o *Organizer) organizerProcessKey(c int) {
 
@@ -27,8 +21,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 		o.fc = pos[1]
 		o.fr = pos[0] - 1
 		//org.fc = utf8.RuneCount(p.ss[org.fr][:pos[1]])
-		tabCompletion.idx = 0
-		tabCompletion.list = nil
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
 		o.Session.imagePreview = false
 		if o.view == TASK {
 			o.drawPreview()
@@ -238,8 +232,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 					}
 				}
 			}
-			tabCompletion.idx = 0
-			tabCompletion.list = nil
+			o.tabCompletion.index = 0
+			o.tabCompletion.list = nil
 
 			if !found {
 				o.showMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
@@ -253,42 +247,54 @@ func (o *Organizer) organizerProcessKey(c int) {
 			if pos == -1 {
 				return
 			}
-			if tabCompletion.list != nil {
-				tabCompletion.idx++
-				if tabCompletion.idx > len(tabCompletion.list)-1 {
-					tabCompletion.idx = 0
+			if o.tabCompletion.list != nil {
+				o.tabCompletion.index++
+				if o.tabCompletion.index > len(o.tabCompletion.list)-1 {
+					o.tabCompletion.index = 0
 				}
 			} else {
 				o.ShowMessage(BR, "tab")
+				o.tabCompletion.index = 0
 				cmd := o.command_line[:pos]
 				option := o.command_line[pos+1:]
-				var filterMap = make(map[string]struct{})
-				switch cmd {
-				case "o", "oc", "c":
-					filterMap = o.Database.contextList()
-				case "of", "f":
-					filterMap = o.Database.folderList()
-				case "ok", "k":
-					filterMap = o.Database.keywordList()
-				case "sort":
-					filterMap = sortColumns
-				default:
+				/*
+					var filterMap = make(map[string]struct{})
+					switch cmd {
+					case "o", "oc", "c", "cd":
+						filterMap = o.Database.contextList()
+					case "of", "f":
+						filterMap = o.Database.folderList()
+					case "ok", "k":
+						filterMap = o.Database.keywordList()
+					case "sort":
+						filterMap = sortColumns
+					default:
+						return
+					}
+					for k, _ := range filterMap {
+						if strings.HasPrefix(k, option) {
+							tabCompletion.list = append(tabCompletion.list, k)
+						}
+				*/
+				//for k, _ := range o.tabCompletion.List {
+				if !(cmd == "o" || cmd == "cd") {
 					return
 				}
-
-				for k, _ := range filterMap {
-					if strings.HasPrefix(k, option) {
-						tabCompletion.list = append(tabCompletion.list, k)
+				for _, k := range o.filterList {
+					if strings.HasPrefix(k.Text, option) {
+						//tabCompletion.list = append(tabCompletion.list, k.Text)
+						o.tabCompletion.list = append(o.tabCompletion.list, FilterNames{Text: k.Text, Char: k.Char})
 					}
 				}
-				if len(tabCompletion.list) == 0 {
+
+				if len(o.tabCompletion.list) == 0 {
 					return
 				}
-				sort.Strings(tabCompletion.list)
+				//sort.Strings(tabCompletion.list)
 			}
 
-			o.command_line = o.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
-			o.showMessage(":%s", o.command_line)
+			o.command_line = o.command_line[:pos+1] + o.tabCompletion.list[o.tabCompletion.index].Text
+			o.showMessage(":%s (%c)", o.command_line, o.tabCompletion.list[o.tabCompletion.index].Char)
 			return
 
 		case DEL_KEY, BACKSPACE:
@@ -301,8 +307,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 			o.command_line += string(c)
 		} // end switch c in COMMAND_LINE
 
-		tabCompletion.idx = 0
-		tabCompletion.list = nil
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
 
 		o.showMessage(":%s", o.command_line)
 

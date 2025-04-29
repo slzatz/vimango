@@ -184,8 +184,8 @@ func (e *Editor) editorProcessKey(c int) bool {
 				cmd0(e)
 				e.command_line = ""
 				e.mode = NORMAL
-				tabCompletion.idx = 0
-				tabCompletion.list = nil
+				e.tabCompletion.index = 0
+				e.tabCompletion.list = nil
 				return false
 			}
 
@@ -197,7 +197,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 		if c == '\t' {
 			pos := strings.Index(e.command_line, " ")
-			if tabCompletion.list == nil {
+			if e.tabCompletion.list == nil {
 				e.ShowMessage(BL, "tab")
 				var s string
 				if pos != -1 {
@@ -218,20 +218,20 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 					for _, path := range paths {
 						if strings.HasPrefix(path.Name(), partial) {
-							tabCompletion.list = append(tabCompletion.list, filepath.Join(dir, path.Name()))
+							e.tabCompletion.list = append(e.tabCompletion.list, filepath.Join(dir, path.Name()))
 						}
 					}
 				}
-				if len(tabCompletion.list) == 0 {
+				if len(e.tabCompletion.list) == 0 {
 					return false
 				}
 			} else {
-				tabCompletion.idx++
-				if tabCompletion.idx > len(tabCompletion.list)-1 {
-					tabCompletion.idx = 0
+				e.tabCompletion.index++
+				if e.tabCompletion.index > len(e.tabCompletion.list)-1 {
+					e.tabCompletion.index = 0
 				}
 			}
-			e.command_line = e.command_line[:pos+1] + tabCompletion.list[tabCompletion.idx]
+			e.command_line = e.command_line[:pos+1] + e.tabCompletion.list[e.tabCompletion.index]
 			e.ShowMessage(BR, ":%s", e.command_line)
 			return false
 		}
@@ -245,8 +245,8 @@ func (e *Editor) editorProcessKey(c int) bool {
 			e.command_line += string(c)
 		}
 
-		tabCompletion.idx = 0
-		tabCompletion.list = nil
+		e.tabCompletion.index = 0
+		e.tabCompletion.list = nil
 
 		e.ShowMessage(BR, ":%s", e.command_line)
 		return false
