@@ -257,8 +257,8 @@ func (a *App) InitApp() {
 
 	a.Organizer.filter = a.Config.Options.Title
 	a.Organizer.marked_entries = make(map[int]struct{})
-	a.Organizer.vbuf = vim.BufferNew(0)
-	vim.BufferSetCurrent(a.Organizer.vbuf)
+	a.Organizer.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(a.Organizer.vbuf)
 }
 
 func (a *App) LoadInitialData() {
@@ -283,7 +283,7 @@ func (a *App) LoadInitialData() {
 	}
 
 	a.Organizer.readRowsIntoBuffer()
-	a.Organizer.bufferTick = vim.BufferGetLastChangedTick(a.Organizer.vbuf)
+	a.Organizer.bufferTick = a.Organizer.vbuf.GetLastChangedTick()
 	a.Organizer.drawPreview()
 	a.Organizer.refreshScreen()
 	a.Organizer.drawStatusBar()

@@ -85,7 +85,7 @@ func (e *Editor) writeNote() {
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
-	e.bufferTick = vim.BufferGetLastChangedTick(e.vbuf)
+	e.bufferTick = e.vbuf.GetLastChangedTick()
 
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 	e.ShowMessage(BR, "isModified = %t", e.isModified())
@@ -334,7 +334,7 @@ func (e *Editor) syntax() {
 }
 
 func (e *Editor) printNote() {
-	vim.Execute("ha")
+	vim.ExecuteCommand("ha")
 }
 
 /*
@@ -371,7 +371,7 @@ func (e *Editor) quitActions() {
 		return
 	}
 
-	vim.Execute("bw") // wipout the buffer
+	vim.ExecuteCommand("bw") // wipout the buffer
 
 	index := -1
 	//for i, w := range app.Windows {
@@ -407,7 +407,7 @@ func (e *Editor) quitActions() {
 		}
 
 		//p = app.Windows[0].(*Editor)
-		vim.BufferSetCurrent(e.Session.activeEditor.vbuf)
+		vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
 		e.Screen.positionWindows()
 		e.Screen.eraseRightScreen()
 		e.Screen.drawRightScreen()
@@ -416,7 +416,7 @@ func (e *Editor) quitActions() {
 		// unless commented out earlier sess.p.quit <- causes panic
 		//sess.p = nil
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
+		vim.SetCurrentBuffer(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
 		e.Screen.eraseRightScreen()
 
 		if e.Screen.divider < 10 {
@@ -434,11 +434,11 @@ func (e *Editor) quitActions() {
 func (e *Editor) writeAll() {
 	for _, w := range e.Session.Windows {
 		if ed, ok := w.(*Editor); ok {
-			vim.BufferSetCurrent(ed.vbuf)
+			vim.SetCurrentBuffer(ed.vbuf)
 			ed.writeNote()
 		}
 	}
-	vim.BufferSetCurrent(e.vbuf)
+	vim.SetCurrentBuffer(e.vbuf)
 	e.command_line = ""
 	e.mode = NORMAL
 }
@@ -483,7 +483,7 @@ func (e *Editor) quitAll() {
 			}
 		}
 
-		vim.BufferSetCurrent(e.Session.activeEditor.vbuf)
+		vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
 		e.Screen.positionWindows()
 		e.Screen.eraseRightScreen()
 		e.Screen.drawRightScreen()
@@ -491,7 +491,7 @@ func (e *Editor) quitAll() {
 
 	} else { // we've been able to quit all editors because none were in modified state
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
+		vim.SetCurrentBuffer(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
 		e.Screen.eraseRightScreen()
 
 		if e.Screen.divider < 10 {
@@ -577,10 +577,10 @@ func (e *Editor) goFormat() {
 
 	e.ss = ss
 
-	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
-	lines := vim.BufferGetLineCount(e.vbuf)
+	e.vbuf.SetLines(0, -1, e.ss)
+	lines := e.vbuf.GetLineCount()
 	e.ShowMessage(BL, "Number of lines in the formatted text = %d", lines)
-	vim.CursorSetPosition(1, 0)
+	vim.SetCursorPosition(1, 0)
 	e.fr = 0
 	e.fc = 0
 	e.scroll()

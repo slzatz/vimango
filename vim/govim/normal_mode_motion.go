@@ -1,0 +1,346 @@
+package govim
+
+// BasicMotions implements the basic h,j,k,l movement commands
+type motionCommand func(e *GoEngine) bool
+
+// motionHandlers maps characters to their motion handlers
+var motionHandlers = map[string]motionCommand{
+	"h": moveLeft,
+	"j": moveDown,
+	"k": moveUp,
+	"l": moveRight,
+	"0": moveToLineStart,
+	"$": moveToLineEnd,
+	"^": moveToFirstNonBlank,
+	"w": moveWordForward,
+	"b": moveWordBackward,
+	"e": moveWordEnd,
+	"G": moveToLastLine,
+}
+
+// moveLeft moves the cursor one character to the left
+func moveLeft(e *GoEngine) bool {
+	if e.cursorCol > 0 {
+		e.cursorCol--
+		return true
+	}
+	return false
+}
+
+// moveRight moves the cursor one character to the right
+func moveRight(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	line := e.currentBuffer.GetLine(e.cursorRow)
+	// In Vim, we can move to the position after the last character
+	// But not beyond the end of the line
+	if e.cursorCol < len(line) - 1 {
+		e.cursorCol++
+		return true
+	}
+	return false
+}
+
+// moveDown moves the cursor one line down
+func moveDown(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	if e.cursorRow < e.currentBuffer.GetLineCount() {
+		e.cursorRow++
+		// Adjust column if the new line is shorter
+		line := e.currentBuffer.GetLine(e.cursorRow)
+		if e.cursorCol >= len(line) && len(line) > 0 {
+			e.cursorCol = len(line) - 1
+		} else if len(line) == 0 {
+			e.cursorCol = 0
+		}
+		return true
+	}
+	return false
+}
+
+// moveUp moves the cursor one line up
+func moveUp(e *GoEngine) bool {
+	if e.cursorRow > 1 {
+		e.cursorRow--
+		// Adjust column if the new line is shorter
+		line := e.currentBuffer.GetLine(e.cursorRow)
+		if e.cursorCol > len(line) {
+			e.cursorCol = len(line)
+		}
+		return true
+	}
+	return false
+}
+
+// moveToLineStart moves to the first character of the line
+func moveToLineStart(e *GoEngine) bool {
+	if e.cursorCol != 0 {
+		e.cursorCol = 0
+		return true
+	}
+	return false
+}
+
+// moveToLineEnd moves to the end of the line
+func moveToLineEnd(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	line := e.currentBuffer.GetLine(e.cursorRow)
+	if len(line) > 0 {
+		// In vim, $ moves to the last character of the line
+		lastPos := len(line) - 1
+		if e.cursorCol != lastPos {
+			e.cursorCol = lastPos
+			return true
+		}
+	}
+	return false
+}
+
+// moveWordForward moves to the start of the next word
+func moveWordForward(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	line := e.currentBuffer.GetLine(e.cursorRow)
+	
+	// If we're at the end of the line, move to the next line
+	if e.cursorCol >= len(line)-1 {
+		if e.cursorRow < e.currentBuffer.GetLineCount() {
+			e.cursorRow++
+			e.cursorCol = 0
+			return true
+		}
+		return false
+	}
+	
+	// Find the next word start
+	inWord := isWordChar(line[e.cursorCol])
+	start := e.cursorCol + 1
+	
+	// Skip current word
+	for start < len(line) && isWordChar(line[start]) == inWord {
+		start++
+	}
+	
+	// Skip whitespace
+	for start < len(line) && isWhitespace(line[start]) {
+		start++
+	}
+	
+	if start < len(line) {
+		e.cursorCol = start
+		return true
+	} else if e.cursorRow < e.currentBuffer.GetLineCount() {
+		// Move to the start of the next line
+		e.cursorRow++
+		e.cursorCol = 0
+		return true
+	}
+	
+	return false
+}
+
+// moveWordBackward moves to the start of the previous word
+func moveWordBackward(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	// If we're at the start of the line, move to the end of the previous line
+	if e.cursorCol == 0 {
+		if e.cursorRow > 1 {
+			e.cursorRow--
+			line := e.currentBuffer.GetLine(e.cursorRow)
+			e.cursorCol = len(line) - 1
+			return true
+		}
+		return false
+	}
+	
+	line := e.currentBuffer.GetLine(e.cursorRow)
+	
+	// Start from the character before current position
+	pos := e.cursorCol - 1
+	
+	// Skip whitespace backwards
+	for pos > 0 && isWhitespace(line[pos]) {
+		pos--
+	}
+	
+	// If we're in the middle of a word, go to the start of the current word
+	if pos > 0 && isWordChar(line[pos]) && isWordChar(line[pos-1]) {
+		// We're in the middle of a word, go to its start
+		for pos > 0 && isWordChar(line[pos-1]) {
+			pos--
+		}
+	} else if pos > 0 {
+		// We're either at the start of a word or on a non-word character
+		
+		// If we're on a non-word character, skip backwards over all non-word characters
+		if !isWordChar(line[pos]) {
+			for pos > 0 && !isWordChar(line[pos-1]) {
+				pos--
+			}
+		}
+		
+		// Now find the start of the previous word if we're not already at the start of a word
+		if pos > 0 {
+			// Skip backwards to a word character
+			if !isWordChar(line[pos]) {
+				for pos > 0 && !isWordChar(line[pos-1]) {
+					pos--
+				}
+			}
+			
+			// If we found a word character, go to the start of that word
+			if pos > 0 && isWordChar(line[pos-1]) {
+				// Go back to start of the word
+				for pos > 0 && isWordChar(line[pos-1]) {
+					pos--
+				}
+			}
+		}
+	}
+	
+	if e.cursorCol != pos {
+		e.cursorCol = pos
+		return true
+	}
+	
+	return false
+}
+
+// moveToLastLine moves to the last line of the buffer
+func moveToLastLine(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	lastLine := e.currentBuffer.GetLineCount()
+	if e.cursorRow != lastLine {
+		e.cursorRow = lastLine
+		line := e.currentBuffer.GetLine(e.cursorRow)
+		if e.cursorCol > len(line) {
+			e.cursorCol = len(line)
+		}
+		return true
+	}
+	return false
+}
+
+// isWordChar checks if a character is part of a word (alphanumeric or underscore)
+func isWordChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || 
+	       (c >= 'A' && c <= 'Z') || 
+	       (c >= '0' && c <= '9') || 
+	       c == '_'
+}
+
+// isWhitespace checks if a character is whitespace
+func isWhitespace(c byte) bool {
+	return c == ' ' || c == '\t'
+}
+
+// moveToFirstNonBlank moves to the first non-whitespace character of the line
+func moveToFirstNonBlank(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	line := e.currentBuffer.GetLine(e.cursorRow)
+	for i := 0; i < len(line); i++ {
+		if !isWhitespace(line[i]) {
+			if e.cursorCol != i {
+				e.cursorCol = i
+				return true
+			}
+			return false
+		}
+	}
+	
+	// If the line is all whitespace, move to the start
+	if e.cursorCol != 0 {
+		e.cursorCol = 0
+		return true
+	}
+	return false
+}
+
+// moveWordEnd moves to the end of the current or next word
+func moveWordEnd(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	line := e.currentBuffer.GetLine(e.cursorRow)
+	
+	// If we're at the end of the line, move to the next line
+	if e.cursorCol >= len(line)-1 {
+		if e.cursorRow < e.currentBuffer.GetLineCount() {
+			e.cursorRow++
+			e.cursorCol = 0
+			return moveWordEnd(e) // Recursively find word end in next line
+		}
+		return false
+	}
+	
+	// Start from the current position
+	pos := e.cursorCol
+	
+	// If we're at a word character, find the end of the current word
+	if isWordChar(line[pos]) {
+		// Move to the end of the current word
+		for pos < len(line)-1 && isWordChar(line[pos+1]) {
+			pos++
+		}
+		
+		// If we're already at the end of a word, find the next one
+		if pos == e.cursorCol && pos < len(line)-1 {
+			pos++
+			// Skip non-word characters
+			for pos < len(line)-1 && !isWordChar(line[pos]) {
+				pos++
+			}
+			// Find the end of this next word
+			for pos < len(line)-1 && isWordChar(line[pos+1]) {
+				pos++
+			}
+		}
+	} else {
+		// We're not on a word character, so find the next word
+		pos++
+		// Skip any remaining non-word characters
+		for pos < len(line) && !isWordChar(line[pos]) {
+			pos++
+		}
+		// Find the end of this word
+		if pos < len(line) {
+			for pos < len(line)-1 && isWordChar(line[pos+1]) {
+				pos++
+			}
+		}
+	}
+	
+	// Set the new cursor position
+	if pos < len(line) && pos != e.cursorCol {
+		e.cursorCol = pos
+		return true
+	}
+	
+	// If we're at the end of the line, move to the last character
+	if pos >= len(line) && e.cursorCol != len(line)-1 {
+		e.cursorCol = len(line) - 1
+		return true
+	}
+	
+	return false
+}

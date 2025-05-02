@@ -142,8 +142,8 @@ func (o *Organizer) generateNoteList() {
 	}
 	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.altRowoff = 0
 	o.drawPreview()
 }
@@ -341,7 +341,7 @@ func (o *Organizer) editNote(id int) {
 			o.Session.Windows = append(o.Session.Windows, ae.output)
 		}
 		o.Database.readNoteIntoBuffer(ae, id)
-		ae.bufferTick = vim.BufferGetLastChangedTick(ae.vbuf)
+		ae.bufferTick = ae.vbuf.GetLastChangedTick()
 		o.Session.activeEditor = ae
 	}
 
@@ -401,7 +401,7 @@ func (o *Organizer) newEntry(_ int) {
 		sort:  time.Now().Format("3:04:05 pm"), //correct whether added, created, modified are the sort
 	}
 
-	vim.BufferSetLines(o.vbuf, 0, 0, []string{""}, 1)
+	o.vbuf.SetLines(0, 0, []string{""})
 	o.rows = append(o.rows, Row{})
 	copy(o.rows[1:], o.rows[0:])
 	o.rows[0] = row
@@ -411,8 +411,8 @@ func (o *Organizer) newEntry(_ int) {
 	o.ShowMessage(BL, "\x1b[1m-- INSERT --\x1b[0m")
 	o.Screen.eraseRightScreen()
 	o.mode = INSERT
-	vim.CursorSetPosition(1, 0)
-	vim.Input("i")
+	vim.SetCursorPosition(1, 0)
+	vim.SendInput("i")
 }
 
 // flag is -1 if called as an ex command and 0 if called by another Organizer method
@@ -435,8 +435,8 @@ func (o *Organizer) refresh(flag int) {
 			}
 			o.Session.imagePreview = false
 			o.readRowsIntoBuffer()
-			vim.CursorSetPosition(1, 0)
-			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+			vim.SetCursorPosition(1, 0)
+			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.drawPreview()
 		} else {
 			o.mode = o.last_mode
@@ -449,8 +449,8 @@ func (o *Organizer) refresh(flag int) {
 			}
 			o.Session.imagePreview = false
 			o.readRowsIntoBuffer()
-			vim.CursorSetPosition(1, 0)
-			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+			vim.SetCursorPosition(1, 0)
+			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.drawPreview()
 		}
 	} else {
@@ -466,8 +466,8 @@ func (o *Organizer) refresh(flag int) {
 		o.fc, o.fr, o.rowoff = 0, 0, 0
 		o.filter = ""
 		o.readRowsIntoBuffer()
-		vim.CursorSetPosition(1, 0)
-		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		vim.SetCursorPosition(1, 0)
+		o.bufferTick = o.vbuf.GetLastChangedTick()
 		if flag != -1 {
 			o.displayContainerInfo()
 		}
@@ -509,8 +509,8 @@ func (o *Organizer) find(pos int) {
 	}
 	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.drawPreview()
 }
 
@@ -618,8 +618,8 @@ func (o *Organizer) contexts(pos int) {
 		o.fc, o.fr, o.rowoff = 0, 0, 0
 		o.filter = ""
 		o.readRowsIntoBuffer()
-		vim.CursorSetPosition(1, 0)
-		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		vim.SetCursorPosition(1, 0)
+		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.displayContainerInfo()
 		o.ShowMessage(BL, "Retrieved contexts")
 		return
@@ -680,8 +680,8 @@ func (o *Organizer) folders(pos int) {
 		o.fc, o.fr, o.rowoff = 0, 0, 0
 		o.filter = ""
 		o.readRowsIntoBuffer()
-		vim.CursorSetPosition(1, 0)
-		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		vim.SetCursorPosition(1, 0)
+		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.displayContainerInfo()
 		o.ShowMessage(BL, "Retrieved folders")
 		return
@@ -729,8 +729,8 @@ func (o *Organizer) keywords(pos int) {
 		o.fc, o.fr, o.rowoff = 0, 0, 0
 		o.filter = ""
 		o.readRowsIntoBuffer()
-		vim.CursorSetPosition(1, 0)
-		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		vim.SetCursorPosition(1, 0)
+		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.displayContainerInfo()
 		o.ShowMessage(BL, "Retrieved keywords")
 		return
@@ -797,8 +797,8 @@ func (o *Organizer) recent(_ int) {
 	}
 	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
-	vim.CursorSetPosition(1, 0)
-	o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.drawPreview()
 }
 
@@ -984,13 +984,13 @@ func (o *Organizer) printList(_ int) {
 	for i, row := range o.rows {
 		ss = append(ss, fmt.Sprintf("%2d. %s", i+1, row.title))
 	}
-	tempBuf := vim.BufferNew(0)
-	vim.BufferSetLines(tempBuf, 0, -1, ss, len(ss))
-	vim.BufferSetCurrent(tempBuf)
-	vim.Execute("ha")
+	tempBuf := vim.NewBuffer(0)
+	tempBuf.SetLines(0, -1, ss)
+	vim.SetCurrentBuffer(tempBuf)
+	vim.ExecuteCommand("ha")
 
 	if o.Session.activeEditor != nil {
-		vim.BufferSetCurrent(o.Session.activeEditor.vbuf)
+		vim.SetCurrentBuffer(o.Session.activeEditor.vbuf)
 	}
 	o.mode = o.last_mode
 	o.command_line = ""
@@ -1058,8 +1058,8 @@ func (o *Organizer) sortEntries(pos int) {
 		}
 		sess.imagePreview = false
 		o.readRowsIntoBuffer()
-		vim.CursorSetPosition(1, 0)
-		o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+		vim.SetCursorPosition(1, 0)
+		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.drawPreview()
 	*/
 }

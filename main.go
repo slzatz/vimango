@@ -18,7 +18,25 @@ func main() {
 	app = CreateApp()
 
 	// Initialize Vim
-	vim.Init(0)
+	// Configure Vim - Enable Go implementation with the --go-vim flag
+	useGoVim := false
+	for _, arg := range os.Args {
+		if arg == "--go-vim" {
+			useGoVim = true
+		}
+	}
+	
+	// Set up logging if Go implementation is used
+	if useGoVim {
+		fmt.Println("Using Go Vim implementation")
+		logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err == nil {
+			log.SetOutput(logFile)
+			log.Println("Go Vim implementation initialized")
+		}
+	}
+	
+	vim.Configure(vim.Config{UseGoImplementation: useGoVim})
 	
 	// Initialize database connections
 	err := app.InitDatabases("config.json")
@@ -38,8 +56,8 @@ func main() {
 	}()
 	
 	// Configure Vim settings
-	vim.Execute("set iskeyword+=*")
-	vim.Execute("set iskeyword+=`")
+	vim.ExecuteCommand("set iskeyword+=*")
+	vim.ExecuteCommand("set iskeyword+=`")
 	
 	// Enable raw mode
 	origCfg, err := rawmode.Enable()

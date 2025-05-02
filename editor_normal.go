@@ -154,7 +154,7 @@ func (e *Editor) moveLeft(_ int) {
 			app.moveDividerPct(80)
 		}
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(app.Organizer.vbuf)
+		vim.SetCurrentBuffer(app.Organizer.vbuf)
 		app.Organizer.drawPreview()
 		app.Organizer.mode = NORMAL
 		app.returnCursor()
@@ -174,7 +174,7 @@ func (e *Editor) moveLeft(_ int) {
 
 	if index > 0 {
 		ae := eds[index-1]
-		vim.BufferSetCurrent(ae.vbuf)
+		vim.SetCurrentBuffer(ae.vbuf)
 		ae.mode = NORMAL
 		e.Session.activeEditor = ae
 		return
@@ -185,7 +185,7 @@ func (e *Editor) moveLeft(_ int) {
 			app.moveDividerPct(80)
 		}
 		e.Session.editorMode = false
-		vim.BufferSetCurrent(app.Organizer.vbuf)
+		vim.SetCurrentBuffer(app.Organizer.vbuf)
 		app.Organizer.drawPreview()
 		app.Organizer.mode = NORMAL
 		app.returnCursor()
@@ -212,7 +212,7 @@ func (e *Editor) moveRight(_ int) {
 	if index < len(eds)-1 {
 		ae := eds[index+1]
 		ae.mode = NORMAL
-		vim.BufferSetCurrent(ae.vbuf)
+		vim.SetCurrentBuffer(ae.vbuf)
 		e.Session.activeEditor = ae
 	}
 
@@ -261,7 +261,7 @@ func (e *Editor) decorateWordVisual(c int) {
 			v.SetBufferText(e.vbuf, e.fr, beg, e.fr, end, [][]byte{word})
 			v.SetWindowCursor(w, [2]int{e.fr + 1, beg}) //set screen cx and cy from pos
 		*/
-		vim.Input2("xi" + s + "\x1b")
+		vim.SendMultiInput("xi" + s + "\x1b")
 		return
 	}
 
@@ -279,7 +279,7 @@ func (e *Editor) decorateWordVisual(c int) {
 		s = fmt.Sprintf("%s`%s`", space, s)
 	}
 
-	vim.Input2("xi" + s + "\x1b")
+	vim.SendMultiInput("xi" + s + "\x1b")
 	/*
 		v.SetBufferText(e.vbuf, e.fr, beg, e.fr, end, [][]byte{[]byte(newText)})
 		v.SetWindowCursor(w, [2]int{e.fr + 1, beg}) //set screen cx and cy from pos
@@ -295,8 +295,8 @@ func (e *Editor) decorateWord(c int) {
 		return
 	}
 
-	vim.Execute("let cword = expand('<cword>')")
-	w := vim.Eval("cword")
+	vim.ExecuteCommand("let cword = expand('<cword>')")
+	w := vim.EvaluateExpression("cword")
 
 	if w == "" {
 		return
@@ -318,7 +318,7 @@ func (e *Editor) decorateWord(c int) {
 	}
 	w = strings.Trim(w, "*`")
 	if undo {
-		vim.Input2("ciw" + w + "\x1b")
+		vim.SendMultiInput("ciw" + w + "\x1b")
 		return
 	}
 
@@ -330,7 +330,7 @@ func (e *Editor) decorateWord(c int) {
 	case ctrlKey('e'), 'e':
 		w = fmt.Sprintf("`%s`", w)
 	}
-	vim.Input("ciw" + w + "\x1b")
+	vim.SendInput("ciw" + w + "\x1b")
 }
 
 func (e *Editor) showMarkdownPreview(_ int) {
@@ -374,7 +374,7 @@ func (e *Editor) spellingCheck(_ int) {
 
 func (e *Editor) spellSuggest(_ int) {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
-	w := vim.Eval("expand('<cword>')")
+	w := vim.EvaluateExpression("expand('<cword>')")
 	if ok := h.Spell(w); ok {
 		e.ShowMessage(BR, "%q is spelled correctly", w)
 		return

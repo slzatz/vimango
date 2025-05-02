@@ -30,7 +30,7 @@ type Editor struct {
 	redraw             bool
 	id                 int //db id of entry
 	output             *Output
-	vbuf               vim.Buffer
+	vbuf               vim.VimBuffer
 	ss                 []string
 	searchPrefix       string
 	renderedNote       string

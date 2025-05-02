@@ -15,7 +15,7 @@ import (
 )
 
 func (e *Editor) highlightInfo() { // [2][4]int {
-	e.highlight = vim.VisualGetRange() //[]line col []line col
+	e.highlight = vim.GetVisualRange() //[]line col []line col
 }
 
 // highlight matched braces in NORMAL and INSERT modes
@@ -41,7 +41,7 @@ func (e *Editor) drawHighlightedBraces() {
 		return
 	}
 
-	pos := vim.SearchGetMatchingPair()
+	pos := vim.GetMatchingPair()
 	if pos == [2]int{0, 0} {
 		return
 	}
@@ -478,23 +478,23 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 func (e *Editor) highlightMispelledWords() {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
 	e.highlightPositions = nil
-	curPos := vim.CursorGetPosition()
-	vim.Input2("gg^")
+	curPos := vim.GetCursorPosition()
+	vim.SendMultiInput("gg^")
 	var pos, prevPos [2]int
 	for {
-		vim.Input("w")
+		vim.SendInput("w")
 		prevPos = pos
-		pos = vim.CursorGetPosition()
+		pos = vim.GetCursorPosition()
 		if pos == prevPos {
 			break
 		}
-		w := vim.Eval("expand('<cword>')")
+		w := vim.EvaluateExpression("expand('<cword>')")
 		if ok := h.Spell(w); ok {
 			continue
 		}
 		e.highlightPositions = append(e.highlightPositions, Position{pos[0] - 1, pos[1], pos[1] + len(w)})
 	}
-	vim.CursorSetPosition(curPos[0], curPos[1]) //return cursor to where it was
+	vim.SetCursorPosition(curPos[0], curPos[1]) //return cursor to where it was
 }
 
 func (e *Editor) drawHighlights(pab *strings.Builder) {
@@ -784,7 +784,7 @@ func (e *Editor) readFileIntoNote(filename string) error {
 		return fmt.Errorf("Error opening file %s: %w", filename, err)
 	}
 	e.ss = strings.Split(string(b), "\n")
-	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
+	e.vbuf.SetLines(0, -1, e.ss)
 
 	e.fr, e.fc, e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0, 0, 0
 
@@ -889,9 +889,9 @@ func (e *Editor) drawOverlay() {
 // this func is reason that we are writing notes to file
 // allows easy testing if a file is modified with BufferOption
 func (e *Editor) isModified() bool {
-	//return vim.BufferGetModified(e.vbuf)
+	//return e.vbuf.IsModified()
 
-	tick := vim.BufferGetLastChangedTick(e.vbuf)
+	tick := e.vbuf.GetLastChangedTick()
 	if tick > e.bufferTick {
 		//e.bufferTick = tick
 		return true

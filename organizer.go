@@ -37,7 +37,7 @@ type Organizer struct {
 	marked_entries      map[int]struct{} // map instead of list makes toggling a row easier
 	title_search_string string
 	highlight           [2]int
-	vbuf                vim.Buffer
+	vbuf                vim.VimBuffer
 	bufferTick          int
 	normalCmds          map[string]func(*Organizer)
 	exCmds              map[string]func(*Organizer, int)
@@ -89,8 +89,8 @@ func (o *Organizer) readRowsIntoBuffer() {
 	for _, row := range o.rows {
 		ss = append(ss, row.title)
 	}
-	vim.BufferSetLines(o.vbuf, 0, -1, ss, len(ss))
-	vim.BufferSetCurrent(o.vbuf)
+	o.vbuf.SetLines(0, -1, ss)
+	vim.SetCurrentBuffer(o.vbuf)
 }
 
 func (o *Organizer) showMessage(format string, a ...interface{}) {

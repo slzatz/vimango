@@ -114,7 +114,7 @@ func (o *Organizer) switchToEditorMode() {
 	o.Screen.eraseRightScreen()
 	o.Screen.drawRightScreen()
 	o.Session.editorMode = true
-	vim.BufferSetCurrent(app.Session.activeEditor.vbuf)
+	vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
 }
 
 func (o *Organizer) scrollPreviewDown() {

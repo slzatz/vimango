@@ -14,10 +14,10 @@ func (o *Organizer) organizerProcessKey(c int) {
 	if c == '\x1b' {
 		o.showMessage("")
 		o.command = ""
-		vim.Key("<esc>")
+		vim.SendKey("<esc>")
 		o.last_mode = o.mode // not sure this is necessary
 		o.mode = NORMAL
-		pos := vim.CursorGetPosition()
+		pos := vim.GetCursorPosition()
 		o.fc = pos[1]
 		o.fr = pos[0] - 1
 		//org.fc = utf8.RuneCount(p.ss[org.fr][:pos[1]])
@@ -42,30 +42,30 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 		if c == '\r' {
 			o.writeTitle() // now updates ftsTitle if taskview == BY_FIND
-			vim.Key("<esc>")
+			vim.SendKey("<esc>")
 			o.mode = NORMAL
 			row := &o.rows[o.fr]
 			row.dirty = false
-			o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.command = ""
 			return
 		}
 
 		if z, found := termcodes[c]; found {
-			vim.Key(z)
+			vim.SendKey(z)
 		} else {
-			vim.Input(string(c))
+			vim.SendInput(string(c))
 		}
-		s := vim.BufferLines(o.vbuf)[o.fr]
+		s := o.vbuf.Lines()[o.fr]
 		o.rows[o.fr].title = s
-		pos := vim.CursorGetPosition()
+		pos := vim.GetCursorPosition()
 		o.fc = pos[1]
 		// need to prevent row from changing in INSERT mode; for instance, an when an up or down arrow is pressed
 		if o.fr != pos[0]-1 {
-			vim.CursorSetPosition(o.fr+1, o.fc)
+			vim.SetCursorPosition(o.fr+1, o.fc)
 		}
 		row := &o.rows[o.fr]
-		tick := vim.BufferGetLastChangedTick(o.vbuf)
+		tick := o.vbuf.GetLastChangedTick()
 		if tick > o.bufferTick {
 			row.dirty = true
 			o.bufferTick = tick
@@ -84,9 +84,9 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row := &o.rows[o.fr]
 			if row.dirty {
 				o.writeTitle() // now updates ftsTitle if taskview == BY_FIND
-				vim.Key("<esc>")
+				vim.SendKey("<esc>")
 				row.dirty = false
-				o.bufferTick = vim.BufferGetLastChangedTick(o.vbuf)
+				o.bufferTick = o.vbuf.GetLastChangedTick()
 				return
 			}
 		}
@@ -99,7 +99,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		if cmd, found := o.normalCmds[o.command]; found {
 			cmd(o)
 			o.command = ""
-			vim.Key("<esc>")
+			vim.SendKey("<esc>")
 			return
 		}
 
@@ -115,20 +115,20 @@ func (o *Organizer) organizerProcessKey(c int) {
 
 		// Send the keystroke to vim
 		if z, found := termcodes[c]; found {
-			vim.Key(z)
+			vim.SendKey(z)
 			o.ShowMessage(BR, "%s", z)
 		} else {
-			vim.Input(string(c))
+			vim.SendInput(string(c))
 		}
 
-		pos := vim.CursorGetPosition()
+		pos := vim.GetCursorPosition()
 		o.fc = pos[1]
 		// if move to a new row then draw task note preview or container info
 		// and set cursor back to beginning of line
 		if o.fr != pos[0]-1 {
 			o.fr = pos[0] - 1
 			o.fc = 0
-			vim.CursorSetPosition(o.fr+1, 0)
+			vim.SetCursorPosition(o.fr+1, 0)
 			o.altRowoff = 0
 			if o.view == TASK {
 				o.drawPreview()
@@ -136,16 +136,16 @@ func (o *Organizer) organizerProcessKey(c int) {
 				o.displayContainerInfo()
 			}
 		}
-		s := vim.BufferLines(o.vbuf)[o.fr]
+		s := o.vbuf.Lines()[o.fr]
 		o.rows[o.fr].title = s
 		//firstLine := vim.WindowGetTopLine() // doesn't seem to work
 		row := &o.rows[o.fr]
-		tick := vim.BufferGetLastChangedTick(o.vbuf)
+		tick := o.vbuf.GetLastChangedTick()
 		if tick > o.bufferTick {
 			row.dirty = true
 			o.bufferTick = tick
 		}
-		mode := vim.GetMode()
+		mode := vim.GetCurrentMode()
 
 		// OP_PENDING like 4da
 		if mode == 4 {
@@ -160,7 +160,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 		}
 		o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		if o.mode == VISUAL {
-			pos := vim.VisualGetRange()
+			pos := vim.GetVisualRange()
 			o.highlight[1] = pos[1][1] + 1
 			o.highlight[0] = pos[0][1]
 		}
@@ -176,30 +176,30 @@ func (o *Organizer) organizerProcessKey(c int) {
 		}
 
 		if z, found := termcodes[c]; found {
-			vim.Key(z)
+			vim.SendKey(z)
 		} else {
-			vim.Input(string(c))
+			vim.SendInput(string(c))
 		}
 
-		s := vim.BufferLines(o.vbuf)[o.fr]
+		s := o.vbuf.Lines()[o.fr]
 		o.rows[o.fr].title = s
-		pos := vim.CursorGetPosition()
+		pos := vim.GetCursorPosition()
 		o.fc = pos[1]
 		// need to prevent row from changing in INSERT mode; for instance, an when an up or down arrow is pressed
 		// note can probably remove j,k,g,G from the above
 		if o.fr != pos[0]-1 {
-			vim.CursorSetPosition(o.fr+1, o.fc)
+			vim.SetCursorPosition(o.fr+1, o.fc)
 		}
 		row := &o.rows[o.fr]
-		tick := vim.BufferGetLastChangedTick(o.vbuf)
+		tick := o.vbuf.GetLastChangedTick()
 		if tick > o.bufferTick {
 			row.dirty = true
 			o.bufferTick = tick
 		}
-		mode := vim.GetMode()  // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
+		mode := vim.GetCurrentMode()  // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
 		o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		o.command = ""
-		visPos := vim.VisualGetRange()
+		visPos := vim.GetVisualRange()
 		o.highlight[1] = visPos[1][1] + 1
 		o.highlight[0] = visPos[0][1]
 		o.showMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])

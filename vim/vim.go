@@ -20,7 +20,7 @@ func ucharP(s string) *C.uchar {
 }
 
 //void vimInit(int argc, char **argv);
-func Init(argc int) {
+func vimInit(argc int) {
 	var c *C.char
 	C.vimInit(C.int(argc), &c)
 }
@@ -33,7 +33,7 @@ func BufferOpen(filename string, lnum int, flags int) *C.buf_T {
 
 //buf_T *vimBufferLoad(char_u *ffname_arg, linenr_T lnum, int flags)
 //buf_T *vimBufferNew(int flags)
-func BufferNew(flags int) *C.buf_T {
+func CBufferNew(flags int) *C.buf_T {
 	vbuf := C.vimBufferNew(C.int(flags))
 	return vbuf
 }
@@ -45,7 +45,7 @@ func BufferGetId(vbuf *C.buf_T) int {
 }
 
 //void vimBufferSetCurrent(buf_T *buf);
-func BufferSetCurrent(vbuf *C.buf_T) {
+func CBufferSetCurrent(vbuf *C.buf_T) {
 	C.vimBufferSetCurrent(vbuf)
 }
 
@@ -122,7 +122,7 @@ func BufferLinesB(vbuf *C.buf_T) [][]byte {
 }
 
 // returns []string
-func BufferLines(vbuf *C.buf_T) []string {
+func CBufferLines(vbuf *C.buf_T) []string {
 	// line count starts from 1
 	var ss []string
 	lc := BufferGetLineCount(vbuf)
@@ -167,7 +167,7 @@ func BufferSetLinesB(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
 }
 
 //void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
-func BufferSetLines(vbuf *C.buf_T, start, end int, ss []string, count int) {
+func CBufferSetLines(vbuf *C.buf_T, start, end int, ss []string, count int) {
 	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(unsafe.Pointer(p))
 	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count:count]
@@ -305,7 +305,7 @@ func SearchGetMatchingPair() [2]int {
 	return pos
 }
 
-func BufferGetLastChangedTick(vbuf *C.buf_T) int {
+func CBufferGetLastChangedTick(vbuf *C.buf_T) int {
 	tick := C.vimBufferGetLastChangedTick(vbuf)
 	return int(tick)
 }

@@ -371,9 +371,9 @@ func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	}
 	e.ss = strings.Split(note.String, "\n")
 	//e.ss = strings.Split(note, "\n")
-	e.vbuf = vim.BufferNew(0)
-	vim.BufferSetCurrent(e.vbuf)
-	vim.BufferSetLines(e.vbuf, 0, -1, e.ss, len(e.ss))
+	e.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(e.vbuf)
+	e.vbuf.SetLines(0, -1, e.ss)
 }
 
 /*

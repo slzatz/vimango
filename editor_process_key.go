@@ -16,7 +16,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
-		vim.Key("<esc>")
+		vim.SendKey("<esc>")
 		e.command = ""
 		e.command_line = ""
 
@@ -37,7 +37,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 			 note you could fall through to getting pos but that recalcs rows which is unnecessary
 		*/
 
-		pos := vim.CursorGetPosition() //set screen cx and cy from pos
+		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 		e.ShowMessage(BR, "")
@@ -108,7 +108,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 						cmd(e)
 					}
 				*/
-				vim.Key("<esc>")
+				vim.SendKey("<esc>")
 				//keep tripping over this
 				//these commands should return a redraw bool = false
 				if strings.Index(" m l c d xz= su", e.command) != -1 {
@@ -117,8 +117,8 @@ func (e *Editor) editorProcessKey(c int) bool {
 				}
 
 				e.command = ""
-				e.ss = vim.BufferLines(e.vbuf)
-				pos := vim.CursorGetPosition() //set screen cx and cy from pos
+				e.ss = e.vbuf.Lines()
+				pos := vim.GetCursorPosition() //set screen cx and cy from pos
 				e.fr = pos[0] - 1
 				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 				return true
@@ -132,11 +132,11 @@ func (e *Editor) editorProcessKey(c int) bool {
 		// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
 		if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
 			e.decorateWordVisual(c)
-			vim.Key("<esc>")
+			vim.SendKey("<esc>")
 			e.mode = NORMAL
 			e.command = ""
-			e.ss = vim.BufferLines(e.vbuf)
-			pos := vim.CursorGetPosition() //set screen cx and cy from pos
+			e.ss = e.vbuf.Lines()
+			pos := vim.GetCursorPosition() //set screen cx and cy from pos
 			e.fr = pos[0] - 1
 			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 			return true
@@ -156,11 +156,11 @@ func (e *Editor) editorProcessKey(c int) bool {
 					return false
 				}
 
-				vim.Input(":" + e.command_line + "\r")
+				vim.SendInput(":" + e.command_line + "\r")
 				e.mode = NORMAL
 				e.command = ""
-				e.ss = vim.BufferLines(e.vbuf)
-				pos := vim.CursorGetPosition() //set screen cx and cy from pos
+				e.ss = e.vbuf.Lines()
+				pos := vim.GetCursorPosition() //set screen cx and cy from pos
 				e.fr = pos[0] - 1
 				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 				e.ShowMessage(BL, "search and replace: %s", e.command_line)
@@ -267,12 +267,12 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 	// Process the key
 	if z, found := termcodes[c]; found {
-		vim.Key(z)
+		vim.SendKey(z)
 	} else {
-		vim.Input(string(c))
+		vim.SendInput(string(c))
 	}
 
-	mode := vim.GetMode()
+	mode := vim.GetCurrentMode()
 
 	//OP_PENDING
 	if mode == 4 {
@@ -285,7 +285,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 		if c == ':' {
 			e.mode = EX_COMMAND
 			// 'park' vim in NORMAL mode and don't feed it keys
-			vim.Key("<esc>")
+			vim.SendKey("<esc>")
 			e.ShowMessage(BR, ":")
 		} else {
 			e.mode = SEARCH
@@ -298,7 +298,7 @@ func (e *Editor) editorProcessKey(c int) bool {
 	}
 
 	if mode == 2 { //VISUAL_MODE
-		vmode := vim.VisualGetType()
+		vmode := vim.GetVisualType()
 		e.mode = visualModeMap[vmode]
 		e.highlightInfo()
 	} else {
@@ -306,8 +306,8 @@ func (e *Editor) editorProcessKey(c int) bool {
 	}
 
 	//below is done for everything except SEARCH and EX_COMMAND
-	e.ss = vim.BufferLines(e.vbuf)
-	pos := vim.CursorGetPosition() //set screen cx and cy from pos
+	e.ss = e.vbuf.Lines()
+	pos := vim.GetCursorPosition() //set screen cx and cy from pos
 	e.fr = pos[0] - 1
 	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 
