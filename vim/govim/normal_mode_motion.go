@@ -16,6 +16,7 @@ var motionHandlers = map[string]motionCommand{
 	"b": moveWordBackward,
 	"e": moveWordEnd,
 	"G": moveToLastLine,
+	"%": moveToMatchingBracket,
 }
 
 // moveLeft moves the cursor one character to the left
@@ -403,4 +404,65 @@ func moveWordEnd(e *GoEngine) bool {
 	}
 	
 	return false
+}
+
+// moveToMatchingBracket moves to the matching bracket (%, bracket matching)
+func moveToMatchingBracket(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	// Use the SearchGetMatchingPair function to find the matching bracket
+	matchPos := e.SearchGetMatchingPair()
+	
+	// If there's no match (returns 0,0), check if we need to look for a bracket first
+	if matchPos[0] == 0 && matchPos[1] == 0 {
+		// We might need to search for a bracket character on the line
+		line := e.currentBuffer.GetLine(e.cursorRow)
+		
+		// Don't attempt to search if the line is empty
+		if len(line) == 0 {
+			return false
+		}
+		
+		// Look for bracket characters to the right of the cursor on the same line
+		for col := e.cursorCol; col < len(line); col++ {
+			if isBracketChar(line[col]) {
+				// Move the cursor to the bracket and try again
+				e.cursorCol = col
+				
+				// Now find the matching bracket
+				matchPos = e.SearchGetMatchingPair()
+				break
+			}
+		}
+		
+		// If still no match, look to the left
+		if matchPos[0] == 0 && matchPos[1] == 0 {
+			for col := e.cursorCol - 1; col >= 0; col-- {
+				if isBracketChar(line[col]) {
+					// Move the cursor to the bracket and try again
+					e.cursorCol = col
+					
+					// Now find the matching bracket
+					matchPos = e.SearchGetMatchingPair()
+					break
+				}
+			}
+		}
+	}
+	
+	// If we found a matching bracket, move the cursor to it
+	if matchPos[0] > 0 {
+		e.cursorRow = matchPos[0]
+		e.cursorCol = matchPos[1]
+		return true
+	}
+	
+	return false
+}
+
+// isBracketChar checks if a character is a bracket character
+func isBracketChar(c byte) bool {
+	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'
 }

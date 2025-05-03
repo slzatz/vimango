@@ -62,43 +62,86 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [ ] Create comparison tests between C and Go implementations
    - [ ] Add benchmark tests to compare performance
 
+## High Priority Features For Next Phase
+
+1. **Registers System**
+   - [ ] Implement named registers (a-z, A-Z for append)
+   - [ ] Add numbered registers (0-9)
+   - [ ] Add special registers (%, #, /, etc.)
+   - [ ] Implement register viewing and manipulation
+
+2. **Text Objects**
+   - [ ] Implement word objects (iw, aw)
+   - [ ] Add sentence objects (is, as)
+   - [ ] Add paragraph objects (ip, ap)
+   - [ ] Add bracket/quote objects (i", a", i), a), etc.)
+   - [ ] Support operations on text objects (diw, ciw, yiw, etc.)
+
+3. **Undo/Redo Functionality**
+   - [ ] Implement change tracking
+   - [ ] Create undo tree structure
+   - [ ] Add undo (u) command
+   - [ ] Add redo (Ctrl+R) command
+   - [ ] Implement persistent undo
+
+4. **Advanced Motions**
+   - [ ] Implement character find (f, F, t, T)
+   - [ ] Add sentence/paragraph motions (( and )), { and })
+   - [x] Implement % for matching brackets
+   - [ ] Add ge, gE (backward end of word)
+
+5. **Complete Visual Mode**
+   - [ ] Add line-visual mode (Shift+V)
+   - [ ] Add block-visual mode (Ctrl+V)
+   - [ ] Implement block operations
+
 ## Medium Priority Tasks
 
 1. **Ex Commands**
    - [ ] Implement core set of Ex commands
    - [ ] Add support for Ex command history
+   - [ ] Implement command-line window (q:)
 
-2. **Advanced Editing**
-   - [ ] Implement text objects (word, sentence, paragraph)
-   - [ ] Add support for registers
-   - [ ] Implement undo/redo functionality
+2. **Marks and Jumps**
+   - [ ] Implement marks (m{a-zA-Z})
+   - [ ] Add mark navigation (', `)
+   - [ ] Create jump list
+   - [ ] Implement Ctrl+O, Ctrl+I for jump navigation
+   - [ ] Add change list and g;, g, navigation
 
-3. **Visual Mode Enhancements**
-   - [ ] Add line-visual mode (Shift+V)
-   - [ ] Add block-visual mode (Ctrl+V)
-   - [ ] Implement operations on visual selections
+3. **Auto-indentation**
+   - [ ] Add basic auto-indent
+   - [ ] Implement smart indent
+   - [ ] Support indent operations (==, =motion)
 
-4. **Marks and Jumps**
-   - [ ] Implement marks
-   - [ ] Add jump list functionality
+4. **Macros**
+   - [ ] Implement macro recording (q{register})
+   - [ ] Add macro playback (@{register})
+   - [ ] Support recursive macros
 
 ## Lower Priority Tasks
 
-1. **Macros**
-   - [ ] Record and playback macros
+1. **Window Management**
+   - [ ] Add split windows (:split, :vsplit)
+   - [ ] Implement window navigation (Ctrl+W commands)
 
-2. **Window Management**
-   - [ ] Support for multiple windows/splits
+2. **Folding**
+   - [ ] Implement manual folding (zf, zo, zc)
+   - [ ] Add indent-based folding
 
-3. **Advanced Features**
-   - [ ] Auto-indent
-   - [ ] Syntax highlighting integration
-   - [ ] Auto-completion
+3. **Advanced Editing**
+   - [ ] Add completion (Ctrl+N, Ctrl+P)
+   - [ ] Implement abbreviations
+   - [ ] Add increment/decrement (Ctrl+A, Ctrl+X)
 
 4. **Performance Optimization**
    - [ ] Optimize buffer operations
    - [ ] Add benchmarks
    - [ ] Profile and improve hotspots
+
+5. **Syntax Highlighting Integration**
+   - [ ] Implement basic syntax highlighting
+   - [ ] Add support for language-specific highlighting
 
 ## Known Issues
 
@@ -106,9 +149,22 @@ This document tracks the planned work and priorities for the pure Go vim impleme
 - ~~Visual mode selection tracking could be improved~~ (Improved May 2025)
 - ~~Buffer content persistence between context switches~~ (Fixed May 2025)
 - Tests needed for edge cases (empty buffers, special characters)
-- Line wrapping not yet implemented
-- Auto-indentation not yet implemented
-- Syntax highlighting integration pending
+- Unexpected behavior with long lines (no text wrapping)
+- Missing most text-object based operations
+- Limited register functionality (only unnamed register)
+- No undo/redo support
+
+## Implementation Status Summary
+
+The current Go vim implementation successfully handles:
+- Basic cursor movement and navigation
+- Simple editing operations
+- Mode switching
+- Basic visual mode
+- Fundamental search functionality
+
+However, it lacks several key vim features that will be the focus of the next development phase,
+as detailed in the "High Priority Features For Next Phase" section above.
 
 ## Migration Plan
 

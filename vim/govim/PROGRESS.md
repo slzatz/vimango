@@ -21,6 +21,7 @@ We've begun implementation of a pure Go version of libvim to replace the current
    - e (end of word)
    - G (go to last line)
    - gg (go to first line)
+   - % (matching bracket navigation)
    - Motion counts (e.g., 5j, 3w)
 
 3. **Text Editing Commands**:
@@ -116,12 +117,30 @@ You can also use the command-line flag to choose the implementation at startup:
 
 ## Known Limitations
 
-- The current implementation has the basic functionality but lacks some advanced vim features:
-  - No support for macros yet
-  - Limited register functionality (only the unnamed register)
-  - Advanced features like marks or folding not yet implemented 
-  - Limited ex command support
-  - Some complex motions not yet implemented
+The current implementation has the basic functionality but lacks several advanced vim features:
+
+### Missing Major Features
+
+- No support for multiple registers (only the unnamed register)
+- Text objects (iw, aw, etc.) not implemented
+- No undo/redo functionality
+- Missing most advanced motions (f, F, t, T, (, ), {, }), but % implemented for bracket matching
+- Limited visual mode (no line or block visual modes)
+- No marks or jump list
+- No macro recording/playback
+- Limited ex command support
+- No auto-indentation
+- No folding functionality
+
+### Prioritized Development
+
+See the TODO.md file for a detailed list of missing features and their implementation priority. The next phase of development will focus on:
+
+1. Implementing a registers system
+2. Adding text objects support
+3. Creating undo/redo functionality
+4. Adding more advanced motions
+5. Completing visual mode implementation
 
 ## Recent Updates (May 2025)
 
@@ -153,3 +172,8 @@ You can also use the command-line flag to choose the implementation at startup:
    - Implemented robust deep copying in buffer operations to prevent reference sharing
    - Added recovery mechanisms for buffer operations
    - Improved data isolation between buffer instances
+
+7. **Advanced Motions**:
+   - Implemented % for matching bracket navigation
+   - Added support for nested brackets across multiple lines
+   - Improved bracket searching to find the nearest bracket when cursor isn't on a bracket

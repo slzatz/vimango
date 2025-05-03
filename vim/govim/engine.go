@@ -1373,7 +1373,7 @@ func (e *GoEngine) SearchGetMatchingPair() [2]int {
 		return [2]int{0, 0}
 	}
 	
-	// Simple implementation for bracket matching
+	// Get the line and check cursor position
 	line := e.currentBuffer.GetLine(e.cursorRow)
 	if e.cursorCol >= len(line) {
 		return [2]int{0, 0}
@@ -1408,25 +1408,76 @@ func (e *GoEngine) SearchGetMatchingPair() [2]int {
 		return [2]int{0, 0}
 	}
 	
-	// Implement bracket matching logic
-	// This is a simplified version - a full implementation would handle nesting
-	
-	// For now, just search the current line
+	// For forward search, we need to track nesting level
 	if direction > 0 {
-		// Search forward
-		for i := e.cursorCol + 1; i < len(line); i++ {
-			if line[i] == match {
-				return [2]int{e.cursorRow, i}
+		nestLevel := 1 // Start at 1 for the character we're on
+		
+		// Search forward from the current position
+		currRow := e.cursorRow
+		for currRow <= e.currentBuffer.GetLineCount() {
+			// Get current line
+			currLine := e.currentBuffer.GetLine(currRow)
+			
+			// Start at the character after the current one if on the same line
+			startCol := 0
+			if currRow == e.cursorRow {
+				startCol = e.cursorCol + 1
 			}
+			
+			// Search through the current line
+			for col := startCol; col < len(currLine); col++ {
+				// If we find a matching bracket, update the nesting level
+				if currLine[col] == char {
+					nestLevel++
+				} else if currLine[col] == match {
+					nestLevel--
+					
+					// If nesting level is 0, we found the matching bracket
+					if nestLevel == 0 {
+						return [2]int{currRow, col}
+					}
+				}
+			}
+			
+			// Move to the next line
+			currRow++
 		}
 	} else {
-		// Search backward
-		for i := e.cursorCol - 1; i >= 0; i-- {
-			if line[i] == match {
-				return [2]int{e.cursorRow, i}
+		// For backward search, we also track nesting level
+		nestLevel := 1 // Start at 1 for the character we're on
+		
+		// Search backward from the current position
+		currRow := e.cursorRow
+		for currRow >= 1 {
+			// Get current line
+			currLine := e.currentBuffer.GetLine(currRow)
+			
+			// End at the character before the current one if on the same line
+			endCol := len(currLine) - 1
+			if currRow == e.cursorRow {
+				endCol = e.cursorCol - 1
 			}
+			
+			// Search through the current line
+			for col := endCol; col >= 0; col-- {
+				// If we find a matching bracket, update the nesting level
+				if currLine[col] == char {
+					nestLevel++
+				} else if currLine[col] == match {
+					nestLevel--
+					
+					// If nesting level is 0, we found the matching bracket
+					if nestLevel == 0 {
+						return [2]int{currRow, col}
+					}
+				}
+			}
+			
+			// Move to the previous line
+			currRow--
 		}
 	}
 	
+	// No matching bracket found
 	return [2]int{0, 0}
 }
