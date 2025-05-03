@@ -359,7 +359,12 @@ func (db *Database) readNoteIntoString(id int) string {
 
 func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	if id == -1 {
-		return // id given to new and unsaved entries
+		// Initialize empty buffer for new notes instead of returning
+		e.ss = []string{""} // Initialize with an empty line
+		e.vbuf = vim.NewBuffer(0)
+		vim.SetCurrentBuffer(e.vbuf)
+		e.vbuf.SetLines(0, -1, e.ss)
+		return
 	}
 
 	row := db.MainDB.QueryRow("SELECT note FROM task WHERE id=?;", id)
@@ -367,10 +372,18 @@ func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
 	err := row.Scan(&note)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error opening note for editing: %v", err)
+		// Initialize empty buffer even on error
+		e.ss = []string{""} // Initialize with an empty line
+		e.vbuf = vim.NewBuffer(0)
+		vim.SetCurrentBuffer(e.vbuf)
+		e.vbuf.SetLines(0, -1, e.ss)
 		return
 	}
 	e.ss = strings.Split(note.String, "\n")
-	//e.ss = strings.Split(note, "\n")
+	// Make sure we have at least one line, even if the note was empty
+	if len(e.ss) == 0 {
+		e.ss = []string{""}
+	}
 	e.vbuf = vim.NewBuffer(0)
 	vim.SetCurrentBuffer(e.vbuf)
 	e.vbuf.SetLines(0, -1, e.ss)

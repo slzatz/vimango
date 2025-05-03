@@ -40,6 +40,8 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [x] Add support for o/O (open line below/above)
    - [x] Add support for I/A (insert at beginning/end of line)
    - [x] Implement J (join lines)
+   - [x] Fix verb+motion state tracking (dw, cw, etc.)
+   - [x] Implement special cases (cw behaving like ce)
 
 4. **Mode Transitions**
    - [x] Fix Escape key handling for all modes
@@ -148,6 +150,7 @@ This document tracks the planned work and priorities for the pure Go vim impleme
 - ~~Cursor positioning at end of lines needs verification~~ (Fixed May 2025)
 - ~~Visual mode selection tracking could be improved~~ (Improved May 2025)
 - ~~Buffer content persistence between context switches~~ (Fixed May 2025)
+- ~~Verb+motion commands not working properly~~ (Fixed May 2025)
 - Tests needed for edge cases (empty buffers, special characters)
 - Unexpected behavior with long lines (no text wrapping)
 - Missing most text-object based operations
@@ -158,12 +161,14 @@ This document tracks the planned work and priorities for the pure Go vim impleme
 
 The current Go vim implementation successfully handles:
 - Basic cursor movement and navigation
-- Simple editing operations
-- Mode switching
+- Basic and compound editing operations
+- Verb+motion commands (dw, cw, y$, etc.)
+- Mode switching with correct cursor positioning
 - Basic visual mode
 - Fundamental search functionality
+- Text yanking and pasting
 
-However, it lacks several key vim features that will be the focus of the next development phase,
+However, it still lacks several key vim features that will be the focus of the next development phase,
 as detailed in the "High Priority Features For Next Phase" section above.
 
 ## Migration Plan

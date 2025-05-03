@@ -139,6 +139,11 @@ func VisualGetType() int {
 	return defaultEngine.VisualGetType()
 }
 
+// GetCurrentMode returns the engine's current mode
+func GetCurrentMode() int {
+	return defaultEngine.GetCurrentMode()
+}
+
 // --------------------------------
 // Search Methods
 // --------------------------------

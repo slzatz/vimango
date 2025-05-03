@@ -177,3 +177,13 @@ See the TODO.md file for a detailed list of missing features and their implement
    - Implemented % for matching bracket navigation
    - Added support for nested brackets across multiple lines
    - Improved bracket searching to find the nearest bracket when cursor isn't on a bracket
+
+8. **Verb+Motion Commands**:
+   - Fixed handling of verb+motion commands like "dw", "cw", "d$"
+   - Implemented special case handlers for common combinations
+   - Ensured proper state tracking between keypresses
+   - Added implementations for all standard combinations:
+     - Delete operations (dw, db, de, d$, d0, dd)
+     - Change operations (cw, cb, ce, c$, c0, cc)
+     - Yank operations (yw, yb, ye, y$, y0, yy)
+   - Fixed "cw" to behave like "ce" as in standard Vim behavior

@@ -307,8 +307,27 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 	//below is done for everything except SEARCH and EX_COMMAND
 	e.ss = e.vbuf.Lines()
+	// Add safety checks to prevent panic with empty buffers
+	if len(e.ss) == 0 {
+		e.ss = []string{""}
+	}
+	
 	pos := vim.GetCursorPosition() //set screen cx and cy from pos
 	e.fr = pos[0] - 1
+	
+	// Ensure fr is in bounds
+	if e.fr < 0 {
+		e.fr = 0
+	}
+	if e.fr >= len(e.ss) {
+		e.fr = len(e.ss) - 1
+	}
+	
+	// Ensure pos[1] (column) is valid
+	if pos[1] > len(e.ss[e.fr]) {
+		pos[1] = len(e.ss[e.fr])
+	}
+	
 	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 
 	return true

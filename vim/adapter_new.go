@@ -129,6 +129,12 @@ func (e *CGOEngine) GetMode() int {
 	return GetMode()
 }
 
+// GetCurrentMode gets the current mode with application-compatible mappings
+// For CGO implementation, this is the same as GetMode
+func (e *CGOEngine) GetCurrentMode() int {
+	return GetMode()
+}
+
 // VisualGetRange gets the visual selection range
 func (e *CGOEngine) VisualGetRange() [2][2]int {
 	return VisualGetRange()
@@ -294,6 +300,11 @@ func (e *GoEngine) Execute(s string) {
 // GetMode gets the current mode
 func (e *GoEngine) GetMode() int {
 	return govim.GetMode()
+}
+
+// GetCurrentMode gets the current mode with application-compatible mappings
+func (e *GoEngine) GetCurrentMode() int {
+	return govim.GetCurrentMode()
 }
 
 // VisualGetRange gets the visual selection range

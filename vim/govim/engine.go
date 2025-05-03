@@ -1,9 +1,5 @@
 package govim
 
-import (
-	"strings"
-)
-
 // ModeNormal is the normal mode constant
 const ModeNormal = 1
 
@@ -121,48 +117,47 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		// Set the new current buffer
 		e.currentBuffer = goBuf
 		
-		// Only reset state if we're actually changing buffers
-		if oldBuffer != goBuf {
-			// Reset cursor position to beginning of file
-			e.cursorRow = 1
-			e.cursorCol = 0
-			
-			// Reset any other buffer-specific state
-			e.commandCount = 0
-			e.awaitingMotion = false
-			e.currentCommand = ""
-			
-			// Reset visual mode state if applicable
-			if e.mode == ModeVisual {
-				e.visualStart = [2]int{1, 0}
-				e.visualEnd = [2]int{1, 0}
-			}
-			
-			// Reset search state
-			e.searching = false
-			e.searchBuffer = ""
-			e.searchResults = nil
-			e.currentSearchIdx = -1
-			
-			// Extra debugging to verify buffer content independence
+		// Ensure the buffer has at least one line (empty buffer protection)
+		if len(goBuf.lines) == 0 {
+			goBuf.lines = []string{""}
+		}
+		
+		// Always reset state for any buffer change to avoid stale state
+		// This is especially important for handling new notes correctly
+		
+		// Reset cursor position to beginning of file
+		e.cursorRow = 1
+		e.cursorCol = 0
+		
+		// Reset buffer-specific state
+		e.commandCount = 0
+		e.awaitingMotion = false
+		e.currentCommand = ""
+		e.mode = ModeNormal // Always reset to normal mode
+		
+		// Reset visual mode state
+		e.visualStart = [2]int{1, 0}
+		e.visualEnd = [2]int{1, 0}
+		
+		// Reset search state
+		e.searching = false
+		e.searchBuffer = ""
+		e.searchResults = nil
+		e.currentSearchIdx = -1
+		
+		// Extra debugging to verify buffer content independence
+		if oldBuffer != nil && goBuf != nil {
 			oldBufferLines := 0
 			if oldBuffer != nil {
 				oldBufferLines = len(oldBuffer.lines)
 			}
 			newBufferLines := len(goBuf.lines)
 			
-			// Perform additional verification to ensure buffer content is distinct
-			if oldBuffer != nil && goBuf != nil && oldBufferLines > 0 && newBufferLines > 0 {
-				// For debug purposes only - don't enable in production
-				// fmt.Printf("Buffer Change: old=%d lines, new=%d lines\n", oldBufferLines, newBufferLines)
-				// fmt.Printf("Old first line: %q\n", oldBuffer.GetLine(1))
-				// fmt.Printf("New first line: %q\n", goBuf.GetLine(1))
-				
-				// Deep verify buffer content isolation - this should never be necessary if 
-				// buffer line slices are correctly managed, but adds a safety check
+			// Perform additional validation of buffer content
+			if oldBufferLines > 0 && newBufferLines > 0 {
+				// If the new buffer has an empty first line and fewer lines than the old buffer,
+				// there might be a reference issue. Create a completely fresh slice.
 				if goBuf.lines[0] == "" && newBufferLines < oldBufferLines {
-					// If the new buffer has an empty first line and fewer lines than the old buffer,
-					// there might be a reference issue. Create a completely fresh slice.
 					newLines := make([]string, len(goBuf.lines))
 					for i, line := range goBuf.lines {
 						newLines[i] = line // Deep copy each string
@@ -181,6 +176,34 @@ func (e *GoEngine) CursorGetLine() int {
 
 // CursorGetPosition returns the cursor position as [row, col]
 func (e *GoEngine) CursorGetPosition() [2]int {
+	// First, validate the current cursor position to ensure it's safe
+	if e.currentBuffer != nil {
+		// Validate row position
+		lineCount := e.currentBuffer.GetLineCount()
+		if e.cursorRow < 1 {
+			e.cursorRow = 1
+		} else if e.cursorRow > lineCount {
+			e.cursorRow = lineCount
+			if e.cursorRow < 1 {
+				e.cursorRow = 1
+			}
+		}
+		
+		// Validate column position
+		lineLen := 0
+		if e.cursorRow >= 1 && e.cursorRow <= lineCount {
+			lineLen = len(e.currentBuffer.GetLine(e.cursorRow))
+		}
+		
+		// Make sure cursor column is valid
+		if e.cursorCol < 0 {
+			e.cursorCol = 0
+		} else if e.cursorCol > lineLen {
+			e.cursorCol = lineLen
+		}
+	}
+	
+	// Return the validated cursor position
 	return [2]int{e.cursorRow, e.cursorCol}
 }
 
@@ -208,1276 +231,172 @@ func (e *GoEngine) CursorSetPosition(row, col int) {
 	e.cursorCol = col
 }
 
-// Input processes input (basic motion commands)
-func (e *GoEngine) Input(s string) {
-	// Handle escape key for all modes
-	if s == "\x1b" { // ESC key
-		// Remember what mode we're coming from
-		prevMode := e.mode
-		
-		// Update state
-		e.mode = ModeNormal
-		e.searching = false
-		e.searchBuffer = ""
-		e.awaitingMotion = false
-		e.currentCommand = ""
-		
-		// Fix cursor position: when coming from insert mode, move one character left (if possible)
-		if prevMode == ModeInsert && e.currentBuffer != nil {
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			
-			// Move cursor left by one character when transitioning from insert to normal
-			// This matches Vim's behavior: when pressing ESC in insert mode, cursor moves left
-			// But only if we're not already at column 0 and not on an empty line
-			if e.cursorCol > 0 && len(line) > 0 {
-				e.cursorCol--
-			}
-			
-			// Also ensure cursor isn't past the end of the line
-			// This handles the case where the line might be shorter after editing
-			if e.cursorCol > 0 && e.cursorCol >= len(line) {
-				e.cursorCol = len(line) - 1
-				if e.cursorCol < 0 {
-					e.cursorCol = 0
-				}
-			}
-		} else if e.currentBuffer != nil {
-			// For other modes, just ensure cursor is not past the end of the line
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			if e.cursorCol > 0 && e.cursorCol >= len(line) {
-				e.cursorCol = len(line) - 1
-				if e.cursorCol < 0 {
-					e.cursorCol = 0
-				}
-			}
-		}
-		return
-	}
-	
-	// Handle motion with count (e.g., "5j", "3w")
-	// First, check if we're in command count building mode
-	if e.mode == ModeNormal && s >= "0" && s <= "9" && !e.awaitingMotion {
-		// Convert the digit to its numeric value
-		digit := int(s[0] - '0')
-		
-		// If the count is 0, it's a special case as a motion
-		if digit == 0 && e.commandCount == 0 {
-			if handler, ok := motionHandlers["0"]; ok {
-				handler(e)
-			}
-			return
-		}
-		
-		// Otherwise, build the count
-		e.commandCount = e.commandCount*10 + digit
-		return
-	}
-	
-	// Apply counts to motions when applicable
-	if e.mode == ModeNormal && e.commandCount > 0 && !e.awaitingMotion {
-		if handler, ok := motionHandlers[s]; ok {
-			// Apply the motion the specified number of times
-			for i := 0; i < e.commandCount; i++ {
-				handler(e)
-			}
-			e.commandCount = 0
-			return
-		}
-	}
-	
-	// Handle command + motion operations (like d, c, y)
-	if e.awaitingMotion {
-		if s == e.currentCommand {
-			// Double command (dd, cc, yy) operates on the entire line
-			e.handleLineCommand(e.currentCommand)
-			e.resetCommandState()
-			return
-		}
-		
-		// Handle motion after command (e.g., "dw", "c$")
-		if handler, ok := motionHandlers[s]; ok {
-			// Save current position as start of operation
-			startPos := [2]int{e.cursorRow, e.cursorCol}
-			
-			// Apply the motion
-			handler(e)
-			
-			// End position after motion
-			endPos := [2]int{e.cursorRow, e.cursorCol}
-			
-			// Execute the command on the range
-			e.executeCommandOnRange(e.currentCommand, startPos, endPos)
-			
-			// Reset command state
-			e.resetCommandState()
-			return
-		}
-		
-		// If we get here, it was an invalid motion after a command
-		e.resetCommandState()
-		return
-	}
-	
-	if e.mode == ModeNormal {
-		if handler, ok := motionHandlers[s]; ok {
-			handler(e)
-			return
-		}
-		
-		// Handle other normal mode commands
-		switch s {
-		case ":":
-			// In the C implementation, typing ':' in normal mode changes the mode to 
-			// COMMAND mode (8), which is intercepted by the editor to show the command line.
-			// We'll set a special command mode flag to emulate this behavior
-			e.mode = ModeCommand // This is equivalent to mode 8 in the C implementation
-			return
-		case "i":
-			e.mode = ModeInsert
-			// In Vim, cursor position stays the same when entering insert mode
-			return
-		case "I":
-			// Enter insert mode at beginning of line
-			e.mode = ModeInsert
-			moveToFirstNonBlank(e)
-			return
-		case "a":
-			// "Append" - enter insert mode after current character
-			e.mode = ModeInsert
-			if e.currentBuffer != nil {
-				line := e.currentBuffer.GetLine(e.cursorRow)
-				if len(line) > 0 && e.cursorCol < len(line) {
-					e.cursorCol++
-				}
-			}
-			return
-		case "A":
-			// Enter insert mode at end of line
-			e.mode = ModeInsert
-			if e.currentBuffer != nil {
-				line := e.currentBuffer.GetLine(e.cursorRow)
-				e.cursorCol = len(line)
-			}
-			return
-		case "o":
-			// Open line below
-			e.mode = ModeInsert
-			if e.currentBuffer != nil {
-				lineIndex := e.cursorRow // 1-based
-				lines := e.currentBuffer.Lines()
-				
-				// Insert a new empty line after the current line
-				newLines := make([]string, 0, len(lines)+1)
-				newLines = append(newLines, lines[:lineIndex]...)
-				newLines = append(newLines, "")
-				newLines = append(newLines, lines[lineIndex:]...)
-				
-				e.currentBuffer.lines = newLines
-				e.currentBuffer.markModified()
-				
-				// Move cursor to the new line
-				e.cursorRow++
-				e.cursorCol = 0
-			}
-			return
-		case "O":
-			// Open line above
-			e.mode = ModeInsert
-			if e.currentBuffer != nil {
-				lineIndex := e.cursorRow - 1 // 0-based
-				lines := e.currentBuffer.Lines()
-				
-				// Insert a new empty line before the current line
-				newLines := make([]string, 0, len(lines)+1)
-				newLines = append(newLines, lines[:lineIndex]...)
-				newLines = append(newLines, "")
-				newLines = append(newLines, lines[lineIndex:]...)
-				
-				e.currentBuffer.lines = newLines
-				e.currentBuffer.markModified()
-				
-				// Keep cursor at the same row (since we inserted above)
-				e.cursorCol = 0
-			}
-			return
-		case "v":
-			e.mode = ModeVisual
-			e.visualStart = [2]int{e.cursorRow, e.cursorCol}
-			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
-			e.visualType = 'v' // character-wise visual mode
-			return
-		case "V":
-			e.mode = ModeVisual
-			e.visualStart = [2]int{e.cursorRow, 0}
-			e.visualEnd = [2]int{e.cursorRow, 0}
-			e.visualType = 'V' // line-wise visual mode
-			return
-		case "gg":
-			// Move to first line
-			e.cursorRow = 1
-			// Move to first non-blank character
-			if e.currentBuffer != nil {
-				moveToFirstNonBlank(e)
-			}
-			return
-		case "G":
-			// Move to last line
-			if e.currentBuffer != nil {
-				e.cursorRow = e.currentBuffer.GetLineCount()
-				moveToFirstNonBlank(e)
-			}
-			return
-		case "d":
-			// Start delete operation, awaiting motion
-			e.awaitingMotion = true
-			e.currentCommand = "d"
-			return
-		case "c":
-			// Start change operation, awaiting motion
-			e.awaitingMotion = true
-			e.currentCommand = "c"
-			return
-		case "y":
-			// Start yank operation, awaiting motion
-			e.awaitingMotion = true
-			e.currentCommand = "y"
-			return
-		case "p":
-			// Put text after cursor
-			e.putAfter()
-			return
-		case "P":
-			// Put text before cursor
-			e.putBefore()
-			return
-		case "/":
-			// Start forward search
-			e.mode = ModeSearch // This is equivalent to mode 8 in the C implementation
-			e.startSearch(1)
-			return
-		case "?":
-			// Start backward search
-			e.mode = ModeSearch // This is equivalent to mode 8 in the C implementation
-			e.startSearch(-1)
-			return
-		case "n":
-			// Repeat search in same direction
-			e.findNextMatch(e.searchDirection)
-			return
-		case "N":
-			// Repeat search in opposite direction
-			e.findNextMatch(-e.searchDirection)
-			return
-		case "x":
-			// Delete character under cursor
-			if e.currentBuffer != nil {
-				line := e.currentBuffer.GetLine(e.cursorRow)
-				if e.cursorCol < len(line) {
-					// Store deleted character in register for potential paste operations
-					e.yankRegister = string(line[e.cursorCol])
-					
-					// Create new line with the character removed
-					newLine := line[:e.cursorCol] + line[e.cursorCol+1:]
-					
-					// Update the line in the buffer
-					e.currentBuffer.SetLines(e.cursorRow-1, e.cursorRow, []string{newLine})
-					
-					// If we're at the end of the line now, move cursor back if possible
-					if e.cursorCol >= len(newLine) && e.cursorCol > 0 {
-						e.cursorCol--
-					}
-				}
-			}
-			return
-		case "J":
-			// Join current line with the next line
-			if e.currentBuffer != nil && e.cursorRow < e.currentBuffer.GetLineCount() {
-				currLine := e.currentBuffer.GetLine(e.cursorRow)
-				nextLine := e.currentBuffer.GetLine(e.cursorRow + 1)
-				
-				// Trim leading whitespace from the next line
-				nextLine = strings.TrimLeft(nextLine, " \t")
-				
-				// Create the joined line with a space in between
-				newLine := currLine
-				if len(currLine) > 0 && !strings.HasSuffix(currLine, " ") {
-					newLine += " "
-				}
-				newLine += nextLine
-				
-				// Replace the two lines with the joined line
-				e.currentBuffer.SetLines(e.cursorRow-1, e.cursorRow+1, []string{newLine})
-				
-				// Keep cursor at the join point
-				e.cursorCol = len(currLine)
-				if len(currLine) > 0 && !strings.HasSuffix(currLine, " ") {
-					e.cursorCol += 1 // Account for the added space
-				}
-			}
-			return
-		}
-	} else if e.mode == ModeInsert {
-		// Insert the character at current position
-		if e.currentBuffer != nil {
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			newLine := ""
-			if e.cursorCol == 0 {
-				newLine = s + line
-			} else if e.cursorCol >= len(line) {
-				newLine = line + s
-			} else {
-				newLine = line[:e.cursorCol] + s + line[e.cursorCol:]
-			}
-			
-			// Update the line
-			e.currentBuffer.lines[e.cursorRow-1] = newLine
-			e.currentBuffer.markModified()
-			
-			// Move cursor forward
-			e.cursorCol += len(s)
-		}
-	} else if e.mode == ModeVisual {
-		// Apply counts to motions in visual mode too
-		if e.commandCount > 0 && s >= "0" && s <= "9" {
-			// Build the count
-			digit := int(s[0] - '0')
-			e.commandCount = e.commandCount*10 + digit
-			return
-		}
-		
-		// Apply count to motion
-		if e.commandCount > 0 {
-			if handler, ok := motionHandlers[s]; ok {
-				// Apply the motion the specified number of times
-				for i := 0; i < e.commandCount; i++ {
-					handler(e)
-				}
-				e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
-				e.commandCount = 0
-				return
-			}
-		}
-		
-		if handler, ok := motionHandlers[s]; ok {
-			handler(e)
-			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
-			return
-		}
-		
-		// Handle visual mode commands
-		switch s {
-		case "d", "x":
-			// Delete visually selected text
-			start, end := e.visualStart, e.visualEnd
-			if start[0] > end[0] || (start[0] == end[0] && start[1] > end[1]) {
-				start, end = end, start
-			}
-			e.deleteRange(start, end, e.visualType == 'V')
-			e.mode = ModeNormal
-			return
-		case "y":
-			// Yank visually selected text
-			start, end := e.visualStart, e.visualEnd
-			if start[0] > end[0] || (start[0] == end[0] && start[1] > end[1]) {
-				start, end = end, start
-			}
-			e.yankRange(start, end, e.visualType == 'V')
-			e.mode = ModeNormal
-			// Return cursor to the start of the selection
-			e.cursorRow, e.cursorCol = start[0], start[1]
-			return
-		case "c":
-			// Change visually selected text (delete and enter insert mode)
-			start, end := e.visualStart, e.visualEnd
-			if start[0] > end[0] || (start[0] == end[0] && start[1] > end[1]) {
-				start, end = end, start
-			}
-			e.deleteRange(start, end, e.visualType == 'V')
-			e.mode = ModeInsert
-			e.cursorRow, e.cursorCol = start[0], start[1]
-			return
-		case ">":
-			// Indent selected lines
-			start, end := e.visualStart, e.visualEnd
-			if start[0] > end[0] {
-				start, end = end, start
-			}
-			
-			// Indent each line in the selection
-			for i := start[0]; i <= end[0]; i++ {
-				line := e.currentBuffer.GetLine(i)
-				e.currentBuffer.lines[i-1] = "  " + line
-			}
-			e.currentBuffer.markModified()
-			e.mode = ModeNormal
-			return
-		case "<":
-			// Un-indent selected lines
-			start, end := e.visualStart, e.visualEnd
-			if start[0] > end[0] {
-				start, end = end, start
-			}
-			
-			// Un-indent each line in the selection
-			for i := start[0]; i <= end[0]; i++ {
-				line := e.currentBuffer.GetLine(i)
-				if strings.HasPrefix(line, "  ") {
-					e.currentBuffer.lines[i-1] = line[2:]
-				} else if strings.HasPrefix(line, "\t") {
-					e.currentBuffer.lines[i-1] = line[1:]
-				}
-			}
-			e.currentBuffer.markModified()
-			e.mode = ModeNormal
-			return
-		}
-	} else if e.mode == ModeSearch {
-		// Handle search mode
-		if s == "\r" { // Enter key
-			// Complete search
-			if e.searchBuffer != "" {
-				// Set the search pattern
-				e.searchPattern = e.searchBuffer
-				
-				// Execute the search
-				e.executeSearch()
-				
-				// Return to normal mode
-				e.mode = ModeNormal
-				e.searching = false
-			} else {
-				// Empty search - repeat last search if there was one
-				if e.searchPattern != "" {
-					e.executeSearch()
-				}
-				e.mode = ModeNormal
-				e.searching = false
-			}
-		} else if s == "\b" { // Backspace key
-			// Remove last character from search buffer
-			if len(e.searchBuffer) > 0 {
-				e.searchBuffer = e.searchBuffer[:len(e.searchBuffer)-1]
-			}
-		} else {
-			// Add character to search buffer
-			e.searchBuffer += s
-		}
-	}
-}
-
-// Key processes a key with terminal codes replaced
-func (e *GoEngine) Key(s string) {
-	// Map common key codes with case-insensitive matching
-	// This provides better compatibility for different key code formats
-	s = strings.ToLower(s)
-	
-	switch s {
-	case "<esc>":
-		// Always change to normal mode when ESC is pressed
-		e.mode = ModeNormal
-		e.searching = false
-		e.searchBuffer = ""
-		e.awaitingMotion = false
-		e.currentCommand = ""
-	case "<left>":
-		// Different behavior based on mode
-		if e.mode == ModeInsert {
-			// In insert mode, just move the cursor
-			moveLeft(e)
-		} else {
-			// In normal/visual mode, use h motion
-			moveLeft(e)
-		}
-	case "<right>":
-		// Different behavior based on mode
-		if e.mode == ModeInsert {
-			// In insert mode, just move the cursor
-			moveRight(e)
-		} else {
-			// In normal/visual mode, use l motion
-			moveRight(e)
-		}
-	case "<up>":
-		// Different behavior based on mode
-		if e.mode == ModeInsert {
-			// In insert mode, just move the cursor
-			moveUp(e)
-		} else {
-			// In normal/visual mode, use k motion
-			moveUp(e)
-		}
-	case "<down>":
-		// Different behavior based on mode
-		if e.mode == ModeInsert {
-			// In insert mode, just move the cursor
-			moveDown(e)
-		} else {
-			// In normal/visual mode, use j motion
-			moveDown(e)
-		}
-	case "<cr>", "<enter>":
-		if e.mode == ModeInsert {
-			// In insert mode, add a new line
-			if e.currentBuffer != nil {
-				// Get current line 
-				currentLineNum := e.cursorRow
-				currentLine := e.currentBuffer.GetLine(currentLineNum)
-				
-				// Split the line at cursor position
-				beforeCursor := ""
-				afterCursor := ""
-				if e.cursorCol < len(currentLine) {
-					beforeCursor = currentLine[:e.cursorCol]
-					afterCursor = currentLine[e.cursorCol:]
-				} else {
-					beforeCursor = currentLine
-					afterCursor = ""
-				}
-				
-				// Create new lines array
-				newLines := []string{beforeCursor, afterCursor}
-				
-				// Update the buffer
-				e.currentBuffer.SetLines(currentLineNum-1, currentLineNum, newLines)
-				
-				// Update cursor position to start of new line
-				e.cursorRow++
-				e.cursorCol = 0
-			}
-		} else {
-			// In normal mode, <CR> moves cursor to beginning of next line
-			if e.currentBuffer != nil && e.cursorRow < e.currentBuffer.GetLineCount() {
-				e.cursorRow++
-				moveToFirstNonBlank(e)
-			}
-		}
-	case "<bs>", "<backspace>":
-		if e.mode == ModeInsert {
-			// In insert mode, delete character before cursor
-			if e.currentBuffer != nil && e.cursorCol > 0 {
-				line := e.currentBuffer.GetLine(e.cursorRow)
-				newLine := line[:e.cursorCol-1] + line[e.cursorCol:]
-				e.currentBuffer.lines[e.cursorRow-1] = newLine
-				e.currentBuffer.markModified()
-				e.cursorCol--
-			} else if e.cursorRow > 1 && e.cursorCol == 0 {
-				// At beginning of line, join with previous line
-				prevLine := e.currentBuffer.GetLine(e.cursorRow-1)
-				currLine := e.currentBuffer.GetLine(e.cursorRow)
-				
-				// Update previous line
-				newLine := prevLine + currLine
-				
-				// Replace the two lines with the joined line
-				e.currentBuffer.SetLines(e.cursorRow-2, e.cursorRow, []string{newLine})
-				
-				// Update cursor position
-				e.cursorRow--
-				e.cursorCol = len(prevLine)
-			}
-		} else {
-			// In normal mode, backspace acts as 'h'
-			moveLeft(e)
-		}
-	case "<home>":
-		if e.mode == ModeInsert {
-			e.cursorCol = 0
-		} else {
-			moveToLineStart(e)
-		}
-	case "<end>":
-		if e.currentBuffer != nil {
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			if e.mode == ModeInsert {
-				e.cursorCol = len(line)
-			} else {
-				moveToLineEnd(e)
-			}
-		}
-	case "<pageup>":
-		// Move cursor 20 lines up or to the top
-		if e.currentBuffer != nil {
-			targetRow := e.cursorRow - 20
-			if targetRow < 1 {
-				targetRow = 1
-			}
-			e.cursorRow = targetRow
-			
-			// Adjust column if needed
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			if e.cursorCol > len(line) {
-				e.cursorCol = len(line)
-				if e.cursorCol > 0 && e.mode == ModeNormal {
-					e.cursorCol--
-				}
-			}
-		}
-	case "<pagedown>":
-		// Move cursor 20 lines down or to the bottom
-		if e.currentBuffer != nil {
-			targetRow := e.cursorRow + 20
-			if targetRow > e.currentBuffer.GetLineCount() {
-				targetRow = e.currentBuffer.GetLineCount()
-			}
-			e.cursorRow = targetRow
-			
-			// Adjust column if needed
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			if e.cursorCol > len(line) {
-				e.cursorCol = len(line)
-				if e.cursorCol > 0 && e.mode == ModeNormal {
-					e.cursorCol--
-				}
-			}
-		}
-	case "<del>":
-		if e.mode == ModeInsert {
-			// In insert mode, delete character under cursor
-			if e.currentBuffer != nil {
-				line := e.currentBuffer.GetLine(e.cursorRow)
-				if e.cursorCol < len(line) {
-					newLine := line[:e.cursorCol] + line[e.cursorCol+1:]
-					e.currentBuffer.lines[e.cursorRow-1] = newLine
-					e.currentBuffer.markModified()
-				} else if e.cursorRow < e.currentBuffer.GetLineCount() {
-					// At end of line, join with next line
-					currLine := line
-					nextLine := e.currentBuffer.GetLine(e.cursorRow+1)
-					
-					// Create joined line
-					newLine := currLine + nextLine
-					
-					// Replace the two lines with the joined line
-					e.currentBuffer.SetLines(e.cursorRow-1, e.cursorRow+1, []string{newLine})
-				}
-			}
-		} else {
-			// In normal mode, <Del> acts like 'x'
-			if e.currentBuffer != nil {
-				line := e.currentBuffer.GetLine(e.cursorRow)
-				if e.cursorCol < len(line) {
-					// Delete character under cursor
-					newLine := line[:e.cursorCol] + line[e.cursorCol+1:]
-					e.currentBuffer.lines[e.cursorRow-1] = newLine
-					e.currentBuffer.markModified()
-				}
-			}
-		}
-	case "<c-[>": // Control-[ is the same as ESC
-		e.mode = ModeNormal
-		e.searching = false
-		e.searchBuffer = ""
-		e.awaitingMotion = false
-		e.currentCommand = ""
-	default:
-		// Try to handle literally by removing angle brackets
-		noAngles := strings.TrimPrefix(strings.TrimSuffix(s, ">"), "<")
-		if s != noAngles {
-			// This was a key in angle brackets we don't directly handle
-			e.Input(noAngles)
-		} else {
-			// Not in angle brackets, treat as normal input
-			e.Input(s)
-		}
-	}
-}
-
-// Execute runs a vim ex command
-func (e *GoEngine) Execute(cmd string) {
-	// Parse and execute ex commands
-	cmd = strings.TrimSpace(cmd)
-	
-	// Handle some basic ex commands
-	if cmd == "w" || strings.HasPrefix(cmd, "w ") {
-		// Mark buffer as saved (not modified)
-		if e.currentBuffer != nil {
-			e.currentBuffer.modified = false
-		}
-	} else if cmd == "q" || cmd == "q!" {
-		// Quit would be handled by the main application
-	} else if cmd == "set number" {
-		// Would set line numbering
-	} else if cmd == "set nonumber" {
-		// Would unset line numbering
-	}
-}
-
 // GetMode returns the current mode
 func (e *GoEngine) GetMode() int {
-	// Return the mode that matches the C implementation's values
-	// This is important for proper interaction with the editor_process_key.go file
+	return e.mode
+}
+
+// GetCurrentMode returns the current mode
+// This is specifically for the wrapper function GetCurrentMode()
+// Takes special care to return the expected values for command/ex mode
+func (e *GoEngine) GetCurrentMode() int {
+	// When in ModeCommand, the application expects value 8 to trigger
+	// intercepting the ':' and entering EX_COMMAND mode
+	if e.mode == ModeCommand {
+		return 8 // The value expected by the editor for command mode
+	}
 	return e.mode
 }
 
 // VisualGetRange returns the visual selection range
 func (e *GoEngine) VisualGetRange() [2][2]int {
-	return [2][2]int{
-		{e.visualStart[0], e.visualStart[1]},
-		{e.visualEnd[0], e.visualEnd[1]},
-	}
+	return [2][2]int{e.visualStart, e.visualEnd}
 }
 
-// VisualGetType returns the visual mode type
+// VisualGetType returns the visual selection type
 func (e *GoEngine) VisualGetType() int {
 	return e.visualType
 }
 
-// GetSearchState returns the current search state information
-func (e *GoEngine) GetSearchState() (bool, string, int, int) {
-	// Returns: isSearching, searchBuffer, matchCount, currentMatchIndex
-	return e.searching, e.searchBuffer, len(e.searchResults), e.currentSearchIdx
-}
-
-// GetSearchResults returns all matches for the current search
-func (e *GoEngine) GetSearchResults() [][2]int {
-	return e.searchResults
+// Execute executes a vim command
+func (e *GoEngine) Execute(cmd string) {
+	// Basic implementation - could be extended later for more sophisticated command parsing
+	
+	// Most commonly used commands
+	switch {
+	case cmd == "normal":
+		e.mode = ModeNormal
+	case cmd == "visual":
+		e.mode = ModeVisual
+	case cmd == "insert":
+		e.mode = ModeInsert
+	case cmd == "write" || cmd == "w":
+		// Simulated file write (doesn't actually write yet)
+		if e.currentBuffer != nil {
+			e.currentBuffer.modified = false
+		}
+	}
 }
 
 // Eval evaluates a vim expression
 func (e *GoEngine) Eval(expr string) string {
-	// Placeholder for vim expression evaluation
+	// Minimal implementation of common expression evaluation
+	// Could be extended later for more sophisticated expression parsing
+	
+	if expr == "mode()" {
+		switch e.mode {
+		case ModeNormal:
+			return "n"
+		case ModeInsert:
+			return "i"
+		case ModeVisual:
+			return "v"
+		case ModeCommand:
+			return "c"
+		case ModeSearch:
+			return "s"
+		default:
+			return "n"
+		}
+	}
+	
+	// Default empty result for unsupported expressions
 	return ""
 }
 
-// resetCommandState resets the command state for operations like d, c, y
-func (e *GoEngine) resetCommandState() {
-	e.awaitingMotion = false
-	e.currentCommand = ""
-}
-
-// handleLineCommand handles line operations like dd, cc, yy
-func (e *GoEngine) handleLineCommand(cmd string) {
-	if e.currentBuffer == nil {
-		return
-	}
-	
-	switch cmd {
-	case "d":
-		// Delete current line
-		e.deleteRange(
-			[2]int{e.cursorRow, 0},
-			[2]int{e.cursorRow, len(e.currentBuffer.GetLine(e.cursorRow))},
-			true,
-		)
-	case "c":
-		// Change current line (delete and enter insert mode)
-		e.deleteRange(
-			[2]int{e.cursorRow, 0},
-			[2]int{e.cursorRow, len(e.currentBuffer.GetLine(e.cursorRow))},
-			true,
-		)
-		e.mode = ModeInsert
-	case "y":
-		// Yank current line
-		e.yankRange(
-			[2]int{e.cursorRow, 0},
-			[2]int{e.cursorRow, len(e.currentBuffer.GetLine(e.cursorRow))},
-			true,
-		)
-	}
-}
-
-// executeCommandOnRange applies a command to a range of text
-func (e *GoEngine) executeCommandOnRange(cmd string, start, end [2]int) {
-	// Ensure start comes before end
-	if start[0] > end[0] || (start[0] == end[0] && start[1] > end[1]) {
-		start, end = end, start
-	}
-	
-	switch cmd {
-	case "d":
-		e.deleteRange(start, end, false)
-	case "c":
-		e.deleteRange(start, end, false)
-		e.mode = ModeInsert
-	case "y":
-		e.yankRange(start, end, false)
-	}
-}
-
-// deleteRange deletes text in the given range
-func (e *GoEngine) deleteRange(start, end [2]int, wholeLine bool) {
-	if e.currentBuffer == nil {
-		return
-	}
-	
-	// First yank the text being deleted
-	e.yankRange(start, end, wholeLine)
-	
-	if wholeLine {
-		// Delete the entire line
-		lines := e.currentBuffer.Lines()
-		lineIndex := start[0] - 1 // Convert to 0-based
-		
-		// Remove the line
-		if lineIndex < len(lines) {
-			e.currentBuffer.lines = append(lines[:lineIndex], lines[lineIndex+1:]...)
-			e.currentBuffer.markModified()
-			
-			// If we deleted the last line, move cursor up
-			if lineIndex >= len(e.currentBuffer.lines) {
-				e.cursorRow = len(e.currentBuffer.lines)
-				if e.cursorRow == 0 {
-					// Buffer is now empty, add an empty line
-					e.currentBuffer.lines = []string{""}
-					e.cursorRow = 1
-				}
-			}
-			
-			// Position cursor at first non-blank character of the line
-			e.cursorCol = 0
-			if e.cursorRow <= len(e.currentBuffer.lines) {
-				moveToFirstNonBlank(e)
-			}
-		}
-	} else if start[0] == end[0] {
-		// Delete within a single line
-		lineIndex := start[0] - 1 // Convert to 0-based
-		line := e.currentBuffer.GetLine(start[0])
-		
-		// Create new line with deleted portion removed
-		newLine := line[:start[1]] + line[end[1]:]
-		e.currentBuffer.lines[lineIndex] = newLine
-		e.currentBuffer.markModified()
-		
-		// Position cursor at the deletion point
-		e.cursorCol = start[1]
-	} else {
-		// Delete across multiple lines
-		startLine := start[0] - 1 // Convert to 0-based
-		endLine := end[0] - 1
-		
-		// Get the parts we want to keep
-		startLineContent := e.currentBuffer.GetLine(start[0])[:start[1]]
-		endLineContent := e.currentBuffer.GetLine(end[0])[end[1]:]
-		
-		// Create the merged line
-		newLine := startLineContent + endLineContent
-		
-		// Keep the merged line and remove the others
-		e.currentBuffer.lines[startLine] = newLine
-		e.currentBuffer.lines = append(
-			e.currentBuffer.lines[:startLine+1],
-			e.currentBuffer.lines[endLine+1:]...,
-		)
-		
-		e.currentBuffer.markModified()
-		
-		// Position cursor at the deletion start
-		e.cursorRow = start[0]
-		e.cursorCol = start[1]
-	}
-}
-
-// yankRange copies text in the given range to the yank register
-func (e *GoEngine) yankRange(start, end [2]int, wholeLine bool) {
-	if e.currentBuffer == nil {
-		return
-	}
-	
-	var yankedText string
-	
-	if wholeLine {
-		// Yank the entire line
-		line := e.currentBuffer.GetLine(start[0])
-		yankedText = line + "\n"
-	} else if start[0] == end[0] {
-		// Yank within a single line
-		line := e.currentBuffer.GetLine(start[0])
-		if end[1] <= len(line) && start[1] <= end[1] {
-			yankedText = line[start[1]:end[1]]
-		}
-	} else {
-		// Yank across multiple lines
-		var sb strings.Builder
-		
-		// First line
-		firstLine := e.currentBuffer.GetLine(start[0])
-		if start[1] < len(firstLine) {
-			sb.WriteString(firstLine[start[1]:])
-		}
-		sb.WriteString("\n")
-		
-		// Middle lines (if any)
-		for i := start[0] + 1; i < end[0]; i++ {
-			sb.WriteString(e.currentBuffer.GetLine(i))
-			sb.WriteString("\n")
-		}
-		
-		// Last line
-		lastLine := e.currentBuffer.GetLine(end[0])
-		if end[1] <= len(lastLine) {
-			sb.WriteString(lastLine[:end[1]])
-		}
-		
-		yankedText = sb.String()
-	}
-	
-	// Store in yank register
-	e.yankRegister = yankedText
-}
-
-// putAfter puts yanked text after the cursor
-func (e *GoEngine) putAfter() {
-	if e.currentBuffer == nil || e.yankRegister == "" {
-		return
-	}
-	
-	// Check if the register contains a whole line (ending with newline)
-	if e.yankRegister[len(e.yankRegister)-1] == '\n' {
-		// Line-wise put: add the line after the current line
-		lineIndex := e.cursorRow // 1-based
-		lines := strings.Split(e.yankRegister, "\n")
-		
-		// Remove the last empty entry from the split if it exists
-		if len(lines) > 0 && lines[len(lines)-1] == "" {
-			lines = lines[:len(lines)-1]
-		}
-		
-		// Insert the lines after the current line
-		newLines := make([]string, 0, len(e.currentBuffer.lines)+len(lines))
-		newLines = append(newLines, e.currentBuffer.lines[:lineIndex]...)
-		newLines = append(newLines, lines...)
-		newLines = append(newLines, e.currentBuffer.lines[lineIndex:]...)
-		
-		e.currentBuffer.lines = newLines
-		e.currentBuffer.markModified()
-		
-		// Position cursor at the first non-blank character of the first inserted line
-		e.cursorRow = lineIndex + 1
-		e.cursorCol = 0
-		moveToFirstNonBlank(e)
-	} else {
-		// Character-wise put: put after the cursor
-		lineIndex := e.cursorRow - 1 // Convert to 0-based
-		line := e.currentBuffer.GetLine(e.cursorRow)
-		col := e.cursorCol
-		
-		// Insert the yanked text after the current position
-		if col >= len(line) {
-			// If cursor is at the end of the line, append
-			e.currentBuffer.lines[lineIndex] += e.yankRegister
-		} else {
-			// Otherwise insert
-			e.currentBuffer.lines[lineIndex] = line[:col+1] + e.yankRegister + line[col+1:]
-		}
-		
-		e.currentBuffer.markModified()
-		
-		// Position cursor at the end of the inserted text
-		e.cursorCol = col + len(e.yankRegister)
-	}
-}
-
-// putBefore puts yanked text before the cursor
-func (e *GoEngine) putBefore() {
-	if e.currentBuffer == nil || e.yankRegister == "" {
-		return
-	}
-	
-	// Check if the register contains a whole line (ending with newline)
-	if e.yankRegister[len(e.yankRegister)-1] == '\n' {
-		// Line-wise put: add the line before the current line
-		lineIndex := e.cursorRow - 1 // 0-based
-		lines := strings.Split(e.yankRegister, "\n")
-		
-		// Remove the last empty entry from the split if it exists
-		if len(lines) > 0 && lines[len(lines)-1] == "" {
-			lines = lines[:len(lines)-1]
-		}
-		
-		// Insert the lines before the current line
-		newLines := make([]string, 0, len(e.currentBuffer.lines)+len(lines))
-		newLines = append(newLines, e.currentBuffer.lines[:lineIndex]...)
-		newLines = append(newLines, lines...)
-		newLines = append(newLines, e.currentBuffer.lines[lineIndex:]...)
-		
-		e.currentBuffer.lines = newLines
-		e.currentBuffer.markModified()
-		
-		// Position cursor at the first non-blank character of the first inserted line
-		e.cursorRow = lineIndex + 1
-		e.cursorCol = 0
-		moveToFirstNonBlank(e)
-	} else {
-		// Character-wise put: put before the cursor
-		lineIndex := e.cursorRow - 1 // Convert to 0-based
-		line := e.currentBuffer.GetLine(e.cursorRow)
-		col := e.cursorCol
-		
-		// Insert the yanked text before the current position
-		e.currentBuffer.lines[lineIndex] = line[:col] + e.yankRegister + line[col:]
-		e.currentBuffer.markModified()
-		
-		// Position cursor at the end of the inserted text
-		e.cursorCol = col + len(e.yankRegister) - 1
-		if e.cursorCol < 0 {
-			e.cursorCol = 0
-		}
-	}
-}
-
-// startSearch begins a search operation
-func (e *GoEngine) startSearch(direction int) {
-	// Keep the mode as ModeSearch (8) for compatibility with the C implementation
-	e.mode = ModeSearch
-	e.searching = true
-	e.searchDirection = direction
-	e.searchBuffer = ""
-}
-
-// executeSearch performs the search with the current pattern
-func (e *GoEngine) executeSearch() {
-	if e.currentBuffer == nil || e.searchPattern == "" {
-		return
-	}
-	
-	// Find all matches in the buffer
-	e.searchResults = e.findAllMatches(e.searchPattern)
-	
-	// If no matches found, return
-	if len(e.searchResults) == 0 {
-		e.currentSearchIdx = -1
-		return
-	}
-	
-	// For backward search, initialize to the last match position
-	if e.searchDirection < 0 && len(e.searchResults) > 0 {
-		// Start from the end for backward search
-		currentPos := [2]int{e.cursorRow, e.cursorCol}
-		
-		// Find the last match before current position
-		foundIdx := -1
-		for i := len(e.searchResults) - 1; i >= 0; i-- {
-			match := e.searchResults[i]
-			if match[0] < currentPos[0] || (match[0] == currentPos[0] && match[1] < currentPos[1]) {
-				foundIdx = i
-				break
-			}
-		}
-		
-		// If no match found before current position, wrap around to the last match
-		if foundIdx == -1 {
-			foundIdx = len(e.searchResults) - 1
-		}
-		
-		// Set the cursor to this match
-		e.currentSearchIdx = foundIdx
-		match := e.searchResults[e.currentSearchIdx]
-		e.cursorRow = match[0]
-		e.cursorCol = match[1]
-	} else {
-		// Forward search - find first match after cursor
-		e.findNextMatch(1)
-	}
-}
-
-// findAllMatches finds all occurrences of the pattern in the buffer
-func (e *GoEngine) findAllMatches(pattern string) [][2]int {
-	if e.currentBuffer == nil {
-		return nil
-	}
-	
-	var matches [][2]int
-	lineCount := e.currentBuffer.GetLineCount()
-	
-	// Search each line for the pattern
-	for i := 1; i <= lineCount; i++ {
-		line := e.currentBuffer.GetLine(i)
-		idx := 0
-		for {
-			// Find the pattern in the current line, starting from idx
-			pos := strings.Index(line[idx:], pattern)
-			if pos == -1 {
-				break
-			}
-			
-			// Record the match position (absolute position in line)
-			absPos := idx + pos
-			matches = append(matches, [2]int{i, absPos})
-			
-			// Move past this match for the next search
-			idx = absPos + len(pattern)
-			if idx >= len(line) {
-				break
-			}
-		}
-	}
-	
-	return matches
-}
-
-// findNextMatch moves to the next match in the specified direction
-func (e *GoEngine) findNextMatch(direction int) {
-	if e.currentBuffer == nil || len(e.searchResults) == 0 {
-		return
-	}
-	
-	currentPos := [2]int{e.cursorRow, e.cursorCol}
-	
-	// If we have a previous search index, use it as a starting point
-	if e.currentSearchIdx >= 0 && e.currentSearchIdx < len(e.searchResults) {
-		if direction > 0 {
-			// Forward search
-			e.currentSearchIdx = (e.currentSearchIdx + 1) % len(e.searchResults)
-		} else {
-			// Backward search
-			e.currentSearchIdx--
-			if e.currentSearchIdx < 0 {
-				e.currentSearchIdx = len(e.searchResults) - 1
-			}
-		}
-	} else {
-		// No previous search index, find the nearest match in the given direction
-		if direction > 0 {
-			// Find the first match after the current position
-			e.currentSearchIdx = -1
-			for i, match := range e.searchResults {
-				if match[0] > currentPos[0] || (match[0] == currentPos[0] && match[1] > currentPos[1]) {
-					e.currentSearchIdx = i
-					break
-				}
-			}
-			
-			// If no match found after current position, wrap around
-			if e.currentSearchIdx == -1 {
-				e.currentSearchIdx = 0
-			}
-		} else {
-			// Find the last match before the current position
-			e.currentSearchIdx = -1
-			for i := len(e.searchResults) - 1; i >= 0; i-- {
-				match := e.searchResults[i]
-				if match[0] < currentPos[0] || (match[0] == currentPos[0] && match[1] < currentPos[1]) {
-					e.currentSearchIdx = i
-					break
-				}
-			}
-			
-			// If no match found before current position, wrap around
-			if e.currentSearchIdx == -1 {
-				e.currentSearchIdx = len(e.searchResults) - 1
-			}
-		}
-	}
-	
-	// Move cursor to the match
-	match := e.searchResults[e.currentSearchIdx]
-	e.cursorRow = match[0]
-	e.cursorCol = match[1]
-}
-
-// SearchGetMatchingPair finds matching brackets
+// SearchGetMatchingPair finds the matching bracket for the character under the cursor
 func (e *GoEngine) SearchGetMatchingPair() [2]int {
 	if e.currentBuffer == nil {
 		return [2]int{0, 0}
 	}
 	
-	// Get the line and check cursor position
-	line := e.currentBuffer.GetLine(e.cursorRow)
-	if e.cursorCol >= len(line) {
+	// Basic implementation for bracket matching
+	row := e.cursorRow
+	col := e.cursorCol
+	line := e.currentBuffer.GetLine(row)
+	
+	if col >= len(line) {
 		return [2]int{0, 0}
 	}
 	
 	// Get the character under the cursor
-	char := line[e.cursorCol]
-	var match byte
-	var direction int
+	char := line[col]
 	
-	// Determine the matching character and search direction
+	// Define matching pairs
+	var matchingChar byte
+	var direction int // 1 for forward search, -1 for backward search
+	
 	switch char {
 	case '(':
-		match = ')'
-		direction = 1
-	case '[':
-		match = ']'
-		direction = 1
-	case '{':
-		match = '}'
+		matchingChar = ')'
 		direction = 1
 	case ')':
-		match = '('
+		matchingChar = '('
 		direction = -1
+	case '[':
+		matchingChar = ']'
+		direction = 1
 	case ']':
-		match = '['
+		matchingChar = '['
 		direction = -1
+	case '{':
+		matchingChar = '}'
+		direction = 1
 	case '}':
-		match = '{'
+		matchingChar = '{'
 		direction = -1
 	default:
-		return [2]int{0, 0}
+		return [2]int{0, 0} // Not a bracket character
 	}
 	
-	// For forward search, we need to track nesting level
-	if direction > 0 {
-		nestLevel := 1 // Start at 1 for the character we're on
-		
-		// Search forward from the current position
-		currRow := e.cursorRow
-		for currRow <= e.currentBuffer.GetLineCount() {
-			// Get current line
-			currLine := e.currentBuffer.GetLine(currRow)
-			
-			// Start at the character after the current one if on the same line
-			startCol := 0
-			if currRow == e.cursorRow {
-				startCol = e.cursorCol + 1
-			}
-			
-			// Search through the current line
-			for col := startCol; col < len(currLine); col++ {
-				// If we find a matching bracket, update the nesting level
-				if currLine[col] == char {
-					nestLevel++
-				} else if currLine[col] == match {
-					nestLevel--
-					
-					// If nesting level is 0, we found the matching bracket
-					if nestLevel == 0 {
-						return [2]int{currRow, col}
-					}
+	// Search for the matching bracket
+	// For simplicity, only search in the current line for now
+	count := 1 // Start with 1 for the bracket under the cursor
+	
+	if direction == 1 {
+		// Search forward
+		for i := col + 1; i < len(line); i++ {
+			if line[i] == char {
+				count++
+			} else if line[i] == matchingChar {
+				count--
+				if count == 0 {
+					return [2]int{row, i}
 				}
 			}
-			
-			// Move to the next line
-			currRow++
 		}
 	} else {
-		// For backward search, we also track nesting level
-		nestLevel := 1 // Start at 1 for the character we're on
-		
-		// Search backward from the current position
-		currRow := e.cursorRow
-		for currRow >= 1 {
-			// Get current line
-			currLine := e.currentBuffer.GetLine(currRow)
-			
-			// End at the character before the current one if on the same line
-			endCol := len(currLine) - 1
-			if currRow == e.cursorRow {
-				endCol = e.cursorCol - 1
-			}
-			
-			// Search through the current line
-			for col := endCol; col >= 0; col-- {
-				// If we find a matching bracket, update the nesting level
-				if currLine[col] == char {
-					nestLevel++
-				} else if currLine[col] == match {
-					nestLevel--
-					
-					// If nesting level is 0, we found the matching bracket
-					if nestLevel == 0 {
-						return [2]int{currRow, col}
-					}
+		// Search backward
+		for i := col - 1; i >= 0; i-- {
+			if line[i] == char {
+				count++
+			} else if line[i] == matchingChar {
+				count--
+				if count == 0 {
+					return [2]int{row, i}
 				}
 			}
-			
-			// Move to the previous line
-			currRow--
 		}
 	}
 	
-	// No matching bracket found
+	// No match found
 	return [2]int{0, 0}
+}
+
+// GetSearchState returns the current search state
+// Returns:
+// - searching: whether we're currently in search mode
+// - pattern: the current search pattern
+// - direction: 1 for forward, -1 for backward
+// - currentIdx: index of current search result in the results list
+func (e *GoEngine) GetSearchState() (bool, string, int, int) {
+	return e.searching, e.searchPattern, e.searchDirection, e.currentSearchIdx
+}
+
+// GetSearchResults returns all matches for the current search
+func (e *GoEngine) GetSearchResults() [][2]int {
+	if e.searchResults == nil {
+		return make([][2]int, 0)
+	}
+	return e.searchResults
 }

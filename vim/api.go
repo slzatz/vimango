@@ -165,7 +165,15 @@ func ExecuteCommand(s string) {
 }
 
 // GetCurrentMode gets the current mode
+// This is specifically used by the editor to determine the mode
 func GetCurrentMode() int {
+	// If we're using the Go implementation, make sure to map our internal 
+	// mode values to what the application expects
+	if IsUsingGoImplementation() {
+		// GetCurrentMode handles the special mapping for command mode
+		return Engine.GetCurrentMode()
+	}
+	// For C implementation, use regular GetMode
 	return Engine.GetMode()
 }
 
@@ -244,11 +252,26 @@ func BufferSetLines(buf Buffer, start, end int, lines []string, count int) {
 
 // ToggleImplementation switches between Go and C implementations
 func ToggleImplementation() string {
+	// Get current buffer before switching to ensure we can
+	// reset its state after the switch
+	var currentBuffer VimBuffer
+	if Engine != nil {
+		currentBuffer = Engine.BufferGetCurrent()
+	}
+	
+	// Switch implementation
 	if IsUsingGoImplementation() {
 		SwitchToCImplementation()
 	} else {
 		SwitchToGoImplementation()
 	}
+	
+	// Reset buffer state if we had an active buffer
+	if currentBuffer != nil && Engine != nil {
+		// Force buffer reset to clean any stale state
+		Engine.BufferSetCurrent(currentBuffer)
+	}
+	
 	return GetActiveImplementation()
 }
 

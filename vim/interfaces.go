@@ -39,6 +39,7 @@ type VimEngine interface {
 	
 	// Mode operations
 	GetMode() int
+	GetCurrentMode() int // A special version for application compatibility
 	
 	// Visual mode
 	VisualGetRange() [2][2]int
