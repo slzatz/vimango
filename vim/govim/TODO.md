@@ -25,6 +25,9 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [x] Implement `^` (first non-blank character)
    - [x] Implement `gg` (go to first line)
    - [x] Add support for motion counts (2j, 5w, etc.)
+   - [x] Fix cursor positioning in normal and insert modes
+   - [x] Improve arrow key handling
+   - [x] Fix end-of-line cursor behavior
 
 3. **Text Editing Commands**
    - [x] Implement delete (d + motion)
@@ -33,13 +36,29 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [x] Implement put (p, P)
    - [x] Implement line deletion (dd)
    - [x] Implement line change (cc)
+   - [x] Add support for x (delete character)
+   - [x] Add support for o/O (open line below/above)
+   - [x] Add support for I/A (insert at beginning/end of line)
+   - [x] Implement J (join lines)
 
-4. **Search Functionality**
+4. **Mode Transitions**
+   - [x] Fix Escape key handling for all modes
+   - [x] Improve mode transition between normal and insert modes
+   - [x] Fix cursor positioning during mode transitions
+   - [x] Add visual mode operations (d, y, c)
+   - [x] Add visual mode indentation (< and >)
+
+5. **Search Functionality**
    - [x] Implement `/` and `?` search
    - [x] Implement `n` and `N` for next/prev match
    - [ ] Add search highlighting support
 
-4. **Integration Testing**
+6. **Error Handling**
+   - [x] Add robust error handling in buffer operations
+   - [x] Improve file loading error handling
+   - [x] Add recovery mechanisms for common operations
+
+7. **Integration Testing**
    - [ ] Create comparison tests between C and Go implementations
    - [ ] Add benchmark tests to compare performance
 
@@ -83,9 +102,13 @@ This document tracks the planned work and priorities for the pure Go vim impleme
 
 ## Known Issues
 
-- Cursor positioning at end of lines needs verification
-- Visual mode selection tracking could be improved
+- ~~Cursor positioning at end of lines needs verification~~ (Fixed May 2025)
+- ~~Visual mode selection tracking could be improved~~ (Improved May 2025)
+- ~~Buffer content persistence between context switches~~ (Fixed May 2025)
 - Tests needed for edge cases (empty buffers, special characters)
+- Line wrapping not yet implemented
+- Auto-indentation not yet implemented
+- Syntax highlighting integration pending
 
 ## Migration Plan
 

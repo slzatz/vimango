@@ -85,12 +85,52 @@ func (o *Organizer) getId() int {
 }
 
 func (o *Organizer) readRowsIntoBuffer() {
-	var ss []string
-	for _, row := range o.rows {
-		ss = append(ss, row.title)
+	// Create a new clean slice for titles
+	numRows := len(o.rows)
+	ss := make([]string, numRows)
+	for i, row := range o.rows {
+		ss[i] = row.title
 	}
-	o.vbuf.SetLines(0, -1, ss)
-	vim.SetCurrentBuffer(o.vbuf)
+	
+	// If we're using Go implementation and have titles
+	if vim.GetActiveImplementation() == vim.ImplGo {
+		// Create a completely new buffer for maximum safety with Go implementation
+		buf := vim.NewBuffer(0)
+		
+		// Handle the special case where we have no rows
+		if len(ss) == 0 {
+			// Always ensure at least an empty line for consistent behavior
+			ss = []string{""}
+		}
+		
+		// Set the new buffer's lines - use a defensive approach
+		deepCopy := make([]string, len(ss))
+		for i, line := range ss {
+			deepCopy[i] = line // Deep copy to ensure no shared references
+		}
+		
+		// Set the lines in the buffer
+		buf.SetLines(0, -1, deepCopy)
+		
+		// Make it the current buffer and store the reference
+		buf.SetCurrent()
+		o.vbuf = buf
+	} else {
+		// Standard approach for C implementation
+		if o.vbuf == nil {
+			// This shouldn't happen, but handle it gracefully
+			o.vbuf = vim.NewBuffer(0)
+		}
+		
+		// Ensure we have at least an empty line in empty cases
+		if len(ss) == 0 {
+			ss = []string{""}
+		}
+		
+		// Update the existing buffer's content
+		o.vbuf.SetLines(0, -1, ss)
+		vim.SetCurrentBuffer(o.vbuf)
+	}
 }
 
 func (o *Organizer) showMessage(format string, a ...interface{}) {

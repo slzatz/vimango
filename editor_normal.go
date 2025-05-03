@@ -35,6 +35,7 @@ func (a *App) setEditorNormalCmds() map[string]func(*Editor, int) {
 		//leader + "l": (*Editor).showVimMessageLog,
 		//leader + "xx": (*Editor).test,
 		//"z=": (*Editor).spellSuggest,
+		string(ctrlKey('z')): (*Editor).switchImplementation,
 	}
 }
 
@@ -381,4 +382,18 @@ func (e *Editor) spellSuggest(_ int) {
 	}
 	s := h.Suggest(w)
 	e.ShowMessage(BR, "%q -> %s", w, strings.Join(s, "|"))
+}
+
+func (e *Editor) switchImplementation(_ int) {
+	// Toggle between C and Go implementations
+	currentImpl := vim.GetActiveImplementation()
+	if currentImpl == vim.ImplC {
+		// Switch to Go implementation
+		e.ShowMessage(BL, "Switching to Go implementation")
+		vim.SwitchToGoImplementation()
+	} else {
+		// Switch to C implementation
+		e.ShowMessage(BL, "Switching to C implementation")
+		vim.SwitchToCImplementation()
+	}
 }

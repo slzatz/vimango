@@ -71,12 +71,63 @@ func (b *GoBuffer) GetLastChangedTick() int {
 
 // SetLines sets all lines in the buffer
 func (b *GoBuffer) SetLines(start, end int, lines []string) {
-	// Add panic recovery
+	// Add panic recovery with detailed logging
 	defer func() {
 		if r := recover(); r != nil {
-			// Log the panic
+			// Log the panic with detailed information
 			println("PANIC in GoBuffer.SetLines:", r)
-			println("Buffer:", b.id, "Start:", start, "End:", end, "Lines len:", len(lines))
+			println("Buffer ID:", b.id)
+			println("Start:", start)
+			println("End:", end)
+			println("Buffer line count:", len(b.lines))
+			println("Lines length:", len(lines))
+			
+			// Try to recover by doing a safer operation
+			try := func() (ok bool) {
+				// Extra safety - recover from panics in the recovery code itself
+				defer func() {
+					if r := recover(); r != nil {
+						println("Recovery failed:", r)
+						ok = false
+					}
+				}()
+				
+				// Make sure we have valid lines
+				if b.lines == nil {
+					b.lines = []string{""}
+				}
+				
+				// Safest possible operation: append an empty line if needed
+				if len(b.lines) == 0 {
+					b.lines = []string{""}
+					ok = true
+					return
+				}
+				
+				// For simple single-line updates (like from 'x' command), try direct update
+				if len(lines) == 1 && start >= 0 && start < len(b.lines) {
+					// Copy existing lines for safety
+					allLines := make([]string, len(b.lines))
+					copy(allLines, b.lines)
+					
+					// Replace just the one line
+					allLines[start] = lines[0]
+					
+					// Set the lines directly
+					b.lines = allLines
+					b.markModified()
+					ok = true
+				}
+				
+				return
+			}
+			
+			// Try the recovery
+			if recovered := try(); recovered {
+				println("Recovery succeeded")
+			} else {
+				println("Could not recover - buffer may be in inconsistent state")
+			}
 		}
 	}()
 	
@@ -85,6 +136,31 @@ func (b *GoBuffer) SetLines(start, end int, lines []string) {
 		b.lines = []string{""}
 	}
 	
+	// Create a completely new buffer and return - this is the most radical approach
+	// to ensure we get a complete replacement for the special case
+	if start == 0 && end == -1 {
+		// Make a clean copy of the input lines
+		cleanLines := make([]string, len(lines))
+		for i, line := range lines {
+			cleanLines[i] = line // Deep copy each string
+		}
+		
+		// Make sure we have at least an empty line
+		if len(cleanLines) == 0 {
+			cleanLines = []string{""}
+		}
+		
+		// COMPLETELY replace the lines array - create a new slice to break all references
+		b.lines = make([]string, len(cleanLines))
+		copy(b.lines, cleanLines)
+		b.markModified()
+		
+		return
+	}
+	
+	// For all other cases (partial replacements), continue with normal logic
+	
+	// Ensure we have a valid lines array to insert
 	if lines == nil {
 		lines = []string{}
 	}
@@ -94,7 +170,7 @@ func (b *GoBuffer) SetLines(start, end int, lines []string) {
 		start = 0
 	}
 	
-	// If end is -1, it means replace all lines from start
+	// For partial replacements, continue with the standard logic
 	if end == -1 {
 		end = len(b.lines)
 	}
@@ -115,21 +191,36 @@ func (b *GoBuffer) SetLines(start, end int, lines []string) {
 	// Calculate number of lines to replace
 	count := end - start
 	
+	// Calculate the capacity needed for the new lines array
+	newCapacity := len(b.lines) - count + len(lines)
+	if newCapacity < 1 {
+		newCapacity = 1 // Ensure at least one line
+	}
+	
 	// Create new lines array with replaced content
-	newLines := make([]string, 0, len(b.lines) - count + len(lines))
+	newLines := make([]string, 0, newCapacity)
 	
 	// Add lines before the replacement
-	newLines = append(newLines, b.lines[:start]...)
+	if start > 0 && start <= len(b.lines) {
+		newLines = append(newLines, b.lines[:start]...)
+	}
 	
-	// Add the new lines
-	newLines = append(newLines, lines...)
+	// Add the new lines - make a deep copy
+	for _, line := range lines {
+		newLines = append(newLines, line)
+	}
 	
 	// Add lines after the replacement
 	if end < len(b.lines) {
 		newLines = append(newLines, b.lines[end:]...)
 	}
 	
-	// Update the buffer's lines
+	// Ensure we always have at least one line
+	if len(newLines) == 0 {
+		newLines = []string{""}
+	}
+	
+	// Update the buffer's lines - ensure we break any reference to the old lines
 	b.lines = newLines
 	b.markModified()
 }
@@ -142,13 +233,54 @@ func (b *GoBuffer) markModified() {
 
 // Load a file into the buffer
 func (b *GoBuffer) loadFile(filename string) error {
+	// Add panic recovery for any unexpected issues
+	defer func() {
+		if r := recover(); r != nil {
+			println("PANIC in GoBuffer.loadFile:", r)
+			println("Filename:", filename)
+			
+			// Ensure we at least have a minimally valid buffer state
+			if b.lines == nil || len(b.lines) == 0 {
+				b.lines = []string{""}
+			}
+			b.name = filename
+			b.modified = false
+		}
+	}()
+	
+	// Try to read the file
 	content, err := ioutil.ReadFile(filename)
 	if err != nil {
+		// File couldn't be read, but don't fail catastrophically
+		// Set up an empty buffer with the right name
+		b.name = filename
+		b.lines = []string{""}
+		b.modified = false
 		return err
 	}
 	
+	// Save the filename
 	b.name = filename
-	b.lines = strings.Split(string(content), "\n")
+	
+	// Split the content by newlines
+	contentStr := string(content)
+	
+	// Check if the file contains CR+LF line endings (Windows)
+	if strings.Contains(contentStr, "\r\n") {
+		// Handle Windows line endings
+		b.lines = strings.Split(contentStr, "\r\n")
+	} else {
+		// Handle Unix line endings
+		b.lines = strings.Split(contentStr, "\n")
+	}
+	
+	// Make sure we have at least one line
+	if len(b.lines) == 0 {
+		b.lines = []string{""}
+	}
+	
+	// Reset the modified flag
 	b.modified = false
+	
 	return nil
 }

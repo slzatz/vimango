@@ -28,7 +28,7 @@ func main() {
 	
 	// Set up logging if Go implementation is used
 	if useGoVim {
-		fmt.Println("Using Go Vim implementation")
+		// Set up logging to file instead of console to avoid flashing messages
 		logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err == nil {
 			log.SetOutput(logFile)

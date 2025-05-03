@@ -23,6 +23,14 @@ func moveLeft(e *GoEngine) bool {
 	if e.cursorCol > 0 {
 		e.cursorCol--
 		return true
+	} else if e.cursorRow > 1 && e.mode == ModeInsert {
+		// In insert mode, allow going to previous line at beginning of line
+		e.cursorRow--
+		if e.currentBuffer != nil {
+			line := e.currentBuffer.GetLine(e.cursorRow)
+			e.cursorCol = len(line)
+		}
+		return true
 	}
 	return false
 }
@@ -34,11 +42,21 @@ func moveRight(e *GoEngine) bool {
 	}
 	
 	line := e.currentBuffer.GetLine(e.cursorRow)
-	// In Vim, we can move to the position after the last character
-	// But not beyond the end of the line
-	if e.cursorCol < len(line) - 1 {
-		e.cursorCol++
-		return true
+	
+	// Different behavior based on mode
+	if e.mode == ModeInsert {
+		// In insert mode we can only go to the end of the line
+		if e.cursorCol < len(line) {
+			e.cursorCol++
+			return true
+		}
+	} else { 
+		// In normal mode, we can go to the last character of the line
+		// In real Vim, we can position on the last character
+		if len(line) > 0 && e.cursorCol < len(line) - 1 {
+			e.cursorCol++
+			return true
+		}
 	}
 	return false
 }
@@ -50,14 +68,32 @@ func moveDown(e *GoEngine) bool {
 	}
 	
 	if e.cursorRow < e.currentBuffer.GetLineCount() {
+		// Save the desired column position (this helps maintain cursor column when navigating through lines of different lengths)
+		desiredCol := e.cursorCol
+		
 		e.cursorRow++
+		
 		// Adjust column if the new line is shorter
 		line := e.currentBuffer.GetLine(e.cursorRow)
-		if e.cursorCol >= len(line) && len(line) > 0 {
-			e.cursorCol = len(line) - 1
-		} else if len(line) == 0 {
-			e.cursorCol = 0
+		
+		if e.mode == ModeInsert {
+			// In insert mode, we can position at the end of the line
+			if desiredCol >= len(line) {
+				e.cursorCol = len(line)
+			} else {
+				e.cursorCol = desiredCol
+			}
+		} else {
+			// In normal mode, we can only position on an actual character
+			if len(line) == 0 {
+				e.cursorCol = 0
+			} else if desiredCol >= len(line) {
+				e.cursorCol = len(line) - 1
+			} else {
+				e.cursorCol = desiredCol
+			}
 		}
+		
 		return true
 	}
 	return false
@@ -65,13 +101,37 @@ func moveDown(e *GoEngine) bool {
 
 // moveUp moves the cursor one line up
 func moveUp(e *GoEngine) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
 	if e.cursorRow > 1 {
+		// Save the desired column position
+		desiredCol := e.cursorCol
+		
 		e.cursorRow--
+		
 		// Adjust column if the new line is shorter
 		line := e.currentBuffer.GetLine(e.cursorRow)
-		if e.cursorCol > len(line) {
-			e.cursorCol = len(line)
+		
+		if e.mode == ModeInsert {
+			// In insert mode, we can position at the end of the line
+			if desiredCol >= len(line) {
+				e.cursorCol = len(line)
+			} else {
+				e.cursorCol = desiredCol
+			}
+		} else {
+			// In normal mode, we can only position on an actual character
+			if len(line) == 0 {
+				e.cursorCol = 0
+			} else if desiredCol >= len(line) {
+				e.cursorCol = len(line) - 1
+			} else {
+				e.cursorCol = desiredCol
+			}
 		}
+		
 		return true
 	}
 	return false

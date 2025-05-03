@@ -232,7 +232,8 @@ func (e *GoEngine) BufferNew(flags int) VimBuffer {
 		if e.debugLog != nil {
 			e.debugLog.Println("BufferNew failed - returned nil buffer")
 		}
-		fmt.Println("WARNING: Go implementation BufferNew returned nil")
+		// Log to stderr instead of stdout to avoid affecting the UI
+		fmt.Fprintf(os.Stderr, "WARNING: Go implementation BufferNew returned nil\n")
 	} else {
 		if e.debugLog != nil {
 			e.debugLog.Println("BufferNew succeeded")
@@ -327,12 +328,19 @@ func (b *GoBufferWrapper) GetID() int {
 
 // GetLine gets a line from the buffer
 func (b *GoBufferWrapper) GetLine(lnum int) string {
+	// Safety check for lines that don't exist
+	if lnum < 1 || lnum > b.buf.GetLineCount() {
+		return ""
+	}
+	
+	// Get the line content safely
 	return b.buf.GetLine(lnum)
 }
 
 // GetLineB gets a line as bytes from the buffer
 func (b *GoBufferWrapper) GetLineB(lnum int) []byte {
-	return b.buf.GetLineB(lnum)
+	// Use our safer GetLine implementation
+	return []byte(b.GetLine(lnum))
 }
 
 // GetLineCount gets the number of lines in the buffer
@@ -342,12 +350,27 @@ func (b *GoBufferWrapper) GetLineCount() int {
 
 // Lines gets all lines from the buffer
 func (b *GoBufferWrapper) Lines() []string {
-	return b.buf.Lines()
+	// Create a completely fresh copy of the lines to prevent unexpected sharing
+	lines := b.buf.Lines()
+	result := make([]string, len(lines))
+	for i, line := range lines {
+		result[i] = line
+	}
+	return result
 }
 
 // LinesB gets all lines as bytes from the buffer
 func (b *GoBufferWrapper) LinesB() [][]byte {
-	return b.buf.LinesB()
+	// Create a completely fresh copy of the lines to prevent unexpected sharing
+	lines := b.buf.LinesB()
+	result := make([][]byte, len(lines))
+	for i, line := range lines {
+		// Make a copy of each line's bytes
+		newLine := make([]byte, len(line))
+		copy(newLine, line)
+		result[i] = newLine
+	}
+	return result
 }
 
 // SetCurrent sets this buffer as the current buffer
@@ -367,67 +390,64 @@ func (b *GoBufferWrapper) GetLastChangedTick() int {
 
 // SetLines sets all lines in the buffer
 func (b *GoBufferWrapper) SetLines(start, end int, lines []string) {
-	// For debugging - print to stdout
-	fmt.Printf("GoBufferWrapper.SetLines called: start=%d, end=%d, lines length=%d\n", start, end, len(lines))
-	
 	// Convert nils to empty arrays to prevent panics
 	if lines == nil {
 		lines = []string{}
 	}
 	
+	// Create a deep copy of the lines to avoid any shared references
+	safeLines := make([]string, len(lines))
+	for i, line := range lines {
+		safeLines[i] = line
+	}
+	
+	// Ensure we have at least one line for complete buffer replacement
+	if start == 0 && end == -1 && len(safeLines) == 0 {
+		safeLines = []string{""}
+	}
+	
 	// Try to call SetLines with error handling
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("PANIC in GoBufferWrapper.SetLines:", r)
-			// Print debug information
-			fmt.Printf("Buffer: %v, Start: %d, End: %d, Lines length: %d\n", b.buf, start, end, len(lines))
+			// Log to stderr instead of stdout to avoid affecting the UI
+			fmt.Fprintf(os.Stderr, "PANIC in GoBufferWrapper.SetLines: %v\n", r)
 			
-			// Try to recover by using an alternative approach
-			if goBuf, ok := b.buf.(*govim.GoBuffer); ok {
-				// Safe operation on the detected buffer
-				fmt.Println("Attempting recovery with direct line manipulation")
-				
-				// Validate inputs for safety
-				if start < 0 {
-					start = 0
+			// Simple recovery approach: use standard method with safe inputs
+			if start < 0 {
+				start = 0
+			}
+			
+			if end == -1 {
+				// Create a safe buffer replacement
+				if len(safeLines) == 0 {
+					safeLines = []string{""}
 				}
 				
-				// Handle single-line update case (common with 'x' command)
-				if len(lines) == 1 && start >= 0 && start < goBuf.GetLineCount() {
-					// Get all lines
-					allLines := goBuf.Lines()
-					
-					// Replace just the one line
-					allLines[start] = lines[0]
-					
-					// Get a new reference and update all lines directly
-					goBuf.SetLines(0, goBuf.GetLineCount(), allLines)
-					fmt.Println("Recovery succeeded")
-				}
+				// Create a buffer with the safe content
+				newBuf := govim.BufferNew(0)
+				newBuf.SetLines(0, -1, safeLines)
+				
+				// Replace the current buffer with this new one
+				b.buf = newBuf
+				b.buf.SetCurrent()
+				return
 			}
 		}
 	}()
 	
-	// Now that Buffer interface has SetLines method, we can call it directly
-	// But still try with concrete type first for better error handling
-	if goBuf, ok := b.buf.(*govim.GoBuffer); ok {
-		goBuf.SetLines(start, end, lines)
-	} else {
-		// Fall back to the interface method
-		b.buf.SetLines(start, end, lines)
-	}
+	// Update the buffer
+	b.buf.SetLines(start, end, safeLines)
 }
 
 // API Functions (to be used by the application)
 
 // SwitchToGoImplementation switches to the Go implementation
 func SwitchToGoImplementation() {
-	fmt.Println("Switching to Go implementation")
-	
 	// Set up logging for the Go implementation
 	logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Println("Failed to open log file:", err)
+		// Log to stderr instead of stdout to avoid affecting the UI
+		fmt.Fprintf(os.Stderr, "Failed to open govim log file: %v\n", err)
 	}
 	
 	ActiveImplementation = ImplGo

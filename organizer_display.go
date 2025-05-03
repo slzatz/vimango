@@ -22,6 +22,7 @@ func (o *Organizer) refreshScreen() {
 	//if (org.view != KEYWORD) {
 	if o.mode != ADD_CHANGE_FILTER {
 		for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
+			// Use 1K to clear from cursor to start of line, preserving vertical lines
 			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17)
 		}
 	}

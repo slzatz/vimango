@@ -116,8 +116,40 @@ You can also use the command-line flag to choose the implementation at startup:
 
 ## Known Limitations
 
-- The current implementation is basic and lacks many vim features
-- No support for macros, registers, or advanced editing operations
-- Search functionality not yet implemented
-- Text editing is minimal (only basic insert mode)
-- No multi-line operations or complex motions
+- The current implementation has the basic functionality but lacks some advanced vim features:
+  - No support for macros yet
+  - Limited register functionality (only the unnamed register)
+  - Advanced features like marks or folding not yet implemented 
+  - Limited ex command support
+  - Some complex motions not yet implemented
+
+## Recent Updates (May 2025)
+
+1. **Arrow Key Handling**:
+   - Added robust support for all arrow keys and special keys (home, end, page up/down)
+   - Ensured consistent behavior between normal and insert modes
+
+2. **Mode Transitions**:
+   - Fixed escape key to properly exit all modes and return to normal mode
+   - Added proper insert mode entry via i, I, a, A, o, O commands
+   - Fixed cursor positioning during mode transitions
+
+3. **Cursor Positioning**:
+   - Improved cursor positioning at line ends in different modes
+   - Fixed cursor movement between lines of different lengths
+   - Ensured mode-specific cursor positioning logic
+
+4. **Error Handling**:
+   - Added robust error handling and recovery in buffer operations
+   - Improved file loading with support for different line endings
+   - Made the implementation more resilient against crashes
+
+5. **Implementation Switching**:
+   - Fixed implementation toggling in the switchImplementation function
+   - Improved command line flag handling for switching implementations
+
+6. **Buffer Management**:
+   - Fixed issue where first title from previous context would persist visually when loading a new context
+   - Implemented robust deep copying in buffer operations to prevent reference sharing
+   - Added recovery mechanisms for buffer operations
+   - Improved data isolation between buffer instances
