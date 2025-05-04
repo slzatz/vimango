@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/slzatz/vimango/vim"
 	//"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -223,16 +222,11 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	} else {
 		s += fmt.Sprintf(" ORDER BY task.%s DESC LIMIT %d;", sort, max) //01162022
 	}
-
-	//var rows *sql.Rows
-	//var err error
-
 	rows, err := db.MainDB.Query(s, filter)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error in getItems: %v", err)
 		return []Row{}, err
 	}
-
 	defer rows.Close()
 
 	var orgRows []Row
@@ -307,33 +301,6 @@ func (db *Database) insertTitle(row *Row, context_tid, folder_tid int) error { /
 	return nil
 }
 
-/*
-func (db *Database) insertRowInDB(row *Row) error { // should return err
-
-	folder_tid := 1
-	context_tid := 1
-	// if org.taskview is BY_KEYWORD or BY_RECENT then new task gets context=1, folder=1
-	switch org.taskview {
-	case BY_CONTEXT:
-		context_tid, _ = db.contextExists(org.filter)
-	case BY_FOLDER:
-		folder_tid, _ = db.folderExists(org.filter)
-	}
-	var id int
-	err := db.MainDB.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
-		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
-		row.title, folder_tid, context_tid, row.star).Scan(&id)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error inserting into DB: %v", err)
-		//return -1
-		return err
-	}
-	row.id = id
-	row.dirty = false
-	return nil
-}
-*/
-
 func (db *Database) insertSyncEntry(title, note string) {
 	_, err := db.MainDB.Exec("INSERT INTO sync_log (title, note, modified) VALUES (?, ?, datetime('now'));",
 		title, note)
@@ -356,56 +323,6 @@ func (db *Database) readNoteIntoString(id int) string {
 	}
 	return note.String
 }
-
-func (db *Database) readNoteIntoBuffer(e *Editor, id int) {
-	if id == -1 {
-		// Initialize empty buffer for new notes instead of returning
-		e.ss = []string{""} // Initialize with an empty line
-		e.vbuf = vim.NewBuffer(0)
-		vim.SetCurrentBuffer(e.vbuf)
-		e.vbuf.SetLines(0, -1, e.ss)
-		return
-	}
-
-	row := db.MainDB.QueryRow("SELECT note FROM task WHERE id=?;", id)
-	var note sql.NullString
-	err := row.Scan(&note)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error opening note for editing: %v", err)
-		// Initialize empty buffer even on error
-		e.ss = []string{""} // Initialize with an empty line
-		e.vbuf = vim.NewBuffer(0)
-		vim.SetCurrentBuffer(e.vbuf)
-		e.vbuf.SetLines(0, -1, e.ss)
-		return
-	}
-	e.ss = strings.Split(note.String, "\n")
-	// Make sure we have at least one line, even if the note was empty
-	if len(e.ss) == 0 {
-		e.ss = []string{""}
-	}
-	e.vbuf = vim.NewBuffer(0)
-	vim.SetCurrentBuffer(e.vbuf)
-	e.vbuf.SetLines(0, -1, e.ss)
-}
-
-/*
-// not in use
-func (db *Database) readSyncLogIntoAltRows(id int) {
-	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
-	var note string
-	err := row.Scan(&note)
-	if err != nil {
-		return
-	}
-	org.altRows = nil
-	for _, line := range strings.Split(note, "\n") {
-		var r AltRow
-		r.title = line
-		org.altRows = append(org.altRows, r)
-	}
-}
-*/
 
 func (db *Database) readSyncLog(id int) string {
 	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)

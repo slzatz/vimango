@@ -313,7 +313,6 @@ func (o *Organizer) editNote(id int) {
 		return
 	}
 
-	//sess.showOrgMessage("Edit note %d", id)
 	o.Session.editorMode = true
 
 	active := false
@@ -321,14 +320,14 @@ func (o *Organizer) editNote(id int) {
 		if e, ok := w.(*Editor); ok {
 			if e.id == id {
 				active = true
-				ae = e // should become o.Session.activeEditor = e
+				ae = e
 				break
 			}
 		}
 	}
 
 	if !active {
-		ae = app.NewEditor() // should become p := o.Session.NewEditor() in NewEditor should set activeEditor
+		ae = app.NewEditor()
 		o.Session.Windows = append(o.Session.Windows, ae)
 		ae.id = id
 		ae.title = o.rows[o.fr].title
@@ -340,18 +339,24 @@ func (o *Organizer) editNote(id int) {
 			ae.output.id = id
 			o.Session.Windows = append(o.Session.Windows, ae.output)
 		}
-		o.Database.readNoteIntoBuffer(ae, id)
+		note := o.Database.readNoteIntoString(id)
+		ae.ss = strings.Split(note, "\n")
+		// Make sure we have at least one line, even if the note was empty
+		if len(ae.ss) == 0 {
+			ae.ss = []string{""}
+		}
+		ae.vbuf = vim.NewBuffer(0)
+		vim.SetCurrentBuffer(ae.vbuf)
+		ae.vbuf.SetLines(0, -1, ae.ss)
+		////////
 		ae.bufferTick = ae.vbuf.GetLastChangedTick()
 		o.Session.activeEditor = ae
 	}
 
 	o.Screen.positionWindows()
 	o.Screen.eraseRightScreen() //erases editor area + statusbar + msg
-	//delete any images
-	//fmt.Print("\x1b_Ga=d\x1b\\") //now in sess.eraseRightScreen
 	o.Screen.drawRightScreen()
 	ae.mode = NORMAL
-	// either app.p = p or app.Session.p = p
 	o.Session.activeEditor = ae
 	o.command = ""
 	o.mode = NORMAL
