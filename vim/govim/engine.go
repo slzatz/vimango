@@ -28,7 +28,8 @@ type GoEngine struct {
 	visualType      int
 	commandCount    int  // For motion counts like 5j, 3w, etc.
 	awaitingMotion  bool // True when waiting for a motion after d, c, y, etc.
-	currentCommand  string // Current command (d, c, y) waiting for motion
+	currentCommand  string // Current command (d, c, y, g) waiting for motion or second character
+	buildingCount   bool   // True when we're in the process of entering a numeric prefix
 	yankRegister    string // Content of the "unnamed" register for yank/put
 	
 	// Search state
@@ -49,6 +50,7 @@ func NewEngine() *GoEngine {
 		commandCount:    0,
 		awaitingMotion:  false,
 		currentCommand:  "",
+		buildingCount:   false,
 		yankRegister:    "",
 		searchPattern:   "",
 		searchDirection: 1,  // Default to forward search
@@ -131,6 +133,7 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		
 		// Reset buffer-specific state
 		e.commandCount = 0
+		e.buildingCount = false
 		e.awaitingMotion = false
 		e.currentCommand = ""
 		e.mode = ModeNormal // Always reset to normal mode

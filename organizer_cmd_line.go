@@ -78,6 +78,7 @@ func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
 		"printlist":       (*Organizer).printList2,
 		"pl":              (*Organizer).printList2,
 		"sort":            (*Organizer).sortEntries,
+		"which":           (*Organizer).whichVim,
 	}
 }
 
@@ -982,6 +983,18 @@ func (o *Organizer) printDocument(_ int) {
 	}
 	o.mode = o.last_mode
 	o.command_line = ""
+}
+
+func (o *Organizer) whichVim(_ int) {
+	//o.mode = NORMAL
+	//o.command_line = ""
+	var msg string
+	if vim.ActiveImplementation == vim.ImplGo {
+		msg = "Go Vim"
+	} else {
+		msg = "CGO Vim"
+	}
+	o.ShowMessage(BL, "vim version: %s", msg)
 }
 
 func (o *Organizer) printList(_ int) {

@@ -51,8 +51,6 @@ func CreateApp() *App {
 }
 
 func (a *App) NewEditor() *Editor {
-	// a.setEditorNormalCmds
-	// a.setEditorExCmds
 	exCmds := a.setEditorExCmds()
 	normalCmds := a.setEditorNormalCmds()
 	return &Editor{
@@ -98,7 +96,7 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 }
 
 func (a *App) signalHandler() {
-	err := a.Screen.GetWindowSize() // Should change to Screen
+	err := a.Screen.GetWindowSize()
 	if err != nil {
 		//SafeExit(fmt.Errorf("couldn't get window size: %v", err))
 		os.Exit(1)
@@ -106,7 +104,6 @@ func (a *App) signalHandler() {
 	a.moveDividerPct(a.Screen.edPct) // should change to Screen
 }
 
-// Most of the Sessions below (but not all) should become Screen
 func (a *App) moveDividerPct(pct int) {
 	// note below only necessary if window resized or font size changed
 	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
@@ -132,7 +129,6 @@ func (a *App) moveDividerPct(pct int) {
 		a.Organizer.drawPreview()
 	}
 	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
-
 	a.returnCursor()
 }
 
@@ -144,7 +140,6 @@ func (a *App) moveDividerAbs(num int) {
 	} else {
 		a.Screen.divider = a.Screen.screenCols - num
 	}
-
 	a.Screen.edPct = 100 - 100*a.Screen.divider/a.Screen.screenCols
 	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 2
 	a.Screen.eraseScreenRedrawLines()
@@ -153,7 +148,6 @@ func (a *App) moveDividerAbs(num int) {
 		a.Organizer.refreshScreen()
 		a.Organizer.drawStatusBar()
 	}
-
 	if a.Session.editorMode {
 		a.Screen.positionWindows()
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
@@ -162,38 +156,31 @@ func (a *App) moveDividerAbs(num int) {
 		a.Organizer.drawPreview()
 	}
 	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d edPct: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider, a.Screen.edPct)
-
 	a.returnCursor()
 }
 
 // InitDatabases initializes database connections
 func (a *App) InitDatabases(configPath string) error {
-	//var err error
-
 	// Read config file
 	config, err := a.FromFile(configPath)
 	if err != nil {
 		return err
 	}
-
 	// Initialize main database
 	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
-
 	// Enable foreign keys
 	_, err = a.Database.MainDB.Exec("PRAGMA foreign_keys=ON;")
 	if err != nil {
 		return err
 	}
-
 	// Initialize FTS database
 	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
 	if err != nil {
 		return err
 	}
-
 	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		config.Postgres.Host,
 		config.Postgres.Port,
@@ -201,7 +188,6 @@ func (a *App) InitDatabases(configPath string) error {
 		config.Postgres.Password,
 		config.Postgres.DB,
 	)
-
 	a.Database.PG, err = sql.Open("postgres", connect)
 	if err != nil {
 		//fmt.Fprintf("Error opening postgres db: %v", err)
@@ -320,7 +306,6 @@ func (a *App) returnCursor() {
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Organizer.cy+TOP_MARGIN+1, a.Organizer.cx+LEFT_MARGIN+1)
 		}
 	}
-
 	ab.WriteString("\x1b[0m")   //return to default fg/bg
 	ab.WriteString("\x1b[?25h") //shows the cursor
 	fmt.Print(ab.String())

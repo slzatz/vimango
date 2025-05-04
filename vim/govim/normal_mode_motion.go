@@ -1,7 +1,7 @@
 package govim
 
 // BasicMotions implements the basic h,j,k,l movement commands
-type motionCommand func(e *GoEngine) bool
+type motionCommand func(e *GoEngine, count int) bool
 
 // motionHandlers maps characters to their motion handlers
 var motionHandlers = map[string]motionCommand{
@@ -16,64 +16,89 @@ var motionHandlers = map[string]motionCommand{
 	"b": moveWordBackward,
 	"e": moveWordEnd,
 	"G": moveToLastLine,
+	"g": moveToFirstLine, // Changed from "gg" to "g" - we'll handle the second 'g' in Input()
 	"%": moveToMatchingBracket,
 }
 
-// moveLeft moves the cursor one character to the left
-func moveLeft(e *GoEngine) bool {
-	if e.cursorCol > 0 {
-		e.cursorCol--
-		return true
-	} else if e.cursorRow > 1 && e.mode == ModeInsert {
-		// In insert mode, allow going to previous line at beginning of line
-		e.cursorRow--
-		if e.currentBuffer != nil {
-			line := e.currentBuffer.GetLine(e.cursorRow)
-			e.cursorCol = len(line)
-		}
-		return true
+// moveLeft moves the cursor one or more characters to the left
+func moveLeft(e *GoEngine, count int) bool {
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
 	}
-	return false
+	
+	moved := false
+	for i := 0; i < count; i++ {
+		if e.cursorCol > 0 {
+			e.cursorCol--
+			moved = true
+		} else if e.cursorRow > 1 && e.mode == ModeInsert {
+			// In insert mode, allow going to previous line at beginning of line
+			e.cursorRow--
+			if e.currentBuffer != nil {
+				line := e.currentBuffer.GetLine(e.cursorRow)
+				e.cursorCol = len(line)
+			}
+			moved = true
+			break // Stop after jumping to previous line
+		} else {
+			break // Can't move further
+		}
+	}
+	return moved
 }
 
-// moveRight moves the cursor one character to the right
-func moveRight(e *GoEngine) bool {
+// moveRight moves the cursor one or more characters to the right
+func moveRight(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
+	}
+	
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
 	}
 	
 	line := e.currentBuffer.GetLine(e.cursorRow)
+	moved := false
 	
 	// Different behavior based on mode
 	if e.mode == ModeInsert {
-		// In insert mode we can only go to the end of the line
-		if e.cursorCol < len(line) {
+		// In insert mode we can go to the end of the line
+		for i := 0; i < count && e.cursorCol < len(line); i++ {
 			e.cursorCol++
-			return true
+			moved = true
 		}
-	} else { 
-		// In normal mode, we can go to the last character of the line
-		// In real Vim, we can position on the last character
-		if len(line) > 0 && e.cursorCol < len(line) - 1 {
+	} else {
+		// In normal mode, we can only go to the last character of the line
+		for i := 0; i < count && len(line) > 0 && e.cursorCol < len(line) - 1; i++ {
 			e.cursorCol++
-			return true
+			moved = true
 		}
 	}
-	return false
+	
+	return moved
 }
 
-// moveDown moves the cursor one line down
-func moveDown(e *GoEngine) bool {
+// moveDown moves the cursor one or more lines down
+func moveDown(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
 	
-	if e.cursorRow < e.currentBuffer.GetLineCount() {
-		// Save the desired column position (this helps maintain cursor column when navigating through lines of different lengths)
-		desiredCol := e.cursorCol
-		
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	// Save the desired column position
+	desiredCol := e.cursorCol
+	moved := false
+	
+	// Move down by the specified count
+	for i := 0; i < count && e.cursorRow < e.currentBuffer.GetLineCount(); i++ {
 		e.cursorRow++
-		
+		moved = true
+	}
+	
+	if moved {
 		// Adjust column if the new line is shorter
 		line := e.currentBuffer.GetLine(e.cursorRow)
 		
@@ -94,24 +119,32 @@ func moveDown(e *GoEngine) bool {
 				e.cursorCol = desiredCol
 			}
 		}
-		
-		return true
 	}
-	return false
+	
+	return moved
 }
 
-// moveUp moves the cursor one line up
-func moveUp(e *GoEngine) bool {
+// moveUp moves the cursor one or more lines up
+func moveUp(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
 	
-	if e.cursorRow > 1 {
-		// Save the desired column position
-		desiredCol := e.cursorCol
-		
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	// Save the desired column position
+	desiredCol := e.cursorCol
+	moved := false
+	
+	// Move up by the specified count
+	for i := 0; i < count && e.cursorRow > 1; i++ {
 		e.cursorRow--
-		
+		moved = true
+	}
+	
+	if moved {
 		// Adjust column if the new line is shorter
 		line := e.currentBuffer.GetLine(e.cursorRow)
 		
@@ -132,14 +165,13 @@ func moveUp(e *GoEngine) bool {
 				e.cursorCol = desiredCol
 			}
 		}
-		
-		return true
 	}
-	return false
+	
+	return moved
 }
 
-// moveToLineStart moves to the first character of the line
-func moveToLineStart(e *GoEngine) bool {
+// moveToLineStart moves to the first character of the line (count is ignored)
+func moveToLineStart(e *GoEngine, count int) bool {
 	if e.cursorCol != 0 {
 		e.cursorCol = 0
 		return true
@@ -147,8 +179,8 @@ func moveToLineStart(e *GoEngine) bool {
 	return false
 }
 
-// moveToLineEnd moves to the end of the line
-func moveToLineEnd(e *GoEngine) bool {
+// moveToLineEnd moves to the end of the line (count is ignored)
+func moveToLineEnd(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
@@ -166,11 +198,28 @@ func moveToLineEnd(e *GoEngine) bool {
 }
 
 // moveWordForward moves to the start of the next word
-func moveWordForward(e *GoEngine) bool {
+func moveWordForward(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
 	
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	moved := false
+	for i := 0; i < count; i++ {
+		if !moveWordForwardOnce(e) {
+			break
+		}
+		moved = true
+	}
+	
+	return moved
+}
+
+// moveWordForwardOnce moves to the start of the next word (helper function)
+func moveWordForwardOnce(e *GoEngine) bool {
 	line := e.currentBuffer.GetLine(e.cursorRow)
 	
 	// If we're at the end of the line, move to the next line
@@ -211,7 +260,24 @@ func moveWordForward(e *GoEngine) bool {
 }
 
 // moveWordBackward moves to the start of the previous word
-func moveWordBackward(e *GoEngine) bool {
+func moveWordBackward(e *GoEngine, count int) bool {
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	moved := false
+	for i := 0; i < count; i++ {
+		if !moveWordBackwardOnce(e) {
+			break
+		}
+		moved = true
+	}
+	
+	return moved
+}
+
+// moveWordBackwardOnce moves to the start of the previous word (helper function)
+func moveWordBackwardOnce(e *GoEngine) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
@@ -281,7 +347,7 @@ func moveWordBackward(e *GoEngine) bool {
 }
 
 // moveToLastLine moves to the last line of the buffer
-func moveToLastLine(e *GoEngine) bool {
+func moveToLastLine(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
@@ -293,6 +359,42 @@ func moveToLastLine(e *GoEngine) bool {
 		if e.cursorCol > len(line) {
 			e.cursorCol = len(line)
 		}
+		return true
+	}
+	return false
+}
+
+// moveToFirstLine moves to the first line of the buffer or to a specific line if count is provided
+func moveToFirstLine(e *GoEngine, count int) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	lineCount := e.currentBuffer.GetLineCount()
+	targetRow := 1 // Default to first line
+	
+	// If count is provided, go to that specific line number
+	if count > 1 {
+		targetRow = count
+		if targetRow > lineCount {
+			targetRow = lineCount // Clamp to last line
+		}
+	}
+	
+	if e.cursorRow != targetRow {
+		e.cursorRow = targetRow
+		line := e.currentBuffer.GetLine(e.cursorRow)
+		
+		// Move to the first non-blank character on the line
+		for i := 0; i < len(line); i++ {
+			if !isWhitespace(line[i]) {
+				e.cursorCol = i
+				return true
+			}
+		}
+		
+		// If the line is all whitespace or empty, move to the beginning
+		e.cursorCol = 0
 		return true
 	}
 	return false
@@ -312,7 +414,7 @@ func isWhitespace(c byte) bool {
 }
 
 // moveToFirstNonBlank moves to the first non-whitespace character of the line
-func moveToFirstNonBlank(e *GoEngine) bool {
+func moveToFirstNonBlank(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
@@ -337,7 +439,24 @@ func moveToFirstNonBlank(e *GoEngine) bool {
 }
 
 // moveWordEnd moves to the end of the current or next word
-func moveWordEnd(e *GoEngine) bool {
+func moveWordEnd(e *GoEngine, count int) bool {
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	moved := false
+	for i := 0; i < count; i++ {
+		if !moveWordEndOnce(e) {
+			break
+		}
+		moved = true
+	}
+	
+	return moved
+}
+
+// moveWordEndOnce moves to the end of the current or next word (helper function)
+func moveWordEndOnce(e *GoEngine) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
@@ -349,7 +468,7 @@ func moveWordEnd(e *GoEngine) bool {
 		if e.cursorRow < e.currentBuffer.GetLineCount() {
 			e.cursorRow++
 			e.cursorCol = 0
-			return moveWordEnd(e) // Recursively find word end in next line
+			return moveWordEndOnce(e) // Recursively find word end in next line
 		}
 		return false
 	}
@@ -407,7 +526,7 @@ func moveWordEnd(e *GoEngine) bool {
 }
 
 // moveToMatchingBracket moves to the matching bracket (%, bracket matching)
-func moveToMatchingBracket(e *GoEngine) bool {
+func moveToMatchingBracket(e *GoEngine, count int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
