@@ -123,13 +123,11 @@ The current implementation has the basic functionality but lacks several advance
 
 - No support for multiple registers (only the unnamed register)
 - Text objects (iw, aw, etc.) not implemented
-- No undo/redo functionality
 - Missing most advanced motions (f, F, t, T, (, ), {, }), but % implemented for bracket matching
 - Limited visual mode (no line or block visual modes)
 - No marks or jump list
 - No macro recording/playback
 - Limited ex command support
-- No auto-indentation
 - No folding functionality
 
 ### Prioritized Development
@@ -138,47 +136,55 @@ See the TODO.md file for a detailed list of missing features and their implement
 
 1. Implementing a registers system
 2. Adding text objects support
-3. Creating undo/redo functionality
-4. Adding more advanced motions
-5. Completing visual mode implementation
+3. Adding more advanced motions
+4. Completing visual mode implementation
+5. Implementing marks and jump list
 
 ## Recent Updates (May 2025)
 
-1. **Arrow Key Handling**:
+1. **Undo/Redo Functionality**:
+   - Implemented full undo/redo functionality with 'u' and Ctrl-r commands
+   - Added proper handling of insert mode changes as a single undo operation
+   - Implemented special handling for 'o' and 'O' commands to ensure correct line removal on undo
+   - Added cursor position tracking and restoration during undo/redo operations
+   - Implemented command grouping for complex operations
+   - Added robust state tracking to maintain buffer consistency
+
+2. **Arrow Key Handling**:
    - Added robust support for all arrow keys and special keys (home, end, page up/down)
    - Ensured consistent behavior between normal and insert modes
 
-2. **Mode Transitions**:
+3. **Mode Transitions**:
    - Fixed escape key to properly exit all modes and return to normal mode
    - Added proper insert mode entry via i, I, a, A, o, O commands
    - Fixed cursor positioning during mode transitions
 
-3. **Cursor Positioning**:
+4. **Cursor Positioning**:
    - Improved cursor positioning at line ends in different modes
    - Fixed cursor movement between lines of different lengths
    - Ensured mode-specific cursor positioning logic
 
-4. **Error Handling**:
+5. **Error Handling**:
    - Added robust error handling and recovery in buffer operations
    - Improved file loading with support for different line endings
    - Made the implementation more resilient against crashes
 
-5. **Implementation Switching**:
+6. **Implementation Switching**:
    - Fixed implementation toggling in the switchImplementation function
    - Improved command line flag handling for switching implementations
 
-6. **Buffer Management**:
+7. **Buffer Management**:
    - Fixed issue where first title from previous context would persist visually when loading a new context
    - Implemented robust deep copying in buffer operations to prevent reference sharing
    - Added recovery mechanisms for buffer operations
    - Improved data isolation between buffer instances
 
-7. **Advanced Motions**:
+8. **Advanced Motions**:
    - Implemented % for matching bracket navigation
    - Added support for nested brackets across multiple lines
    - Improved bracket searching to find the nearest bracket when cursor isn't on a bracket
 
-8. **Verb+Motion Commands**:
+9. **Verb+Motion Commands**:
    - Fixed handling of verb+motion commands like "dw", "cw", "d$"
    - Implemented special case handlers for common combinations
    - Ensured proper state tracking between keypresses

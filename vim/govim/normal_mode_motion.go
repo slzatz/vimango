@@ -5,19 +5,21 @@ type motionCommand func(e *GoEngine, count int) bool
 
 // motionHandlers maps characters to their motion handlers
 var motionHandlers = map[string]motionCommand{
-	"h": moveLeft,
-	"j": moveDown,
-	"k": moveUp,
-	"l": moveRight,
-	"0": moveToLineStart,
-	"$": moveToLineEnd,
-	"^": moveToFirstNonBlank,
-	"w": moveWordForward,
-	"b": moveWordBackward,
-	"e": moveWordEnd,
-	"G": moveToLastLine,
-	"g": moveToFirstLine, // Changed from "gg" to "g" - we'll handle the second 'g' in Input()
-	"%": moveToMatchingBracket,
+	"h": saveAndMoveLeft,
+	"j": saveAndMoveDown,
+	"k": saveAndMoveUp,
+	"l": saveAndMoveRight,
+	"0": saveAndMoveToLineStart,
+	"$": saveAndMoveToLineEnd,
+	"^": saveAndMoveToFirstNonBlank,
+	"w": saveAndMoveWordForward,
+	"b": saveAndMoveWordBackward,
+	"e": saveAndMoveWordEnd,
+	"G": saveAndMoveToLastLine,
+	"g": saveAndMoveToFirstLine, // Changed from "gg" to "g" - we'll handle the second 'g' in Input()
+	"%": saveAndMoveToMatchingBracket,
+	"u": performUndo,
+	"<C-r>": performRedo,
 }
 
 // moveLeft moves the cursor one or more characters to the left
@@ -584,4 +586,108 @@ func moveToMatchingBracket(e *GoEngine, count int) bool {
 // isBracketChar checks if a character is a bracket character
 func isBracketChar(c byte) bool {
 	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'
+}
+
+// Wrappers for motion functions that save cursor position for undo
+func saveAndMoveLeft(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveLeft(e, count)
+}
+
+func saveAndMoveRight(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveRight(e, count)
+}
+
+func saveAndMoveUp(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveUp(e, count)
+}
+
+func saveAndMoveDown(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveDown(e, count)
+}
+
+func saveAndMoveToLineStart(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveToLineStart(e, count)
+}
+
+func saveAndMoveToLineEnd(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveToLineEnd(e, count)
+}
+
+func saveAndMoveToFirstNonBlank(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveToFirstNonBlank(e, count)
+}
+
+func saveAndMoveWordForward(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveWordForward(e, count)
+}
+
+func saveAndMoveWordBackward(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveWordBackward(e, count)
+}
+
+func saveAndMoveWordEnd(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveWordEnd(e, count)
+}
+
+func saveAndMoveToLastLine(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveToLastLine(e, count)
+}
+
+func saveAndMoveToFirstLine(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveToFirstLine(e, count)
+}
+
+func saveAndMoveToMatchingBracket(e *GoEngine, count int) bool {
+	e.UndoSaveCursor()
+	return moveToMatchingBracket(e, count)
+}
+
+// performUndo executes the undo operation
+func performUndo(e *GoEngine, count int) bool {
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	// Perform undo the specified number of times
+	success := false
+	for i := 0; i < count; i++ {
+		if e.Undo() {
+			success = true
+		} else {
+			break // Stop if we can't undo further
+		}
+	}
+	
+	return success
+}
+
+// performRedo executes the redo operation
+func performRedo(e *GoEngine, count int) bool {
+	if count <= 0 {
+		count = 1 // Default to 1 if count is not specified
+	}
+	
+	// Perform redo the specified number of times
+	success := false
+	for i := 0; i < count; i++ {
+		if e.Redo() {
+			success = true
+		} else {
+			break // Stop if we can't redo further
+		}
+	}
+	
+	return success
 }

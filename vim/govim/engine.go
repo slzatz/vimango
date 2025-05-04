@@ -1,5 +1,9 @@
 package govim
 
+import (
+	// No imports needed here
+)
+
 // ModeNormal is the normal mode constant
 const ModeNormal = 1
 
@@ -28,9 +32,12 @@ type GoEngine struct {
 	visualType      int
 	commandCount    int  // For motion counts like 5j, 3w, etc.
 	awaitingMotion  bool // True when waiting for a motion after d, c, y, etc.
-	currentCommand  string // Current command (d, c, y, g) waiting for motion or second character
+	currentCommand  string // Current command (d, c, y) waiting for motion
 	buildingCount   bool   // True when we're in the process of entering a numeric prefix
 	yankRegister    string // Content of the "unnamed" register for yank/put
+	
+	// Undo state
+	inInsertUndoGroup bool // True when in insert mode to group all changes as one undo operation
 	
 	// Search state
 	searchPattern     string  // Current search pattern
@@ -52,6 +59,7 @@ func NewEngine() *GoEngine {
 		currentCommand:  "",
 		buildingCount:   false,
 		yankRegister:    "",
+		inInsertUndoGroup: false,
 		searchPattern:   "",
 		searchDirection: 1,  // Default to forward search
 		searchResults:   make([][2]int, 0),
@@ -69,8 +77,11 @@ func (e *GoEngine) Init(argc int) {
 // BufferOpen opens a file and returns a buffer
 func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 	buf := &GoBuffer{
-		id:     e.nextBufferId,
-		engine: e,
+		id:             e.nextBufferId,
+		engine:         e,
+		undoStack:      make([]*UndoRecord, 0),
+		redoStack:      make([]*UndoRecord, 0),
+		lastSavedState: -1, // Initialize to -1 (no saved state yet)
 	}
 	e.nextBufferId++
 	
@@ -95,9 +106,12 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 // BufferNew creates a new empty buffer
 func (e *GoEngine) BufferNew(flags int) Buffer {
 	buf := &GoBuffer{
-		id:     e.nextBufferId,
-		engine: e,
-		lines:  []string{""},
+		id:             e.nextBufferId,
+		engine:         e,
+		lines:          []string{""},
+		undoStack:      make([]*UndoRecord, 0),
+		redoStack:      make([]*UndoRecord, 0),
+		lastSavedState: -1, // Initialize to -1 (no saved state yet)
 	}
 	e.nextBufferId++
 	
@@ -147,6 +161,9 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		e.searchBuffer = ""
 		e.searchResults = nil
 		e.currentSearchIdx = -1
+		
+		// Reset undo state
+		e.inInsertUndoGroup = false
 		
 		// Extra debugging to verify buffer content independence
 		if oldBuffer != nil && goBuf != nil {
@@ -277,6 +294,8 @@ func (e *GoEngine) Execute(cmd string) {
 		// Simulated file write (doesn't actually write yet)
 		if e.currentBuffer != nil {
 			e.currentBuffer.modified = false
+			// Update the lastSavedState to the current position in the undo stack
+			e.currentBuffer.lastSavedState = len(e.currentBuffer.undoStack)
 		}
 	}
 }
@@ -402,4 +421,403 @@ func (e *GoEngine) GetSearchResults() [][2]int {
 		return make([][2]int, 0)
 	}
 	return e.searchResults
+}
+
+// UndoSaveCursor saves just the cursor position for undo
+// Returns true if successful, false otherwise
+func (e *GoEngine) UndoSaveCursor() bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	// Check if there's already an undo record that can be appended to
+	// For cursor-only changes, we don't always need a new record
+	if len(e.currentBuffer.undoStack) > 0 {
+		lastRecord := e.currentBuffer.undoStack[len(e.currentBuffer.undoStack)-1]
+		// If there are no line changes yet, just update the cursor position
+		if len(lastRecord.Changes) == 0 {
+			lastRecord.CursorPos = [2]int{e.cursorRow, e.cursorCol}
+			return true
+		}
+	}
+	
+	// Create a new undo record with just the cursor position
+	record := &UndoRecord{
+		Changes:     make(map[int]string),
+		CursorPos:   [2]int{e.cursorRow, e.cursorCol},
+		Description: "cursor movement",
+	}
+	
+	// Add to undo stack
+	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, record)
+	
+	// Clear redo stack when making a new change
+	if len(e.currentBuffer.redoStack) > 0 {
+		e.currentBuffer.redoStack = nil
+	}
+	
+	return true
+}
+
+// UndoSaveRegion saves the current state of lines for later undo
+// Returns true if successful, false otherwise
+func (e *GoEngine) UndoSaveRegion(startLine, endLine int) bool {
+	if e.currentBuffer == nil {
+		return false
+	}
+	
+	// Create a new undo record
+	record := &UndoRecord{
+		Changes:     make(map[int]string),
+		CursorPos:   [2]int{e.cursorRow, e.cursorCol},
+		Description: "text change",
+	}
+	
+	// Save the specified lines (1-based indexing)
+	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		if lineNum >= 1 && lineNum <= e.currentBuffer.GetLineCount() {
+			record.Changes[lineNum] = e.currentBuffer.GetLine(lineNum)
+		}
+	}
+	
+	// Add to undo stack
+	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, record)
+	
+	// Clear redo stack when making a new change
+	if len(e.currentBuffer.redoStack) > 0 {
+		e.currentBuffer.redoStack = nil
+	}
+	
+	return true
+}
+
+// UndoSync creates a synchronization point for undo operations
+// This ensures the next change will be a separate undo operation
+// The force parameter determines whether to always create a new sync point
+func (e *GoEngine) UndoSync(force bool) {
+	// Currently a no-op in our implementation since each UndoSaveRegion
+	// already creates a distinct undo record. We could extend this later
+	// to consolidate sequential changes if desired.
+}
+
+// Undo performs an undo operation, restoring the buffer and cursor to a previous state
+// Returns true if the undo was successful, false otherwise
+func (e *GoEngine) Undo() bool {
+	if e.currentBuffer == nil || len(e.currentBuffer.undoStack) == 0 {
+		// Nothing to undo
+		return false
+	}
+	
+	// Get the last undo record
+	lastIdx := len(e.currentBuffer.undoStack) - 1
+	record := e.currentBuffer.undoStack[lastIdx]
+	
+	// Create a redo record with current state of the changed lines
+	redoRecord := &UndoRecord{
+		Changes:       make(map[int]string),
+		CursorPos:     [2]int{e.cursorRow, e.cursorCol},
+		Description:   "redo " + record.Description,
+		CommandType:   record.CommandType,
+		LineOperation: record.LineOperation,
+	}
+	
+	// Special handling for 'o' and 'O' commands which add a line
+	// For these commands, we need to handle line removal properly
+	if record.CommandType == "o" || record.CommandType == "O" {
+		// For 'o' command, we need to save the current state then remove the added line
+		lineCount := e.currentBuffer.GetLineCount()
+		
+		// Store the current state for redo
+		for i := 1; i <= lineCount; i++ {
+			redoRecord.Changes[i] = e.currentBuffer.GetLine(i)
+		}
+		
+		// Temporarily disable undo recording
+		oldUndoGroupState := e.inInsertUndoGroup
+		e.inInsertUndoGroup = true
+		
+		// For 'o' command, we need to remove the line that was added
+		// and restore the other lines to their previous state
+		if record.CommandType == "o" {
+			// The line after the cursor was added, so remove it
+			newRow := record.CursorPos[0] + 1
+			if newRow <= lineCount {
+				// Remove the added line by restoring the buffer to its previous state
+				// We create a new array excluding the line that was added
+				var newLines []string
+				for i := 1; i <= lineCount; i++ {
+					if i != newRow {
+						// Keep all lines except the added one
+						if i <= len(record.Changes) {
+							// Use the original content for lines that existed before
+							newLines = append(newLines, record.Changes[i])
+						} else {
+							// This shouldn't happen if the undo record is properly created
+							newLines = append(newLines, e.currentBuffer.GetLine(i))
+						}
+					}
+				}
+				
+				// Replace the entire buffer with these lines
+				if len(newLines) > 0 {
+					e.currentBuffer.SetLines(0, -1, newLines)
+				} else {
+					// Ensure we have at least one line
+					e.currentBuffer.SetLines(0, -1, []string{""})
+				}
+			}
+		} else if record.CommandType == "O" {
+			// The line at the cursor was added, so remove it
+			newRow := record.CursorPos[0]
+			if newRow <= lineCount {
+				// Remove the added line by restoring the buffer to its previous state
+				var newLines []string
+				for i := 1; i <= lineCount; i++ {
+					if i != newRow {
+						// Keep all lines except the added one
+						if i <= len(record.Changes) {
+							newLines = append(newLines, record.Changes[i])
+						} else {
+							newLines = append(newLines, e.currentBuffer.GetLine(i))
+						}
+					}
+				}
+				
+				// Replace the entire buffer with these lines
+				if len(newLines) > 0 {
+					e.currentBuffer.SetLines(0, -1, newLines)
+				} else {
+					// Ensure we have at least one line
+					e.currentBuffer.SetLines(0, -1, []string{""})
+				}
+			}
+		}
+		
+		// Restore undo state
+		e.inInsertUndoGroup = oldUndoGroupState
+	} else {
+		// Standard undo behavior for other commands
+		
+		// Save current state for redo
+		for lineNum := range record.Changes {
+			if lineNum <= e.currentBuffer.GetLineCount() {
+				redoRecord.Changes[lineNum] = e.currentBuffer.GetLine(lineNum)
+			}
+		}
+		
+		// Apply the undo changes
+		// Temporarily disable undo recording to avoid circular undo events
+		oldUndoGroupState := e.inInsertUndoGroup
+		e.inInsertUndoGroup = true  // This prevents SetLines from creating new undo records
+		
+		// For each line in the undo record, restore it to its previous state
+		for lineNum, content := range record.Changes {
+			if lineNum >= 1 && lineNum <= e.currentBuffer.GetLineCount() {
+				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{content})
+			}
+		}
+		
+		// Restore previous undo state
+		e.inInsertUndoGroup = oldUndoGroupState
+	}
+	
+	// Make sure to update the buffer's last tick
+	e.currentBuffer.lastTick++
+	
+	// Only mark the buffer as modified if we're not back at the last saved state
+	if lastIdx == e.currentBuffer.lastSavedState {
+		e.currentBuffer.modified = false
+	} else {
+		e.currentBuffer.modified = true
+	}
+	
+	// Always restore cursor position based on undo record
+	e.cursorRow = record.CursorPos[0]
+	e.cursorCol = record.CursorPos[1]
+	
+	// Ensure cursor position is valid for the current buffer state
+	e.validateCursorPosition()
+	
+	// Move record from undo to redo stack
+	e.currentBuffer.undoStack = e.currentBuffer.undoStack[:lastIdx]
+	e.currentBuffer.redoStack = append(e.currentBuffer.redoStack, redoRecord)
+	
+	return true
+}
+
+// Redo performs a redo operation, reapplying a previously undone change
+// Returns true if the redo was successful, false otherwise
+func (e *GoEngine) Redo() bool {
+	if e.currentBuffer == nil || len(e.currentBuffer.redoStack) == 0 {
+		// Nothing to redo
+		return false
+	}
+	
+	// Get the last redo record
+	lastIdx := len(e.currentBuffer.redoStack) - 1
+	record := e.currentBuffer.redoStack[lastIdx]
+	
+	// Create an undo record with current state of the changed lines
+	undoRecord := &UndoRecord{
+		Changes:       make(map[int]string),
+		CursorPos:     [2]int{e.cursorRow, e.cursorCol},
+		Description:   "undo " + record.Description,
+		CommandType:   record.CommandType,
+		LineOperation: record.LineOperation,
+	}
+	
+	// Special handling for 'o' and 'O' commands - they need special treatment during redo
+	if record.CommandType == "o" || record.CommandType == "O" {
+		// For 'o' or 'O' commands, we need to save the current state
+		lineCount := e.currentBuffer.GetLineCount()
+		
+		// Store the current state for undo
+		for i := 1; i <= lineCount; i++ {
+			undoRecord.Changes[i] = e.currentBuffer.GetLine(i)
+		}
+		
+		// Temporarily disable undo recording
+		oldUndoGroupState := e.inInsertUndoGroup
+		e.inInsertUndoGroup = true
+		
+		// For redoing 'o' or 'O', we need to restore the buffer state from the redo record
+		// This includes the line that was added
+		
+		// Create a completely new buffer with all lines from the redo record
+		var newLines []string
+		for i := 1; i <= len(record.Changes); i++ {
+			if content, exists := record.Changes[i]; exists {
+				newLines = append(newLines, content)
+			}
+		}
+		
+		// Replace the entire buffer with these lines
+		if len(newLines) > 0 {
+			e.currentBuffer.SetLines(0, -1, newLines)
+		} else {
+			// Ensure we have at least one line
+			e.currentBuffer.SetLines(0, -1, []string{""})
+		}
+		
+		// Restore undo state
+		e.inInsertUndoGroup = oldUndoGroupState
+	} else {
+		// Standard redo behavior for other commands
+		
+		// Save current state for undo
+		for lineNum := range record.Changes {
+			if lineNum <= e.currentBuffer.GetLineCount() {
+				undoRecord.Changes[lineNum] = e.currentBuffer.GetLine(lineNum)
+			}
+		}
+		
+		// Apply the redo changes
+		// Temporarily disable undo recording to avoid circular undo events
+		oldUndoGroupState := e.inInsertUndoGroup
+		e.inInsertUndoGroup = true  // This prevents SetLines from creating new undo records
+		
+		// For each line in the redo record, restore it to its state before undo
+		for lineNum, content := range record.Changes {
+			if lineNum >= 1 && lineNum <= e.currentBuffer.GetLineCount() {
+				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{content})
+			}
+		}
+		
+		// Restore previous undo state
+		e.inInsertUndoGroup = oldUndoGroupState
+	}
+	
+	// Make sure to update the buffer's last tick
+	e.currentBuffer.lastTick++
+	
+	// Check if we're back at the saved state
+	if len(e.currentBuffer.undoStack) == e.currentBuffer.lastSavedState {
+		e.currentBuffer.modified = false
+	} else {
+		e.currentBuffer.modified = true
+	}
+	
+	// Restore cursor position based on redo record
+	e.cursorRow = record.CursorPos[0]
+	e.cursorCol = record.CursorPos[1]
+	
+	// Ensure cursor position is valid for the current buffer state
+	e.validateCursorPosition()
+	
+	// Move record from redo to undo stack
+	e.currentBuffer.redoStack = e.currentBuffer.redoStack[:lastIdx]
+	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, undoRecord)
+	
+	return true
+}
+
+// validateCursorPosition ensures the cursor is in a valid position
+// after operations like undo/redo that might change buffer contents
+func (e *GoEngine) validateCursorPosition() {
+	if e.currentBuffer == nil {
+		return
+	}
+	
+	// Check row bounds
+	lineCount := e.currentBuffer.GetLineCount()
+	if e.cursorRow < 1 {
+		e.cursorRow = 1
+	} else if e.cursorRow > lineCount {
+		e.cursorRow = lineCount
+	}
+	
+	// Check column bounds
+	currentLine := e.currentBuffer.GetLine(e.cursorRow)
+	if e.cursorCol < 0 {
+		e.cursorCol = 0
+	} else if e.cursorCol > len(currentLine) {
+		e.cursorCol = len(currentLine)
+	}
+}
+
+// startInsertUndoGroup begins a new insert mode undo group
+// This makes vim treat all changes in insert mode as a single undo operation
+// commandType can be "o", "O", or "" (general insert mode)
+func (e *GoEngine) startInsertUndoGroup(commandType string) {
+	if e.currentBuffer == nil {
+		return
+	}
+	
+	// Mark that we're in an insert undo group
+	e.inInsertUndoGroup = true
+	
+	// Create a comprehensive undo record containing the entire buffer state
+	record := &UndoRecord{
+		Changes:       make(map[int]string),
+		CursorPos:     [2]int{e.cursorRow, e.cursorCol},
+		Description:   "insert mode",
+		CommandType:   commandType,
+		LineOperation: commandType == "o" || commandType == "O", // These commands operate on whole lines
+	}
+	
+	// For 'o' and 'O' commands, we need to save the state BEFORE the line is added
+	// This is important to ensure that undo will properly restore the state
+	if commandType == "o" || commandType == "O" {
+		// Make a clean copy of the buffer state
+		// It's important to get a snapshot of the buffer BEFORE the additional line is added
+		// For 'o' we need to save the cursor row and the cursor row - 1
+		// For 'O' we need to save the cursor row + 1 and the cursor row
+		// But for simplicity, just save the entire buffer
+		for i := 1; i <= e.currentBuffer.GetLineCount(); i++ {
+			record.Changes[i] = e.currentBuffer.GetLine(i)
+		}
+	} else {
+		// For normal insert operations, save the current buffer state
+		for i := 1; i <= e.currentBuffer.GetLineCount(); i++ {
+			record.Changes[i] = e.currentBuffer.GetLine(i)
+		}
+	}
+	
+	// Add to undo stack
+	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, record)
+	
+	// Clear redo stack when making a new change
+	if len(e.currentBuffer.redoStack) > 0 {
+		e.currentBuffer.redoStack = nil
+	}
 }

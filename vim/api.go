@@ -157,7 +157,8 @@ func SendMultiInput(s string) {
 // SendKey sends special key input
 func SendKey(s string) {
 	// For the enter key in insert mode, we need special handling in our Go implementation
-	if s == "<cr>" && IsUsingGoImplementation() && GetCurrentMode() == 16 {
+	// This ensures the auto-indent functionality works properly
+	if (s == "<cr>" || s == "<enter>" || s == "<return>") && IsUsingGoImplementation() && GetCurrentMode() == 16 {
 		// Handle enter key specially - as if \r was typed
 		Engine.Input("\r")
 		return

@@ -5,14 +5,26 @@ import (
 	"strings"
 )
 
+// UndoRecord represents a single undoable change
+type UndoRecord struct {
+	Changes       map[int]string  // Map of line numbers to their previous content (1-based)
+	CursorPos     [2]int          // Cursor position before the change [row, col]
+	Description   string          // Optional description of the change
+	CommandType   string          // The type of command that created this undo record (e.g., "o", "O", "general")
+	LineOperation bool            // Whether this operation added or removed entire lines
+}
+
 // GoBuffer is the Go implementation of a vim buffer
 type GoBuffer struct {
-	id        int
-	lines     []string
-	name      string
-	modified  bool
-	engine    *GoEngine
-	lastTick  int
+	id              int
+	lines           []string
+	name            string
+	modified        bool
+	engine          *GoEngine
+	lastTick        int
+	undoStack       []*UndoRecord     // Stack of undo records (newest at the end)
+	redoStack       []*UndoRecord     // Stack of redo records (newest at the end)
+	lastSavedState  int               // Index in the undo stack when buffer was last saved (-1 if never)
 }
 
 // GetID returns the buffer ID
@@ -136,6 +148,28 @@ func (b *GoBuffer) SetLines(start, end int, lines []string) {
 		b.lines = []string{""}
 	}
 	
+	// Save state for undo before making changes
+	// Convert from 0-based to 1-based line numbering for undo save
+	if b.engine != nil && !b.engine.inInsertUndoGroup {
+		// Only save undo state if we're not in an insert group
+		// This is because all insert mode changes are treated as a single undo operation
+		if start == 0 && end == -1 {
+			// For complete buffer replacement, save all lines
+			b.engine.UndoSaveRegion(1, len(b.lines))
+		} else {
+			// For partial replacements, save the affected region
+			// Need to add 1 because UndoSaveRegion expects 1-based line numbers
+			startLine := start + 1
+			endLine := end + 1
+			if endLine > len(b.lines) {
+				endLine = len(b.lines)
+			}
+			if startLine <= endLine {
+				b.engine.UndoSaveRegion(startLine, endLine)
+			}
+		}
+	}
+	
 	// Create a completely new buffer and return - this is the most radical approach
 	// to ensure we get a complete replacement for the special case
 	if start == 0 && end == -1 {
@@ -227,7 +261,10 @@ func (b *GoBuffer) SetLines(start, end int, lines []string) {
 
 // Mark the buffer as modified and increment the change tick
 func (b *GoBuffer) markModified() {
+	// Set modified flag to trigger UI updates
 	b.modified = true
+	
+	// Increment last tick to indicate change
 	b.lastTick++
 }
 
@@ -256,6 +293,9 @@ func (b *GoBuffer) loadFile(filename string) error {
 		b.name = filename
 		b.lines = []string{""}
 		b.modified = false
+		b.undoStack = make([]*UndoRecord, 0)
+		b.redoStack = make([]*UndoRecord, 0)
+		b.lastSavedState = -1
 		return err
 	}
 	
@@ -278,6 +318,11 @@ func (b *GoBuffer) loadFile(filename string) error {
 	if len(b.lines) == 0 {
 		b.lines = []string{""}
 	}
+	
+	// Initialize undo/redo stacks
+	b.undoStack = make([]*UndoRecord, 0)
+	b.redoStack = make([]*UndoRecord, 0)
+	b.lastSavedState = -1
 	
 	// Reset the modified flag
 	b.modified = false
