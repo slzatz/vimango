@@ -986,8 +986,6 @@ func (o *Organizer) printDocument(_ int) {
 }
 
 func (o *Organizer) whichVim(_ int) {
-	//o.mode = NORMAL
-	//o.command_line = ""
 	var msg string
 	if vim.ActiveImplementation == vim.ImplGo {
 		msg = "Go Vim"
@@ -995,6 +993,8 @@ func (o *Organizer) whichVim(_ int) {
 		msg = "CGO Vim"
 	}
 	o.ShowMessage(BL, "vim version: %s", msg)
+	o.mode = NORMAL
+	o.command_line = ""
 }
 
 func (o *Organizer) printList(_ int) {

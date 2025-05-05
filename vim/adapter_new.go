@@ -299,7 +299,10 @@ func (e *GoEngine) Execute(s string) {
 
 // GetMode gets the current mode
 func (e *GoEngine) GetMode() int {
-	return govim.GetMode()
+	mode := govim.GetMode()
+	// Add optional debug logging to see if mode is being correctly passed
+	fmt.Fprintf(os.Stderr, "GoEngine GetMode: govim.GetMode returned %d\n", mode)
+	return mode
 }
 
 // GetCurrentMode gets the current mode with application-compatible mappings

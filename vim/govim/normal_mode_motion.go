@@ -46,6 +46,12 @@ func moveLeft(e *GoEngine, count int) bool {
 			break // Can't move further
 		}
 	}
+	
+	// Update visual selection if in visual mode
+	if moved && e.mode == ModeVisual {
+		e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+	}
+	
 	return moved
 }
 
@@ -75,6 +81,11 @@ func moveRight(e *GoEngine, count int) bool {
 			e.cursorCol++
 			moved = true
 		}
+	}
+	
+	// Update visual selection if in visual mode
+	if moved && e.mode == ModeVisual {
+		e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
 	}
 	
 	return moved
@@ -120,6 +131,11 @@ func moveDown(e *GoEngine, count int) bool {
 			} else {
 				e.cursorCol = desiredCol
 			}
+		}
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
 		}
 	}
 	
@@ -167,6 +183,11 @@ func moveUp(e *GoEngine, count int) bool {
 				e.cursorCol = desiredCol
 			}
 		}
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+		}
 	}
 	
 	return moved
@@ -176,6 +197,12 @@ func moveUp(e *GoEngine, count int) bool {
 func moveToLineStart(e *GoEngine, count int) bool {
 	if e.cursorCol != 0 {
 		e.cursorCol = 0
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+		}
+		
 		return true
 	}
 	return false
@@ -193,6 +220,12 @@ func moveToLineEnd(e *GoEngine, count int) bool {
 		lastPos := len(line) - 1
 		if e.cursorCol != lastPos {
 			e.cursorCol = lastPos
+			
+			// Update visual selection if in visual mode
+			if e.mode == ModeVisual {
+				e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+			}
+			
 			return true
 		}
 	}
@@ -215,6 +248,11 @@ func moveWordForward(e *GoEngine, count int) bool {
 			break
 		}
 		moved = true
+	}
+	
+	// Update visual selection if in visual mode
+	if moved && e.mode == ModeVisual {
+		e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
 	}
 	
 	return moved
@@ -273,6 +311,11 @@ func moveWordBackward(e *GoEngine, count int) bool {
 			break
 		}
 		moved = true
+	}
+	
+	// Update visual selection if in visual mode
+	if moved && e.mode == ModeVisual {
+		e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
 	}
 	
 	return moved
@@ -361,6 +404,12 @@ func moveToLastLine(e *GoEngine, count int) bool {
 		if e.cursorCol > len(line) {
 			e.cursorCol = len(line)
 		}
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+		}
+		
 		return true
 	}
 	return false
@@ -391,12 +440,24 @@ func moveToFirstLine(e *GoEngine, count int) bool {
 		for i := 0; i < len(line); i++ {
 			if !isWhitespace(line[i]) {
 				e.cursorCol = i
+				
+				// Update visual selection if in visual mode
+				if e.mode == ModeVisual {
+					e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+				}
+				
 				return true
 			}
 		}
 		
 		// If the line is all whitespace or empty, move to the beginning
 		e.cursorCol = 0
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+		}
+		
 		return true
 	}
 	return false
@@ -426,6 +487,12 @@ func moveToFirstNonBlank(e *GoEngine, count int) bool {
 		if !isWhitespace(line[i]) {
 			if e.cursorCol != i {
 				e.cursorCol = i
+				
+				// Update visual selection if in visual mode
+				if e.mode == ModeVisual {
+					e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+				}
+				
 				return true
 			}
 			return false
@@ -435,6 +502,12 @@ func moveToFirstNonBlank(e *GoEngine, count int) bool {
 	// If the line is all whitespace, move to the start
 	if e.cursorCol != 0 {
 		e.cursorCol = 0
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+		}
+		
 		return true
 	}
 	return false
@@ -452,6 +525,11 @@ func moveWordEnd(e *GoEngine, count int) bool {
 			break
 		}
 		moved = true
+	}
+	
+	// Update visual selection if in visual mode
+	if moved && e.mode == ModeVisual {
+		e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
 	}
 	
 	return moved
@@ -577,6 +655,12 @@ func moveToMatchingBracket(e *GoEngine, count int) bool {
 	if matchPos[0] > 0 {
 		e.cursorRow = matchPos[0]
 		e.cursorCol = matchPos[1]
+		
+		// Update visual selection if in visual mode
+		if e.mode == ModeVisual {
+			e.visualEnd = [2]int{e.cursorRow, e.cursorCol}
+		}
+		
 		return true
 	}
 	

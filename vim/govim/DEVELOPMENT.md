@@ -25,6 +25,34 @@ The GoVim implementation follows this architecture:
    - Define APIs that match the C implementation
    - Allow for implementation switching
 
+## Visual Mode Design
+
+When implementing or modifying visual mode functionality, follow these guidelines:
+
+1. **Use Helper Functions**:
+   - `enterVisualMode(visualType int)` - Call this to initialize visual mode with a specific type
+   - `updateVisualSelection()` - Call this after any cursor movement in visual mode
+   - `exitVisualMode()` - Call this when exiting visual mode
+   - `visualOperation(op string)` - Use this for operations on visual selections
+
+2. **Mode Handling**:
+   - Visual mode should always properly return to the appropriate mode after operations
+   - Yank operations should return to normal mode
+   - Delete operations should return to normal mode
+   - Change operations should enter insert mode
+
+3. **Visual Selection State**:
+   - `visualStart` holds the start position of the selection
+   - `visualEnd` holds the end position (current cursor)
+   - `visualType` determines the type of visual mode (0 = char, 1 = line, 2 = block)
+   - Always use `getNormalizedVisualSelection()` to get a properly ordered selection
+
+4. **Operation Process Flow**:
+   - Enter visual mode with `enterVisualMode()`
+   - Update selection with cursor movement
+   - Perform operations with `visualOperation()`
+   - If needed, exit explicitly with `exitVisualMode()`
+
 ## Development Guidelines
 
 When implementing new features:

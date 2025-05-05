@@ -142,7 +142,18 @@ See the TODO.md file for a detailed list of missing features and their implement
 
 ## Recent Updates (May 2025)
 
-1. **Undo/Redo Functionality**:
+1. **Visual Mode Improvements**:
+   - Refactored visual mode code to be more modular and maintainable
+   - Added helper functions for visual mode operations:
+     - `enterVisualMode()` - Properly initializes visual mode with a specific type
+     - `updateVisualSelection()` - Updates selection end when cursor moves
+     - `exitVisualMode()` - Handles proper state cleanup when exiting visual mode
+     - `visualOperation()` - Centralizes operations on visual selections
+   - Ensured consistent mode transitions when performing visual operations
+   - Improved code organization by grouping related helper functions
+   - Removed debug print statements that were interfering with terminal display
+
+2. **Undo/Redo Functionality**:
    - Implemented full undo/redo functionality with 'u' and Ctrl-r commands
    - Added proper handling of insert mode changes as a single undo operation
    - Implemented special handling for 'o' and 'O' commands to ensure correct line removal on undo

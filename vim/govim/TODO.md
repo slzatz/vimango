@@ -93,9 +93,12 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [ ] Add ge, gE (backward end of word)
 
 5. **Complete Visual Mode**
-   - [ ] Add line-visual mode (Shift+V)
-   - [ ] Add block-visual mode (Ctrl+V)
-   - [ ] Implement block operations
+   - [x] Add line-visual mode (Shift+V)
+   - [x] Add block-visual mode (Ctrl+V)
+   - [x] Implement block operations
+   - [x] Refactor visual mode code for better maintainability 
+   - [ ] Add support for incremental visual selection update
+   - [ ] Improve visual mode feedback for terminal UI
 
 ## Medium Priority Tasks
 
@@ -151,6 +154,7 @@ This document tracks the planned work and priorities for the pure Go vim impleme
 - ~~Visual mode selection tracking could be improved~~ (Improved May 2025)
 - ~~Buffer content persistence between context switches~~ (Fixed May 2025)
 - ~~Verb+motion commands not working properly~~ (Fixed May 2025)
+- ~~Visual mode code organization and maintainability~~ (Refactored May 2025)
 - Tests needed for edge cases (empty buffers, special characters)
 - Unexpected behavior with long lines (no text wrapping)
 - Missing most text-object based operations
@@ -164,7 +168,7 @@ The current Go vim implementation successfully handles:
 - Basic and compound editing operations
 - Verb+motion commands (dw, cw, y$, etc.)
 - Mode switching with correct cursor positioning
-- Basic visual mode
+- Visual mode with operations (y, d, c) and modular design
 - Fundamental search functionality
 - Text yanking and pasting
 

@@ -1,9 +1,5 @@
 package govim
 
-import (
-	// No imports needed currently
-)
-
 // This file provides compatibility wrappers to match the C API
 
 // --------------------------------

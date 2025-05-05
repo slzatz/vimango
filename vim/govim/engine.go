@@ -1,9 +1,5 @@
 package govim
 
-import (
-	// No imports needed here
-)
-
 // ModeNormal is the normal mode constant
 const ModeNormal = 1
 
@@ -264,7 +260,8 @@ func (e *GoEngine) GetCurrentMode() int {
 	// intercepting the ':' and entering EX_COMMAND mode
 	if e.mode == ModeCommand {
 		return 8 // The value expected by the editor for command mode
-	}
+	} 
+	
 	return e.mode
 }
 
@@ -275,7 +272,28 @@ func (e *GoEngine) VisualGetRange() [2][2]int {
 
 // VisualGetType returns the visual selection type
 func (e *GoEngine) VisualGetType() int {
-	return e.visualType
+    // We need to return the character values that the editor expects:
+    // 118 ('v') for character-wise visual mode
+    // 86 ('V') for line-wise visual mode 
+    // 22 (Ctrl-V) for block-wise visual mode
+    
+    if e.mode == ModeVisual {
+        switch e.visualType {
+        case 0: // character-wise visual mode
+            return 118 // ASCII for 'v'
+        case 1: // line-wise visual mode
+            return 86  // ASCII for 'V'
+        case 2: // block-wise visual mode
+            return 22  // ASCII for Ctrl-V
+        }
+    }
+    
+    // Default to character-wise visual mode if in visual mode
+    if e.mode == ModeVisual {
+        return 118 // ASCII for 'v'
+    }
+    
+    return 0 // Not in visual mode
 }
 
 // Execute executes a vim command
@@ -421,6 +439,15 @@ func (e *GoEngine) GetSearchResults() [][2]int {
 		return make([][2]int, 0)
 	}
 	return e.searchResults
+}
+
+// startSearch begins a search operation
+// direction: 1 for forward search (/), -1 for backward search (?)
+func (e *GoEngine) startSearch(direction int) {
+	e.mode = ModeSearch
+	e.searching = true
+	e.searchDirection = direction
+	e.searchBuffer = ""
 }
 
 // UndoSaveCursor saves just the cursor position for undo

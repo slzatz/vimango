@@ -297,9 +297,12 @@ func (e *Editor) editorProcessKey(c int) bool {
 		e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 	}
 
+	//e.ShowMessage(BL, "Current mode from vim: %d, visual test: %v", mode, mode == 2) //////Debug
+
 	if mode == 2 { //VISUAL_MODE
 		vmode := vim.GetVisualType()
 		e.mode = visualModeMap[vmode]
+		//e.ShowMessage(BR, "Current visualType from vim: %d, visual test: %v", vmode, mode == 118)
 		e.highlightInfo()
 	} else {
 		e.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
@@ -311,10 +314,10 @@ func (e *Editor) editorProcessKey(c int) bool {
 	if len(e.ss) == 0 {
 		e.ss = []string{""}
 	}
-	
+
 	pos := vim.GetCursorPosition() //set screen cx and cy from pos
 	e.fr = pos[0] - 1
-	
+
 	// Ensure fr is in bounds
 	if e.fr < 0 {
 		e.fr = 0
@@ -322,12 +325,12 @@ func (e *Editor) editorProcessKey(c int) bool {
 	if e.fr >= len(e.ss) {
 		e.fr = len(e.ss) - 1
 	}
-	
+
 	// Ensure pos[1] (column) is valid
 	if pos[1] > len(e.ss[e.fr]) {
 		pos[1] = len(e.ss[e.fr])
 	}
-	
+
 	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 
 	return true
