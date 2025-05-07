@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	
+
 	govim "github.com/slzatz/vimango/vim/govim"
 )
 
@@ -31,7 +31,7 @@ func (c *CGOImplementation) GetName() string {
 }
 
 // GoImplementation provides the pure Go vim implementation
-type GoImplementation struct{
+type GoImplementation struct {
 	logger *log.Logger
 }
 
@@ -40,11 +40,11 @@ func (g *GoImplementation) GetEngine() VimEngine {
 	engine := &GoEngine{
 		debugLog: g.logger,
 	}
-	
+
 	if g.logger != nil {
 		g.logger.Println("Created GoEngine instance")
 	}
-	
+
 	return engine
 }
 
@@ -211,7 +211,7 @@ func (b *CGOBufferWrapper) SetLines(start, end int, lines []string) {
 }
 
 // GoEngine implements the Go-based vim engine
-type GoEngine struct{
+type GoEngine struct {
 	// Add debug logger
 	debugLog *log.Logger
 }
@@ -229,23 +229,20 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) VimBuffer {
 
 // BufferNew creates a new empty buffer
 func (e *GoEngine) BufferNew(flags int) VimBuffer {
-	if e.debugLog != nil {
-		e.debugLog.Println("BufferNew called with flags:", flags)
-	}
-	
 	buf := govim.BufferNew(flags)
-	if buf == nil {
-		if e.debugLog != nil {
-			e.debugLog.Println("BufferNew failed - returned nil buffer")
+	/*
+		if buf == nil {
+			if e.debugLog != nil {
+				e.debugLog.Println("BufferNew failed - returned nil buffer")
+			}
+			// Log to stderr instead of stdout to avoid affecting the UI
+			fmt.Fprintf(os.Stderr, "WARNING: Go implementation BufferNew returned nil\n")
+		} else {
+			if e.debugLog != nil {
+				e.debugLog.Println("BufferNew succeeded")
+			}
 		}
-		// Log to stderr instead of stdout to avoid affecting the UI
-		fmt.Fprintf(os.Stderr, "WARNING: Go implementation BufferNew returned nil\n")
-	} else {
-		if e.debugLog != nil {
-			e.debugLog.Println("BufferNew succeeded")
-		}
-	}
-	
+	*/
 	return &GoBufferWrapper{buf: buf}
 }
 
@@ -346,7 +343,7 @@ func (b *GoBufferWrapper) GetLine(lnum int) string {
 	if lnum < 1 || lnum > b.buf.GetLineCount() {
 		return ""
 	}
-	
+
 	// Get the line content safely
 	return b.buf.GetLine(lnum)
 }
@@ -408,39 +405,39 @@ func (b *GoBufferWrapper) SetLines(start, end int, lines []string) {
 	if lines == nil {
 		lines = []string{}
 	}
-	
+
 	// Create a deep copy of the lines to avoid any shared references
 	safeLines := make([]string, len(lines))
 	for i, line := range lines {
 		safeLines[i] = line
 	}
-	
+
 	// Ensure we have at least one line for complete buffer replacement
 	if start == 0 && end == -1 && len(safeLines) == 0 {
 		safeLines = []string{""}
 	}
-	
+
 	// Try to call SetLines with error handling
 	defer func() {
 		if r := recover(); r != nil {
 			// Log to stderr instead of stdout to avoid affecting the UI
 			fmt.Fprintf(os.Stderr, "PANIC in GoBufferWrapper.SetLines: %v\n", r)
-			
+
 			// Simple recovery approach: use standard method with safe inputs
 			if start < 0 {
 				start = 0
 			}
-			
+
 			if end == -1 {
 				// Create a safe buffer replacement
 				if len(safeLines) == 0 {
 					safeLines = []string{""}
 				}
-				
+
 				// Create a buffer with the safe content
 				newBuf := govim.BufferNew(0)
 				newBuf.SetLines(0, -1, safeLines)
-				
+
 				// Replace the current buffer with this new one
 				b.buf = newBuf
 				b.buf.SetCurrent()
@@ -448,7 +445,7 @@ func (b *GoBufferWrapper) SetLines(start, end int, lines []string) {
 			}
 		}
 	}()
-	
+
 	// Update the buffer
 	b.buf.SetLines(start, end, safeLines)
 }
@@ -463,16 +460,16 @@ func SwitchToGoImplementation() {
 		// Log to stderr instead of stdout to avoid affecting the UI
 		fmt.Fprintf(os.Stderr, "Failed to open govim log file: %v\n", err)
 	}
-	
+
 	ActiveImplementation = ImplGo
 	goImpl := &GoImplementation{}
-	
+
 	// Initialize the logger if file was opened successfully
 	if err == nil {
 		goImpl.logger = log.New(logFile, "GoVim: ", log.Ltime|log.Lshortfile)
 		goImpl.logger.Println("Go implementation activated")
 	}
-	
+
 	activeImpl = goImpl
 }
 

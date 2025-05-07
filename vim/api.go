@@ -1,9 +1,5 @@
 package vim
 
-import (
-	"fmt"
-)
-
 // This file provides an API layer for the application to interact with vim
 // regardless of whether the C or Go implementation is being used.
 
@@ -18,10 +14,10 @@ func InitializeVim(useGoImplementation bool, argc int) {
 	} else {
 		SwitchToCImplementation()
 	}
-	
+
 	// Get the engine
 	Engine = GetEngine()
-	
+
 	// Initialize vim
 	Engine.Init(argc)
 }
@@ -39,38 +35,12 @@ func Init(argc int) {
 
 // OpenBuffer opens a file and returns a buffer
 func OpenBuffer(filename string, lnum int, flags int) (result VimBuffer) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("PANIC in OpenBuffer: %v - falling back to C implementation\n", r)
-			// Attempt to fallback to C implementation
-			origImpl := GetActiveImplementation()
-			SwitchToCImplementation()
-			result = Engine.BufferOpen(filename, lnum, flags)
-			// Switch back to original implementation for other operations
-			if origImpl == ImplGo {
-				SwitchToGoImplementation()
-			}
-		}
-	}()
 	return Engine.BufferOpen(filename, lnum, flags)
 }
 
 // NewBuffer creates a new empty buffer
 // Returns VimBuffer for the new adapter API but can be used with old code too
 func NewBuffer(flags int) (result VimBuffer) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("PANIC in NewBuffer: %v - falling back to C implementation\n", r)
-			// Attempt to fallback to C implementation
-			origImpl := GetActiveImplementation()
-			SwitchToCImplementation()
-			result = Engine.BufferNew(flags)
-			// Switch back to original implementation for other operations
-			if origImpl == ImplGo {
-				SwitchToGoImplementation()
-			}
-		}
-	}()
 	return Engine.BufferNew(flags)
 }
 
@@ -86,37 +56,11 @@ func BufferNew(flags int) Buffer {
 
 // GetCurrentBuffer gets the current buffer
 func GetCurrentBuffer() (result VimBuffer) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("PANIC in GetCurrentBuffer: %v - falling back to C implementation\n", r)
-			// Attempt to fallback to C implementation
-			origImpl := GetActiveImplementation()
-			SwitchToCImplementation()
-			result = Engine.BufferGetCurrent()
-			// Switch back to original implementation for other operations
-			if origImpl == ImplGo {
-				SwitchToGoImplementation()
-			}
-		}
-	}()
 	return Engine.BufferGetCurrent()
 }
 
 // SetCurrentBuffer sets the current buffer
 func SetCurrentBuffer(buf VimBuffer) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("PANIC in SetCurrentBuffer: %v - falling back to C implementation\n", r)
-			// Attempt to fallback to C implementation
-			origImpl := GetActiveImplementation()
-			SwitchToCImplementation()
-			Engine.BufferSetCurrent(buf)
-			// Switch back to original implementation for other operations
-			if origImpl == ImplGo {
-				SwitchToGoImplementation()
-			}
-		}
-	}()
 	Engine.BufferSetCurrent(buf)
 }
 
@@ -163,7 +107,7 @@ func SendKey(s string) {
 		Engine.Input("\r")
 		return
 	}
-	
+
 	Engine.Key(s)
 }
 
@@ -175,7 +119,7 @@ func ExecuteCommand(s string) {
 // GetCurrentMode gets the current mode
 // This is specifically used by the editor to determine the mode
 func GetCurrentMode() int {
-	// If we're using the Go implementation, make sure to map our internal 
+	// If we're using the Go implementation, make sure to map our internal
 	// mode values to what the application expects
 	if IsUsingGoImplementation() {
 		// GetCurrentMode handles the special mapping for command mode
@@ -235,25 +179,6 @@ func BufferSetLines(buf Buffer, start, end int, lines []string, count int) {
 	if buf == nil {
 		return
 	}
-	
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("PANIC in BufferSetLines: %v - falling back to direct C implementation\n", r)
-			// Try using the C implementation directly if possible
-			origImpl := GetActiveImplementation()
-			SwitchToCImplementation()
-			
-			// Create a fresh wrapper to avoid any corrupted state
-			wrapper := &CGOBufferWrapper{buf: buf}
-			wrapper.SetLines(start, end, lines)
-			
-			// Switch back to original implementation for other operations
-			if origImpl == ImplGo {
-				SwitchToGoImplementation()
-			}
-		}
-	}()
-	
 	wrapper := &CGOBufferWrapper{buf: buf}
 	wrapper.SetLines(start, end, lines)
 }
@@ -266,20 +191,20 @@ func ToggleImplementation() string {
 	if Engine != nil {
 		currentBuffer = Engine.BufferGetCurrent()
 	}
-	
+
 	// Switch implementation
 	if IsUsingGoImplementation() {
 		SwitchToCImplementation()
 	} else {
 		SwitchToGoImplementation()
 	}
-	
+
 	// Reset buffer state if we had an active buffer
 	if currentBuffer != nil && Engine != nil {
 		// Force buffer reset to clean any stale state
 		Engine.BufferSetCurrent(currentBuffer)
 	}
-	
+
 	return GetActiveImplementation()
 }
 

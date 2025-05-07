@@ -17,51 +17,51 @@ const ModeSearch = 32
 
 // GoEngine implements the vim engine in pure Go
 type GoEngine struct {
-	buffers         map[int]*GoBuffer
-	nextBufferId    int
-	currentBuffer   *GoBuffer
-	cursorRow       int
-	cursorCol       int
-	mode            int
-	visualStart     [2]int
-	visualEnd       [2]int
-	visualType      int
-	commandCount    int  // For motion counts like 5j, 3w, etc.
-	awaitingMotion  bool // True when waiting for a motion after d, c, y, etc.
-	currentCommand  string // Current command (d, c, y) waiting for motion
-	buildingCount   bool   // True when we're in the process of entering a numeric prefix
-	yankRegister    string // Content of the "unnamed" register for yank/put
-	
+	buffers        map[int]*GoBuffer
+	nextBufferId   int
+	currentBuffer  *GoBuffer
+	cursorRow      int
+	cursorCol      int
+	mode           int
+	visualStart    [2]int
+	visualEnd      [2]int
+	visualType     int
+	commandCount   int    // For motion counts like 5j, 3w, etc.
+	awaitingMotion bool   // True when waiting for a motion after d, c, y, etc.
+	currentCommand string // Current command (d, c, y) waiting for motion
+	buildingCount  bool   // True when we're in the process of entering a numeric prefix
+	yankRegister   string // Content of the "unnamed" register for yank/put
+
 	// Undo state
 	inInsertUndoGroup bool // True when in insert mode to group all changes as one undo operation
-	
+
 	// Search state
-	searchPattern     string  // Current search pattern
-	searchDirection   int     // 1 for forward (/) and -1 for backward (?)
-	searchResults     [][2]int // List of [row, col] positions matching the search
-	currentSearchIdx  int     // Index of current search result
-	searching         bool    // True when in search mode (typing the search pattern)
-	searchBuffer      string  // Buffer for search input
+	searchPattern    string   // Current search pattern
+	searchDirection  int      // 1 for forward (/) and -1 for backward (?)
+	searchResults    [][2]int // List of [row, col] positions matching the search
+	currentSearchIdx int      // Index of current search result
+	searching        bool     // True when in search mode (typing the search pattern)
+	searchBuffer     string   // Buffer for search input
 }
 
 // NewEngine creates a new vim engine
 func NewEngine() *GoEngine {
 	return &GoEngine{
-		buffers:         make(map[int]*GoBuffer),
-		nextBufferId:    1,
-		mode:            ModeNormal,
-		commandCount:    0,
-		awaitingMotion:  false,
-		currentCommand:  "",
-		buildingCount:   false,
-		yankRegister:    "",
+		buffers:           make(map[int]*GoBuffer),
+		nextBufferId:      1,
+		mode:              ModeNormal,
+		commandCount:      0,
+		awaitingMotion:    false,
+		currentCommand:    "",
+		buildingCount:     false,
+		yankRegister:      "",
 		inInsertUndoGroup: false,
-		searchPattern:   "",
-		searchDirection: 1,  // Default to forward search
-		searchResults:   make([][2]int, 0),
-		currentSearchIdx: -1,
-		searching:       false,
-		searchBuffer:    "",
+		searchPattern:     "",
+		searchDirection:   1, // Default to forward search
+		searchResults:     make([][2]int, 0),
+		currentSearchIdx:  -1,
+		searching:         false,
+		searchBuffer:      "",
 	}
 }
 
@@ -80,14 +80,14 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 		lastSavedState: -1, // Initialize to -1 (no saved state yet)
 	}
 	e.nextBufferId++
-	
+
 	// Load the file (ignoring errors for now)
 	buf.loadFile(filename)
-	
+
 	// Set as current
 	e.currentBuffer = buf
 	e.buffers[buf.id] = buf
-	
+
 	// Set cursor position
 	if lnum > 0 && lnum <= buf.GetLineCount() {
 		e.cursorRow = lnum
@@ -95,7 +95,7 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 		e.cursorRow = 1
 	}
 	e.cursorCol = 0
-	
+
 	return buf
 }
 
@@ -110,7 +110,7 @@ func (e *GoEngine) BufferNew(flags int) Buffer {
 		lastSavedState: -1, // Initialize to -1 (no saved state yet)
 	}
 	e.nextBufferId++
-	
+
 	e.buffers[buf.id] = buf
 	return buf
 }
@@ -125,42 +125,45 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 	if goBuf, ok := buf.(*GoBuffer); ok {
 		// Save the old buffer reference to check if we're changing buffers
 		oldBuffer := e.currentBuffer
-		
+
 		// Set the new current buffer
 		e.currentBuffer = goBuf
-		
+
 		// Ensure the buffer has at least one line (empty buffer protection)
 		if len(goBuf.lines) == 0 {
 			goBuf.lines = []string{""}
 		}
-		
+
 		// Always reset state for any buffer change to avoid stale state
 		// This is especially important for handling new notes correctly
-		
+
 		// Reset cursor position to beginning of file
-		e.cursorRow = 1
-		e.cursorCol = 0
-		
+		//func (e *GoEngine) CursorGetPosition() [2]int {
+		//e.cursorRow = 1
+		//e.cursorCol = 0
+		e.cursorRow = e.CursorGetPosition()[0]
+		e.cursorCol = e.CursorGetPosition()[1]
+
 		// Reset buffer-specific state
 		e.commandCount = 0
 		e.buildingCount = false
 		e.awaitingMotion = false
 		e.currentCommand = ""
 		e.mode = ModeNormal // Always reset to normal mode
-		
+
 		// Reset visual mode state
 		e.visualStart = [2]int{1, 0}
 		e.visualEnd = [2]int{1, 0}
-		
+
 		// Reset search state
 		e.searching = false
 		e.searchBuffer = ""
 		e.searchResults = nil
 		e.currentSearchIdx = -1
-		
+
 		// Reset undo state
 		e.inInsertUndoGroup = false
-		
+
 		// Extra debugging to verify buffer content independence
 		if oldBuffer != nil && goBuf != nil {
 			oldBufferLines := 0
@@ -168,7 +171,7 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 				oldBufferLines = len(oldBuffer.lines)
 			}
 			newBufferLines := len(goBuf.lines)
-			
+
 			// Perform additional validation of buffer content
 			if oldBufferLines > 0 && newBufferLines > 0 {
 				// If the new buffer has an empty first line and fewer lines than the old buffer,
@@ -204,13 +207,13 @@ func (e *GoEngine) CursorGetPosition() [2]int {
 				e.cursorRow = 1
 			}
 		}
-		
+
 		// Validate column position
 		lineLen := 0
 		if e.cursorRow >= 1 && e.cursorRow <= lineCount {
 			lineLen = len(e.currentBuffer.GetLine(e.cursorRow))
 		}
-		
+
 		// Make sure cursor column is valid
 		if e.cursorCol < 0 {
 			e.cursorCol = 0
@@ -218,7 +221,7 @@ func (e *GoEngine) CursorGetPosition() [2]int {
 			e.cursorCol = lineLen
 		}
 	}
-	
+
 	// Return the validated cursor position
 	return [2]int{e.cursorRow, e.cursorCol}
 }
@@ -228,21 +231,21 @@ func (e *GoEngine) CursorSetPosition(row, col int) {
 	if e.currentBuffer == nil {
 		return
 	}
-	
+
 	// Ensure valid position
 	if row < 1 {
 		row = 1
 	} else if row > e.currentBuffer.GetLineCount() {
 		row = e.currentBuffer.GetLineCount()
 	}
-	
+
 	lineLen := len(e.currentBuffer.GetLine(row))
 	if col < 0 {
 		col = 0
 	} else if col > lineLen {
 		col = lineLen
 	}
-	
+
 	e.cursorRow = row
 	e.cursorCol = col
 }
@@ -260,8 +263,8 @@ func (e *GoEngine) GetCurrentMode() int {
 	// intercepting the ':' and entering EX_COMMAND mode
 	if e.mode == ModeCommand {
 		return 8 // The value expected by the editor for command mode
-	} 
-	
+	}
+
 	return e.mode
 }
 
@@ -272,34 +275,34 @@ func (e *GoEngine) VisualGetRange() [2][2]int {
 
 // VisualGetType returns the visual selection type
 func (e *GoEngine) VisualGetType() int {
-    // We need to return the character values that the editor expects:
-    // 118 ('v') for character-wise visual mode
-    // 86 ('V') for line-wise visual mode 
-    // 22 (Ctrl-V) for block-wise visual mode
-    
-    if e.mode == ModeVisual {
-        switch e.visualType {
-        case 0: // character-wise visual mode
-            return 118 // ASCII for 'v'
-        case 1: // line-wise visual mode
-            return 86  // ASCII for 'V'
-        case 2: // block-wise visual mode
-            return 22  // ASCII for Ctrl-V
-        }
-    }
-    
-    // Default to character-wise visual mode if in visual mode
-    if e.mode == ModeVisual {
-        return 118 // ASCII for 'v'
-    }
-    
-    return 0 // Not in visual mode
+	// We need to return the character values that the editor expects:
+	// 118 ('v') for character-wise visual mode
+	// 86 ('V') for line-wise visual mode
+	// 22 (Ctrl-V) for block-wise visual mode
+
+	if e.mode == ModeVisual {
+		switch e.visualType {
+		case 0: // character-wise visual mode
+			return 118 // ASCII for 'v'
+		case 1: // line-wise visual mode
+			return 86 // ASCII for 'V'
+		case 2: // block-wise visual mode
+			return 22 // ASCII for Ctrl-V
+		}
+	}
+
+	// Default to character-wise visual mode if in visual mode
+	if e.mode == ModeVisual {
+		return 118 // ASCII for 'v'
+	}
+
+	return 0 // Not in visual mode
 }
 
 // Execute executes a vim command
 func (e *GoEngine) Execute(cmd string) {
 	// Basic implementation - could be extended later for more sophisticated command parsing
-	
+
 	// Most commonly used commands
 	switch {
 	case cmd == "normal":
@@ -322,7 +325,7 @@ func (e *GoEngine) Execute(cmd string) {
 func (e *GoEngine) Eval(expr string) string {
 	// Minimal implementation of common expression evaluation
 	// Could be extended later for more sophisticated expression parsing
-	
+
 	if expr == "mode()" {
 		switch e.mode {
 		case ModeNormal:
@@ -339,7 +342,7 @@ func (e *GoEngine) Eval(expr string) string {
 			return "n"
 		}
 	}
-	
+
 	// Default empty result for unsupported expressions
 	return ""
 }
@@ -349,23 +352,23 @@ func (e *GoEngine) SearchGetMatchingPair() [2]int {
 	if e.currentBuffer == nil {
 		return [2]int{0, 0}
 	}
-	
+
 	// Basic implementation for bracket matching
 	row := e.cursorRow
 	col := e.cursorCol
 	line := e.currentBuffer.GetLine(row)
-	
+
 	if col >= len(line) {
 		return [2]int{0, 0}
 	}
-	
+
 	// Get the character under the cursor
 	char := line[col]
-	
+
 	// Define matching pairs
 	var matchingChar byte
 	var direction int // 1 for forward search, -1 for backward search
-	
+
 	switch char {
 	case '(':
 		matchingChar = ')'
@@ -388,11 +391,11 @@ func (e *GoEngine) SearchGetMatchingPair() [2]int {
 	default:
 		return [2]int{0, 0} // Not a bracket character
 	}
-	
+
 	// Search for the matching bracket
 	// For simplicity, only search in the current line for now
 	count := 1 // Start with 1 for the bracket under the cursor
-	
+
 	if direction == 1 {
 		// Search forward
 		for i := col + 1; i < len(line); i++ {
@@ -418,7 +421,7 @@ func (e *GoEngine) SearchGetMatchingPair() [2]int {
 			}
 		}
 	}
-	
+
 	// No match found
 	return [2]int{0, 0}
 }
@@ -456,7 +459,7 @@ func (e *GoEngine) UndoSaveCursor() bool {
 	if e.currentBuffer == nil {
 		return false
 	}
-	
+
 	// Check if there's already an undo record that can be appended to
 	// For cursor-only changes, we don't always need a new record
 	if len(e.currentBuffer.undoStack) > 0 {
@@ -467,22 +470,22 @@ func (e *GoEngine) UndoSaveCursor() bool {
 			return true
 		}
 	}
-	
+
 	// Create a new undo record with just the cursor position
 	record := &UndoRecord{
 		Changes:     make(map[int]string),
 		CursorPos:   [2]int{e.cursorRow, e.cursorCol},
 		Description: "cursor movement",
 	}
-	
+
 	// Add to undo stack
 	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, record)
-	
+
 	// Clear redo stack when making a new change
 	if len(e.currentBuffer.redoStack) > 0 {
 		e.currentBuffer.redoStack = nil
 	}
-	
+
 	return true
 }
 
@@ -492,29 +495,29 @@ func (e *GoEngine) UndoSaveRegion(startLine, endLine int) bool {
 	if e.currentBuffer == nil {
 		return false
 	}
-	
+
 	// Create a new undo record
 	record := &UndoRecord{
 		Changes:     make(map[int]string),
 		CursorPos:   [2]int{e.cursorRow, e.cursorCol},
 		Description: "text change",
 	}
-	
+
 	// Save the specified lines (1-based indexing)
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {
 		if lineNum >= 1 && lineNum <= e.currentBuffer.GetLineCount() {
 			record.Changes[lineNum] = e.currentBuffer.GetLine(lineNum)
 		}
 	}
-	
+
 	// Add to undo stack
 	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, record)
-	
+
 	// Clear redo stack when making a new change
 	if len(e.currentBuffer.redoStack) > 0 {
 		e.currentBuffer.redoStack = nil
 	}
-	
+
 	return true
 }
 
@@ -534,11 +537,11 @@ func (e *GoEngine) Undo() bool {
 		// Nothing to undo
 		return false
 	}
-	
+
 	// Get the last undo record
 	lastIdx := len(e.currentBuffer.undoStack) - 1
 	record := e.currentBuffer.undoStack[lastIdx]
-	
+
 	// Create a redo record with current state of the changed lines
 	redoRecord := &UndoRecord{
 		Changes:       make(map[int]string),
@@ -547,22 +550,22 @@ func (e *GoEngine) Undo() bool {
 		CommandType:   record.CommandType,
 		LineOperation: record.LineOperation,
 	}
-	
+
 	// Special handling for 'o' and 'O' commands which add a line
 	// For these commands, we need to handle line removal properly
 	if record.CommandType == "o" || record.CommandType == "O" {
 		// For 'o' command, we need to save the current state then remove the added line
 		lineCount := e.currentBuffer.GetLineCount()
-		
+
 		// Store the current state for redo
 		for i := 1; i <= lineCount; i++ {
 			redoRecord.Changes[i] = e.currentBuffer.GetLine(i)
 		}
-		
+
 		// Temporarily disable undo recording
 		oldUndoGroupState := e.inInsertUndoGroup
 		e.inInsertUndoGroup = true
-		
+
 		// For 'o' command, we need to remove the line that was added
 		// and restore the other lines to their previous state
 		if record.CommandType == "o" {
@@ -584,7 +587,7 @@ func (e *GoEngine) Undo() bool {
 						}
 					}
 				}
-				
+
 				// Replace the entire buffer with these lines
 				if len(newLines) > 0 {
 					e.currentBuffer.SetLines(0, -1, newLines)
@@ -609,7 +612,7 @@ func (e *GoEngine) Undo() bool {
 						}
 					}
 				}
-				
+
 				// Replace the entire buffer with these lines
 				if len(newLines) > 0 {
 					e.currentBuffer.SetLines(0, -1, newLines)
@@ -619,56 +622,56 @@ func (e *GoEngine) Undo() bool {
 				}
 			}
 		}
-		
+
 		// Restore undo state
 		e.inInsertUndoGroup = oldUndoGroupState
 	} else {
 		// Standard undo behavior for other commands
-		
+
 		// Save current state for redo
 		for lineNum := range record.Changes {
 			if lineNum <= e.currentBuffer.GetLineCount() {
 				redoRecord.Changes[lineNum] = e.currentBuffer.GetLine(lineNum)
 			}
 		}
-		
+
 		// Apply the undo changes
 		// Temporarily disable undo recording to avoid circular undo events
 		oldUndoGroupState := e.inInsertUndoGroup
-		e.inInsertUndoGroup = true  // This prevents SetLines from creating new undo records
-		
+		e.inInsertUndoGroup = true // This prevents SetLines from creating new undo records
+
 		// For each line in the undo record, restore it to its previous state
 		for lineNum, content := range record.Changes {
 			if lineNum >= 1 && lineNum <= e.currentBuffer.GetLineCount() {
 				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{content})
 			}
 		}
-		
+
 		// Restore previous undo state
 		e.inInsertUndoGroup = oldUndoGroupState
 	}
-	
+
 	// Make sure to update the buffer's last tick
 	e.currentBuffer.lastTick++
-	
+
 	// Only mark the buffer as modified if we're not back at the last saved state
 	if lastIdx == e.currentBuffer.lastSavedState {
 		e.currentBuffer.modified = false
 	} else {
 		e.currentBuffer.modified = true
 	}
-	
+
 	// Always restore cursor position based on undo record
 	e.cursorRow = record.CursorPos[0]
 	e.cursorCol = record.CursorPos[1]
-	
+
 	// Ensure cursor position is valid for the current buffer state
 	e.validateCursorPosition()
-	
+
 	// Move record from undo to redo stack
 	e.currentBuffer.undoStack = e.currentBuffer.undoStack[:lastIdx]
 	e.currentBuffer.redoStack = append(e.currentBuffer.redoStack, redoRecord)
-	
+
 	return true
 }
 
@@ -679,11 +682,11 @@ func (e *GoEngine) Redo() bool {
 		// Nothing to redo
 		return false
 	}
-	
+
 	// Get the last redo record
 	lastIdx := len(e.currentBuffer.redoStack) - 1
 	record := e.currentBuffer.redoStack[lastIdx]
-	
+
 	// Create an undo record with current state of the changed lines
 	undoRecord := &UndoRecord{
 		Changes:       make(map[int]string),
@@ -692,24 +695,24 @@ func (e *GoEngine) Redo() bool {
 		CommandType:   record.CommandType,
 		LineOperation: record.LineOperation,
 	}
-	
+
 	// Special handling for 'o' and 'O' commands - they need special treatment during redo
 	if record.CommandType == "o" || record.CommandType == "O" {
 		// For 'o' or 'O' commands, we need to save the current state
 		lineCount := e.currentBuffer.GetLineCount()
-		
+
 		// Store the current state for undo
 		for i := 1; i <= lineCount; i++ {
 			undoRecord.Changes[i] = e.currentBuffer.GetLine(i)
 		}
-		
+
 		// Temporarily disable undo recording
 		oldUndoGroupState := e.inInsertUndoGroup
 		e.inInsertUndoGroup = true
-		
+
 		// For redoing 'o' or 'O', we need to restore the buffer state from the redo record
 		// This includes the line that was added
-		
+
 		// Create a completely new buffer with all lines from the redo record
 		var newLines []string
 		for i := 1; i <= len(record.Changes); i++ {
@@ -717,7 +720,7 @@ func (e *GoEngine) Redo() bool {
 				newLines = append(newLines, content)
 			}
 		}
-		
+
 		// Replace the entire buffer with these lines
 		if len(newLines) > 0 {
 			e.currentBuffer.SetLines(0, -1, newLines)
@@ -725,56 +728,56 @@ func (e *GoEngine) Redo() bool {
 			// Ensure we have at least one line
 			e.currentBuffer.SetLines(0, -1, []string{""})
 		}
-		
+
 		// Restore undo state
 		e.inInsertUndoGroup = oldUndoGroupState
 	} else {
 		// Standard redo behavior for other commands
-		
+
 		// Save current state for undo
 		for lineNum := range record.Changes {
 			if lineNum <= e.currentBuffer.GetLineCount() {
 				undoRecord.Changes[lineNum] = e.currentBuffer.GetLine(lineNum)
 			}
 		}
-		
+
 		// Apply the redo changes
 		// Temporarily disable undo recording to avoid circular undo events
 		oldUndoGroupState := e.inInsertUndoGroup
-		e.inInsertUndoGroup = true  // This prevents SetLines from creating new undo records
-		
+		e.inInsertUndoGroup = true // This prevents SetLines from creating new undo records
+
 		// For each line in the redo record, restore it to its state before undo
 		for lineNum, content := range record.Changes {
 			if lineNum >= 1 && lineNum <= e.currentBuffer.GetLineCount() {
 				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{content})
 			}
 		}
-		
+
 		// Restore previous undo state
 		e.inInsertUndoGroup = oldUndoGroupState
 	}
-	
+
 	// Make sure to update the buffer's last tick
 	e.currentBuffer.lastTick++
-	
+
 	// Check if we're back at the saved state
 	if len(e.currentBuffer.undoStack) == e.currentBuffer.lastSavedState {
 		e.currentBuffer.modified = false
 	} else {
 		e.currentBuffer.modified = true
 	}
-	
+
 	// Restore cursor position based on redo record
 	e.cursorRow = record.CursorPos[0]
 	e.cursorCol = record.CursorPos[1]
-	
+
 	// Ensure cursor position is valid for the current buffer state
 	e.validateCursorPosition()
-	
+
 	// Move record from redo to undo stack
 	e.currentBuffer.redoStack = e.currentBuffer.redoStack[:lastIdx]
 	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, undoRecord)
-	
+
 	return true
 }
 
@@ -784,7 +787,7 @@ func (e *GoEngine) validateCursorPosition() {
 	if e.currentBuffer == nil {
 		return
 	}
-	
+
 	// Check row bounds
 	lineCount := e.currentBuffer.GetLineCount()
 	if e.cursorRow < 1 {
@@ -792,7 +795,7 @@ func (e *GoEngine) validateCursorPosition() {
 	} else if e.cursorRow > lineCount {
 		e.cursorRow = lineCount
 	}
-	
+
 	// Check column bounds
 	currentLine := e.currentBuffer.GetLine(e.cursorRow)
 	if e.cursorCol < 0 {
@@ -809,10 +812,10 @@ func (e *GoEngine) startInsertUndoGroup(commandType string) {
 	if e.currentBuffer == nil {
 		return
 	}
-	
+
 	// Mark that we're in an insert undo group
 	e.inInsertUndoGroup = true
-	
+
 	// Create a comprehensive undo record containing the entire buffer state
 	record := &UndoRecord{
 		Changes:       make(map[int]string),
@@ -821,7 +824,7 @@ func (e *GoEngine) startInsertUndoGroup(commandType string) {
 		CommandType:   commandType,
 		LineOperation: commandType == "o" || commandType == "O", // These commands operate on whole lines
 	}
-	
+
 	// For 'o' and 'O' commands, we need to save the state BEFORE the line is added
 	// This is important to ensure that undo will properly restore the state
 	if commandType == "o" || commandType == "O" {
@@ -839,10 +842,10 @@ func (e *GoEngine) startInsertUndoGroup(commandType string) {
 			record.Changes[i] = e.currentBuffer.GetLine(i)
 		}
 	}
-	
+
 	// Add to undo stack
 	e.currentBuffer.undoStack = append(e.currentBuffer.undoStack, record)
-	
+
 	// Clear redo stack when making a new change
 	if len(e.currentBuffer.redoStack) > 0 {
 		e.currentBuffer.redoStack = nil

@@ -23,7 +23,8 @@ func BufferGetId(buf Buffer) int {
 
 // BufferSetCurrent sets the current buffer
 func BufferSetCurrent(buf Buffer) {
-	buf.SetCurrent()
+	//buf.SetCurrent()
+	defaultEngine.BufferSetCurrent(buf)
 }
 
 // BufferGetCurrent gets the current buffer
