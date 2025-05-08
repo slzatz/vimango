@@ -17,21 +17,21 @@ const ModeSearch = 32
 
 // GoEngine implements the vim engine in pure Go
 type GoEngine struct {
-	buffers        map[int]*GoBuffer
-	nextBufferId   int
-	currentBuffer  *GoBuffer
-	cursorRow      int
-	cursorCol      int
-	mode           int
-	visualStart    [2]int
-	visualEnd      [2]int
-	visualType     int
-	commandCount   int    // For motion counts like 5j, 3w, etc.
-	awaitingMotion bool   // True when waiting for a motion after d, c, y, etc.
-	currentCommand string // Current command (d, c, y) waiting for motion
-	buildingCount  bool   // True when we're in the process of entering a numeric prefix
-	yankRegister   string // Content of the "unnamed" register for yank/put
-	awaitingReplace bool  // True when we're waiting for a character to replace (after 'r')
+	buffers       map[int]*GoBuffer
+	nextBufferId  int
+	currentBuffer *GoBuffer
+	//cursorRow      int
+	//cursorCol      int
+	mode            int
+	visualStart     [2]int
+	visualEnd       [2]int
+	visualType      int
+	commandCount    int    // For motion counts like 5j, 3w, etc.
+	awaitingMotion  bool   // True when waiting for a motion after d, c, y, etc.
+	currentCommand  string // Current command (d, c, y) waiting for motion
+	buildingCount   bool   // True when we're in the process of entering a numeric prefix
+	yankRegister    string // Content of the "unnamed" register for yank/put
+	awaitingReplace bool   // True when we're waiting for a character to replace (after 'r')
 
 	// Undo state
 	inInsertUndoGroup bool // True when in insert mode to group all changes as one undo operation
@@ -94,14 +94,14 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 
 	// Set cursor position both in the engine and in the buffer
 	if lnum > 0 && lnum <= buf.GetLineCount() {
-		e.cursorRow = lnum
+		//e.cursorRow = lnum
 		buf.cursorRow = lnum // Set the buffer's cursor position
 	} else {
-		e.cursorRow = 1
-		buf.cursorRow = 1    // Set the buffer's cursor position
+		//e.cursorRow = 1
+		buf.cursorRow = 1 // Set the buffer's cursor position
 	}
-	e.cursorCol = 0
-	buf.cursorCol = 0       // Set the buffer's cursor position
+	//e.cursorCol = 0
+	buf.cursorCol = 0 // Set the buffer's cursor position
 
 	return buf
 }
@@ -136,13 +136,14 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		oldBuffer := e.currentBuffer
 
 		// Save the current cursor position to the current buffer before switching
-		if e.currentBuffer != nil {
-			// Since e.currentBuffer is already defined as *GoBuffer in the struct,
-			// we can access its fields directly without type assertion
-			e.currentBuffer.cursorRow = e.cursorRow
-			e.currentBuffer.cursorCol = e.cursorCol
-		}
-
+		/*
+			if e.currentBuffer != nil {
+				// Since e.currentBuffer is already defined as *GoBuffer in the struct,
+				// we can access its fields directly without type assertion
+				e.currentBuffer.cursorRow = e.cursorRow
+				e.currentBuffer.cursorCol = e.cursorCol
+			}
+		*/
 		// Set the new current buffer
 		e.currentBuffer = goBuf
 
@@ -151,16 +152,20 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 			goBuf.lines = []string{""}
 		}
 
-		// Restore cursor position from the buffer
-		e.cursorRow = goBuf.cursorRow
-		e.cursorCol = goBuf.cursorCol
+		/*
+			// Restore cursor position from the buffer
+			e.cursorRow = goBuf.cursorRow
+			e.cursorCol = goBuf.cursorCol
+		*/
 
 		// Validate the cursor position to ensure it's valid for the current buffer content
 		e.validateCursorPosition()
-		
-		// After validation, update the buffer's cursor position if it was adjusted
-		goBuf.cursorRow = e.cursorRow
-		goBuf.cursorCol = e.cursorCol
+
+		/*
+			// After validation, update the buffer's cursor position if it was adjusted
+			goBuf.cursorRow = e.cursorRow
+			goBuf.cursorCol = e.cursorCol
+		*/
 
 		// Reset buffer-specific state
 		e.commandCount = 0
@@ -208,40 +213,21 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 
 // CursorGetLine returns the current cursor line
 func (e *GoEngine) CursorGetLine() int {
-	return e.cursorRow
+	return e.currentBuffer.cursorRow
 }
 
 // CursorGetPosition returns the cursor position as [row, col]
 func (e *GoEngine) CursorGetPosition() [2]int {
-	// First, validate the current cursor position to ensure it's safe
-	if e.currentBuffer != nil {
-		// Validate row position
-		lineCount := e.currentBuffer.GetLineCount()
-		if e.cursorRow < 1 {
-			e.cursorRow = 1
-		} else if e.cursorRow > lineCount {
-			e.cursorRow = lineCount
-			if e.cursorRow < 1 {
-				e.cursorRow = 1
-			}
-		}
-
-		// Validate column position
-		lineLen := 0
-		if e.cursorRow >= 1 && e.cursorRow <= lineCount {
-			lineLen = len(e.currentBuffer.GetLine(e.cursorRow))
-		}
-
-		// Make sure cursor column is valid
-		if e.cursorCol < 0 {
-			e.cursorCol = 0
-		} else if e.cursorCol > lineLen {
-			e.cursorCol = lineLen
-		}
+	// Get cursor position from the current buffer
+	if e.currentBuffer == nil {
+		return [2]int{1, 0} // Default position if no buffer
 	}
 
+	// Validate the buffer's cursor position
+	e.validateCursorPosition()
+
 	// Return the validated cursor position
-	return [2]int{e.cursorRow, e.cursorCol}
+	return [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
 }
 
 // CursorSetPosition sets the cursor position
@@ -264,12 +250,7 @@ func (e *GoEngine) CursorSetPosition(row, col int) {
 		col = lineLen
 	}
 
-	e.cursorRow = row
-	e.cursorCol = col
-	
-	// Also update the buffer's cursor position to keep it in sync
-	// Since e.currentBuffer is already defined as *GoBuffer in the struct,
-	// we can access its fields directly without type assertion
+	// Set the cursor position directly in the buffer
 	e.currentBuffer.cursorRow = row
 	e.currentBuffer.cursorCol = col
 }
@@ -378,8 +359,8 @@ func (e *GoEngine) SearchGetMatchingPair() [2]int {
 	}
 
 	// Basic implementation for bracket matching
-	row := e.cursorRow
-	col := e.cursorCol
+	row := e.currentBuffer.cursorRow
+	col := e.currentBuffer.cursorCol
 	line := e.currentBuffer.GetLine(row)
 
 	if col >= len(line) {
@@ -490,7 +471,7 @@ func (e *GoEngine) UndoSaveCursor() bool {
 		lastRecord := e.currentBuffer.undoStack[len(e.currentBuffer.undoStack)-1]
 		// If there are no line changes yet, just update the cursor position
 		if len(lastRecord.Changes) == 0 {
-			lastRecord.CursorPos = [2]int{e.cursorRow, e.cursorCol}
+			lastRecord.CursorPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
 			return true
 		}
 	}
@@ -498,7 +479,7 @@ func (e *GoEngine) UndoSaveCursor() bool {
 	// Create a new undo record with just the cursor position
 	record := &UndoRecord{
 		Changes:     make(map[int]string),
-		CursorPos:   [2]int{e.cursorRow, e.cursorCol},
+		CursorPos:   [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol},
 		Description: "cursor movement",
 	}
 
@@ -523,7 +504,7 @@ func (e *GoEngine) UndoSaveRegion(startLine, endLine int) bool {
 	// Create a new undo record
 	record := &UndoRecord{
 		Changes:     make(map[int]string),
-		CursorPos:   [2]int{e.cursorRow, e.cursorCol},
+		CursorPos:   [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol},
 		Description: "text change",
 	}
 
@@ -569,7 +550,7 @@ func (e *GoEngine) Undo() bool {
 	// Create a redo record with current state of the changed lines
 	redoRecord := &UndoRecord{
 		Changes:       make(map[int]string),
-		CursorPos:     [2]int{e.cursorRow, e.cursorCol},
+		CursorPos:     [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol},
 		Description:   "redo " + record.Description,
 		CommandType:   record.CommandType,
 		LineOperation: record.LineOperation,
@@ -686,8 +667,8 @@ func (e *GoEngine) Undo() bool {
 	}
 
 	// Always restore cursor position based on undo record
-	e.cursorRow = record.CursorPos[0]
-	e.cursorCol = record.CursorPos[1]
+	e.currentBuffer.cursorRow = record.CursorPos[0]
+	e.currentBuffer.cursorCol = record.CursorPos[1]
 
 	// Ensure cursor position is valid for the current buffer state
 	e.validateCursorPosition()
@@ -714,7 +695,7 @@ func (e *GoEngine) Redo() bool {
 	// Create an undo record with current state of the changed lines
 	undoRecord := &UndoRecord{
 		Changes:       make(map[int]string),
-		CursorPos:     [2]int{e.cursorRow, e.cursorCol},
+		CursorPos:     [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol},
 		Description:   "undo " + record.Description,
 		CommandType:   record.CommandType,
 		LineOperation: record.LineOperation,
@@ -792,8 +773,8 @@ func (e *GoEngine) Redo() bool {
 	}
 
 	// Restore cursor position based on redo record
-	e.cursorRow = record.CursorPos[0]
-	e.cursorCol = record.CursorPos[1]
+	e.currentBuffer.cursorRow = record.CursorPos[0]
+	e.currentBuffer.cursorCol = record.CursorPos[1]
 
 	// Ensure cursor position is valid for the current buffer state
 	e.validateCursorPosition()
@@ -814,18 +795,18 @@ func (e *GoEngine) validateCursorPosition() {
 
 	// Check row bounds
 	lineCount := e.currentBuffer.GetLineCount()
-	if e.cursorRow < 1 {
-		e.cursorRow = 1
-	} else if e.cursorRow > lineCount {
-		e.cursorRow = lineCount
+	if e.currentBuffer.cursorRow < 1 {
+		e.currentBuffer.cursorRow = 1
+	} else if e.currentBuffer.cursorRow > lineCount {
+		e.currentBuffer.cursorRow = lineCount
 	}
 
 	// Check column bounds
-	currentLine := e.currentBuffer.GetLine(e.cursorRow)
-	if e.cursorCol < 0 {
-		e.cursorCol = 0
-	} else if e.cursorCol > len(currentLine) {
-		e.cursorCol = len(currentLine)
+	currentLine := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+	if e.currentBuffer.cursorCol < 0 {
+		e.currentBuffer.cursorCol = 0
+	} else if e.currentBuffer.cursorCol > len(currentLine) {
+		e.currentBuffer.cursorCol = len(currentLine)
 	}
 }
 
@@ -843,7 +824,7 @@ func (e *GoEngine) startInsertUndoGroup(commandType string) {
 	// Create a comprehensive undo record containing the entire buffer state
 	record := &UndoRecord{
 		Changes:       make(map[int]string),
-		CursorPos:     [2]int{e.cursorRow, e.cursorCol},
+		CursorPos:     [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol},
 		Description:   "insert mode",
 		CommandType:   commandType,
 		LineOperation: commandType == "o" || commandType == "O", // These commands operate on whole lines
