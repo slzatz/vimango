@@ -67,6 +67,8 @@ func NewEngine() *GoEngine {
 	}
 }
 
+var DefaultEngine = NewEngine()
+
 // Init initializes the engine
 func (e *GoEngine) Init(argc int) {
 	// Nothing significant to do in the Go implementation

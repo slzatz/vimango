@@ -1,3 +1,5 @@
+//go:build exclude
+
 package govim
 
 // This file provides compatibility wrappers to match the C API

@@ -14,7 +14,7 @@ type UndoRecord struct {
 	LineOperation bool           // Whether this operation added or removed entire lines
 }
 
-// GoBuffer is the Go implementation of a vim buffer
+// GoBuffer is the Go implementation of the VimBuffer interface in vim/interfaces.go
 type GoBuffer struct {
 	id             int
 	lines          []string

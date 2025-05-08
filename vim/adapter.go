@@ -40,6 +40,7 @@ func (g *GoImplementation) GetEngine() VimEngine {
 	engine := &GoEngine{
 		debugLog: g.logger,
 	}
+	//engine := govim.NewEngine()
 
 	if g.logger != nil {
 		g.logger.Println("Created GoEngine instance")
@@ -218,18 +219,19 @@ type GoEngine struct {
 
 // Init initializes the vim engine
 func (e *GoEngine) Init(argc int) {
-	govim.Init(argc)
+	govim.DefaultEngine.Init(argc)
 }
 
 // BufferOpen opens a file and returns a buffer
 func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) VimBuffer {
-	buf := govim.BufferOpen(filename, lnum, flags)
+	//buf := govim.BufferOpen(filename, lnum, flags)
+	buf := govim.DefaultEngine.BufferOpen(filename, lnum, flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
 func (e *GoEngine) BufferNew(flags int) VimBuffer {
-	buf := govim.BufferNew(flags)
+	buf := govim.DefaultEngine.BufferNew(flags)
 	/*
 		if buf == nil {
 			if e.debugLog != nil {
@@ -248,55 +250,57 @@ func (e *GoEngine) BufferNew(flags int) VimBuffer {
 
 // BufferGetCurrent gets the current buffer
 func (e *GoEngine) BufferGetCurrent() VimBuffer {
-	buf := govim.BufferGetCurrent()
+	buf := govim.DefaultEngine.BufferGetCurrent()
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
 func (e *GoEngine) BufferSetCurrent(buf VimBuffer) {
 	if goBuf, ok := buf.(*GoBufferWrapper); ok {
-		govim.BufferSetCurrent(goBuf.buf)
+		govim.DefaultEngine.BufferSetCurrent(goBuf.buf)
 	}
 }
 
 // CursorGetLine gets the current cursor line
 func (e *GoEngine) CursorGetLine() int {
-	return govim.CursorGetLine()
+	return govim.DefaultEngine.CursorGetLine()
 }
 
 // CursorGetPosition gets the cursor position
 func (e *GoEngine) CursorGetPosition() [2]int {
-	return govim.CursorGetPosition()
+	return govim.DefaultEngine.CursorGetPosition()
 }
 
 // CursorSetPosition sets the cursor position
 func (e *GoEngine) CursorSetPosition(row, col int) {
-	govim.CursorSetPosition(row, col)
+	govim.DefaultEngine.CursorSetPosition(row, col)
 }
 
 // Input sends input to vim
 func (e *GoEngine) Input(s string) {
-	govim.Input(s)
+	govim.DefaultEngine.Input(s)
 }
 
 // Input2 sends multiple character input
 func (e *GoEngine) Input2(s string) {
-	govim.Input2(s)
+	for _, x := range s {
+		govim.DefaultEngine.Input(string(x))
+	}
 }
 
 // Key sends special key input
 func (e *GoEngine) Key(s string) {
-	govim.Key(s)
+	govim.DefaultEngine.Key(s)
 }
 
 // Execute runs an ex command
 func (e *GoEngine) Execute(s string) {
-	govim.Execute(s)
+	govim.DefaultEngine.Execute(s)
 }
 
 // GetMode gets the current mode
 func (e *GoEngine) GetMode() int {
-	mode := govim.GetMode()
+	mode := govim.DefaultEngine.GetMode()
 	// Add optional debug logging to see if mode is being correctly passed
 	fmt.Fprintf(os.Stderr, "GoEngine GetMode: govim.GetMode returned %d\n", mode)
 	return mode
@@ -304,27 +308,27 @@ func (e *GoEngine) GetMode() int {
 
 // GetCurrentMode gets the current mode with application-compatible mappings
 func (e *GoEngine) GetCurrentMode() int {
-	return govim.GetCurrentMode()
+	return govim.DefaultEngine.GetCurrentMode()
 }
 
 // VisualGetRange gets the visual selection range
 func (e *GoEngine) VisualGetRange() [2][2]int {
-	return govim.VisualGetRange()
+	return govim.DefaultEngine.VisualGetRange()
 }
 
 // VisualGetType gets the visual mode type
 func (e *GoEngine) VisualGetType() int {
-	return govim.VisualGetType()
+	return govim.DefaultEngine.VisualGetType()
 }
 
 // Eval evaluates a vim expression
 func (e *GoEngine) Eval(expr string) string {
-	return govim.Eval(expr)
+	return govim.DefaultEngine.Eval(expr)
 }
 
 // SearchGetMatchingPair finds matching brackets
 func (e *GoEngine) SearchGetMatchingPair() [2]int {
-	return govim.SearchGetMatchingPair()
+	return govim.DefaultEngine.SearchGetMatchingPair()
 }
 
 // GoBufferWrapper wraps a Go buffer
@@ -435,7 +439,7 @@ func (b *GoBufferWrapper) SetLines(start, end int, lines []string) {
 				}
 
 				// Create a buffer with the safe content
-				newBuf := govim.BufferNew(0)
+				newBuf := govim.DefaultEngine.BufferNew(0)
 				newBuf.SetLines(0, -1, safeLines)
 
 				// Replace the current buffer with this new one
