@@ -2,7 +2,7 @@
 
 This document tracks the current progress of the pure Go vim implementation.
 
-## Current Status (April 2025)
+## Current Status (May 2025)
 
 We've begun implementation of a pure Go version of libvim to replace the current CGO implementation. Our approach is to create a parallel implementation that can eventually replace the CGO code without disrupting the current functionality.
 
@@ -11,7 +11,7 @@ We've begun implementation of a pure Go version of libvim to replace the current
 1. **Core Data Structures**:
    - Buffer management (`GoBuffer`)
    - Engine state management (`GoEngine`)
-   - Cursor positioning
+   - Cursor positioning with per-buffer position tracking
 
 2. **Basic Motion Commands**:
    - h, j, k, l (left, down, up, right)
@@ -28,6 +28,8 @@ We've begun implementation of a pure Go version of libvim to replace the current
    - Delete operations (d + motion, dd)
    - Change operations (c + motion, cc)
    - Yank and put (y + motion, p, P)
+   - Replace character 'r' command
+   - Case toggling '~' command (both in normal and visual modes)
 
 4. **Search Functionality**:
    - Forward search (/)
@@ -52,6 +54,7 @@ We've begun implementation of a pure Go version of libvim to replace the current
 - `interfaces.go`: Defines the interfaces for the Go implementation
 - `buffer.go`: Implements the buffer functionality
 - `engine.go`: Core engine implementation with mode handling
+- `input.go`: Handles all input processing and command implementation
 - `normal_mode_motion.go`: Normal mode motion command implementations
 - `wrapper.go`: Compatibility wrapper to match the C API
 - `adapter.go`: In parent package, provides switching between implementations
@@ -67,9 +70,12 @@ We've begun implementation of a pure Go version of libvim to replace the current
    - ✅ Updated organizer.go to use new adapter API
    - ✅ Updated dbfunc.go to use new adapter API
    - ✅ Verified app.go already uses new adapter API
-   - Test switching between C and Go implementations using the --go-vim flag
+   - ✅ Fixed cursor position tracking between buffers
+   - ✅ Test switching between C and Go implementations using the --go-vim flag
 
 2. **Further Enhance Go Implementation**:
+   - ✅ Implement 'r' replace command
+   - ✅ Implement '~' case toggle command
    - Implement remaining Ex commands 
    - Enhance the search functionality with highlighting
    - Add registers for yank/put operations
@@ -142,7 +148,18 @@ See the TODO.md file for a detailed list of missing features and their implement
 
 ## Recent Updates (May 2025)
 
-1. **Visual Mode Improvements**:
+1. **Buffer Cursor Position Tracking**:
+   - Added per-buffer cursor position tracking
+   - Each buffer now remembers its cursor position independently
+   - Fixed issues with cursor position when switching between note editing and organizer mode
+
+2. **New Normal Mode Commands**:
+   - Added 'r' command to replace characters in normal mode
+   - Added '~' command to toggle case in normal mode
+   - Implemented count support for both commands (e.g., 5~ to toggle case of 5 characters)
+
+3. **Visual Mode Enhancements**:
+   - Added '~' command support in visual mode to toggle case of selected text
    - Refactored visual mode code to be more modular and maintainable
    - Added helper functions for visual mode operations:
      - `enterVisualMode()` - Properly initializes visual mode with a specific type
@@ -153,7 +170,7 @@ See the TODO.md file for a detailed list of missing features and their implement
    - Improved code organization by grouping related helper functions
    - Removed debug print statements that were interfering with terminal display
 
-2. **Undo/Redo Functionality**:
+4. **Undo/Redo Functionality**:
    - Implemented full undo/redo functionality with 'u' and Ctrl-r commands
    - Added proper handling of insert mode changes as a single undo operation
    - Implemented special handling for 'o' and 'O' commands to ensure correct line removal on undo
@@ -161,46 +178,46 @@ See the TODO.md file for a detailed list of missing features and their implement
    - Implemented command grouping for complex operations
    - Added robust state tracking to maintain buffer consistency
 
-2. **Arrow Key Handling**:
+5. **Arrow Key Handling**:
    - Added robust support for all arrow keys and special keys (home, end, page up/down)
    - Ensured consistent behavior between normal and insert modes
 
-3. **Mode Transitions**:
+6. **Mode Transitions**:
    - Fixed escape key to properly exit all modes and return to normal mode
    - Added proper insert mode entry via i, I, a, A, o, O commands
    - Fixed cursor positioning during mode transitions
 
-4. **Cursor Positioning**:
+7. **Cursor Positioning**:
    - Improved cursor positioning at line ends in different modes
    - Fixed cursor movement between lines of different lengths
    - Ensured mode-specific cursor positioning logic
 
-5. **Error Handling**:
+8. **Error Handling**:
    - Added robust error handling and recovery in buffer operations
    - Improved file loading with support for different line endings
    - Made the implementation more resilient against crashes
 
-6. **Implementation Switching**:
+9. **Implementation Switching**:
    - Fixed implementation toggling in the switchImplementation function
    - Improved command line flag handling for switching implementations
 
-7. **Buffer Management**:
-   - Fixed issue where first title from previous context would persist visually when loading a new context
-   - Implemented robust deep copying in buffer operations to prevent reference sharing
-   - Added recovery mechanisms for buffer operations
-   - Improved data isolation between buffer instances
+10. **Buffer Management**:
+    - Fixed issue where first title from previous context would persist visually when loading a new context
+    - Implemented robust deep copying in buffer operations to prevent reference sharing
+    - Added recovery mechanisms for buffer operations
+    - Improved data isolation between buffer instances
 
-8. **Advanced Motions**:
-   - Implemented % for matching bracket navigation
-   - Added support for nested brackets across multiple lines
-   - Improved bracket searching to find the nearest bracket when cursor isn't on a bracket
+11. **Advanced Motions**:
+    - Implemented % for matching bracket navigation
+    - Added support for nested brackets across multiple lines
+    - Improved bracket searching to find the nearest bracket when cursor isn't on a bracket
 
-9. **Verb+Motion Commands**:
-   - Fixed handling of verb+motion commands like "dw", "cw", "d$"
-   - Implemented special case handlers for common combinations
-   - Ensured proper state tracking between keypresses
-   - Added implementations for all standard combinations:
-     - Delete operations (dw, db, de, d$, d0, dd)
-     - Change operations (cw, cb, ce, c$, c0, cc)
-     - Yank operations (yw, yb, ye, y$, y0, yy)
-   - Fixed "cw" to behave like "ce" as in standard Vim behavior
+12. **Verb+Motion Commands**:
+    - Fixed handling of verb+motion commands like "dw", "cw", "d$"
+    - Implemented special case handlers for common combinations
+    - Ensured proper state tracking between keypresses
+    - Added implementations for all standard combinations:
+      - Delete operations (dw, db, de, d$, d0, dd)
+      - Change operations (cw, cb, ce, c$, c0, cc)
+      - Yank operations (yw, yb, ye, y$, y0, yy)
+    - Fixed "cw" to behave like "ce" as in standard Vim behavior

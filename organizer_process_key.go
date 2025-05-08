@@ -17,10 +17,12 @@ func (o *Organizer) organizerProcessKey(c int) {
 		vim.SendKey("<esc>")
 		o.last_mode = o.mode // not sure this is necessary
 		o.mode = NORMAL
+		
+		// Get cursor position - now should be preserved correctly by the buffer
 		pos := vim.GetCursorPosition()
 		o.fc = pos[1]
 		o.fr = pos[0] - 1
-		//org.fc = utf8.RuneCount(p.ss[org.fr][:pos[1]])
+		
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 		o.Session.imagePreview = false

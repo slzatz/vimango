@@ -31,6 +31,7 @@ type GoEngine struct {
 	currentCommand string // Current command (d, c, y) waiting for motion
 	buildingCount  bool   // True when we're in the process of entering a numeric prefix
 	yankRegister   string // Content of the "unnamed" register for yank/put
+	awaitingReplace bool  // True when we're waiting for a character to replace (after 'r')
 
 	// Undo state
 	inInsertUndoGroup bool // True when in insert mode to group all changes as one undo operation
@@ -62,6 +63,7 @@ func NewEngine() *GoEngine {
 		currentSearchIdx:  -1,
 		searching:         false,
 		searchBuffer:      "",
+		awaitingReplace:   false, // Initialize the replace flag
 	}
 }
 
@@ -78,6 +80,8 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 		undoStack:      make([]*UndoRecord, 0),
 		redoStack:      make([]*UndoRecord, 0),
 		lastSavedState: -1, // Initialize to -1 (no saved state yet)
+		cursorRow:      1,  // Default to first row (will be updated below if lnum > 0)
+		cursorCol:      0,  // Initialize to first column
 	}
 	e.nextBufferId++
 
@@ -88,13 +92,16 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 	e.currentBuffer = buf
 	e.buffers[buf.id] = buf
 
-	// Set cursor position
+	// Set cursor position both in the engine and in the buffer
 	if lnum > 0 && lnum <= buf.GetLineCount() {
 		e.cursorRow = lnum
+		buf.cursorRow = lnum // Set the buffer's cursor position
 	} else {
 		e.cursorRow = 1
+		buf.cursorRow = 1    // Set the buffer's cursor position
 	}
 	e.cursorCol = 0
+	buf.cursorCol = 0       // Set the buffer's cursor position
 
 	return buf
 }
@@ -108,6 +115,8 @@ func (e *GoEngine) BufferNew(flags int) Buffer {
 		undoStack:      make([]*UndoRecord, 0),
 		redoStack:      make([]*UndoRecord, 0),
 		lastSavedState: -1, // Initialize to -1 (no saved state yet)
+		cursorRow:      1,  // Initialize to first row
+		cursorCol:      0,  // Initialize to first column
 	}
 	e.nextBufferId++
 
@@ -126,6 +135,14 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		// Save the old buffer reference to check if we're changing buffers
 		oldBuffer := e.currentBuffer
 
+		// Save the current cursor position to the current buffer before switching
+		if e.currentBuffer != nil {
+			// Since e.currentBuffer is already defined as *GoBuffer in the struct,
+			// we can access its fields directly without type assertion
+			e.currentBuffer.cursorRow = e.cursorRow
+			e.currentBuffer.cursorCol = e.cursorCol
+		}
+
 		// Set the new current buffer
 		e.currentBuffer = goBuf
 
@@ -134,15 +151,16 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 			goBuf.lines = []string{""}
 		}
 
-		// Always reset state for any buffer change to avoid stale state
-		// This is especially important for handling new notes correctly
+		// Restore cursor position from the buffer
+		e.cursorRow = goBuf.cursorRow
+		e.cursorCol = goBuf.cursorCol
 
-		// Reset cursor position to beginning of file
-		//func (e *GoEngine) CursorGetPosition() [2]int {
-		//e.cursorRow = 1
-		//e.cursorCol = 0
-		e.cursorRow = e.CursorGetPosition()[0]
-		e.cursorCol = e.CursorGetPosition()[1]
+		// Validate the cursor position to ensure it's valid for the current buffer content
+		e.validateCursorPosition()
+		
+		// After validation, update the buffer's cursor position if it was adjusted
+		goBuf.cursorRow = e.cursorRow
+		goBuf.cursorCol = e.cursorCol
 
 		// Reset buffer-specific state
 		e.commandCount = 0
@@ -248,6 +266,12 @@ func (e *GoEngine) CursorSetPosition(row, col int) {
 
 	e.cursorRow = row
 	e.cursorCol = col
+	
+	// Also update the buffer's cursor position to keep it in sync
+	// Since e.currentBuffer is already defined as *GoBuffer in the struct,
+	// we can access its fields directly without type assertion
+	e.currentBuffer.cursorRow = row
+	e.currentBuffer.cursorCol = col
 }
 
 // GetMode returns the current mode

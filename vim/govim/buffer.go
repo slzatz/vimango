@@ -25,6 +25,8 @@ type GoBuffer struct {
 	undoStack      []*UndoRecord // Stack of undo records (newest at the end)
 	redoStack      []*UndoRecord // Stack of redo records (newest at the end)
 	lastSavedState int           // Index in the undo stack when buffer was last saved (-1 if never)
+	cursorRow      int           // Current cursor row position for this buffer
+	cursorCol      int           // Current cursor column position for this buffer
 }
 
 // GetID returns the buffer ID
@@ -81,6 +83,22 @@ func (b *GoBuffer) IsModified() bool {
 // GetLastChangedTick returns the last changed tick
 func (b *GoBuffer) GetLastChangedTick() int {
 	return b.lastTick
+}
+
+// GetCursorRow returns the buffer's saved cursor row position
+func (b *GoBuffer) GetCursorRow() int {
+	return b.cursorRow
+}
+
+// GetCursorCol returns the buffer's saved cursor column position
+func (b *GoBuffer) GetCursorCol() int {
+	return b.cursorCol
+}
+
+// SetCursorPosition sets the buffer's saved cursor position
+func (b *GoBuffer) SetCursorPosition(row, col int) {
+	b.cursorRow = row
+	b.cursorCol = col
 }
 
 // SetLines sets all lines in the buffer

@@ -10,20 +10,45 @@ The GoVim implementation follows this architecture:
    - Core state management
    - Mode handling
    - Command dispatch
+   - Per-buffer cursor position tracking
 
 2. **Buffer** (`GoBuffer` in buffer.go)
    - File content management
    - Line operations
    - Modification tracking
+   - Cursor position storage
+   - Undo/redo stacks
 
-3. **Command Handlers** (motion commands, etc.)
-   - Each command is implemented as a function
-   - Commands are registered in handler maps
-   - Mode-specific command handling
+3. **Input Processing** (input.go)
+   - Command handlers implementation
+   - Key processing logic
+   - Mode transitions
+   - Visual mode operations
+   - Text manipulation functions
 
 4. **Interfaces** (interfaces.go)
    - Define APIs that match the C implementation
    - Allow for implementation switching
+
+## Input Processing Design
+
+When implementing new commands or operations:
+
+1. **Add State Tracking if Needed**:
+   - For commands that require multiple keystrokes (like 'r' followed by a character),
+     add appropriate state flags in the `GoEngine` struct
+   - Initialize and reset these flags properly in the constructor and ESC handler
+
+2. **Command Implementation**:
+   - Implement the command logic in the `Input` method in input.go
+   - Add proper count support when applicable
+   - Always save the buffer state for undo operations before modifying content
+   - Reset state flags and counts after command execution
+
+3. **Visual Mode Support**:
+   - When adding a new command, consider implementing both normal mode and visual mode variants
+   - For operations that can work on selections (like case changing), add support to `visualOperation`
+   - Implement a dedicated function for the visual mode operation (like `changeCaseVisualSelection`)
 
 ## Visual Mode Design
 
@@ -40,6 +65,7 @@ When implementing or modifying visual mode functionality, follow these guideline
    - Yank operations should return to normal mode
    - Delete operations should return to normal mode
    - Change operations should enter insert mode
+   - Case toggle operations should return to normal mode
 
 3. **Visual Selection State**:
    - `visualStart` holds the start position of the selection
@@ -52,6 +78,45 @@ When implementing or modifying visual mode functionality, follow these guideline
    - Update selection with cursor movement
    - Perform operations with `visualOperation()`
    - If needed, exit explicitly with `exitVisualMode()`
+
+## Per-Buffer Cursor Position
+
+The implementation now tracks cursor positions per buffer:
+
+1. **Storage**:
+   - Each `GoBuffer` instance stores its own cursor position (cursorRow, cursorCol)
+   - This enables independent cursor position tracking for each buffer
+
+2. **Handling on Buffer Switch**:
+   - When switching buffers, save the current cursor position in the old buffer
+   - Restore the saved cursor position from the new buffer
+   - This preserves cursor positions when switching between contexts (e.g., note editing and organizer)
+
+3. **Position Validation**:
+   - Always validate cursor positions after restoration to ensure they're within buffer bounds
+   - Use `validateCursorPosition()` to ensure consistent cursor behavior
+
+## Command Implementation Patterns
+
+When implementing commands, follow these patterns:
+
+1. **Replace Character (r)**:
+   - Set state flag (awaitingReplace) after 'r' command
+   - Process the next keystroke as replacement character
+   - Update buffer content at cursor position
+   - Reset state flag after operation
+
+2. **Toggle Case (~)**:
+   - Support count prefix for multiple character changes
+   - Implement character-by-character case toggling
+   - Support both normal and visual mode operations
+   - Adjust cursor position after operation
+
+3. **Verb+Motion Commands**:
+   - Use awaitingMotion flag for multi-key commands
+   - Check for double-letter commands (like 'dd', 'yy')
+   - Handle special cases (like 'cw' behaving like 'ce')
+   - Maintain state between keypresses
 
 ## Development Guidelines
 
@@ -135,3 +200,8 @@ When debugging the implementation:
    - Create debug functions to dump internal state
    - Compare state with expectations
    - Identify where behaviors diverge
+
+4. **Buffer Debugging**
+   - Verify buffer content after operations
+   - Check cursor position tracking between buffer switches
+   - Monitor undo/redo stacks for completeness

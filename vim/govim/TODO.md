@@ -19,6 +19,7 @@ This document tracks the planned work and priorities for the pure Go vim impleme
      - [x] Update organizer.go
      - [x] Update dbfunc.go
      - [x] Verify app.go already uses new adapter API
+   - [x] Add per-buffer cursor position tracking
 
 2. **Complete Basic Motion Set**
    - [x] Implement `e` (end of word)
@@ -42,6 +43,8 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [x] Implement J (join lines)
    - [x] Fix verb+motion state tracking (dw, cw, etc.)
    - [x] Implement special cases (cw behaving like ce)
+   - [x] Implement r (replace character)
+   - [x] Implement ~ (toggle case)
 
 4. **Mode Transitions**
    - [x] Fix Escape key handling for all modes
@@ -49,6 +52,7 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [x] Fix cursor positioning during mode transitions
    - [x] Add visual mode operations (d, y, c)
    - [x] Add visual mode indentation (< and >)
+   - [x] Add visual mode case toggling (~)
 
 5. **Search Functionality**
    - [x] Implement `/` and `?` search
@@ -80,10 +84,10 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [ ] Support operations on text objects (diw, ciw, yiw, etc.)
 
 3. **Undo/Redo Functionality**
-   - [ ] Implement change tracking
-   - [ ] Create undo tree structure
-   - [ ] Add undo (u) command
-   - [ ] Add redo (Ctrl+R) command
+   - [x] Implement change tracking
+   - [x] Create undo tree structure
+   - [x] Add undo (u) command
+   - [x] Add redo (Ctrl+R) command
    - [ ] Implement persistent undo
 
 4. **Advanced Motions**
@@ -124,6 +128,12 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [ ] Add macro playback (@{register})
    - [ ] Support recursive macros
 
+5. **Additional Normal Mode Commands**
+   - [ ] Implement J (join lines)
+   - [ ] Implement z commands (scrolling and folding)
+   - [ ] Implement gU/gu (uppercase/lowercase)
+   - [ ] Implement < and > (indentation)
+
 ## Lower Priority Tasks
 
 1. **Window Management**
@@ -155,11 +165,12 @@ This document tracks the planned work and priorities for the pure Go vim impleme
 - ~~Buffer content persistence between context switches~~ (Fixed May 2025)
 - ~~Verb+motion commands not working properly~~ (Fixed May 2025)
 - ~~Visual mode code organization and maintainability~~ (Refactored May 2025)
+- ~~Buffer cursor position not preserved between switches~~ (Fixed May 2025)
 - Tests needed for edge cases (empty buffers, special characters)
 - Unexpected behavior with long lines (no text wrapping)
 - Missing most text-object based operations
 - Limited register functionality (only unnamed register)
-- No undo/redo support
+- ~~No undo/redo support~~ (Implemented May 2025)
 
 ## Implementation Status Summary
 
@@ -168,12 +179,27 @@ The current Go vim implementation successfully handles:
 - Basic and compound editing operations
 - Verb+motion commands (dw, cw, y$, etc.)
 - Mode switching with correct cursor positioning
-- Visual mode with operations (y, d, c) and modular design
+- Visual mode with operations (y, d, c, ~)
 - Fundamental search functionality
 - Text yanking and pasting
+- Cursor position tracking per buffer
+- Replace character with 'r'
+- Toggle case with '~' (both normal and visual modes)
+- Undo/redo functionality
 
 However, it still lacks several key vim features that will be the focus of the next development phase,
 as detailed in the "High Priority Features For Next Phase" section above.
+
+## Next Commands to Implement
+
+The following commands would be good candidates for the next implementation phase:
+1. Text object operations (diw, ciw, yiw, etc.)
+2. Character find commands (f, F, t, T)
+3. Named registers
+4. Additional normal mode utility commands:
+   - gU/gu (uppercase/lowercase line)
+   - < and > (indentation)
+   - Ctrl+A/Ctrl+X (increment/decrement numbers)
 
 ## Migration Plan
 
