@@ -39,8 +39,8 @@ type GoImplementation struct {
 func (g *GoImplementation) GetEngine() VimEngine {
 	engine := &GoEngine{
 		debugLog: g.logger,
+		engine:   govim.NewEngine(),
 	}
-	//engine := govim.NewEngine()
 
 	if g.logger != nil {
 		g.logger.Println("Created GoEngine instance")
@@ -215,92 +215,80 @@ func (b *CGOBufferWrapper) SetLines(start, end int, lines []string) {
 type GoEngine struct {
 	// Add debug logger
 	debugLog *log.Logger
+	engine   govim.Engine
 }
 
 // Init initializes the vim engine
 func (e *GoEngine) Init(argc int) {
-	govim.DefaultEngine.Init(argc)
+	e.engine.Init(argc)
 }
 
 // BufferOpen opens a file and returns a buffer
 func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) VimBuffer {
 	//buf := govim.BufferOpen(filename, lnum, flags)
-	buf := govim.DefaultEngine.BufferOpen(filename, lnum, flags)
+	buf := e.engine.BufferOpen(filename, lnum, flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
 func (e *GoEngine) BufferNew(flags int) VimBuffer {
-	buf := govim.DefaultEngine.BufferNew(flags)
-	/*
-		if buf == nil {
-			if e.debugLog != nil {
-				e.debugLog.Println("BufferNew failed - returned nil buffer")
-			}
-			// Log to stderr instead of stdout to avoid affecting the UI
-			fmt.Fprintf(os.Stderr, "WARNING: Go implementation BufferNew returned nil\n")
-		} else {
-			if e.debugLog != nil {
-				e.debugLog.Println("BufferNew succeeded")
-			}
-		}
-	*/
+	buf := e.engine.BufferNew(flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferGetCurrent gets the current buffer
 func (e *GoEngine) BufferGetCurrent() VimBuffer {
-	buf := govim.DefaultEngine.BufferGetCurrent()
+	buf := e.engine.BufferGetCurrent()
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
 func (e *GoEngine) BufferSetCurrent(buf VimBuffer) {
 	if goBuf, ok := buf.(*GoBufferWrapper); ok {
-		govim.DefaultEngine.BufferSetCurrent(goBuf.buf)
+		e.engine.BufferSetCurrent(goBuf.buf)
 	}
 }
 
 // CursorGetLine gets the current cursor line
 func (e *GoEngine) CursorGetLine() int {
-	return govim.DefaultEngine.CursorGetLine()
+	return e.engine.CursorGetLine()
 }
 
 // CursorGetPosition gets the cursor position
 func (e *GoEngine) CursorGetPosition() [2]int {
-	return govim.DefaultEngine.CursorGetPosition()
+	return e.engine.CursorGetPosition()
 }
 
 // CursorSetPosition sets the cursor position
 func (e *GoEngine) CursorSetPosition(row, col int) {
-	govim.DefaultEngine.CursorSetPosition(row, col)
+	e.engine.CursorSetPosition(row, col)
 }
 
 // Input sends input to vim
 func (e *GoEngine) Input(s string) {
-	govim.DefaultEngine.Input(s)
+	e.engine.Input(s)
 }
 
 // Input2 sends multiple character input
 func (e *GoEngine) Input2(s string) {
 	for _, x := range s {
-		govim.DefaultEngine.Input(string(x))
+		e.engine.Input(string(x))
 	}
 }
 
 // Key sends special key input
 func (e *GoEngine) Key(s string) {
-	govim.DefaultEngine.Key(s)
+	e.engine.Key(s)
 }
 
 // Execute runs an ex command
 func (e *GoEngine) Execute(s string) {
-	govim.DefaultEngine.Execute(s)
+	e.engine.Execute(s)
 }
 
 // GetMode gets the current mode
 func (e *GoEngine) GetMode() int {
-	mode := govim.DefaultEngine.GetMode()
+	mode := e.engine.GetMode()
 	// Add optional debug logging to see if mode is being correctly passed
 	fmt.Fprintf(os.Stderr, "GoEngine GetMode: govim.GetMode returned %d\n", mode)
 	return mode
@@ -308,27 +296,27 @@ func (e *GoEngine) GetMode() int {
 
 // GetCurrentMode gets the current mode with application-compatible mappings
 func (e *GoEngine) GetCurrentMode() int {
-	return govim.DefaultEngine.GetCurrentMode()
+	return e.engine.GetMode()
 }
 
 // VisualGetRange gets the visual selection range
 func (e *GoEngine) VisualGetRange() [2][2]int {
-	return govim.DefaultEngine.VisualGetRange()
+	return e.engine.VisualGetRange()
 }
 
 // VisualGetType gets the visual mode type
 func (e *GoEngine) VisualGetType() int {
-	return govim.DefaultEngine.VisualGetType()
+	return e.engine.VisualGetType()
 }
 
 // Eval evaluates a vim expression
 func (e *GoEngine) Eval(expr string) string {
-	return govim.DefaultEngine.Eval(expr)
+	return e.engine.Eval(expr)
 }
 
 // SearchGetMatchingPair finds matching brackets
 func (e *GoEngine) SearchGetMatchingPair() [2]int {
-	return govim.DefaultEngine.SearchGetMatchingPair()
+	return e.engine.SearchGetMatchingPair()
 }
 
 // GoBufferWrapper wraps a Go buffer
@@ -420,35 +408,6 @@ func (b *GoBufferWrapper) SetLines(start, end int, lines []string) {
 	if start == 0 && end == -1 && len(safeLines) == 0 {
 		safeLines = []string{""}
 	}
-
-	// Try to call SetLines with error handling
-	defer func() {
-		if r := recover(); r != nil {
-			// Log to stderr instead of stdout to avoid affecting the UI
-			fmt.Fprintf(os.Stderr, "PANIC in GoBufferWrapper.SetLines: %v\n", r)
-
-			// Simple recovery approach: use standard method with safe inputs
-			if start < 0 {
-				start = 0
-			}
-
-			if end == -1 {
-				// Create a safe buffer replacement
-				if len(safeLines) == 0 {
-					safeLines = []string{""}
-				}
-
-				// Create a buffer with the safe content
-				newBuf := govim.DefaultEngine.BufferNew(0)
-				newBuf.SetLines(0, -1, safeLines)
-
-				// Replace the current buffer with this new one
-				b.buf = newBuf
-				b.buf.SetCurrent()
-				return
-			}
-		}
-	}()
 
 	// Update the buffer
 	b.buf.SetLines(start, end, safeLines)
