@@ -1,12 +1,15 @@
 package vim
 
-import cvim "github.com/slzatz/vimango/vim/cvim"
+import (
+	cvim "github.com/slzatz/vimango/vim/cvim"
+	"github.com/slzatz/vimango/vim/interfaces"
+)
 
 // This file provides an API layer for the application to interact with vim
 // regardless of whether the C or Go implementation is being used.
 
 // Engine is the default engine instance
-var Engine VimEngine
+var Engine interfaces.VimEngine
 
 // InitializeVim sets up the vim engine with the selected implementation
 func InitializeVim(useGoImplementation bool, argc int) {
@@ -36,13 +39,13 @@ func Init(argc int) {
 }
 
 // OpenBuffer opens a file and returns a buffer
-func OpenBuffer(filename string, lnum int, flags int) (result VimBuffer) {
+func OpenBuffer(filename string, lnum int, flags int) interfaces.VimBuffer {
 	return Engine.BufferOpen(filename, lnum, flags)
 }
 
 // NewBuffer creates a new empty buffer
 // Returns VimBuffer for the new adapter API but can be used with old code too
-func NewBuffer(flags int) (result VimBuffer) {
+func NewBuffer(flags int) (result interfaces.VimBuffer) {
 	return Engine.BufferNew(flags)
 }
 
@@ -57,12 +60,12 @@ func BufferNew(flags int) cvim.Buffer {
 }
 
 // GetCurrentBuffer gets the current buffer
-func GetCurrentBuffer() (result VimBuffer) {
+func GetCurrentBuffer() interfaces.VimBuffer {
 	return Engine.BufferGetCurrent()
 }
 
 // SetCurrentBuffer sets the current buffer
-func SetCurrentBuffer(buf VimBuffer) {
+func SetCurrentBuffer(buf interfaces.VimBuffer) {
 	Engine.BufferSetCurrent(buf)
 }
 
@@ -189,7 +192,7 @@ func BufferSetLines(buf cvim.Buffer, start, end int, lines []string, count int) 
 func ToggleImplementation() string {
 	// Get current buffer before switching to ensure we can
 	// reset its state after the switch
-	var currentBuffer VimBuffer
+	var currentBuffer interfaces.VimBuffer
 	if Engine != nil {
 		currentBuffer = Engine.BufferGetCurrent()
 	}
@@ -213,7 +216,7 @@ func ToggleImplementation() string {
 // Helper functions to convert between buffer types
 
 // BufferToVimBuffer converts an old-style Buffer to a VimBuffer interface
-func BufferToVimBuffer(buf cvim.Buffer) VimBuffer {
+func BufferToVimBuffer(buf cvim.Buffer) interfaces.VimBuffer {
 	if buf == nil {
 		return nil
 	}
@@ -222,7 +225,7 @@ func BufferToVimBuffer(buf cvim.Buffer) VimBuffer {
 
 // VimBufferToBuffer attempts to convert a VimBuffer to a Buffer
 // Returns nil if conversion is not possible
-func VimBufferToBuffer(buf VimBuffer) cvim.Buffer {
+func VimBufferToBuffer(buf interfaces.VimBuffer) cvim.Buffer {
 	if buf == nil {
 		return nil
 	}

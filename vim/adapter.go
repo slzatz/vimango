@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 
-	cvim "github.com/slzatz/vimango/vim/cvim"
-	govim "github.com/slzatz/vimango/vim/govim"
+	"github.com/slzatz/vimango/vim/cvim"
+	"github.com/slzatz/vimango/vim/govim"
+	"github.com/slzatz/vimango/vim/interfaces"
 )
 
 // Implementation constants
@@ -17,7 +18,7 @@ const (
 
 // VimImplementation allows switching between C and Go implementations
 type VimImplementation interface {
-	GetEngine() VimEngine
+	GetEngine() interfaces.VimEngine
 	GetName() string
 }
 
@@ -28,7 +29,7 @@ var ActiveImplementation = ImplC
 type CGOImplementation struct{}
 
 // GetEngine returns the C-based engine
-func (c *CGOImplementation) GetEngine() VimEngine {
+func (c *CGOImplementation) GetEngine() interfaces.VimEngine {
 	return &CGOEngine{}
 }
 
@@ -43,7 +44,7 @@ type GoImplementation struct {
 }
 
 // GetEngine returns the Go-based engine
-func (g *GoImplementation) GetEngine() VimEngine {
+func (g *GoImplementation) GetEngine() interfaces.VimEngine {
 	engine := &GoEngine{
 		debugLog: g.logger,
 		engine:   govim.NewEngine(),
@@ -73,25 +74,25 @@ func (e *CGOEngine) Init(argc int) {
 }
 
 // BufferOpen opens a file and returns a buffer
-func (e *CGOEngine) BufferOpen(filename string, lnum int, flags int) VimBuffer {
+func (e *CGOEngine) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
 	buf := cvim.BufferOpen(filename, lnum, flags)
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
-func (e *CGOEngine) BufferNew(flags int) VimBuffer {
+func (e *CGOEngine) BufferNew(flags int) interfaces.VimBuffer {
 	buf := cvim.CBufferNew(flags)
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferGetCurrent gets the current buffer
-func (e *CGOEngine) BufferGetCurrent() VimBuffer {
+func (e *CGOEngine) BufferGetCurrent() interfaces.VimBuffer {
 	buf := cvim.BufferGetCurrent()
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
-func (e *CGOEngine) BufferSetCurrent(buf VimBuffer) {
+func (e *CGOEngine) BufferSetCurrent(buf interfaces.VimBuffer) {
 	if cgoBuf, ok := buf.(*CGOBufferWrapper); ok {
 		cvim.CBufferSetCurrent(cgoBuf.buf)
 	}
@@ -231,26 +232,26 @@ func (e *GoEngine) Init(argc int) {
 }
 
 // BufferOpen opens a file and returns a buffer
-func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) VimBuffer {
+func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
 	//buf := govim.BufferOpen(filename, lnum, flags)
 	buf := e.engine.BufferOpen(filename, lnum, flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
-func (e *GoEngine) BufferNew(flags int) VimBuffer {
+func (e *GoEngine) BufferNew(flags int) interfaces.VimBuffer {
 	buf := e.engine.BufferNew(flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferGetCurrent gets the current buffer
-func (e *GoEngine) BufferGetCurrent() VimBuffer {
+func (e *GoEngine) BufferGetCurrent() interfaces.VimBuffer {
 	buf := e.engine.BufferGetCurrent()
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
-func (e *GoEngine) BufferSetCurrent(buf VimBuffer) {
+func (e *GoEngine) BufferSetCurrent(buf interfaces.VimBuffer) {
 	if goBuf, ok := buf.(*GoBufferWrapper); ok {
 		e.engine.BufferSetCurrent(goBuf.buf)
 	}
@@ -455,6 +456,6 @@ func GetActiveImplementation() string {
 }
 
 // GetEngine gets the current engine implementation
-func GetEngine() VimEngine {
+func GetEngine() interfaces.VimEngine {
 	return activeImpl.GetEngine()
 }

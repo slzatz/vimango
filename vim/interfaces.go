@@ -1,3 +1,5 @@
+//go:build ignore
+
 package vim
 
 // VimBuffer represents the interface for vim buffer operations

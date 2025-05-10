@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/slzatz/vimango/vim"
+	"github.com/slzatz/vimango/vim/interfaces"
 )
 
 //import "github.com/neovim/go-client/nvim"
@@ -30,7 +30,7 @@ type Editor struct {
 	redraw             bool
 	id                 int //db id of entry
 	output             *Output
-	vbuf               vim.VimBuffer
+	vbuf               interfaces.VimBuffer
 	ss                 []string
 	searchPrefix       string
 	renderedNote       string

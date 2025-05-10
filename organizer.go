@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/slzatz/vimango/vim"
+	"github.com/slzatz/vimango/vim/interfaces"
 )
 
 type Organizer struct {
@@ -37,7 +38,7 @@ type Organizer struct {
 	marked_entries      map[int]struct{} // map instead of list makes toggling a row easier
 	title_search_string string
 	highlight           [2]int
-	vbuf                vim.VimBuffer
+	vbuf                interfaces.VimBuffer
 	bufferTick          int
 	normalCmds          map[string]func(*Organizer)
 	exCmds              map[string]func(*Organizer, int)
@@ -91,27 +92,27 @@ func (o *Organizer) readRowsIntoBuffer() {
 	for i, row := range o.rows {
 		ss[i] = row.title
 	}
-	
+
 	// If we're using Go implementation and have titles
 	if vim.GetActiveImplementation() == vim.ImplGo {
 		// Create a completely new buffer for maximum safety with Go implementation
 		buf := vim.NewBuffer(0)
-		
+
 		// Handle the special case where we have no rows
 		if len(ss) == 0 {
 			// Always ensure at least an empty line for consistent behavior
 			ss = []string{""}
 		}
-		
+
 		// Set the new buffer's lines - use a defensive approach
 		deepCopy := make([]string, len(ss))
 		for i, line := range ss {
 			deepCopy[i] = line // Deep copy to ensure no shared references
 		}
-		
+
 		// Set the lines in the buffer
 		buf.SetLines(0, -1, deepCopy)
-		
+
 		// Make it the current buffer and store the reference
 		buf.SetCurrent()
 		o.vbuf = buf
@@ -121,12 +122,12 @@ func (o *Organizer) readRowsIntoBuffer() {
 			// This shouldn't happen, but handle it gracefully
 			o.vbuf = vim.NewBuffer(0)
 		}
-		
+
 		// Ensure we have at least an empty line in empty cases
 		if len(ss) == 0 {
 			ss = []string{""}
 		}
-		
+
 		// Update the existing buffer's content
 		o.vbuf.SetLines(0, -1, ss)
 		vim.SetCurrentBuffer(o.vbuf)
