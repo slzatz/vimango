@@ -1,3 +1,4 @@
+//go:buiid ignore
 package govim
 
 // Buffer interface mirrors the buf_T functionality from C
@@ -21,19 +22,19 @@ type Engine interface {
 	BufferNew(flags int) Buffer
 	BufferGetCurrent() Buffer
 	BufferSetCurrent(buf Buffer)
-	
+
 	CursorGetLine() int
 	CursorGetPosition() [2]int
 	CursorSetPosition(row, col int)
-	
+
 	Input(s string)
 	Key(s string)
 	Execute(cmd string)
-	
+
 	GetMode() int
 	VisualGetRange() [2][2]int
 	VisualGetType() int
-	
+
 	Eval(expr string) string
 	SearchGetMatchingPair() [2]int
 }

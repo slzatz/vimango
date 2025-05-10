@@ -1,14 +1,20 @@
 package vim
 
 import (
-	cvim "github.com/slzatz/vimango/vim/cvim"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
 // This file provides an API layer for the application to interact with vim
 // regardless of whether the C or Go implementation is being used.
 
-// Engine is the default engine instance
+// Engine is the active engine instance
+// The CGOEngineWrapper and the GoEngineWrapper are the two implementations
+// the Engine Wrappers need to satisfy the VimEngine interface
 var Engine interfaces.VimEngine
 
 // InitializeVim sets up the vim engine with the selected implementation
@@ -20,14 +26,51 @@ func InitializeVim(useGoImplementation bool, argc int) {
 		SwitchToCImplementation()
 	}
 
-	// Get the engine
-	Engine = GetEngine()
+	// Get the engine wrapper for the active implementation
+	Engine = GetEngineWrapper()
 
 	// Initialize vim
 	Engine.Init(argc)
 }
 
-// API Functions - These wrap the engine calls
+// API Functions that deal with which implementation is being used
+
+// SwitchToGoImplementation switches to the Go implementation
+func SwitchToGoImplementation() {
+	// Set up logging for the Go implementation
+	logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		// Log to stderr instead of stdout to avoid affecting the UI
+		fmt.Fprintf(os.Stderr, "Failed to open govim log file: %v\n", err)
+	}
+
+	ActiveImplementation = ImplGo
+	goImpl := &GoImplementation{}
+
+	// Initialize the logger if file was opened successfully
+	if err == nil {
+		goImpl.logger = log.New(logFile, "GoVim: ", log.Ltime|log.Lshortfile)
+		goImpl.logger.Println("Go implementation activated")
+	}
+
+	activeImpl = goImpl
+}
+
+// SwitchToCImplementation switches to the C implementation
+func SwitchToCImplementation() {
+	ActiveImplementation = ImplC
+	activeImpl = &CGOImplementation{}
+}
+
+// GetActiveImplementation returns the name of the active implementation
+func GetActiveImplementation() string {
+	return activeImpl.GetName()
+}
+
+// GetEngine gets the current engine implementation
+func GetEngineWrapper() interfaces.VimEngine {
+	return activeImpl.GetEngineWrapper()
+}
 
 // Init initializes vim
 func Init(argc int) {
@@ -37,6 +80,8 @@ func Init(argc int) {
 		Engine.Init(argc)
 	}
 }
+
+// API Functions - These wrap the engine calls
 
 // OpenBuffer opens a file and returns a buffer
 func OpenBuffer(filename string, lnum int, flags int) interfaces.VimBuffer {

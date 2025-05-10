@@ -67,7 +67,7 @@ func NewEngine() *GoEngine {
 	}
 }
 
-var DefaultEngine = NewEngine()
+//var DefaultEngine = NewEngine()
 
 // Init initializes the engine
 func (e *GoEngine) Init(argc int) {
