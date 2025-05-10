@@ -1,4 +1,4 @@
-package vim
+package interfaces
 
 // VimBuffer represents the interface for vim buffer operations
 type VimBuffer interface {
@@ -50,10 +50,8 @@ type VimEngine interface {
 	SearchGetMatchingPair() [2]int
 }
 
-/*
 // VimImplementation allows switching between C and Go implementations
 type VimImplementation interface {
 	GetEngine() VimEngine
 	GetName() string
 }
-*/

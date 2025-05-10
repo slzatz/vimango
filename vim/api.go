@@ -1,5 +1,7 @@
 package vim
 
+import cvim "github.com/slzatz/vimango/vim/cvim"
+
 // This file provides an API layer for the application to interact with vim
 // regardless of whether the C or Go implementation is being used.
 
@@ -45,7 +47,7 @@ func NewBuffer(flags int) (result VimBuffer) {
 }
 
 // For backward compatibility with existing code
-func BufferNew(flags int) Buffer {
+func BufferNew(flags int) cvim.Buffer {
 	b := Engine.BufferNew(flags)
 	if wrapper, ok := b.(*CGOBufferWrapper); ok {
 		return wrapper.buf
@@ -65,7 +67,7 @@ func SetCurrentBuffer(buf VimBuffer) {
 }
 
 // For backward compatibility with existing code
-func BufferSetCurrent(buf Buffer) {
+func BufferSetCurrent(buf cvim.Buffer) {
 	if buf == nil {
 		return
 	}
@@ -157,7 +159,7 @@ func IsUsingGoImplementation() bool {
 // Additional backward compatibility functions
 
 // BufferLines gets all lines from a buffer (old style)
-func BufferLines(buf Buffer) []string {
+func BufferLines(buf cvim.Buffer) []string {
 	if buf == nil {
 		return nil
 	}
@@ -166,7 +168,7 @@ func BufferLines(buf Buffer) []string {
 }
 
 // BufferGetLastChangedTick gets the last changed tick
-func BufferGetLastChangedTick(buf Buffer) int {
+func BufferGetLastChangedTick(buf cvim.Buffer) int {
 	if buf == nil {
 		return 0
 	}
@@ -175,7 +177,7 @@ func BufferGetLastChangedTick(buf Buffer) int {
 }
 
 // BufferSetLines sets lines in a buffer
-func BufferSetLines(buf Buffer, start, end int, lines []string, count int) {
+func BufferSetLines(buf cvim.Buffer, start, end int, lines []string, count int) {
 	if buf == nil {
 		return
 	}
@@ -211,7 +213,7 @@ func ToggleImplementation() string {
 // Helper functions to convert between buffer types
 
 // BufferToVimBuffer converts an old-style Buffer to a VimBuffer interface
-func BufferToVimBuffer(buf Buffer) VimBuffer {
+func BufferToVimBuffer(buf cvim.Buffer) VimBuffer {
 	if buf == nil {
 		return nil
 	}
@@ -220,7 +222,7 @@ func BufferToVimBuffer(buf Buffer) VimBuffer {
 
 // VimBufferToBuffer attempts to convert a VimBuffer to a Buffer
 // Returns nil if conversion is not possible
-func VimBufferToBuffer(buf VimBuffer) Buffer {
+func VimBufferToBuffer(buf VimBuffer) cvim.Buffer {
 	if buf == nil {
 		return nil
 	}

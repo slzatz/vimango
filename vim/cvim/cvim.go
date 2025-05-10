@@ -1,6 +1,4 @@
-//go:build ignore
-
-package vim
+package cvim
 
 import (
 	"unsafe"
@@ -22,7 +20,7 @@ func ucharP(s string) *C.uchar {
 }
 
 // void vimInit(int argc, char **argv);
-func vimInit(argc int) {
+func VimInit(argc int) {
 	var c *C.char
 	C.vimInit(C.int(argc), &c)
 }

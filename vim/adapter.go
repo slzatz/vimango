@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	cvim "github.com/slzatz/vimango/vim/cvim"
 	govim "github.com/slzatz/vimango/vim/govim"
 )
 
@@ -13,6 +14,12 @@ const (
 	ImplC  = "cgo"
 	ImplGo = "go"
 )
+
+// VimImplementation allows switching between C and Go implementations
+type VimImplementation interface {
+	GetEngine() VimEngine
+	GetName() string
+}
 
 // ActiveImplementation tracks which implementation is active
 var ActiveImplementation = ImplC
@@ -62,133 +69,133 @@ type CGOEngine struct{}
 
 // Init initializes the vim engine
 func (e *CGOEngine) Init(argc int) {
-	vimInit(argc)
+	cvim.VimInit(argc)
 }
 
 // BufferOpen opens a file and returns a buffer
 func (e *CGOEngine) BufferOpen(filename string, lnum int, flags int) VimBuffer {
-	buf := BufferOpen(filename, lnum, flags)
+	buf := cvim.BufferOpen(filename, lnum, flags)
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
 func (e *CGOEngine) BufferNew(flags int) VimBuffer {
-	buf := CBufferNew(flags)
+	buf := cvim.CBufferNew(flags)
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferGetCurrent gets the current buffer
 func (e *CGOEngine) BufferGetCurrent() VimBuffer {
-	buf := BufferGetCurrent()
+	buf := cvim.BufferGetCurrent()
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
 func (e *CGOEngine) BufferSetCurrent(buf VimBuffer) {
 	if cgoBuf, ok := buf.(*CGOBufferWrapper); ok {
-		CBufferSetCurrent(cgoBuf.buf)
+		cvim.CBufferSetCurrent(cgoBuf.buf)
 	}
 }
 
 // CursorGetLine gets the current cursor line
 func (e *CGOEngine) CursorGetLine() int {
-	return CursorGetLine()
+	return cvim.CursorGetLine()
 }
 
 // CursorGetPosition gets the cursor position
 func (e *CGOEngine) CursorGetPosition() [2]int {
-	return CursorGetPosition()
+	return cvim.CursorGetPosition()
 }
 
 // CursorSetPosition sets the cursor position
 func (e *CGOEngine) CursorSetPosition(row, col int) {
-	CursorSetPosition(row, col)
+	cvim.CursorSetPosition(row, col)
 }
 
 // Input sends input to vim
 func (e *CGOEngine) Input(s string) {
-	Input(s)
+	cvim.Input(s)
 }
 
 // Input2 sends multiple character input
 func (e *CGOEngine) Input2(s string) {
-	Input2(s)
+	cvim.Input2(s)
 }
 
 // Key sends special key input
 func (e *CGOEngine) Key(s string) {
-	Key(s)
+	cvim.Key(s)
 }
 
 // Execute runs an ex command
 func (e *CGOEngine) Execute(s string) {
-	Execute(s)
+	cvim.Execute(s)
 }
 
 // GetMode gets the current mode
 func (e *CGOEngine) GetMode() int {
-	return GetMode()
+	return cvim.GetMode()
 }
 
 // GetCurrentMode gets the current mode with application-compatible mappings
 // For CGO implementation, this is the same as GetMode
 func (e *CGOEngine) GetCurrentMode() int {
-	return GetMode()
+	return cvim.GetMode()
 }
 
 // VisualGetRange gets the visual selection range
 func (e *CGOEngine) VisualGetRange() [2][2]int {
-	return VisualGetRange()
+	return cvim.VisualGetRange()
 }
 
 // VisualGetType gets the visual mode type
 func (e *CGOEngine) VisualGetType() int {
-	return VisualGetType()
+	return cvim.VisualGetType()
 }
 
 // Eval evaluates a vim expression
 func (e *CGOEngine) Eval(expr string) string {
-	return Eval(expr)
+	return cvim.Eval(expr)
 }
 
 // SearchGetMatchingPair finds matching brackets
 func (e *CGOEngine) SearchGetMatchingPair() [2]int {
-	return SearchGetMatchingPair()
+	return cvim.SearchGetMatchingPair()
 }
 
 // CGOBufferWrapper wraps a C buffer
 type CGOBufferWrapper struct {
-	buf Buffer
+	buf cvim.Buffer
 }
 
 // GetID gets the buffer ID
 func (b *CGOBufferWrapper) GetID() int {
-	return BufferGetId(b.buf)
+	return cvim.BufferGetId(b.buf)
 }
 
 // GetLine gets a line from the buffer
 func (b *CGOBufferWrapper) GetLine(lnum int) string {
-	return BufferGetLine(b.buf, lnum)
+	return cvim.BufferGetLine(b.buf, lnum)
 }
 
 // GetLineB gets a line as bytes from the buffer
 func (b *CGOBufferWrapper) GetLineB(lnum int) []byte {
-	return BufferGetLineB(b.buf, lnum)
+	return cvim.BufferGetLineB(b.buf, lnum)
 }
 
 // GetLineCount gets the number of lines in the buffer
 func (b *CGOBufferWrapper) GetLineCount() int {
-	return BufferGetLineCount(b.buf)
+	return cvim.BufferGetLineCount(b.buf)
 }
 
 // Lines gets all lines from the buffer
 func (b *CGOBufferWrapper) Lines() []string {
-	return CBufferLines(b.buf)
+	return cvim.CBufferLines(b.buf)
 }
 
 // LinesB gets all lines as bytes from the buffer
 func (b *CGOBufferWrapper) LinesB() [][]byte {
-	return BufferLinesB(b.buf)
+	return cvim.BufferLinesB(b.buf)
 }
 
 // SetCurrent sets this buffer as the current buffer
@@ -198,17 +205,17 @@ func (b *CGOBufferWrapper) SetCurrent() {
 
 // IsModified checks if the buffer has been modified
 func (b *CGOBufferWrapper) IsModified() bool {
-	return BufferGetModified(b.buf)
+	return cvim.BufferGetModified(b.buf)
 }
 
 // GetLastChangedTick gets the last changed tick value
 func (b *CGOBufferWrapper) GetLastChangedTick() int {
-	return CBufferGetLastChangedTick(b.buf)
+	return cvim.CBufferGetLastChangedTick(b.buf)
 }
 
 // SetLines sets all lines in the buffer
 func (b *CGOBufferWrapper) SetLines(start, end int, lines []string) {
-	CBufferSetLines(b.buf, start, end, lines, len(lines))
+	cvim.CBufferSetLines(b.buf, start, end, lines, len(lines))
 }
 
 // GoEngine implements the Go-based vim engine
