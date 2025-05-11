@@ -94,17 +94,13 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 	e.currentBuffer = buf
 	e.buffers[buf.id] = buf
 
-	// Set cursor position both in the engine and in the buffer
+	// Set cursor position both in the buffer
 	if lnum > 0 && lnum <= buf.GetLineCount() {
-		//e.cursorRow = lnum
-		buf.cursorRow = lnum // Set the buffer's cursor position
+		buf.cursorRow = lnum
 	} else {
-		//e.cursorRow = 1
-		buf.cursorRow = 1 // Set the buffer's cursor position
+		buf.cursorRow = 1
 	}
-	//e.cursorCol = 0
-	buf.cursorCol = 0 // Set the buffer's cursor position
-
+	buf.cursorCol = 0
 	return buf
 }
 
@@ -137,15 +133,6 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		// Save the old buffer reference to check if we're changing buffers
 		oldBuffer := e.currentBuffer
 
-		// Save the current cursor position to the current buffer before switching
-		/*
-			if e.currentBuffer != nil {
-				// Since e.currentBuffer is already defined as *GoBuffer in the struct,
-				// we can access its fields directly without type assertion
-				e.currentBuffer.cursorRow = e.cursorRow
-				e.currentBuffer.cursorCol = e.cursorCol
-			}
-		*/
 		// Set the new current buffer
 		e.currentBuffer = goBuf
 
@@ -153,21 +140,8 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		if len(goBuf.lines) == 0 {
 			goBuf.lines = []string{""}
 		}
-
-		/*
-			// Restore cursor position from the buffer
-			e.cursorRow = goBuf.cursorRow
-			e.cursorCol = goBuf.cursorCol
-		*/
-
 		// Validate the cursor position to ensure it's valid for the current buffer content
 		e.validateCursorPosition()
-
-		/*
-			// After validation, update the buffer's cursor position if it was adjusted
-			goBuf.cursorRow = e.cursorRow
-			goBuf.cursorCol = e.cursorCol
-		*/
 
 		// Reset buffer-specific state
 		e.commandCount = 0
@@ -259,19 +233,6 @@ func (e *GoEngine) CursorSetPosition(row, col int) {
 
 // GetMode returns the current mode
 func (e *GoEngine) GetMode() int {
-	return e.mode
-}
-
-// GetCurrentMode returns the current mode
-// This is specifically for the wrapper function GetCurrentMode()
-// Takes special care to return the expected values for command/ex mode
-func (e *GoEngine) GetCurrentMode() int {
-	// When in ModeCommand, the application expects value 8 to trigger
-	// intercepting the ':' and entering EX_COMMAND mode
-	if e.mode == ModeCommand {
-		return 8 // The value expected by the editor for command mode
-	}
-
 	return e.mode
 }
 

@@ -169,13 +169,6 @@ func ExecuteCommand(s string) {
 // GetCurrentMode gets the current mode
 // This is specifically used by the editor to determine the mode
 func GetCurrentMode() int {
-	// If we're using the Go implementation, make sure to map our internal
-	// mode values to what the application expects
-	if IsUsingGoImplementation() {
-		// GetCurrentMode handles the special mapping for command mode
-		return Engine.GetCurrentMode()
-	}
-	// For C implementation, use regular GetMode
 	return Engine.GetMode()
 }
 
