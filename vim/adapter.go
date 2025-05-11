@@ -1,11 +1,7 @@
-//go:build ignore
-
 package vim
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/govim"
@@ -20,7 +16,7 @@ const (
 
 // VimImplementation allows switching between C and Go implementations
 type VimImplementation interface {
-	GetEngine() interfaces.VimEngine
+	GetEngineWrapper() interfaces.VimEngine
 	GetName() string
 }
 
@@ -30,9 +26,9 @@ var ActiveImplementation = ImplC
 // CGOImplementation provides the C-based vim implementation
 type CGOImplementation struct{}
 
-// GetEngine returns the C-based engine
-func (c *CGOImplementation) GetEngine() interfaces.VimEngine {
-	return &CGOEngine{}
+// GetEngineWrapper returns the C-based engine wrapper
+func (c *CGOImplementation) GetEngineWrapper() interfaces.VimEngine {
+	return &CGOEngineWrapper{}
 }
 
 // GetName returns the implementation name
@@ -45,11 +41,11 @@ type GoImplementation struct {
 	logger *log.Logger
 }
 
-// GetEngine returns the Go-based engine
-func (g *GoImplementation) GetEngine() interfaces.VimEngine {
-	engine := &GoEngine{
+// GetEngineWrapper returns the Go-based engine wrapper
+func (g *GoImplementation) GetEngineWrapper() interfaces.VimEngine {
+	engine := &GoEngineWrapper{
 		debugLog: g.logger,
-		engine:   govim.NewEngine(),
+		engine:   govim.NewEngine(), // This is the Go vim engine from package govim
 	}
 
 	if g.logger != nil {
@@ -67,102 +63,103 @@ func (g *GoImplementation) GetName() string {
 // activeImpl is the current implementation (C or Go)
 var activeImpl VimImplementation = &CGOImplementation{}
 
-// CGOEngine wraps the C-based vim implementation
-type CGOEngine struct{}
+// CGOEngineWrapper wraps the C-based vim implementation in package cvim
+// CGOEngineWrapper satisfies the VimEngine interface
+type CGOEngineWrapper struct{}
 
 // Init initializes the vim engine
-func (e *CGOEngine) Init(argc int) {
+func (e *CGOEngineWrapper) Init(argc int) {
 	cvim.VimInit(argc)
 }
 
 // BufferOpen opens a file and returns a buffer
-func (e *CGOEngine) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
+func (e *CGOEngineWrapper) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
 	buf := cvim.BufferOpen(filename, lnum, flags)
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
-func (e *CGOEngine) BufferNew(flags int) interfaces.VimBuffer {
+func (e *CGOEngineWrapper) BufferNew(flags int) interfaces.VimBuffer {
 	buf := cvim.CBufferNew(flags)
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferGetCurrent gets the current buffer
-func (e *CGOEngine) BufferGetCurrent() interfaces.VimBuffer {
+func (e *CGOEngineWrapper) BufferGetCurrent() interfaces.VimBuffer {
 	buf := cvim.BufferGetCurrent()
 	return &CGOBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
-func (e *CGOEngine) BufferSetCurrent(buf interfaces.VimBuffer) {
+func (e *CGOEngineWrapper) BufferSetCurrent(buf interfaces.VimBuffer) {
 	if cgoBuf, ok := buf.(*CGOBufferWrapper); ok {
 		cvim.CBufferSetCurrent(cgoBuf.buf)
 	}
 }
 
 // CursorGetLine gets the current cursor line
-func (e *CGOEngine) CursorGetLine() int {
+func (e *CGOEngineWrapper) CursorGetLine() int {
 	return cvim.CursorGetLine()
 }
 
 // CursorGetPosition gets the cursor position
-func (e *CGOEngine) CursorGetPosition() [2]int {
+func (e *CGOEngineWrapper) CursorGetPosition() [2]int {
 	return cvim.CursorGetPosition()
 }
 
 // CursorSetPosition sets the cursor position
-func (e *CGOEngine) CursorSetPosition(row, col int) {
+func (e *CGOEngineWrapper) CursorSetPosition(row, col int) {
 	cvim.CursorSetPosition(row, col)
 }
 
 // Input sends input to vim
-func (e *CGOEngine) Input(s string) {
+func (e *CGOEngineWrapper) Input(s string) {
 	cvim.Input(s)
 }
 
 // Input2 sends multiple character input
-func (e *CGOEngine) Input2(s string) {
+func (e *CGOEngineWrapper) Input2(s string) {
 	cvim.Input2(s)
 }
 
 // Key sends special key input
-func (e *CGOEngine) Key(s string) {
+func (e *CGOEngineWrapper) Key(s string) {
 	cvim.Key(s)
 }
 
 // Execute runs an ex command
-func (e *CGOEngine) Execute(s string) {
+func (e *CGOEngineWrapper) Execute(s string) {
 	cvim.Execute(s)
 }
 
 // GetMode gets the current mode
-func (e *CGOEngine) GetMode() int {
+func (e *CGOEngineWrapper) GetMode() int {
 	return cvim.GetMode()
 }
 
 // GetCurrentMode gets the current mode with application-compatible mappings
 // For CGO implementation, this is the same as GetMode
-func (e *CGOEngine) GetCurrentMode() int {
+func (e *CGOEngineWrapper) GetCurrentMode() int {
 	return cvim.GetMode()
 }
 
 // VisualGetRange gets the visual selection range
-func (e *CGOEngine) VisualGetRange() [2][2]int {
+func (e *CGOEngineWrapper) VisualGetRange() [2][2]int {
 	return cvim.VisualGetRange()
 }
 
 // VisualGetType gets the visual mode type
-func (e *CGOEngine) VisualGetType() int {
+func (e *CGOEngineWrapper) VisualGetType() int {
 	return cvim.VisualGetType()
 }
 
 // Eval evaluates a vim expression
-func (e *CGOEngine) Eval(expr string) string {
+func (e *CGOEngineWrapper) Eval(expr string) string {
 	return cvim.Eval(expr)
 }
 
 // SearchGetMatchingPair finds matching brackets
-func (e *CGOEngine) SearchGetMatchingPair() [2]int {
+func (e *CGOEngineWrapper) SearchGetMatchingPair() [2]int {
 	return cvim.SearchGetMatchingPair()
 }
 
@@ -221,111 +218,110 @@ func (b *CGOBufferWrapper) SetLines(start, end int, lines []string) {
 	cvim.CBufferSetLines(b.buf, start, end, lines, len(lines))
 }
 
-// GoEngine implements the Go-based vim engine
-type GoEngine struct {
+// GoEngineWrapper wraps the Go-based vim engine in package govim
+// GoEngineWrapper satisfies the VimEngine interface
+type GoEngineWrapper struct {
 	// Add debug logger
 	debugLog *log.Logger
 	engine   govim.Engine
 }
 
 // Init initializes the vim engine
-func (e *GoEngine) Init(argc int) {
+func (e *GoEngineWrapper) Init(argc int) {
 	e.engine.Init(argc)
 }
 
 // BufferOpen opens a file and returns a buffer
-func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
+func (e *GoEngineWrapper) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
 	//buf := govim.BufferOpen(filename, lnum, flags)
 	buf := e.engine.BufferOpen(filename, lnum, flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferNew creates a new empty buffer
-func (e *GoEngine) BufferNew(flags int) interfaces.VimBuffer {
+func (e *GoEngineWrapper) BufferNew(flags int) interfaces.VimBuffer {
 	buf := e.engine.BufferNew(flags)
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferGetCurrent gets the current buffer
-func (e *GoEngine) BufferGetCurrent() interfaces.VimBuffer {
+func (e *GoEngineWrapper) BufferGetCurrent() interfaces.VimBuffer {
 	buf := e.engine.BufferGetCurrent()
 	return &GoBufferWrapper{buf: buf}
 }
 
 // BufferSetCurrent sets the current buffer
-func (e *GoEngine) BufferSetCurrent(buf interfaces.VimBuffer) {
+func (e *GoEngineWrapper) BufferSetCurrent(buf interfaces.VimBuffer) {
 	if goBuf, ok := buf.(*GoBufferWrapper); ok {
 		e.engine.BufferSetCurrent(goBuf.buf)
 	}
 }
 
 // CursorGetLine gets the current cursor line
-func (e *GoEngine) CursorGetLine() int {
+func (e *GoEngineWrapper) CursorGetLine() int {
 	return e.engine.CursorGetLine()
 }
 
 // CursorGetPosition gets the cursor position
-func (e *GoEngine) CursorGetPosition() [2]int {
+func (e *GoEngineWrapper) CursorGetPosition() [2]int {
 	return e.engine.CursorGetPosition()
 }
 
 // CursorSetPosition sets the cursor position
-func (e *GoEngine) CursorSetPosition(row, col int) {
+func (e *GoEngineWrapper) CursorSetPosition(row, col int) {
 	e.engine.CursorSetPosition(row, col)
 }
 
 // Input sends input to vim
-func (e *GoEngine) Input(s string) {
+func (e *GoEngineWrapper) Input(s string) {
 	e.engine.Input(s)
 }
 
 // Input2 sends multiple character input
-func (e *GoEngine) Input2(s string) {
+func (e *GoEngineWrapper) Input2(s string) {
 	for _, x := range s {
 		e.engine.Input(string(x))
 	}
 }
 
 // Key sends special key input
-func (e *GoEngine) Key(s string) {
+func (e *GoEngineWrapper) Key(s string) {
 	e.engine.Key(s)
 }
 
 // Execute runs an ex command
-func (e *GoEngine) Execute(s string) {
+func (e *GoEngineWrapper) Execute(s string) {
 	e.engine.Execute(s)
 }
 
 // GetMode gets the current mode
-func (e *GoEngine) GetMode() int {
+func (e *GoEngineWrapper) GetMode() int {
 	mode := e.engine.GetMode()
-	// Add optional debug logging to see if mode is being correctly passed
-	fmt.Fprintf(os.Stderr, "GoEngine GetMode: govim.GetMode returned %d\n", mode)
 	return mode
 }
 
 // GetCurrentMode gets the current mode with application-compatible mappings
-func (e *GoEngine) GetCurrentMode() int {
+func (e *GoEngineWrapper) GetCurrentMode() int {
 	return e.engine.GetMode()
 }
 
 // VisualGetRange gets the visual selection range
-func (e *GoEngine) VisualGetRange() [2][2]int {
+func (e *GoEngineWrapper) VisualGetRange() [2][2]int {
 	return e.engine.VisualGetRange()
 }
 
 // VisualGetType gets the visual mode type
-func (e *GoEngine) VisualGetType() int {
+func (e *GoEngineWrapper) VisualGetType() int {
 	return e.engine.VisualGetType()
 }
 
 // Eval evaluates a vim expression
-func (e *GoEngine) Eval(expr string) string {
+func (e *GoEngineWrapper) Eval(expr string) string {
 	return e.engine.Eval(expr)
 }
 
 // SearchGetMatchingPair finds matching brackets
-func (e *GoEngine) SearchGetMatchingPair() [2]int {
+func (e *GoEngineWrapper) SearchGetMatchingPair() [2]int {
 	return e.engine.SearchGetMatchingPair()
 }
 
@@ -421,43 +417,4 @@ func (b *GoBufferWrapper) SetLines(start, end int, lines []string) {
 
 	// Update the buffer
 	b.buf.SetLines(start, end, safeLines)
-}
-
-// API Functions (to be used by the application)
-
-// SwitchToGoImplementation switches to the Go implementation
-func SwitchToGoImplementation() {
-	// Set up logging for the Go implementation
-	logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		// Log to stderr instead of stdout to avoid affecting the UI
-		fmt.Fprintf(os.Stderr, "Failed to open govim log file: %v\n", err)
-	}
-
-	ActiveImplementation = ImplGo
-	goImpl := &GoImplementation{}
-
-	// Initialize the logger if file was opened successfully
-	if err == nil {
-		goImpl.logger = log.New(logFile, "GoVim: ", log.Ltime|log.Lshortfile)
-		goImpl.logger.Println("Go implementation activated")
-	}
-
-	activeImpl = goImpl
-}
-
-// SwitchToCImplementation switches to the C implementation
-func SwitchToCImplementation() {
-	ActiveImplementation = ImplC
-	activeImpl = &CGOImplementation{}
-}
-
-// GetActiveImplementation returns the name of the active implementation
-func GetActiveImplementation() string {
-	return activeImpl.GetName()
-}
-
-// GetEngine gets the current engine implementation
-func GetEngine() interfaces.VimEngine {
-	return activeImpl.GetEngine()
 }
