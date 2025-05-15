@@ -17,6 +17,7 @@ const (
 // VimImplementation allows switching between C and Go implementations
 type VimImplementation interface {
 	GetEngineWrapper() interfaces.VimEngine
+	//GetBufferWrapper() interfaces.VimBuffer
 	GetName() string
 }
 
@@ -53,6 +54,13 @@ func (g *GoImplementation) GetEngineWrapper() interfaces.VimEngine {
 	}
 
 	return engine
+}
+
+// does nothing to set buf to nil
+func (g *GoImplementation) GetBufferWrapper() interfaces.VimBuffer {
+	return &GoBufferWrapper{
+		buf: &govim.GoBuffer{}, // This is the Go vim buffer from package govim
+	}
 }
 
 // GetName returns the implementation name
@@ -223,7 +231,7 @@ func (b *CGOBufferWrapper) SetLines(start, end int, lines []string) {
 type GoEngineWrapper struct {
 	// Add debug logger
 	debugLog *log.Logger
-	engine   govim.Engine
+	engine   *govim.GoEngine
 }
 
 // Init initializes the vim engine
@@ -327,7 +335,8 @@ func (e *GoEngineWrapper) SearchGetMatchingPair() [2]int {
 
 // GoBufferWrapper wraps a Go buffer
 type GoBufferWrapper struct {
-	buf govim.Buffer
+	//buf interfaces.VimBuffer
+	buf *govim.GoBuffer
 }
 
 // GetID gets the buffer ID
@@ -361,11 +370,14 @@ func (b *GoBufferWrapper) GetLineCount() int {
 func (b *GoBufferWrapper) Lines() []string {
 	// Create a completely fresh copy of the lines to prevent unexpected sharing
 	lines := b.buf.Lines()
-	result := make([]string, len(lines))
-	for i, line := range lines {
-		result[i] = line
-	}
-	return result
+	/*
+		result := make([]string, len(lines))
+		for i, line := range lines {
+			result[i] = line
+		}
+		return result
+	*/
+	return lines
 }
 
 // LinesB gets all lines as bytes from the buffer

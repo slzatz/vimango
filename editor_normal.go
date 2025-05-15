@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/slzatz/vimango/hunspell"
@@ -177,7 +178,12 @@ func (e *Editor) moveLeft(_ int) {
 		ae := eds[index-1]
 		vim.SetCurrentBuffer(ae.vbuf)
 		ae.mode = NORMAL
-		e.Session.activeEditor = ae
+		ae.command = ""
+		ae.ss = ae.vbuf.Lines()
+		app.Session.activeEditor = ae
+		pos := vim.GetCursorPosition() //set screen cx and cy from pos
+		ae.fr = pos[0] - 1
+		ae.fc = utf8.RuneCountInString(ae.ss[ae.fr][:pos[1]])
 		return
 	} else {
 
@@ -208,13 +214,20 @@ func (e *Editor) moveRight(_ int) {
 			break
 		}
 	}
-	e.ShowMessage(BR, "index: %d; length: %d", index, len(eds))
+	pos := vim.GetCursorPosition()
+	e.ShowMessage(BR, "Before move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(eds), pos[0]-1, pos[1])
 
 	if index < len(eds)-1 {
 		ae := eds[index+1]
-		ae.mode = NORMAL
 		vim.SetCurrentBuffer(ae.vbuf)
-		e.Session.activeEditor = ae
+		ae.mode = NORMAL
+		ae.command = ""
+		ae.ss = ae.vbuf.Lines()
+		app.Session.activeEditor = ae
+		pos := vim.GetCursorPosition() //set screen cx and cy from pos
+		ae.fr = pos[0] - 1
+		ae.fc = utf8.RuneCountInString(ae.ss[ae.fr][:pos[1]])
+		e.ShowMessage(BL, "After move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(eds), ae.fr, ae.fc)
 	}
 
 	return

@@ -75,7 +75,7 @@ func (e *GoEngine) Init(argc int) {
 }
 
 // BufferOpen opens a file and returns a buffer
-func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
+func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) *GoBuffer {
 	buf := &GoBuffer{
 		id:             e.nextBufferId,
 		engine:         e,
@@ -105,7 +105,7 @@ func (e *GoEngine) BufferOpen(filename string, lnum int, flags int) Buffer {
 }
 
 // BufferNew creates a new empty buffer
-func (e *GoEngine) BufferNew(flags int) Buffer {
+func (e *GoEngine) BufferNew(flags int) *GoBuffer {
 	buf := &GoBuffer{
 		id:             e.nextBufferId,
 		engine:         e,
@@ -123,12 +123,54 @@ func (e *GoEngine) BufferNew(flags int) Buffer {
 }
 
 // BufferGetCurrent returns the current buffer
-func (e *GoEngine) BufferGetCurrent() Buffer {
+func (e *GoEngine) BufferGetCurrent() *GoBuffer {
 	return e.currentBuffer
 }
 
+func (e *GoEngine) BufferSetCurrent(buf *GoBuffer) {
+	// Set the new current buffer
+	e.currentBuffer = buf
+
+	// Ensure the buffer has at least one line (empty buffer protection)
+	if len(buf.lines) == 0 {
+		buf.lines = []string{""}
+	}
+	
+	// Ensure each buffer that gets set as current has a completely independent copy of its lines
+	// This prevents any possible reference sharing between buffers
+	independentLines := make([]string, len(buf.lines))
+	for i, line := range buf.lines {
+		independentLines[i] = string(line) // Force a new string allocation
+	}
+	buf.lines = independentLines
+	
+	// Validate the cursor position to ensure it's valid for the current buffer content
+	e.validateCursorPosition()
+
+	// Reset buffer-specific state
+	e.commandCount = 0
+	e.buildingCount = false
+	e.awaitingMotion = false
+	e.currentCommand = ""
+	e.mode = ModeNormal // Always reset to normal mode
+
+	// Reset visual mode state
+	e.visualStart = [2]int{1, 0}
+	e.visualEnd = [2]int{1, 0}
+
+	// Reset search state
+	e.searching = false
+	e.searchBuffer = ""
+	e.searchResults = nil
+	e.currentSearchIdx = -1
+
+	// Reset undo state
+	e.inInsertUndoGroup = false
+}
+
+/*
 // BufferSetCurrent sets the current buffer
-func (e *GoEngine) BufferSetCurrent(buf Buffer) {
+func (e *GoEngine) BufferSetCurrent_(buf *GoBuffer) {
 	if goBuf, ok := buf.(*GoBuffer); ok {
 		// Save the old buffer reference to check if we're changing buffers
 		oldBuffer := e.currentBuffer
@@ -186,6 +228,7 @@ func (e *GoEngine) BufferSetCurrent(buf Buffer) {
 		}
 	}
 }
+*/
 
 // CursorGetLine returns the current cursor line
 func (e *GoEngine) CursorGetLine() int {
