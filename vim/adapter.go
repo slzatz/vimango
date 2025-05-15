@@ -100,9 +100,13 @@ func (e *CGOEngineWrapper) BufferGetCurrent() interfaces.VimBuffer {
 
 // BufferSetCurrent sets the current buffer
 func (e *CGOEngineWrapper) BufferSetCurrent(buf interfaces.VimBuffer) {
-	if cgoBuf, ok := buf.(*CGOBufferWrapper); ok {
-		cvim.CBufferSetCurrent(cgoBuf.buf)
-	}
+	/*
+		if cgoBufWrap, ok := buf.(*CGOBufferWrapper); ok {
+			cvim.CBufferSetCurrent(cgoBufWrap.buf)
+		}
+	*/
+	// doesn't need if statement to check if buf is a CGOBufferWrapper
+	cvim.CBufferSetCurrent(buf.(*CGOBufferWrapper).buf)
 }
 
 // CursorGetLine gets the current cursor line
@@ -241,7 +245,6 @@ func (e *GoEngineWrapper) Init(argc int) {
 
 // BufferOpen opens a file and returns a buffer
 func (e *GoEngineWrapper) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
-	//buf := govim.BufferOpen(filename, lnum, flags)
 	buf := e.engine.BufferOpen(filename, lnum, flags)
 	return &GoBufferWrapper{buf: buf}
 }
@@ -260,9 +263,15 @@ func (e *GoEngineWrapper) BufferGetCurrent() interfaces.VimBuffer {
 
 // BufferSetCurrent sets the current buffer
 func (e *GoEngineWrapper) BufferSetCurrent(buf interfaces.VimBuffer) {
-	if goBuf, ok := buf.(*GoBufferWrapper); ok {
-		e.engine.BufferSetCurrent(goBuf.buf)
-	}
+	// really could just do buf.(*GoBufferWrapper).buf
+	// govim.engine.BufferSetCurrent is expecting a *GoBuffer
+	/*
+		if goBufWrap, ok := buf.(*GoBufferWrapper); ok {
+			e.engine.BufferSetCurrent(goBufWrap.buf)
+		}
+	*/
+	// doesn't need if statement to check if buf is a GoBufferWrapper
+	e.engine.BufferSetCurrent(buf.(*GoBufferWrapper).buf)
 }
 
 // CursorGetLine gets the current cursor line
@@ -333,9 +342,9 @@ func (e *GoEngineWrapper) SearchGetMatchingPair() [2]int {
 	return e.engine.SearchGetMatchingPair()
 }
 
-// GoBufferWrapper wraps a Go buffer
+// GoBufferWrapper wraps an instance of govim.GoBuffer
+// GoBufferWrapper satisfies the VimBuffer interface
 type GoBufferWrapper struct {
-	//buf interfaces.VimBuffer
 	buf *govim.GoBuffer
 }
 

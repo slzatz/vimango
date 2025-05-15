@@ -12,9 +12,8 @@ import (
 // This file provides an API layer for the application to interact with vim
 // regardless of whether the C or Go implementation is being used.
 
-// Engine is the active engine instance
-// The CGOEngineWrapper and the GoEngineWrapper are the two implementations
-// the Engine Wrappers need to satisfy the VimEngine interface
+// Engine is the active engine wrapper of the C or Go implementation:
+// either  CGOEngineWrapper or  GoEngineWrapper, which satisfy the VimEngine interface
 var Engine interfaces.VimEngine
 
 // InitializeVim sets up the vim engine with the selected implementation
@@ -81,19 +80,20 @@ func Init(argc int) {
 	}
 }
 
-// API Functions - These wrap the engine calls
+// API Functions - These functions are called by package main as vim.OpenBuffer (..) for example
 
-// OpenBuffer opens a file and returns a buffer
+// OpenBuffer opens a file and returns a buffer - not currently in use
 func OpenBuffer(filename string, lnum int, flags int) interfaces.VimBuffer {
 	return Engine.BufferOpen(filename, lnum, flags)
 }
 
 // NewBuffer creates a new empty buffer
 // Returns VimBuffer for the new adapter API but can be used with old code too
-func NewBuffer(flags int) (result interfaces.VimBuffer) {
+func NewBuffer(flags int) interfaces.VimBuffer {
 	return Engine.BufferNew(flags)
 }
 
+/*
 // For backward compatibility with existing code
 func BufferNew(flags int) cvim.Buffer {
 	b := Engine.BufferNew(flags)
@@ -103,6 +103,7 @@ func BufferNew(flags int) cvim.Buffer {
 	// Fallback for non-CGO implementation - this may cause issues
 	return nil
 }
+*/
 
 // GetCurrentBuffer gets the current buffer
 func GetCurrentBuffer() interfaces.VimBuffer {

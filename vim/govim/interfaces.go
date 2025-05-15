@@ -1,6 +1,6 @@
 //go:build ignore
 
-package govima
+package govim
 
 // Buffer interface mirrors the buf_T functionality from C
 type Buffer interface {
