@@ -351,13 +351,15 @@ func (e *Editor) showMarkdownPreview(_ int) {
 	if len(e.ss) == 0 {
 		return
 	}
-	note := e.generateWWStringFromBuffer2()
+	//note := e.generateWWStringFromBuffer2()
+	note := strings.Join(e.vbuf.Lines(), "\n")
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)
-	note = WordWrap(note, e.Screen.totaleditorcols)
+	//note = WordWrap(note, e.Screen.totaleditorcols)
+	note = WordWrap(note, e.screencols)
 	note = strings.TrimSpace(note)
 	e.renderedNote = note
 	e.mode = PREVIEW

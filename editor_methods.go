@@ -7,7 +7,8 @@ import (
 	"image"
 	"os"
 	"strings"
-//	"time"
+
+	//	"time"
 	"unicode/utf8"
 
 	"github.com/slzatz/vimango/hunspell"
@@ -415,7 +416,7 @@ func (e *Editor) drawPlainRows(pab *strings.Builder) {
 }
 
 func (e *Editor) drawCodeRows(pab *strings.Builder) {
-	note := e.generateWWStringFromBuffer()
+	//note := e.generateWWStringFromBuffer()
 	var lang string
 	if e.Database.taskFolder(e.id) == "code" {
 		c := e.Database.taskContext(e.id)
@@ -427,17 +428,16 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 		lang = "markdown"
 	}
 
-	//note := e.generateWWStringFromBuffer()
-
+	note := e.generateWWStringFromBuffer()
 	var buf bytes.Buffer
 	if lang == "markdown" {
-	  _ = Highlight2(&buf, note, lang, "terminal16m", e.Session.markdown_style)
+		_ = Highlight2(&buf, note, lang, "terminal16m", e.Session.markdown_style)
 	} else {
-	  _ = Highlight(&buf, note, lang, "terminal16m", e.Session.style[e.Session.styleIndex])
+		_ = Highlight(&buf, note, lang, "terminal16m", e.Session.style[e.Session.styleIndex])
 	}
 	note = buf.String()
-
 	nnote := strings.Split(note, "\n")
+
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
 	fmt.Fprintf(pab, "\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
 
@@ -522,9 +522,9 @@ func (e *Editor) drawHighlights(pab *strings.Builder) {
 * simplified version of generateWWStringFromBuffer
 * used by editor.showMarkdown and editor.spellCheck in editor_normal
 * we know we want the whole buffer not just what is visible
-* unlike the situation with syntax highlighting for code
+* unlike the situation with syntax highlighting for code and markdown
 * we don't have to handle word-wrapped lines in a special way
- */
+* had been in use in showMarkdownPreview in editor_normal.go
 func (e *Editor) generateWWStringFromBuffer2() string {
 	numRows := len(e.ss)
 	if numRows == 0 {
@@ -590,6 +590,7 @@ func (e *Editor) generateWWStringFromBuffer2() string {
 		}
 	}
 }
+*/
 
 /* below exists to create a string that has the proper
  * line breaks based on screen width for syntax highlighting
@@ -666,7 +667,7 @@ func (e *Editor) drawStatusBar() {
 	fmt.Fprintf(&ab, "\x1b[%dX", e.screencols)
 
 	ab.WriteString("\x1b[7m ") //switches to inverted colors
-  title := e.title
+	title := e.title
 	if len(title) > 30 {
 		title = title[:30]
 	}
