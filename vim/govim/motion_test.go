@@ -21,8 +21,8 @@ func TestBasicMotions(t *testing.T) {
 	engine.buffers[buf.id] = buf
 	
 	// Set initial cursor position
-	engine.cursorRow = 2
-	engine.cursorCol = 5
+	engine.currentBuffer.cursorRow = 2
+	engine.currentBuffer.cursorCol = 5
 	
 	// Test cases for basic motions
 	tests := []struct {
@@ -47,11 +47,13 @@ func TestBasicMotions(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// Reset cursor for each test
-			engine.cursorRow = 2
-			engine.cursorCol = 5
+			engine.currentBuffer.cursorRow = 2
+			engine.currentBuffer.cursorCol = 5
 			
 			// Execute the motion
 			engine.Input(tc.input)
+				// Debug printout
+				t.Logf("After input %s, buffer cursor at [%d,%d]", tc.input, engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol);
 			
 			// Check the result
 			pos := engine.CursorGetPosition()
@@ -80,8 +82,8 @@ func TestCombinedMotions(t *testing.T) {
 	engine.buffers[buf.id] = buf
 	
 	// Start at the beginning
-	engine.cursorRow = 1
-	engine.cursorCol = 0
+	engine.currentBuffer.cursorRow = 1
+	engine.currentBuffer.cursorCol = 0
 	
 	// Test a sequence of movements
 	movements := []struct {
@@ -145,17 +147,17 @@ func TestModeTransitions(t *testing.T) {
 	
 	// Check visual range start
 	start := engine.visualStart
-	if start[0] != engine.cursorRow || start[1] != engine.cursorCol {
+	if start[0] != engine.currentBuffer.cursorRow || start[1] != engine.currentBuffer.cursorCol {
 		t.Errorf("Visual start position incorrect, got [%d,%d], expected [%d,%d]",
-			start[0], start[1], engine.cursorRow, engine.cursorCol)
+			start[0], start[1], engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 	}
 	
 	// Move right in visual mode
 	engine.Input("l")
 	end := engine.visualEnd
-	if end[0] != engine.cursorRow || end[1] != engine.cursorCol {
+	if end[0] != engine.currentBuffer.cursorRow || end[1] != engine.currentBuffer.cursorCol {
 		t.Errorf("Visual end position incorrect, got [%d,%d], expected [%d,%d]",
-			end[0], end[1], engine.cursorRow, engine.cursorCol)
+			end[0], end[1], engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 	}
 	
 	// Exit visual mode

@@ -41,6 +41,18 @@ func (e *GoEngine) exitVisualMode() {
 	// (where we were when we entered visual mode)
 	e.currentBuffer.cursorRow = e.visualStart[0]
 	e.currentBuffer.cursorCol = e.visualStart[1]
+	
+	// For line-wise visual mode, if we're at the start of a line, move to first non-blank character
+	if e.visualType == 1 && e.currentBuffer.cursorCol == 0 {
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		for i := 0; i < len(line); i++ {
+			if line[i] != ' ' && line[i] != '\t' {
+				e.currentBuffer.cursorCol = i
+				break
+			}
+		}
+	}
+	
 	e.mode = ModeNormal
 }
 
@@ -200,9 +212,11 @@ func (e *GoEngine) Input(s string) {
 		}
 
 		// First check for numeric prefix
-		if isDigit(s) && (e.buildingCount || s != "0" || e.currentCommand == "") {
-			// Only allow 0 as first digit if we're not already building a count
-			// or if we have a current command (for commands that take 0 as first digit)
+		if isDigit(s) && (e.buildingCount || s != "0" || e.currentCommand != "") {
+			// Treat digits as part of a count if any of these are true:
+			// 1. We're already building a count (e.buildingCount is true)
+			// 2. The digit is not "0" (so "0" alone is a motion command, not a count)
+			// 3. We have a current command (so "0" can be used in commands like "d0")
 			digit := int(s[0] - '0')
 
 			if e.buildingCount {
@@ -343,6 +357,7 @@ func (e *GoEngine) Input(s string) {
 					// Special case for "yy" - yank entire line
 					line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
 					e.yankRegister = line + "\n"
+					e.yankRegisterType = 1 // Mark as line-wise yank
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
@@ -367,6 +382,9 @@ func (e *GoEngine) Input(s string) {
 			return
 		case "v": // character-wise visual mode
 			e.enterVisualMode(0) // 0 for character-wise visual mode
+			return
+		case "V": // line-wise visual mode
+			e.enterVisualMode(1) // 1 for line-wise visual mode
 			return
 		case "a": // append (insert after cursor)
 			if e.currentBuffer != nil {
@@ -570,18 +588,46 @@ func (e *GoEngine) Input(s string) {
 			return
 		}
 
-		// Handle paste with p
+		// Handle new line commands
+// Handle paste with p
 		if s == "p" && e.currentBuffer != nil && e.yankRegister != "" {
 			// Paste after cursor position
 			line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
 
-			// If the yanked content contains a newline, it's a line paste
-			if strings.Contains(e.yankRegister, "\n") {
-				// Line paste - insert after current line
-				lines := strings.Split(e.yankRegister, "\n")
+			// Handle differently based on the type of yanked content
+			if e.yankRegisterType == 1 || (e.yankRegisterType == 0 && strings.Contains(e.yankRegister, "\n")) {
+				// Line-wise paste - insert after current line
+				
+				// Split the content by newlines and filter out any empty trailing element
+				parts := strings.Split(e.yankRegister, "\n")
+				
+				// The last element will be empty if the string ends with a newline
+				// which it does with line-wise yanks
+				lines := make([]string, 0, len(parts))
+				for _, part := range parts {
+					if part != "" || len(lines) == 0 {
+						lines = append(lines, part)
+					}
+				}
+				
+				// Insert the lines after current line
 				e.currentBuffer.SetLines(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow, lines)
-				e.currentBuffer.cursorRow += len(lines)
+				
+				// Move cursor to the first non-whitespace character of the first pasted line
+				e.currentBuffer.cursorRow++
 				e.currentBuffer.cursorCol = 0
+				
+				// If no lines were actually added, don't adjust the cursor
+				if len(lines) > 0 {
+					// Move to first non-blank character in the line
+					line = e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+					for i := 0; i < len(line); i++ {
+						if line[i] != ' ' && line[i] != '\t' {
+							e.currentBuffer.cursorCol = i
+							break
+						}
+					}
+				}
 			} else {
 				// Character paste - insert after current position
 				newLine := ""
@@ -1470,6 +1516,21 @@ func (e *GoEngine) getNormalizedVisualSelection() (startRow, startCol, endRow, e
 		startCol, endCol = endCol, startCol
 	}
 
+	// For line-wise visual mode (type 1), select entire lines
+	if e.visualType == 1 {
+		// Select from beginning to end of lines
+		startCol = 0
+		
+		// Go to the end of the last line
+		if endRow <= e.currentBuffer.GetLineCount() {
+			line := e.currentBuffer.GetLine(endRow)
+			endCol = len(line)
+		}
+		
+		return startRow, startCol, endRow, endCol
+	}
+
+	// For character-wise visual mode (type 0)
 	// Add 1 to endCol to make the selection inclusive
 	// This matches Vim behavior where the character under the cursor is included
 	if endRow <= e.currentBuffer.GetLineCount() {
@@ -1491,40 +1552,57 @@ func (e *GoEngine) yankVisualSelection() {
 	// Get normalized selection bounds (start before end)
 	startRow, startCol, endRow, endCol := e.getNormalizedVisualSelection()
 
-	// Yank the selected text
-	if startRow == endRow {
-		// Single line selection
-		line := e.currentBuffer.GetLine(startRow)
-		if startCol < len(line) && endCol <= len(line) {
-			e.yankRegister = line[startCol:endCol]
-		}
-	} else {
-		// Multi-line selection
+	// Handle differently based on visual mode type
+	if e.visualType == 1 {
+		// Line-wise visual mode: yank entire lines with newlines
 		var content strings.Builder
 
-		// First line (partial)
-		line := e.currentBuffer.GetLine(startRow)
-		if startCol < len(line) {
-			content.WriteString(line[startCol:])
-			content.WriteString("\n")
-		}
-
-		// Middle lines (complete)
-		for row := startRow + 1; row < endRow; row++ {
+		// Include all lines from startRow to endRow
+		for row := startRow; row <= endRow; row++ {
 			line := e.currentBuffer.GetLine(row)
 			content.WriteString(line)
-			content.WriteString("\n")
+			content.WriteString("\n") // Add newline after each line
 		}
 
-		// Last line (partial)
-		if endRow <= e.currentBuffer.GetLineCount() {
-			line = e.currentBuffer.GetLine(endRow)
-			if endCol <= len(line) {
-				content.WriteString(line[:endCol])
-			}
-		}
-
+		// Store yanked content and mark it as line-wise
 		e.yankRegister = content.String()
+		e.yankRegisterType = 1 // 1 for line-wise yank
+	} else {
+		// Character-wise visual mode
+		if startRow == endRow {
+			// Single line selection
+			line := e.currentBuffer.GetLine(startRow)
+			if startCol < len(line) && endCol <= len(line) {
+				e.yankRegister = line[startCol:endCol]
+			}
+		} else {
+			// Multi-line selection
+			var content strings.Builder
+
+			// First line (partial)
+			line := e.currentBuffer.GetLine(startRow)
+			if startCol < len(line) {
+				content.WriteString(line[startCol:])
+				content.WriteString("\n")
+			}
+
+			// Middle lines (complete)
+			for row := startRow + 1; row < endRow; row++ {
+				line := e.currentBuffer.GetLine(row)
+				content.WriteString(line)
+				content.WriteString("\n")
+			}
+
+			// Last line (partial)
+			if endRow <= e.currentBuffer.GetLineCount() {
+				line = e.currentBuffer.GetLine(endRow)
+				if endCol <= len(line) {
+					content.WriteString(line[:endCol])
+				}
+			}
+
+			e.yankRegister = content.String()
+		}
 	}
 
 	// Reset cursor to the start of the selection
@@ -1545,44 +1623,103 @@ func (e *GoEngine) deleteVisualSelection() {
 	// Yank before deleting
 	e.yankVisualSelection()
 
-	// Perform the deletion
-	if startRow == endRow {
-		// Single line selection
-		line := e.currentBuffer.GetLine(startRow)
-		if startCol < len(line) {
-			// Create new line with deletion
-			newLine := ""
-			if startCol > 0 {
-				newLine = line[:startCol]
+	// Handle differently based on visual mode type
+	if e.visualType == 1 {
+		// Line-wise visual mode: delete entire lines
+		
+		// Remove all lines from startRow to endRow
+		// If we're removing all lines, leave an empty line
+		if startRow == 1 && endRow == e.currentBuffer.GetLineCount() {
+			// Deleting all lines, leave one empty line
+			e.currentBuffer.SetLines(0, endRow, []string{""})
+			e.currentBuffer.cursorRow = 1
+			e.currentBuffer.cursorCol = 0
+		} else {
+			// Create a new set of lines without the selected range
+			lineCount := e.currentBuffer.GetLineCount()
+			newLines := make([]string, 0, lineCount-(endRow-startRow+1))
+			
+			// Add lines before selection
+			for i := 1; i < startRow; i++ {
+				newLines = append(newLines, e.currentBuffer.GetLine(i))
 			}
-			if endCol < len(line) {
-				newLine += line[endCol:]
+			
+			// Add lines after selection
+			for i := endRow + 1; i <= lineCount; i++ {
+				newLines = append(newLines, e.currentBuffer.GetLine(i))
 			}
-			e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+			
+			// If we removed all lines, ensure at least an empty line remains
+			if len(newLines) == 0 {
+				newLines = []string{""}
+			}
+			
+			// Replace buffer content
+			e.currentBuffer.SetLines(0, lineCount, newLines)
+			
+			// Move cursor to line after the deletion (or the last line if we deleted at the end)
+			if startRow <= len(newLines) {
+				e.currentBuffer.cursorRow = startRow
+			} else if len(newLines) > 0 {
+				e.currentBuffer.cursorRow = len(newLines)
+			} else {
+				e.currentBuffer.cursorRow = 1
+			}
+			
+			// Move to first non-whitespace character on the line
+			line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+			e.currentBuffer.cursorCol = 0
+			for i := 0; i < len(line); i++ {
+				if line[i] != ' ' && line[i] != '\t' {
+					e.currentBuffer.cursorCol = i
+					break
+				}
+			}
 		}
 	} else {
-		// Multi-line selection
-		var newLine string
+		// Character-wise visual mode
+		if startRow == endRow {
+			// Single line selection
+			line := e.currentBuffer.GetLine(startRow)
+			if startCol < len(line) {
+				// Create new line with deletion
+				newLine := ""
+				if startCol > 0 {
+					newLine = line[:startCol]
+				}
+				if endCol < len(line) {
+					newLine += line[endCol:]
+				}
+				e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+			}
+			
+			// Reset cursor to the start of the selection
+			e.currentBuffer.cursorRow = startRow
+			e.currentBuffer.cursorCol = startCol
+		} else {
+			// Multi-line selection
+			var newLine string
 
-		// Combine the first line's prefix with the last line's suffix
-		firstLine := e.currentBuffer.GetLine(startRow)
-		lastLine := e.currentBuffer.GetLine(endRow)
+			// Combine the first line's prefix with the last line's suffix
+			firstLine := e.currentBuffer.GetLine(startRow)
+			lastLine := e.currentBuffer.GetLine(endRow)
 
-		if startCol < len(firstLine) {
-			newLine = firstLine[:startCol]
+			if startCol < len(firstLine) {
+				newLine = firstLine[:startCol]
+			}
+
+			if endCol < len(lastLine) {
+				newLine += lastLine[endCol:]
+			}
+
+			// Replace all the selected lines with the new combined line
+			e.currentBuffer.SetLines(startRow-1, endRow, []string{newLine})
+			
+			// Reset cursor to the start of the selection
+			e.currentBuffer.cursorRow = startRow
+			e.currentBuffer.cursorCol = startCol
 		}
-
-		if endCol < len(lastLine) {
-			newLine += lastLine[endCol:]
-		}
-
-		// Replace all the selected lines with the new combined line
-		e.currentBuffer.SetLines(startRow-1, endRow, []string{newLine})
 	}
-
-	// Reset cursor to the start of the selection
-	e.currentBuffer.cursorRow = startRow
-	e.currentBuffer.cursorCol = startCol
 }
 
 // changeCaseVisualSelection changes the case of characters in the visual selection
@@ -1610,93 +1747,112 @@ func (e *GoEngine) changeCaseVisualSelection() {
 		return char
 	}
 
-	// Perform the case change
-	if startRow == endRow {
-		// Single line selection
-		line := e.currentBuffer.GetLine(startRow)
+	// Handle based on visual mode type
+	if e.visualType == 1 {
+		// Line-wise visual mode: change case of entire lines
+		for row := startRow; row <= endRow; row++ {
+			line := e.currentBuffer.GetLine(row)
+			if len(line) > 0 {
+				newLine := ""
 
-		// Ensure indices are valid
-		if startCol >= len(line) {
-			startCol = len(line) - 1
-			if startCol < 0 {
-				startCol = 0
+				// Toggle case for all characters in the line
+				for i := 0; i < len(line); i++ {
+					newLine += string(toggleCase(line[i]))
+				}
+
+				// Update the line
+				e.currentBuffer.SetLines(row-1, row, []string{newLine})
 			}
 		}
-		if endCol > len(line) {
-			endCol = len(line)
-		}
-
-		// Create new line with case changes
-		newLine := ""
-		if startCol > 0 {
-			newLine = line[:startCol]
-		}
-
-		// Toggle case of selected characters
-		for i := startCol; i < endCol && i < len(line); i++ {
-			newLine += string(toggleCase(line[i]))
-		}
-
-		// Add remainder of line
-		if endCol < len(line) {
-			newLine += line[endCol:]
-		}
-
-		// Update the buffer
-		e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
 	} else {
-		// Multi-line selection
-		// Handle first line
-		line := e.currentBuffer.GetLine(startRow)
-		if startCol < len(line) {
+		// Character-wise visual mode
+		if startRow == endRow {
+			// Single line selection
+			line := e.currentBuffer.GetLine(startRow)
+
+			// Ensure indices are valid
+			if startCol >= len(line) {
+				startCol = len(line) - 1
+				if startCol < 0 {
+					startCol = 0
+				}
+			}
+			if endCol > len(line) {
+				endCol = len(line)
+			}
+
+			// Create new line with case changes
 			newLine := ""
 			if startCol > 0 {
 				newLine = line[:startCol]
 			}
 
-			// Toggle case for remaining characters on first line
-			for i := startCol; i < len(line); i++ {
+			// Toggle case of selected characters
+			for i := startCol; i < endCol && i < len(line); i++ {
 				newLine += string(toggleCase(line[i]))
 			}
 
-			// Update the first line
-			e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
-		}
-
-		// Handle middle lines (complete lines)
-		for row := startRow + 1; row < endRow; row++ {
-			line := e.currentBuffer.GetLine(row)
-			if len(line) > 0 {
-				newLine := ""
-
-				// Toggle case for all characters
-				for i := 0; i < len(line); i++ {
-					newLine += string(toggleCase(line[i]))
-				}
-
-				// Update the middle line
-				e.currentBuffer.SetLines(row-1, row, []string{newLine})
+			// Add remainder of line
+			if endCol < len(line) {
+				newLine += line[endCol:]
 			}
-		}
 
-		// Handle last line
-		if endRow <= e.currentBuffer.GetLineCount() {
-			line := e.currentBuffer.GetLine(endRow)
-			if endCol > 0 && endCol <= len(line) {
+			// Update the buffer
+			e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+		} else {
+			// Multi-line selection
+			// Handle first line
+			line := e.currentBuffer.GetLine(startRow)
+			if startCol < len(line) {
 				newLine := ""
+				if startCol > 0 {
+					newLine = line[:startCol]
+				}
 
-				// Toggle case for selected characters on last line
-				for i := 0; i < endCol && i < len(line); i++ {
+				// Toggle case for remaining characters on first line
+				for i := startCol; i < len(line); i++ {
 					newLine += string(toggleCase(line[i]))
 				}
 
-				// Add remainder of line
-				if endCol < len(line) {
-					newLine += line[endCol:]
-				}
+				// Update the first line
+				e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+			}
 
-				// Update the last line
-				e.currentBuffer.SetLines(endRow-1, endRow, []string{newLine})
+			// Handle middle lines (complete lines)
+			for row := startRow + 1; row < endRow; row++ {
+				line := e.currentBuffer.GetLine(row)
+				if len(line) > 0 {
+					newLine := ""
+
+					// Toggle case for all characters
+					for i := 0; i < len(line); i++ {
+						newLine += string(toggleCase(line[i]))
+					}
+
+					// Update the middle line
+					e.currentBuffer.SetLines(row-1, row, []string{newLine})
+				}
+			}
+
+			// Handle last line
+			if endRow <= e.currentBuffer.GetLineCount() {
+				line := e.currentBuffer.GetLine(endRow)
+				if endCol > 0 && endCol <= len(line) {
+					newLine := ""
+
+					// Toggle case for selected characters on last line
+					for i := 0; i < endCol && i < len(line); i++ {
+						newLine += string(toggleCase(line[i]))
+					}
+
+					// Add remainder of line
+					if endCol < len(line) {
+						newLine += line[endCol:]
+					}
+
+					// Update the last line
+					e.currentBuffer.SetLines(endRow-1, endRow, []string{newLine})
+				}
 			}
 		}
 	}

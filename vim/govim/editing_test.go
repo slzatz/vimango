@@ -30,8 +30,8 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Position cursor at start of "line" in first line
-		engine.cursorRow = 1
-		engine.cursorCol = 6
+		engine.currentBuffer.cursorRow = 1
+		engine.currentBuffer.cursorCol = 6
 		
 		// Delete word (dw)
 		engine.Input("d")
@@ -44,8 +44,8 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Check cursor position
-		if engine.cursorCol != 6 {
-			t.Errorf("After dw, cursor column should be 6, got %d", engine.cursorCol)
+		if engine.currentBuffer.cursorCol != 6 {
+			t.Errorf("After dw, cursor column should be 6, got %d", engine.currentBuffer.cursorCol)
 		}
 	})
 	
@@ -59,8 +59,8 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Position cursor in the second line
-		engine.cursorRow = 2
-		engine.cursorCol = 5
+		engine.currentBuffer.cursorRow = 2
+		engine.currentBuffer.cursorCol = 5
 		
 		// Delete line (dd)
 		engine.Input("d")
@@ -72,9 +72,9 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Check cursor position is at the start of the next line
-		if engine.cursorRow != 2 || engine.cursorCol != 0 {
+		if engine.currentBuffer.cursorRow != 2 || engine.currentBuffer.cursorCol != 0 {
 			t.Errorf("After dd, cursor should be at [2,0], got [%d,%d]", 
-				engine.cursorRow, engine.cursorCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 		}
 	})
 	
@@ -88,16 +88,16 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Position cursor at start of "line" in third line
-		engine.cursorRow = 3
-		engine.cursorCol = 6
+		engine.currentBuffer.cursorRow = 3
+		engine.currentBuffer.cursorCol = 6
 		
 		// Yank word (yw)
 		engine.Input("y")
 		engine.Input("w")
 		
 		// Move to end of "Fourth" in fourth line
-		engine.cursorRow = 4
-		engine.cursorCol = 6
+		engine.currentBuffer.cursorRow = 4
+		engine.currentBuffer.cursorCol = 6
 		
 		// Put after cursor (p)
 		engine.Input("p")
@@ -119,8 +119,8 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Position cursor at the start of "line" in first line
-		engine.cursorRow = 1
-		engine.cursorCol = 6
+		engine.currentBuffer.cursorRow = 1
+		engine.currentBuffer.cursorCol = 6
 		
 		// Change word (cw) then add "word"
 		engine.Input("c")
@@ -157,16 +157,16 @@ func TestEditingOperations(t *testing.T) {
 		}
 		
 		// Position cursor at start
-		engine.cursorRow = 1
-		engine.cursorCol = 0
+		engine.currentBuffer.cursorRow = 1
+		engine.currentBuffer.cursorCol = 0
 		
 		// Move down 3 lines with count (3j)
 		engine.Input("3")
 		engine.Input("j")
 		
 		// Check position
-		if engine.cursorRow != 4 {
-			t.Errorf("After 3j, expected to be at row 4, got %d", engine.cursorRow)
+		if engine.currentBuffer.cursorRow != 4 {
+			t.Errorf("After 3j, expected to be at row 4, got %d", engine.currentBuffer.cursorRow)
 		}
 		
 		// Move right 5 characters with count (5l)
@@ -174,8 +174,8 @@ func TestEditingOperations(t *testing.T) {
 		engine.Input("l")
 		
 		// Check position
-		if engine.cursorCol != 5 {
-			t.Errorf("After 5l, expected to be at column 5, got %d", engine.cursorCol)
+		if engine.currentBuffer.cursorCol != 5 {
+			t.Errorf("After 5l, expected to be at column 5, got %d", engine.currentBuffer.cursorCol)
 		}
 	})
 }

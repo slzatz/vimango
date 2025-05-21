@@ -31,6 +31,7 @@ type GoEngine struct {
 	currentCommand  string // Current command (d, c, y) waiting for motion
 	buildingCount   bool   // True when we're in the process of entering a numeric prefix
 	yankRegister    string // Content of the "unnamed" register for yank/put
+	yankRegisterType int    // Type of yanked content: 0=char, 1=line, 2=block
 	awaitingReplace bool   // True when we're waiting for a character to replace (after 'r')
 
 	// Undo state
@@ -56,6 +57,7 @@ func NewEngine() *GoEngine {
 		currentCommand:    "",
 		buildingCount:     false,
 		yankRegister:      "",
+			yankRegisterType:  0, // Default to character-wise,
 		inInsertUndoGroup: false,
 		searchPattern:     "",
 		searchDirection:   1, // Default to forward search

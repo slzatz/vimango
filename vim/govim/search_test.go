@@ -21,8 +21,8 @@ func TestBasicSearch(t *testing.T) {
 	engine.buffers[buf.id] = buf
 	
 	// Start at the beginning
-	engine.cursorRow = 1
-	engine.cursorCol = 0
+	engine.currentBuffer.cursorRow = 1
+	engine.currentBuffer.cursorCol = 0
 	
 	// Test forward search (/)
 	t.Run("Forward search", func(t *testing.T) {
@@ -56,9 +56,9 @@ func TestBasicSearch(t *testing.T) {
 		
 		// Check that the cursor moved to the first match
 		expectedRow, expectedCol := 1, 16
-		if engine.cursorRow != expectedRow || engine.cursorCol != expectedCol {
+		if engine.currentBuffer.cursorRow != expectedRow || engine.currentBuffer.cursorCol != expectedCol {
 			t.Errorf("After search for 'test', cursor at [%d,%d], want [%d,%d]",
-				engine.cursorRow, engine.cursorCol, expectedRow, expectedCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol, expectedRow, expectedCol)
 		}
 		
 		// Check search results
@@ -74,25 +74,25 @@ func TestBasicSearch(t *testing.T) {
 		
 		// Check cursor position
 		expectedRow, expectedCol := 3, 8
-		if engine.cursorRow != expectedRow || engine.cursorCol != expectedCol {
+		if engine.currentBuffer.cursorRow != expectedRow || engine.currentBuffer.cursorCol != expectedCol {
 			t.Errorf("After 'n', cursor at [%d,%d], want [%d,%d]",
-				engine.cursorRow, engine.cursorCol, expectedRow, expectedCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol, expectedRow, expectedCol)
 		}
 		
 		// Go to next match (should wrap around)
 		engine.Input("n")
 		expectedRow, expectedCol = 4, 16
-		if engine.cursorRow != expectedRow || engine.cursorCol != expectedCol {
+		if engine.currentBuffer.cursorRow != expectedRow || engine.currentBuffer.cursorCol != expectedCol {
 			t.Errorf("After second 'n', cursor at [%d,%d], want [%d,%d]",
-				engine.cursorRow, engine.cursorCol, expectedRow, expectedCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol, expectedRow, expectedCol)
 		}
 		
 		// Go to next match (should wrap to first match)
 		engine.Input("n")
 		expectedRow, expectedCol = 1, 16
-		if engine.cursorRow != expectedRow || engine.cursorCol != expectedCol {
+		if engine.currentBuffer.cursorRow != expectedRow || engine.currentBuffer.cursorCol != expectedCol {
 			t.Errorf("After third 'n' (wraparound), cursor at [%d,%d], want [%d,%d]",
-				engine.cursorRow, engine.cursorCol, expectedRow, expectedCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol, expectedRow, expectedCol)
 		}
 	})
 	
@@ -103,9 +103,9 @@ func TestBasicSearch(t *testing.T) {
 		
 		// Check cursor position
 		expectedRow, expectedCol := 4, 16
-		if engine.cursorRow != expectedRow || engine.cursorCol != expectedCol {
+		if engine.currentBuffer.cursorRow != expectedRow || engine.currentBuffer.cursorCol != expectedCol {
 			t.Errorf("After 'N', cursor at [%d,%d], want [%d,%d]",
-				engine.cursorRow, engine.cursorCol, expectedRow, expectedCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol, expectedRow, expectedCol)
 		}
 	})
 }
@@ -127,8 +127,8 @@ func TestBackwardSearch(t *testing.T) {
 	engine.buffers[buf.id] = buf
 	
 	// Start at the end
-	engine.cursorRow = 4
-	engine.cursorCol = 0
+	engine.currentBuffer.cursorRow = 4
+	engine.currentBuffer.cursorCol = 0
 	
 	// Test backward search (?)
 	t.Run("Backward search", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestBackwardSearch(t *testing.T) {
 			// The current position should be at a match
 			matchFound := false
 			for _, match := range engine.searchResults {
-				if match[0] == engine.cursorRow && match[1] == engine.cursorCol {
+				if match[0] == engine.currentBuffer.cursorRow && match[1] == engine.currentBuffer.cursorCol {
 					matchFound = true
 					break
 				}
@@ -178,13 +178,13 @@ func TestBackwardSearch(t *testing.T) {
 			
 			if !matchFound {
 				t.Errorf("After search, cursor [%d,%d] is not at any match position",
-					engine.cursorRow, engine.cursorCol)
+					engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 			}
 		}
 		
 		// Store current position for next tests
-		currentRow := engine.cursorRow
-		currentCol := engine.cursorCol
+		currentRow := engine.currentBuffer.cursorRow
+		currentCol := engine.currentBuffer.cursorCol
 		
 		// Check search results count
 		if len(engine.searchResults) != 4 {
@@ -192,29 +192,29 @@ func TestBackwardSearch(t *testing.T) {
 		}
 		
 		// Reset cursor for next tests
-		engine.cursorRow = currentRow
-		engine.cursorCol = currentCol
+		engine.currentBuffer.cursorRow = currentRow
+		engine.currentBuffer.cursorCol = currentCol
 	})
 	
 	// Test next match (n)
 	t.Run("Next match in search", func(t *testing.T) {
 		// Store current position
-		oldRow := engine.cursorRow
-		oldCol := engine.cursorCol
+		oldRow := engine.currentBuffer.cursorRow
+		oldCol := engine.currentBuffer.cursorCol
 		
 		// Navigate to next match
 		engine.Input("n")
 		
 		// We should move to a different match position
-		if engine.cursorRow == oldRow && engine.cursorCol == oldCol {
+		if engine.currentBuffer.cursorRow == oldRow && engine.currentBuffer.cursorCol == oldCol {
 			t.Errorf("After 'n', cursor didn't move, still at [%d,%d]",
-				engine.cursorRow, engine.cursorCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 		}
 		
 		// The new position should be a valid match
 		matchFound := false
 		for _, match := range engine.searchResults {
-			if match[0] == engine.cursorRow && match[1] == engine.cursorCol {
+			if match[0] == engine.currentBuffer.cursorRow && match[1] == engine.currentBuffer.cursorCol {
 				matchFound = true
 				break
 			}
@@ -222,29 +222,29 @@ func TestBackwardSearch(t *testing.T) {
 		
 		if !matchFound {
 			t.Errorf("After 'n', cursor [%d,%d] is not at any match position",
-				engine.cursorRow, engine.cursorCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 		}
 	})
 	
 	// Test previous match (N)
 	t.Run("Previous match in search", func(t *testing.T) {
 		// Store current position
-		oldRow := engine.cursorRow
-		oldCol := engine.cursorCol
+		oldRow := engine.currentBuffer.cursorRow
+		oldCol := engine.currentBuffer.cursorCol
 		
 		// Navigate to previous match
 		engine.Input("N")
 		
 		// We should move to a different match position
-		if engine.cursorRow == oldRow && engine.cursorCol == oldCol {
+		if engine.currentBuffer.cursorRow == oldRow && engine.currentBuffer.cursorCol == oldCol {
 			t.Errorf("After 'N', cursor didn't move, still at [%d,%d]",
-				engine.cursorRow, engine.cursorCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 		}
 		
 		// The new position should be a valid match
 		matchFound := false
 		for _, match := range engine.searchResults {
-			if match[0] == engine.cursorRow && match[1] == engine.cursorCol {
+			if match[0] == engine.currentBuffer.cursorRow && match[1] == engine.currentBuffer.cursorCol {
 				matchFound = true
 				break
 			}
@@ -252,7 +252,7 @@ func TestBackwardSearch(t *testing.T) {
 		
 		if !matchFound {
 			t.Errorf("After 'N', cursor [%d,%d] is not at any match position",
-				engine.cursorRow, engine.cursorCol)
+				engine.currentBuffer.cursorRow, engine.currentBuffer.cursorCol)
 		}
 	})
 }
