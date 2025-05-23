@@ -121,6 +121,75 @@ func (e *GoEngine) Input(s string) {
 					// If not at the end but not at the beginning, move back
 					e.currentBuffer.cursorCol--
 				}
+
+				// Check if this was an s-triggered insert mode and capture the inserted text
+				if e.sCommandActive {
+					// Calculate the inserted text from the starting position to current position (before cursor moved back)
+					line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+					
+					// The actual end position before cursor was moved back
+					actualEndCol := e.currentBuffer.cursorCol + 1
+					
+					// Extract the inserted text
+					insertedText := ""
+					if e.sCommandStartCol < len(line) && e.sCommandStartCol <= actualEndCol {
+						if actualEndCol <= len(line) {
+							insertedText = line[e.sCommandStartCol:actualEndCol]
+						} else {
+							insertedText = line[e.sCommandStartCol:]
+						}
+					}
+					
+					// Record the s command with the captured text
+					e.recordEditCommandWithText("s", e.sCommandCount, insertedText)
+					
+					// Reset s command tracking
+					e.sCommandActive = false
+					e.sCommandCount = 0
+					e.sCommandStartCol = 0
+				}
+				
+				// Check if this was an insert command (i, o, O) and capture the inserted text
+				if e.insertCommandActive {
+					var insertedText string
+					
+					switch e.insertCommandType {
+					case "i":
+						// For 'i' command, capture text from the original position
+						line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+						actualEndCol := e.currentBuffer.cursorCol + 1
+						startCol := e.insertCommandPos[1]
+						
+						if startCol < len(line) && startCol <= actualEndCol {
+							if actualEndCol <= len(line) {
+								insertedText = line[startCol:actualEndCol]
+							} else {
+								insertedText = line[startCol:]
+							}
+						}
+						
+					case "o":
+						// For 'o' command, capture the entire line that was created
+						if e.currentBuffer.cursorRow > e.insertCommandPos[0] {
+							insertedText = e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+						}
+						
+					case "O":
+						// For 'O' command, capture the entire line that was created
+						if e.currentBuffer.cursorRow >= e.insertCommandPos[0] {
+							insertedText = e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+						}
+					}
+					
+					// Record the insert command with the captured text
+					e.recordEditCommandWithText(e.insertCommandType, e.insertCommandCount, insertedText)
+					
+					// Reset insert command tracking
+					e.insertCommandActive = false
+					e.insertCommandType = ""
+					e.insertCommandCount = 0
+					e.insertCommandPos = [2]int{0, 0}
+				}
 			}
 		} else if prevMode == ModeVisual {
 			// When exiting visual mode, position cursor at visual start
@@ -183,6 +252,12 @@ func (e *GoEngine) Input(s string) {
 		// Check if we're waiting for a replacement character after 'r'
 		if e.awaitingReplace {
 			if e.currentBuffer != nil {
+				// Get the count (default to 1 if no count specified)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+
 				// Get the current line
 				line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
 
@@ -191,22 +266,48 @@ func (e *GoEngine) Input(s string) {
 					// Save for undo
 					e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
 
-					// Replace the character at cursor
+					// Determine how many characters we can actually replace
+					charsToReplace := count
+					if e.currentBuffer.cursorCol+charsToReplace > len(line) {
+						charsToReplace = len(line) - e.currentBuffer.cursorCol
+					}
+
+					// Create the new line with replacements
 					newLine := ""
 					if e.currentBuffer.cursorCol > 0 {
 						newLine = line[:e.currentBuffer.cursorCol]
 					}
-					newLine += s
-					if e.currentBuffer.cursorCol < len(line)-1 {
-						newLine += line[e.currentBuffer.cursorCol+1:]
+
+					// Replace the specified number of characters
+					for i := 0; i < charsToReplace; i++ {
+						newLine += s
+					}
+
+					// Add the rest of the line
+					if e.currentBuffer.cursorCol+charsToReplace < len(line) {
+						newLine += line[e.currentBuffer.cursorCol+charsToReplace:]
 					}
 
 					// Update the line
 					e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+
+					// Move cursor forward by the number of characters replaced (but not past end)
+					e.currentBuffer.cursorCol += charsToReplace - 1
+					if e.currentBuffer.cursorCol >= len(newLine) && len(newLine) > 0 {
+						e.currentBuffer.cursorCol = len(newLine) - 1
+					}
+					if e.currentBuffer.cursorCol < 0 {
+						e.currentBuffer.cursorCol = 0
+					}
+
+					// Record this edit for the dot command
+					e.recordEditCommandWithText("r", count, s)
 				}
 
-				// Exit replace mode
+				// Exit replace mode and reset count
 				e.awaitingReplace = false
+				e.commandCount = 0
+				e.buildingCount = false
 				return
 			}
 		}
@@ -261,32 +362,38 @@ func (e *GoEngine) Input(s string) {
 				switch s {
 				case "w":
 					e.deleteWord()
+					e.recordEditCommand("dw", 1)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "$":
 					e.deleteToEndOfLine()
+					e.recordEditCommand("d$", 1)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "0":
 					e.deleteToStartOfLine()
+					e.recordEditCommand("d0", 1)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "b":
 					e.deleteBackwardWord()
+					e.recordEditCommand("db", 1)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "e":
 					e.deleteToWordEnd()
+					e.recordEditCommand("de", 1)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "d":
 					// Special case for "dd" - delete entire line
 					e.deleteLines(1)
+					e.recordEditCommand("dd", 1)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
@@ -377,8 +484,21 @@ func (e *GoEngine) Input(s string) {
 			e.awaitingReplace = true
 			return
 		case "i": // insert mode
+			// Set up tracking for insert command
+			e.insertCommandActive = true
+			e.insertCommandType = "i"
+			e.insertCommandCount = e.commandCount
+			if e.insertCommandCount == 0 {
+				e.insertCommandCount = 1
+			}
+			e.insertCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+			
 			e.mode = ModeInsert
 			e.startInsertUndoGroup("") // Start a new insert undo group (regular insert)
+			
+			// Reset count after execution
+			e.commandCount = 0
+			e.buildingCount = false
 			return
 		case "v": // character-wise visual mode
 			e.enterVisualMode(0) // 0 for character-wise visual mode
@@ -450,6 +570,9 @@ func (e *GoEngine) Input(s string) {
 				if len(newLine) > 0 && e.currentBuffer.cursorCol >= len(newLine) {
 					e.currentBuffer.cursorCol = len(newLine) - 1
 				}
+
+				// Record this edit for the dot command
+				e.recordEditCommand("x", count)
 			}
 
 			// Reset count after execution
@@ -518,6 +641,9 @@ func (e *GoEngine) Input(s string) {
 						e.currentBuffer.cursorCol = 0
 					}
 				}
+
+				// Record this edit for the dot command
+				e.recordEditCommand("~", count)
 			}
 
 			// Reset count after execution
@@ -554,10 +680,18 @@ func (e *GoEngine) Input(s string) {
 				}
 				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
 
+				// Set up tracking for s command before entering insert mode
+				e.sCommandActive = true
+				e.sCommandCount = count
+				e.sCommandStartCol = e.currentBuffer.cursorCol
+
 				// Enter insert mode
 				e.mode = ModeInsert
 			} else if len(line) == 0 {
-				// If the line is empty, just enter insert mode
+				// If the line is empty, set up tracking and enter insert mode
+				e.sCommandActive = true
+				e.sCommandCount = count
+				e.sCommandStartCol = e.currentBuffer.cursorCol
 				e.mode = ModeInsert
 			}
 
@@ -644,6 +778,15 @@ func (e *GoEngine) Input(s string) {
 
 		// Handle new line commands
 		if s == "o" && e.currentBuffer != nil {
+			// Set up tracking for o command
+			e.insertCommandActive = true
+			e.insertCommandType = "o"
+			e.insertCommandCount = e.commandCount
+			if e.insertCommandCount == 0 {
+				e.insertCommandCount = 1
+			}
+			e.insertCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+			
 			// Start a new insert undo group BEFORE adding the new line
 			// This ensures we capture the buffer state before modification
 			e.startInsertUndoGroup("o") // Start a new insert undo group for 'o' command
@@ -653,10 +796,23 @@ func (e *GoEngine) Input(s string) {
 			e.currentBuffer.cursorRow++
 			e.currentBuffer.cursorCol = 0
 			e.mode = ModeInsert
+			
+			// Reset count after execution
+			e.commandCount = 0
+			e.buildingCount = false
 			return
 		}
 
 		if s == "O" && e.currentBuffer != nil {
+			// Set up tracking for O command
+			e.insertCommandActive = true
+			e.insertCommandType = "O"
+			e.insertCommandCount = e.commandCount
+			if e.insertCommandCount == 0 {
+				e.insertCommandCount = 1
+			}
+			e.insertCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+			
 			// Start a new insert undo group BEFORE adding the new line
 			// This ensures we capture the buffer state before modification
 			e.startInsertUndoGroup("O") // Start a new insert undo group for 'O' command
@@ -665,6 +821,10 @@ func (e *GoEngine) Input(s string) {
 			e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow-1, []string{""})
 			e.currentBuffer.cursorCol = 0
 			e.mode = ModeInsert
+			
+			// Reset count after execution
+			e.commandCount = 0
+			e.buildingCount = false
 			return
 		}
 
@@ -1897,32 +2057,38 @@ func (e *GoEngine) Key(s string) {
 			switch s {
 			case "w":
 				e.deleteWord()
+				e.recordEditCommand("dw", 1)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "$":
 				e.deleteToEndOfLine()
+				e.recordEditCommand("d$", 1)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "0":
 				e.deleteToStartOfLine()
+				e.recordEditCommand("d0", 1)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "b":
 				e.deleteBackwardWord()
+				e.recordEditCommand("db", 1)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "e":
 				e.deleteToWordEnd()
+				e.recordEditCommand("de", 1)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "d":
 				// Special case for "dd" - delete entire line
 				e.deleteLines(1)
+				e.recordEditCommand("dd", 1)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return

@@ -20,6 +20,7 @@ var motionHandlers = map[string]motionCommand{
 	"%":     saveAndMoveToMatchingBracket,
 	"u":     performUndo,
 	"<C-r>": performRedo,
+	".":     repeatLastEdit,
 }
 
 // moveLeft moves the cursor one or more characters to the left
@@ -771,6 +772,301 @@ func performRedo(e *GoEngine, count int) bool {
 		} else {
 			break // Stop if we can't redo further
 		}
+	}
+
+	return success
+}
+
+// repeatLastEdit repeats the last edit operation (the dot command)
+func repeatLastEdit(e *GoEngine, count int) bool {
+	if e.currentBuffer == nil || e.lastEditCommand == "" {
+		return false // No buffer or no previous edit to repeat
+	}
+
+	// Use provided count if specified, otherwise use the original count
+	effectiveCount := count
+	if effectiveCount == 0 {
+		effectiveCount = e.lastEditCount
+	}
+
+	// Track if any operation was successful
+	success := false
+
+	// Execute based on the last edit command
+	switch e.lastEditCommand {
+	case "x":
+		// Repeat character deletion
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		if e.currentBuffer.cursorCol < len(line) {
+			// Save the current state for undo before changing anything
+			e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+
+			// Determine how many characters we can actually delete
+			charsToDelete := effectiveCount
+			if e.currentBuffer.cursorCol+charsToDelete > len(line) {
+				charsToDelete = len(line) - e.currentBuffer.cursorCol
+			}
+
+			// Delete the characters under and after the cursor
+			newLine := ""
+			if e.currentBuffer.cursorCol > 0 {
+				newLine = line[:e.currentBuffer.cursorCol]
+			}
+			if e.currentBuffer.cursorCol+charsToDelete < len(line) {
+				newLine += line[e.currentBuffer.cursorCol+charsToDelete:]
+			}
+			e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+
+			// Adjust cursor if at end of line
+			if len(newLine) > 0 && e.currentBuffer.cursorCol >= len(newLine) {
+				e.currentBuffer.cursorCol = len(newLine) - 1
+			}
+
+			success = true
+		}
+
+	case "~":
+		// Repeat case toggle
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		if e.currentBuffer.cursorCol < len(line) {
+			// Save the current state for undo before changing anything
+			e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+
+			// Determine how many characters we can actually change
+			charsToChange := effectiveCount
+			if e.currentBuffer.cursorCol+charsToChange > len(line) {
+				charsToChange = len(line) - e.currentBuffer.cursorCol
+			}
+
+			// Create the new line with case changes
+			newLine := ""
+			if e.currentBuffer.cursorCol > 0 {
+				newLine = line[:e.currentBuffer.cursorCol]
+			}
+
+			// Change the case of each character
+			for i := 0; i < charsToChange; i++ {
+				pos := e.currentBuffer.cursorCol + i
+				if pos < len(line) {
+					char := line[pos]
+					if char >= 'a' && char <= 'z' {
+						// Convert lowercase to uppercase
+						newLine += string(char - 32)
+					} else if char >= 'A' && char <= 'Z' {
+						// Convert uppercase to lowercase
+						newLine += string(char + 32)
+					} else {
+						// Non-alphabetic character remains unchanged
+						newLine += string(char)
+					}
+				}
+			}
+
+			// Add the rest of the line
+			if e.currentBuffer.cursorCol+charsToChange < len(line) {
+				newLine += line[e.currentBuffer.cursorCol+charsToChange:]
+			}
+
+			// Update the line
+			e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+
+			// Move cursor forward by the number of characters changed
+			e.currentBuffer.cursorCol += charsToChange
+
+			// Ensure cursor doesn't go past end of line
+			if e.currentBuffer.cursorCol >= len(newLine) {
+				e.currentBuffer.cursorCol = len(newLine) - 1
+				if e.currentBuffer.cursorCol < 0 {
+					e.currentBuffer.cursorCol = 0
+				}
+			}
+
+			success = true
+		}
+
+	case "r":
+		// Repeat character replacement
+		if e.lastEditText == "" {
+			return false // No replacement character stored
+		}
+		
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		if e.currentBuffer.cursorCol < len(line) {
+			// Save the current state for undo before changing anything
+			e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+
+			// Determine how many characters we can actually replace
+			charsToReplace := effectiveCount
+			if e.currentBuffer.cursorCol+charsToReplace > len(line) {
+				charsToReplace = len(line) - e.currentBuffer.cursorCol
+			}
+
+			// Create the new line with replacements
+			newLine := ""
+			if e.currentBuffer.cursorCol > 0 {
+				newLine = line[:e.currentBuffer.cursorCol]
+			}
+
+			// Replace each character with the stored replacement character
+			for i := 0; i < charsToReplace; i++ {
+				newLine += e.lastEditText
+			}
+
+			// Add the rest of the line
+			if e.currentBuffer.cursorCol+charsToReplace < len(line) {
+				newLine += line[e.currentBuffer.cursorCol+charsToReplace:]
+			}
+
+			// Update the line
+			e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+
+			// Move cursor forward by the number of characters replaced (but not past end)
+			e.currentBuffer.cursorCol += charsToReplace - 1
+			if e.currentBuffer.cursorCol >= len(newLine) && len(newLine) > 0 {
+				e.currentBuffer.cursorCol = len(newLine) - 1
+			}
+			if e.currentBuffer.cursorCol < 0 {
+				e.currentBuffer.cursorCol = 0
+			}
+
+			success = true
+		}
+
+	case "s":
+		// Repeat substitute command (delete characters and insert text)
+		if e.lastEditText == "" {
+			// If no text was captured, treat it like just deletion
+		}
+		
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		if e.currentBuffer.cursorCol < len(line) {
+			// Save the current state for undo before changing anything
+			e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+
+			// Determine how many characters we can actually delete
+			charsToDelete := effectiveCount
+			if e.currentBuffer.cursorCol+charsToDelete > len(line) {
+				charsToDelete = len(line) - e.currentBuffer.cursorCol
+			}
+
+			// Delete the characters under and after the cursor
+			newLine := ""
+			if e.currentBuffer.cursorCol > 0 {
+				newLine = line[:e.currentBuffer.cursorCol]
+			}
+			
+			// Insert the captured text
+			newLine += e.lastEditText
+			
+			// Add the rest of the line (after the deleted characters)
+			if e.currentBuffer.cursorCol+charsToDelete < len(line) {
+				newLine += line[e.currentBuffer.cursorCol+charsToDelete:]
+			}
+
+			// Update the line
+			e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+
+			// Position cursor at the end of the inserted text
+			if len(e.lastEditText) > 0 {
+				e.currentBuffer.cursorCol += len(e.lastEditText) - 1
+			}
+			
+			// Ensure cursor doesn't go past end of line
+			if e.currentBuffer.cursorCol >= len(newLine) && len(newLine) > 0 {
+				e.currentBuffer.cursorCol = len(newLine) - 1
+			}
+			if e.currentBuffer.cursorCol < 0 {
+				e.currentBuffer.cursorCol = 0
+			}
+
+			success = true
+		}
+
+	case "dw":
+		// Repeat delete word - call the actual function
+		e.deleteWord()
+		success = true
+
+	case "d$":
+		// Repeat delete to end of line - call the actual function
+		e.deleteToEndOfLine()
+		success = true
+
+	case "d0":
+		// Repeat delete to start of line - call the actual function
+		e.deleteToStartOfLine()
+		success = true
+
+	case "db":
+		// Repeat delete backward word - call the actual function
+		e.deleteBackwardWord()
+		success = true
+
+	case "de":
+		// Repeat delete to word end - call the actual function
+		e.deleteToWordEnd()
+		success = true
+
+	case "dd":
+		// Repeat delete lines - call the actual function
+		e.deleteLines(effectiveCount)
+		success = true
+		
+	case "i":
+		// Repeat insert command - insert the same text at current position
+		if e.lastEditText != "" {
+			// Save for undo
+			e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+			
+			// Repeat the text insertion count times
+			for i := 0; i < effectiveCount; i++ {
+				line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+				newLine := ""
+				if e.currentBuffer.cursorCol > 0 {
+					newLine = line[:e.currentBuffer.cursorCol]
+				}
+				newLine += e.lastEditText
+				if e.currentBuffer.cursorCol < len(line) {
+					newLine += line[e.currentBuffer.cursorCol:]
+				}
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+				
+				// Move cursor to end of inserted text
+				e.currentBuffer.cursorCol += len(e.lastEditText)
+			}
+			success = true
+		}
+		
+	case "o":
+		// Repeat open line below command - create new line with same text
+		if e.lastEditText != "" {
+			// Save for undo
+			e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+			
+			// Repeat the line creation count times
+			for i := 0; i < effectiveCount; i++ {
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow, []string{e.lastEditText})
+				e.currentBuffer.cursorRow++
+				e.currentBuffer.cursorCol = len(e.lastEditText)
+			}
+			success = true
+		}
+		
+	case "O":
+		// Repeat open line above command - create new line with same text
+		if e.lastEditText != "" {
+			// Save for undo
+			e.UndoSaveRegion(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow-1)
+			
+			// Repeat the line creation count times
+			for i := 0; i < effectiveCount; i++ {
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow-1, []string{e.lastEditText})
+				e.currentBuffer.cursorCol = len(e.lastEditText)
+			}
+			success = true
+		}
+		
+	// Add cases for other commands as they are implemented
 	}
 
 	return success

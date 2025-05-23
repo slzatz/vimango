@@ -37,6 +37,23 @@ type GoEngine struct {
 	// Undo state
 	inInsertUndoGroup bool // True when in insert mode to group all changes as one undo operation
 
+	// Dot command state
+	lastEditCommand string // The last editing command that changed the buffer (e.g., "x", "dd", "dw")
+	lastEditCount   int    // The count used with the last editing command
+	lastEditText    string // For insert mode: the text that was inserted, for replace: the replacement character
+	lastEditPos     [2]int // Position where the last edit occurred [row, col]
+
+	// S command tracking for insert mode text capture
+	sCommandActive   bool // True when insert mode was entered via 's' command
+	sCommandCount    int  // Count used with the 's' command
+	sCommandStartCol int  // Starting column position when 's' was executed
+
+	// Insert command tracking for dot command support
+	insertCommandActive bool   // True when insert mode was entered via 'i', 'o', or 'O' command
+	insertCommandType   string // The command that triggered insert mode ("i", "o", "O")
+	insertCommandCount  int    // Count used with the insert command
+	insertCommandPos    [2]int // Position where the insert command was executed
+
 	// Search state
 	searchPattern    string   // Current search pattern
 	searchDirection  int      // 1 for forward (/) and -1 for backward (?)
@@ -59,6 +76,13 @@ func NewEngine() *GoEngine {
 		yankRegister:      "",
 			yankRegisterType:  0, // Default to character-wise,
 		inInsertUndoGroup: false,
+		lastEditCommand:   "",
+		lastEditCount:     0,
+		lastEditText:      "",
+		lastEditPos:       [2]int{1, 0},
+		sCommandActive:    false,
+		sCommandCount:     0,
+		sCommandStartCol:  0,
 		searchPattern:     "",
 		searchDirection:   1, // Default to forward search
 		searchResults:     make([][2]int, 0),
@@ -816,6 +840,44 @@ func (e *GoEngine) validateCursorPosition() {
 	} else if e.currentBuffer.cursorCol > len(currentLine) {
 		e.currentBuffer.cursorCol = len(currentLine)
 	}
+}
+
+// recordEditCommand records an editing command for the dot command
+func (e *GoEngine) recordEditCommand(cmd string, count int) {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Store the command details
+	e.lastEditCommand = cmd
+	e.lastEditCount = count
+	if count == 0 {
+		e.lastEditCount = 1 // Default to 1 for commands without an explicit count
+	}
+	
+	// Store the position
+	e.lastEditPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	
+	// Clear any previous text (for commands that don't use it)
+	e.lastEditText = ""
+}
+
+// recordEditCommandWithText records an editing command with associated text for the dot command
+func (e *GoEngine) recordEditCommandWithText(cmd string, count int, text string) {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Store the command details
+	e.lastEditCommand = cmd
+	e.lastEditCount = count
+	if count == 0 {
+		e.lastEditCount = 1 // Default to 1 for commands without an explicit count
+	}
+	
+	// Store the position and text
+	e.lastEditPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	e.lastEditText = text
 }
 
 // startInsertUndoGroup begins a new insert mode undo group
