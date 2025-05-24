@@ -61,6 +61,10 @@ type GoEngine struct {
 	currentSearchIdx int      // Index of current search result
 	searching        bool     // True when in search mode (typing the search pattern)
 	searchBuffer     string   // Buffer for search input
+
+	// Indentation settings
+	useTabsForIndent bool // true = use tabs, false = use spaces  
+	indentWidth      int  // number of spaces per indent level
 }
 
 // NewEngine creates a new vim engine
@@ -90,6 +94,8 @@ func NewEngine() *GoEngine {
 		searching:         false,
 		searchBuffer:      "",
 		awaitingReplace:   false, // Initialize the replace flag
+		useTabsForIndent:  false, // Default to spaces
+		indentWidth:       4,     // Default to 4 spaces per indent
 	}
 }
 
@@ -925,4 +931,41 @@ func (e *GoEngine) startInsertUndoGroup(commandType string) {
 	if len(e.currentBuffer.redoStack) > 0 {
 		e.currentBuffer.redoStack = nil
 	}
+}
+
+// getIndentString returns the indentation string based on current settings
+func (e *GoEngine) getIndentString() string {
+	if e.useTabsForIndent {
+		return "\t"
+	}
+	result := ""
+	for i := 0; i < e.indentWidth; i++ {
+		result += " "
+	}
+	return result
+}
+
+// indentLine adds one level of indentation to a line
+func (e *GoEngine) indentLine(line string) string {
+	return e.getIndentString() + line
+}
+
+// dedentLine removes one level of indentation from a line
+func (e *GoEngine) dedentLine(line string) string {
+	if e.useTabsForIndent {
+		// Remove one tab if present
+		if len(line) > 0 && line[0] == '\t' {
+			return line[1:]
+		}
+	} else {
+		// Remove up to indentWidth spaces from the beginning
+		spacesToRemove := 0
+		for i := 0; i < len(line) && i < e.indentWidth && line[i] == ' '; i++ {
+			spacesToRemove++
+		}
+		if spacesToRemove > 0 {
+			return line[spacesToRemove:]
+		}
+	}
+	return line
 }

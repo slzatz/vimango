@@ -783,10 +783,10 @@ func repeatLastEdit(e *GoEngine, count int) bool {
 		return false // No buffer or no previous edit to repeat
 	}
 
-	// Use provided count if specified, otherwise use the original count
+	// Use provided count if specified, otherwise default to 1 for dot command
 	effectiveCount := count
 	if effectiveCount == 0 {
-		effectiveCount = e.lastEditCount
+		effectiveCount = 1  // Default to 1 repetition for simple dot command
 	}
 
 	// Track if any operation was successful
@@ -1065,6 +1065,165 @@ func repeatLastEdit(e *GoEngine, count int) bool {
 			}
 			success = true
 		}
+		
+	case ">>":
+		// Repeat line indent command
+		
+		// Determine how many times to repeat and how many lines to affect
+		var repeatCount, lineCount int
+		
+		if effectiveCount == 0 {
+			// Simple dot command (.) - use original behavior
+			repeatCount = 1
+			lineCount = e.lastEditCount
+			if lineCount == 0 {
+				lineCount = 1
+			}
+		} else {
+			// Dot command with count (e.g., 2.) - repeat the operation
+			repeatCount = effectiveCount
+			lineCount = e.lastEditCount
+			if lineCount == 0 {
+				lineCount = 1
+			}
+		}
+
+		// Save for undo
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+lineCount-1)
+
+		// Apply indentation: repeatCount times, each time affecting lineCount lines
+		for rep := 0; rep < repeatCount; rep++ {
+			for i := 0; i < lineCount && (e.currentBuffer.cursorRow+i) <= e.currentBuffer.GetLineCount(); i++ {
+				lineNum := e.currentBuffer.cursorRow + i
+				line := e.currentBuffer.GetLine(lineNum)
+				newLine := e.indentLine(line)
+				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{newLine})
+			}
+		}
+
+		// Move cursor to first non-blank character of the current line
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		e.currentBuffer.cursorCol = 0
+		for i := 0; i < len(line); i++ {
+			if line[i] != ' ' && line[i] != '\t' {
+				e.currentBuffer.cursorCol = i
+				break
+			}
+		}
+		success = true
+		
+	case "<<":
+		// Repeat line dedent command
+		// For dot command, count represents number of repetitions, not lines
+		repeatCount := effectiveCount
+		if repeatCount == 0 {
+			repeatCount = 1
+		}
+
+		// Get the original line count from the last edit
+		lineCount := e.lastEditCount
+		if lineCount == 0 {
+			lineCount = 1
+		}
+
+		// Save for undo
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+lineCount-1)
+
+		// Repeat the dedentation operation repeatCount times
+		for rep := 0; rep < repeatCount; rep++ {
+			// Apply dedentation to lineCount lines starting from current line
+			for i := 0; i < lineCount && (e.currentBuffer.cursorRow+i) <= e.currentBuffer.GetLineCount(); i++ {
+				lineNum := e.currentBuffer.cursorRow + i
+				line := e.currentBuffer.GetLine(lineNum)
+				newLine := e.dedentLine(line)
+				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{newLine})
+			}
+		}
+
+		// Move cursor to first non-blank character of the current line
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		e.currentBuffer.cursorCol = 0
+		for i := 0; i < len(line); i++ {
+			if line[i] != ' ' && line[i] != '\t' {
+				e.currentBuffer.cursorCol = i
+				break
+			}
+		}
+		success = true
+		
+	case "visual_indent":
+		// Repeat visual line indent - apply one indentation to the specified number of lines
+		lineCount := e.lastEditCount
+		if lineCount == 0 {
+			lineCount = 1
+		}
+		
+		// For visual operations, effectiveCount represents how many times to repeat the entire operation
+		repeatCount := effectiveCount
+		if repeatCount == 0 {
+			repeatCount = 1
+		}
+
+		// Save for undo
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+(lineCount*repeatCount)-1)
+
+		// Apply indentation to lineCount lines, repeatCount times
+		for rep := 0; rep < repeatCount; rep++ {
+			for i := 0; i < lineCount && (e.currentBuffer.cursorRow+i) <= e.currentBuffer.GetLineCount(); i++ {
+				lineNum := e.currentBuffer.cursorRow + i
+				line := e.currentBuffer.GetLine(lineNum)
+				newLine := e.indentLine(line)
+				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{newLine})
+			}
+		}
+
+		// Move cursor to first non-blank character of the current line
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		e.currentBuffer.cursorCol = 0
+		for i := 0; i < len(line); i++ {
+			if line[i] != ' ' && line[i] != '\t' {
+				e.currentBuffer.cursorCol = i
+				break
+			}
+		}
+		success = true
+		
+	case "visual_dedent":
+		// Repeat visual line dedent - apply one dedentation to the specified number of lines
+		lineCount := e.lastEditCount
+		if lineCount == 0 {
+			lineCount = 1
+		}
+		
+		// If user specified a count with dot command, repeat the entire operation that many times
+		repeatCount := effectiveCount
+		if repeatCount == 0 {
+			repeatCount = 1
+		}
+
+		// Save for undo
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+lineCount-1)
+
+		// Apply the visual dedentation operation repeatCount times
+		for rep := 0; rep < repeatCount; rep++ {
+			for i := 0; i < lineCount && (e.currentBuffer.cursorRow+i) <= e.currentBuffer.GetLineCount(); i++ {
+				lineNum := e.currentBuffer.cursorRow + i
+				line := e.currentBuffer.GetLine(lineNum)
+				newLine := e.dedentLine(line)
+				e.currentBuffer.SetLines(lineNum-1, lineNum, []string{newLine})
+			}
+		}
+
+		// Move cursor to first non-blank character of the current line
+		line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+		e.currentBuffer.cursorCol = 0
+		for i := 0; i < len(line); i++ {
+			if line[i] != ' ' && line[i] != '\t' {
+				e.currentBuffer.cursorCol = i
+				break
+			}
+		}
+		success = true
 		
 	// Add cases for other commands as they are implemented
 	}

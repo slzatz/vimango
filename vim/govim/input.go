@@ -71,6 +71,12 @@ func (e *GoEngine) visualOperation(op string) {
 	case "~":
 		e.changeCaseVisualSelection()
 		e.mode = ModeNormal // Return to normal mode after changing case
+	case ">":
+		e.indentVisualSelection()
+		e.mode = ModeNormal // Return to normal mode after indenting
+	case "<":
+		e.dedentVisualSelection()
+		e.mode = ModeNormal // Return to normal mode after dedenting
 	}
 }
 
@@ -231,6 +237,16 @@ func (e *GoEngine) Input(s string) {
 			return
 		case "~": // change case of selection
 			e.visualOperation("~")
+			return
+		case ">": // indent selection (only for line-wise visual mode)
+			if e.visualType == 1 { // Only for line-wise visual mode (V)
+				e.visualOperation(">")
+			}
+			return
+		case "<": // dedent selection (only for line-wise visual mode)
+			if e.visualType == 1 { // Only for line-wise visual mode (V)
+				e.visualOperation("<")
+			}
 			return
 		}
 
@@ -722,6 +738,20 @@ func (e *GoEngine) Input(s string) {
 			return
 		}
 
+		// Handle indent command
+		if s == ">" && !e.awaitingMotion {
+			e.awaitingMotion = true
+			e.currentCommand = ">"
+			return
+		}
+
+		// Handle dedent command
+		if s == "<" && !e.awaitingMotion {
+			e.awaitingMotion = true
+			e.currentCommand = "<"
+			return
+		}
+
 		// Handle new line commands
 // Handle paste with p
 		if s == "p" && e.currentBuffer != nil && e.yankRegister != "" {
@@ -837,7 +867,9 @@ func (e *GoEngine) Input(s string) {
 			// We need to check for specific double-letter commands before checking for general motions
 			if e.currentCommand == "d" && s == "d" ||
 				e.currentCommand == "y" && s == "y" ||
-				e.currentCommand == "c" && s == "c" {
+				e.currentCommand == "c" && s == "c" ||
+				e.currentCommand == ">" && s == ">" ||
+				e.currentCommand == "<" && s == "<" {
 				// Double-letter commands (dd, yy, cc)
 
 				// Get line count
@@ -899,11 +931,54 @@ func (e *GoEngine) Input(s string) {
 							e.mode = ModeInsert
 						}
 					}
+				} else if e.currentCommand == ">" || e.currentCommand == "<" {
+					// Handle indentation commands (>> and <<)
+					// Get the count (default to 1 if no count specified)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+
+					// Save for undo
+					e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+count-1)
+
+					// Apply indentation/dedentation to count lines starting from current line
+					for i := 0; i < count && (e.currentBuffer.cursorRow+i) <= e.currentBuffer.GetLineCount(); i++ {
+						lineNum := e.currentBuffer.cursorRow + i
+						line := e.currentBuffer.GetLine(lineNum)
+						
+						var newLine string
+						if e.currentCommand == ">" {
+							// Indent the line
+							newLine = e.indentLine(line)
+						} else {
+							// Dedent the line
+							newLine = e.dedentLine(line)
+						}
+						
+						// Update the line in the buffer
+						e.currentBuffer.SetLines(lineNum-1, lineNum, []string{newLine})
+					}
+
+					// Record for dot command
+					e.recordEditCommand(e.currentCommand + e.currentCommand, count) // ">>" or "<<"
+
+					// Move cursor to first non-blank character of the current line
+					line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+					e.currentBuffer.cursorCol = 0
+					for i := 0; i < len(line); i++ {
+						if line[i] != ' ' && line[i] != '\t' {
+							e.currentBuffer.cursorCol = i
+							break
+						}
+					}
 				}
 
 				// Reset awaiting motion state
 				e.awaitingMotion = false
 				e.currentCommand = ""
+				e.commandCount = 0
+				e.buildingCount = false
 				return
 			}
 
@@ -2020,6 +2095,82 @@ func (e *GoEngine) changeCaseVisualSelection() {
 	// Reset cursor to the start of the selection
 	e.currentBuffer.cursorRow = startRow
 	e.currentBuffer.cursorCol = startCol
+}
+
+// indentVisualSelection indents all lines in the visual selection
+func (e *GoEngine) indentVisualSelection() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Get normalized selection bounds (start before end)
+	startRow, _, endRow, _ := e.getNormalizedVisualSelection()
+
+	// Save region for undo
+	e.UndoSaveRegion(startRow, endRow)
+
+	// For line-wise visual mode, indent all lines in the selection
+	if e.visualType == 1 {
+		lineCount := endRow - startRow + 1
+		for row := startRow; row <= endRow; row++ {
+			line := e.currentBuffer.GetLine(row)
+			newLine := e.indentLine(line)
+			e.currentBuffer.SetLines(row-1, row, []string{newLine})
+		}
+		
+		// Record for dot command - visual line indent should be repeatable
+		// Use a special command name to distinguish from normal mode >>
+		e.recordEditCommand("visual_indent", lineCount)
+	}
+
+	// Move cursor to first non-blank character of the first line
+	line := e.currentBuffer.GetLine(startRow)
+	e.currentBuffer.cursorRow = startRow
+	e.currentBuffer.cursorCol = 0
+	for i := 0; i < len(line); i++ {
+		if line[i] != ' ' && line[i] != '\t' {
+			e.currentBuffer.cursorCol = i
+			break
+		}
+	}
+}
+
+// dedentVisualSelection dedents all lines in the visual selection
+func (e *GoEngine) dedentVisualSelection() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Get normalized selection bounds (start before end)
+	startRow, _, endRow, _ := e.getNormalizedVisualSelection()
+
+	// Save region for undo
+	e.UndoSaveRegion(startRow, endRow)
+
+	// For line-wise visual mode, dedent all lines in the selection
+	if e.visualType == 1 {
+		lineCount := endRow - startRow + 1
+		for row := startRow; row <= endRow; row++ {
+			line := e.currentBuffer.GetLine(row)
+			newLine := e.dedentLine(line)
+			e.currentBuffer.SetLines(row-1, row, []string{newLine})
+		}
+		
+		// Record for dot command - visual line dedent should be repeatable
+		// Use a special command name to distinguish from normal mode <<
+		e.recordEditCommand("visual_dedent", lineCount)
+	}
+
+	// Move cursor to first non-blank character of the first line
+	line := e.currentBuffer.GetLine(startRow)
+	e.currentBuffer.cursorRow = startRow
+	e.currentBuffer.cursorCol = 0
+	for i := 0; i < len(line); i++ {
+		if line[i] != ' ' && line[i] != '\t' {
+			e.currentBuffer.cursorCol = i
+			break
+		}
+	}
 }
 
 // Key processes a key with terminal codes replaced
