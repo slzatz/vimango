@@ -1225,6 +1225,56 @@ func repeatLastEdit(e *GoEngine, count int) bool {
 		}
 		success = true
 		
+	case "cw":
+		// Repeat change word command (delete word and insert text)
+		// Note: lastEditText can be empty if user did cw+ESC without typing anything
+		
+		// Save for undo
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+		
+		// Repeat the change operation count times
+		for i := 0; i < effectiveCount; i++ {
+			// Delete the word at cursor using change-specific deletion (preserves whitespace)
+			e.changeWordDelete()
+			
+			// Insert the captured text at cursor position
+			line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+			newLine := ""
+			if e.currentBuffer.cursorCol > 0 {
+				newLine = line[:e.currentBuffer.cursorCol]
+			}
+			newLine += e.lastEditText
+			if e.currentBuffer.cursorCol < len(line) {
+				newLine += line[e.currentBuffer.cursorCol:]
+			}
+			e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+			
+			// Position cursor after the inserted text for the next iteration
+			e.currentBuffer.cursorCol += len(e.lastEditText)
+			
+			// Adjust cursor to not go past line end
+			if e.currentBuffer.cursorCol > len(newLine) {
+				e.currentBuffer.cursorCol = len(newLine)
+			}
+			
+			// For multiple repetitions, move to the next word for the next iteration
+			// For the final position (after all iterations), move back to last char of inserted text
+			if i < effectiveCount-1 {
+				// Not the last iteration - move to next word start
+				line = e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+				// Skip any whitespace to get to next word
+				for e.currentBuffer.cursorCol < len(line) && !isWordChar(line[e.currentBuffer.cursorCol]) {
+					e.currentBuffer.cursorCol++
+				}
+			} else {
+				// Last iteration - position cursor at last character of inserted text (vim behavior)
+				if e.currentBuffer.cursorCol > 0 {
+					e.currentBuffer.cursorCol--
+				}
+			}
+		}
+		success = true
+		
 	// Add cases for other commands as they are implemented
 	}
 

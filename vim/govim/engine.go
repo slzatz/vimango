@@ -54,6 +54,12 @@ type GoEngine struct {
 	insertCommandCount  int    // Count used with the insert command
 	insertCommandPos    [2]int // Position where the insert command was executed
 
+	// Change command tracking for dot command support  
+	changeCommandActive bool   // True when insert mode was entered via 'c' command
+	changeCommandType   string // The change command type ("cw", "c$", "cc", etc.)
+	changeCommandCount  int    // Count used with the change command
+	changeCommandPos    [2]int // Position where the change command was executed
+
 	// Search state
 	searchPattern    string   // Current search pattern
 	searchDirection  int      // 1 for forward (/) and -1 for backward (?)
@@ -87,6 +93,10 @@ func NewEngine() *GoEngine {
 		sCommandActive:    false,
 		sCommandCount:     0,
 		sCommandStartCol:  0,
+		changeCommandActive: false,
+		changeCommandType:   "",
+		changeCommandCount:  0,
+		changeCommandPos:    [2]int{1, 0},
 		searchPattern:     "",
 		searchDirection:   1, // Default to forward search
 		searchResults:     make([][2]int, 0),

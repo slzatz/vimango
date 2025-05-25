@@ -196,6 +196,44 @@ func (e *GoEngine) Input(s string) {
 					e.insertCommandCount = 0
 					e.insertCommandPos = [2]int{0, 0}
 				}
+
+				// Check if this was a change command and capture the inserted text
+				if e.changeCommandActive {
+					// For change commands, we need to be more careful about text capture
+					// because the text between startCol and cursor might be existing text, not inserted text
+					
+					// Calculate the inserted text from the starting position to current position (before cursor moved back)
+					line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+					
+					// The actual end position before cursor was moved back
+					actualEndCol := e.currentBuffer.cursorCol + 1
+					
+					// Extract the inserted text from the change starting position
+					insertedText := ""
+					startCol := e.changeCommandPos[1]
+					
+					// Special case: if cursor is still at the starting position (or moved back to it due to ESC positioning),
+					// and we haven't typed anything, then there's no inserted text
+					if e.currentBuffer.cursorCol == startCol {
+						// No text was inserted - cursor is at the same position where change started
+						insertedText = ""
+					} else if startCol < len(line) && startCol < actualEndCol {
+						if actualEndCol <= len(line) {
+							insertedText = line[startCol:actualEndCol]
+						} else {
+							insertedText = line[startCol:]
+						}
+					}
+					
+					// Record the change command with the captured text
+					e.recordEditCommandWithText(e.changeCommandType, e.changeCommandCount, insertedText)
+					
+					// Reset change command tracking
+					e.changeCommandActive = false
+					e.changeCommandType = ""
+					e.changeCommandCount = 0
+					e.changeCommandPos = [2]int{0, 0}
+				}
 			}
 		} else if prevMode == ModeVisual {
 			// When exiting visual mode, position cursor at visual start
@@ -329,11 +367,11 @@ func (e *GoEngine) Input(s string) {
 		}
 
 		// First check for numeric prefix
-		if isDigit(s) && (e.buildingCount || s != "0" || e.currentCommand != "") {
+		if isDigit(s) && (e.buildingCount || s != "0" || (e.currentCommand != "" && !e.awaitingMotion)) {
 			// Treat digits as part of a count if any of these are true:
 			// 1. We're already building a count (e.buildingCount is true)
 			// 2. The digit is not "0" (so "0" alone is a motion command, not a count)
-			// 3. We have a current command (so "0" can be used in commands like "d0")
+			// 3. We have a current command but are NOT awaiting motion (prevent "0" in "c0" from being treated as count)
 			digit := int(s[0] - '0')
 
 			if e.buildingCount {
@@ -417,7 +455,11 @@ func (e *GoEngine) Input(s string) {
 			case "c":
 				switch s {
 				case "w":
-					e.changeWord()
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.changeWord(count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
@@ -1506,9 +1548,54 @@ func (e *GoEngine) deleteLines(count int) {
 }
 
 // changeWord deletes from cursor to next word and enters insert mode
-func (e *GoEngine) changeWord() {
-	e.deleteWord()
+// Note: Unlike deleteWord, changeWord only deletes word characters, not trailing whitespace
+func (e *GoEngine) changeWord(count int) {
+	// Set up change command tracking before deletion
+	e.changeCommandActive = true
+	e.changeCommandType = "cw"
+	e.changeCommandCount = count
+	e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	
+	// Use a special change-specific word deletion that preserves whitespace
+	e.changeWordDelete()
 	e.mode = ModeInsert
+}
+
+// changeWordDelete deletes word characters only, preserving trailing whitespace
+// This is used by change commands (cw) which behave differently from delete commands (dw)
+func (e *GoEngine) changeWordDelete() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+	if e.currentBuffer.cursorCol >= len(line) {
+		return // Nothing to delete
+	}
+
+	startCol := e.currentBuffer.cursorCol
+	endCol := startCol
+
+	// Find the end of the current word (word characters only)
+	for endCol < len(line) && isWordChar(line[endCol]) {
+		endCol++
+	}
+
+	// If we didn't move (not on a word character), delete the non-word characters until next word
+	if endCol == startCol {
+		for endCol < len(line) && !isWordChar(line[endCol]) {
+			endCol++
+		}
+	}
+
+	// Store the deleted text in yank register
+	if endCol > startCol {
+		e.yankRegister = line[startCol:endCol]
+	}
+
+	// Create new line with the word deleted
+	newLine := line[:startCol] + line[endCol:]
+	e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
 }
 
 // changeToEndOfLine deletes to end of line and enters insert mode
@@ -2247,7 +2334,11 @@ func (e *GoEngine) Key(s string) {
 		case "c":
 			switch s {
 			case "w":
-				e.changeWord()
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.changeWord(count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
