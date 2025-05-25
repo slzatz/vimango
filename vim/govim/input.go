@@ -464,28 +464,60 @@ func (e *GoEngine) Input(s string) {
 					e.currentCommand = ""
 					return
 				case "$":
-					e.changeToEndOfLine()
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.changeToEndOfLine(count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "0":
-					e.changeToStartOfLine()
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.changeToStartOfLine(count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "b":
-					e.changeBackwardWord()
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.changeBackwardWord(count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "e":
-					e.changeToWordEnd()
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.changeToWordEnd(count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "c":
 					// Special case for "cc" - change entire line
-					e.deleteLines(1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					
+					// Start undo grouping for the entire change operation
+					e.inInsertUndoGroup = true
+					
+					// Save undo state for the entire change operation
+					e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+count-1)
+					
+					e.changeCommandActive = true
+					e.changeCommandType = "cc"
+					e.changeCommandCount = count
+					e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+					
+					e.deleteLines(count)
 					e.mode = ModeInsert
 					e.awaitingMotion = false
 					e.currentCommand = ""
@@ -1550,6 +1582,12 @@ func (e *GoEngine) deleteLines(count int) {
 // changeWord deletes from cursor to next word and enters insert mode
 // Note: Unlike deleteWord, changeWord only deletes word characters, not trailing whitespace
 func (e *GoEngine) changeWord(count int) {
+	// Start undo grouping for the entire change operation (delete + insert + ESC)
+	e.inInsertUndoGroup = true
+	
+	// Save undo state for the entire change operation before any modifications
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
 	// Set up change command tracking before deletion
 	e.changeCommandActive = true
 	e.changeCommandType = "cw"
@@ -1557,8 +1595,122 @@ func (e *GoEngine) changeWord(count int) {
 	e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
 	
 	// Use a special change-specific word deletion that preserves whitespace
-	e.changeWordDelete()
+	e.changeWordDeleteWithCount(count)
 	e.mode = ModeInsert
+	
+	// Note: inInsertUndoGroup will be set to false when ESC is pressed
+}
+
+// changeWordDeleteWithCount deletes count words, preserving trailing whitespace on the last word
+// This is used by change commands (cw) which behave differently from delete commands (dw)
+// Note: Undo saving is handled by the change command caller, not here
+func (e *GoEngine) changeWordDeleteWithCount(count int) {
+	e.changeWordDeleteRaw(count)
+}
+
+// changeWordDeleteRaw deletes count words without undo saving (for internal use)
+func (e *GoEngine) changeWordDeleteRaw(count int) {
+	if e.currentBuffer == nil || count <= 0 {
+		return
+	}
+	
+	if count == 1 {
+		// Simple case: use existing single-word logic (but without undo save)
+		e.changeWordDeleteSingle()
+		return
+	}
+	
+	// Multi-word case: delete current word + (count-1) additional words
+	startRow := e.currentBuffer.cursorRow
+	startCol := e.currentBuffer.cursorCol
+	line := e.currentBuffer.GetLine(startRow)
+	
+	if startCol >= len(line) {
+		return // Nothing to delete
+	}
+	
+	endCol := startCol
+	wordsDeleted := 0
+	
+	// Delete the specified number of words
+	for wordsDeleted < count && endCol < len(line) {
+		// Find the end of the current word (word characters only)
+		wordStart := endCol
+		for endCol < len(line) && isWordChar(line[endCol]) {
+			endCol++
+		}
+		
+		// If we found word characters, count this as a word
+		if endCol > wordStart {
+			wordsDeleted++
+		} else {
+			// If we're not on a word character, skip non-word characters until next word
+			for endCol < len(line) && !isWordChar(line[endCol]) {
+				endCol++
+			}
+			// Don't count whitespace skipping as a word deletion
+		}
+		
+		// If this is not the last word we're deleting, include trailing whitespace
+		if wordsDeleted < count && endCol < len(line) {
+			// Skip whitespace after the word (except for the last word)
+			for endCol < len(line) && !isWordChar(line[endCol]) {
+				endCol++
+			}
+		}
+	}
+	
+	// Store the deleted text in yank register
+	if endCol > startCol {
+		e.yankRegister = line[startCol:endCol]
+	}
+	
+	// Create new line with the text deleted
+	newLine := ""
+	if startCol > 0 {
+		newLine = line[:startCol]
+	}
+	if endCol < len(line) {
+		newLine += line[endCol:]
+	}
+	
+	e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+}
+
+// changeWordDeleteSingle deletes one word without undo saving (for internal use)
+func (e *GoEngine) changeWordDeleteSingle() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+	if e.currentBuffer.cursorCol >= len(line) {
+		return // Nothing to delete
+	}
+
+	startCol := e.currentBuffer.cursorCol
+	endCol := startCol
+
+	// Find the end of the current word (word characters only)
+	for endCol < len(line) && isWordChar(line[endCol]) {
+		endCol++
+	}
+
+	// If we didn't move (not on a word character), delete the non-word characters until next word
+	if endCol == startCol {
+		for endCol < len(line) && !isWordChar(line[endCol]) {
+			endCol++
+		}
+	}
+
+	// Store the deleted text in yank register
+	if endCol > startCol {
+		e.yankRegister = line[startCol:endCol]
+	}
+
+	// Create new line with the text deleted
+	newLine := line[:startCol] + line[endCol:]
+	e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
 }
 
 // changeWordDelete deletes word characters only, preserving trailing whitespace
@@ -1598,26 +1750,118 @@ func (e *GoEngine) changeWordDelete() {
 	e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
 }
 
+// deleteToEndOfLineWithCount deletes from cursor to end of line, plus (count-1) additional lines
+func (e *GoEngine) deleteToEndOfLineWithCount(count int) {
+	if e.currentBuffer == nil {
+		return
+	}
+	
+	if count <= 1 {
+		// Simple case: just delete to end of current line
+		e.deleteToEndOfLine()
+	} else {
+		// Multi-line case: delete to end of current line + (count-1) more full lines
+		// Save undo state
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+count-1)
+		
+		startRow := e.currentBuffer.cursorRow
+		startCol := e.currentBuffer.cursorCol
+		
+		// Get the text before cursor on current line
+		currentLine := e.currentBuffer.GetLine(startRow)
+		if startCol > len(currentLine) {
+			startCol = len(currentLine)
+		}
+		
+		// Keep only the part before the cursor
+		newLine := ""
+		if startCol > 0 {
+			newLine = currentLine[:startCol]
+		}
+		
+		// Calculate how many lines we can actually delete
+		totalLines := len(e.currentBuffer.lines)
+		linesToDelete := count
+		if startRow + linesToDelete - 1 > totalLines {
+			linesToDelete = totalLines - startRow + 1
+		}
+		
+		// Replace the range with just the partial first line
+		e.currentBuffer.SetLines(startRow-1, startRow+linesToDelete-1, []string{newLine})
+		
+		// Position cursor at end of the remaining text
+		e.currentBuffer.cursorCol = len(newLine)
+	}
+}
+
 // changeToEndOfLine deletes to end of line and enters insert mode
-func (e *GoEngine) changeToEndOfLine() {
-	e.deleteToEndOfLine()
+func (e *GoEngine) changeToEndOfLine(count int) {
+	// Start undo grouping for the entire change operation
+	e.inInsertUndoGroup = true
+	
+	// Save undo state for the entire change operation
+	endRow := e.currentBuffer.cursorRow + count - 1
+	if endRow > len(e.currentBuffer.lines) {
+		endRow = len(e.currentBuffer.lines)
+	}
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, endRow)
+	
+	e.changeCommandActive = true
+	e.changeCommandType = "c$"
+	e.changeCommandCount = count
+	e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	
+	e.deleteToEndOfLineWithCount(count)
 	e.mode = ModeInsert
 }
 
 // changeToStartOfLine deletes to start of line and enters insert mode
-func (e *GoEngine) changeToStartOfLine() {
+func (e *GoEngine) changeToStartOfLine(count int) {
+	// Start undo grouping for the entire change operation
+	e.inInsertUndoGroup = true
+	
+	// Save undo state for the entire change operation
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	e.changeCommandActive = true
+	e.changeCommandType = "c0"
+	e.changeCommandCount = count
+	e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	
 	e.deleteToStartOfLine()
 	e.mode = ModeInsert
 }
 
 // changeBackwardWord deletes to start of previous word and enters insert mode
-func (e *GoEngine) changeBackwardWord() {
+func (e *GoEngine) changeBackwardWord(count int) {
+	// Start undo grouping for the entire change operation
+	e.inInsertUndoGroup = true
+	
+	// Save undo state for the entire change operation
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	e.changeCommandActive = true
+	e.changeCommandType = "cb"
+	e.changeCommandCount = count
+	e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	
 	e.deleteBackwardWord()
 	e.mode = ModeInsert
 }
 
 // changeToWordEnd deletes to end of word and enters insert mode
-func (e *GoEngine) changeToWordEnd() {
+func (e *GoEngine) changeToWordEnd(count int) {
+	// Start undo grouping for the entire change operation
+	e.inInsertUndoGroup = true
+	
+	// Save undo state for the entire change operation
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	e.changeCommandActive = true
+	e.changeCommandType = "ce"
+	e.changeCommandCount = count
+	e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+	
 	e.deleteToWordEnd()
 	e.mode = ModeInsert
 }
@@ -2343,28 +2587,60 @@ func (e *GoEngine) Key(s string) {
 				e.currentCommand = ""
 				return
 			case "$":
-				e.changeToEndOfLine()
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.changeToEndOfLine(count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "0":
-				e.changeToStartOfLine()
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.changeToStartOfLine(count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "b":
-				e.changeBackwardWord()
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.changeBackwardWord(count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "e":
-				e.changeToWordEnd()
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.changeToWordEnd(count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "c":
 				// Special case for "cc" - change entire line
-				e.deleteLines(1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				
+				// Start undo grouping for the entire change operation
+				e.inInsertUndoGroup = true
+				
+				// Save undo state for the entire change operation
+				e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow+count-1)
+				
+				e.changeCommandActive = true
+				e.changeCommandType = "cc"
+				e.changeCommandCount = count
+				e.changeCommandPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
+				
+				e.deleteLines(count)
 				e.mode = ModeInsert
 				e.awaitingMotion = false
 				e.currentCommand = ""

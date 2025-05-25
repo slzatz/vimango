@@ -1235,7 +1235,8 @@ func repeatLastEdit(e *GoEngine, count int) bool {
 		// Repeat the change operation count times
 		for i := 0; i < effectiveCount; i++ {
 			// Delete the word at cursor using change-specific deletion (preserves whitespace)
-			e.changeWordDelete()
+			// Use the original count that was used with the cw command (raw version to avoid double undo save)
+			e.changeWordDeleteRaw(e.lastEditCount)
 			
 			// Insert the captured text at cursor position
 			line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
@@ -1271,6 +1272,131 @@ func repeatLastEdit(e *GoEngine, count int) bool {
 				if e.currentBuffer.cursorCol > 0 {
 					e.currentBuffer.cursorCol--
 				}
+			}
+		}
+		success = true
+		
+	case "c$":
+		// Repeat change to end of line (with original count)
+		for i := 0; i < effectiveCount; i++ {
+			// Delete to end of line using the original count
+			e.deleteToEndOfLineWithCount(e.lastEditCount)
+			
+			// Insert the recorded text
+			if e.lastEditText != "" {
+				line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+				newLine := ""
+				if e.currentBuffer.cursorCol > 0 {
+					newLine = line[:e.currentBuffer.cursorCol]
+				}
+				newLine += e.lastEditText
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+				
+				// Position cursor after inserted text
+				e.currentBuffer.cursorCol += len(e.lastEditText)
+				if e.currentBuffer.cursorCol > 0 {
+					e.currentBuffer.cursorCol--
+				}
+			}
+		}
+		success = true
+		
+	case "c0":
+		// Repeat change to start of line
+		for i := 0; i < effectiveCount; i++ {
+			// Delete to start of line
+			e.deleteToStartOfLine()
+			
+			// Insert the recorded text
+			if e.lastEditText != "" {
+				line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+				newLine := e.lastEditText + line
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+				
+				// Position cursor after inserted text
+				e.currentBuffer.cursorCol = len(e.lastEditText)
+				if e.currentBuffer.cursorCol > 0 {
+					e.currentBuffer.cursorCol--
+				}
+			}
+		}
+		success = true
+		
+	case "cb":
+		// Repeat change backward word
+		for i := 0; i < effectiveCount; i++ {
+			// Delete backward word
+			e.deleteBackwardWord()
+			
+			// Insert the recorded text
+			if e.lastEditText != "" {
+				line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+				newLine := ""
+				if e.currentBuffer.cursorCol > 0 {
+					newLine = line[:e.currentBuffer.cursorCol]
+				}
+				newLine += e.lastEditText
+				if e.currentBuffer.cursorCol < len(line) {
+					newLine += line[e.currentBuffer.cursorCol:]
+				}
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+				
+				// Position cursor after inserted text
+				e.currentBuffer.cursorCol += len(e.lastEditText)
+				if e.currentBuffer.cursorCol > 0 {
+					e.currentBuffer.cursorCol--
+				}
+			}
+		}
+		success = true
+		
+	case "ce":
+		// Repeat change to word end
+		for i := 0; i < effectiveCount; i++ {
+			// Delete to word end
+			e.deleteToWordEnd()
+			
+			// Insert the recorded text
+			if e.lastEditText != "" {
+				line := e.currentBuffer.GetLine(e.currentBuffer.cursorRow)
+				newLine := ""
+				if e.currentBuffer.cursorCol > 0 {
+					newLine = line[:e.currentBuffer.cursorCol]
+				}
+				newLine += e.lastEditText
+				if e.currentBuffer.cursorCol < len(line) {
+					newLine += line[e.currentBuffer.cursorCol:]
+				}
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow, []string{newLine})
+				
+				// Position cursor after inserted text
+				e.currentBuffer.cursorCol += len(e.lastEditText)
+				if e.currentBuffer.cursorCol > 0 {
+					e.currentBuffer.cursorCol--
+				}
+			}
+		}
+		success = true
+		
+	case "cc":
+		// Repeat change line
+		for i := 0; i < effectiveCount; i++ {
+			// Delete the entire line (use original count)
+			e.deleteLines(e.lastEditCount)
+			
+			// Insert the recorded text as a new line
+			if e.lastEditText != "" {
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow-1, []string{e.lastEditText})
+				
+				// Position cursor after inserted text
+				e.currentBuffer.cursorCol = len(e.lastEditText)
+				if e.currentBuffer.cursorCol > 0 {
+					e.currentBuffer.cursorCol--
+				}
+			} else {
+				// If no text was inserted, create an empty line
+				e.currentBuffer.SetLines(e.currentBuffer.cursorRow-1, e.currentBuffer.cursorRow-1, []string{""})
+				e.currentBuffer.cursorCol = 0
 			}
 		}
 		success = true
