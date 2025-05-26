@@ -983,33 +983,60 @@ func repeatLastEdit(e *GoEngine, count int) bool {
 		}
 
 	case "dw":
-		// Repeat delete word - call the actual function
-		e.deleteWord()
+		// Repeat delete word operation
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+		
+		// Repeat the original delete word operation (with its original count) effectiveCount times
+		for i := 0; i < effectiveCount; i++ {
+			for j := 0; j < e.lastEditCount; j++ {
+				e.deleteWordRaw()
+			}
+		}
 		success = true
 
 	case "d$":
-		// Repeat delete to end of line - call the actual function
-		e.deleteToEndOfLine()
+		// Repeat delete to end of line operation
+		// For d$, we multiply the counts: original count * dot repetition count
+		totalCount := e.lastEditCount * effectiveCount
+		e.deleteToEndOfLineWithCount(totalCount)
 		success = true
 
 	case "d0":
-		// Repeat delete to start of line - call the actual function
-		e.deleteToStartOfLine()
+		// Repeat delete to start of line operation  
+		// For d0, we multiply the counts: original count * dot repetition count
+		totalCount := e.lastEditCount * effectiveCount
+		e.deleteToStartOfLineWithCount(totalCount)
 		success = true
 
 	case "db":
-		// Repeat delete backward word - call the actual function
-		e.deleteBackwardWord()
+		// Repeat delete backward word operation
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+		
+		// Repeat the original delete backward word operation (with its original count) effectiveCount times
+		for i := 0; i < effectiveCount; i++ {
+			for j := 0; j < e.lastEditCount; j++ {
+				e.deleteBackwardWordRaw()
+			}
+		}
 		success = true
 
 	case "de":
-		// Repeat delete to word end - call the actual function
-		e.deleteToWordEnd()
+		// Repeat delete to word end operation
+		e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+		
+		// Repeat the original delete to word end operation (with its original count) effectiveCount times
+		for i := 0; i < effectiveCount; i++ {
+			for j := 0; j < e.lastEditCount; j++ {
+				e.deleteToWordEndRaw()
+			}
+		}
 		success = true
 
 	case "dd":
-		// Repeat delete lines - call the actual function
-		e.deleteLines(effectiveCount)
+		// Repeat delete lines operation
+		// For dd, we multiply the counts: original count * dot repetition count  
+		totalCount := e.lastEditCount * effectiveCount
+		e.deleteLines(totalCount)
 		success = true
 		
 	case "i":

@@ -221,3 +221,22 @@ See the TODO.md file for a detailed list of missing features and their implement
       - Change operations (cw, cb, ce, c$, c0, cc)
       - Yank operations (yw, yb, ye, y$, y0, yy)
     - Fixed "cw" to behave like "ce" as in standard Vim behavior
+
+13. **Delete Commands Count Handling and Line Safety (May 2025)**:
+    - **Fixed Critical Count Handling Issues**: d commands now properly handle count prefixes
+      - `3dw`, `2d$`, `5dd` work correctly (previously ignored count)
+      - Fixed input processing to use `e.commandCount` instead of hardcoded 1
+      - Added count-aware delete functions: `deleteWordWithCount()`, `deleteBackwardWordWithCount()`, etc.
+    - **Enhanced Dot Command Support**: All d commands now work correctly with dot (`.`) repetition
+      - `dw` then `.` repeats correctly
+      - `dw` then `2.` repeats operation 2 times  
+      - Proper count multiplication in `repeatLastEdit()` function
+    - **Fixed Line Merging Bug**: Critical issue where `dw` incorrectly merged lines
+      - `dw` at end of line no longer merges with next line (preserves vim semantics)
+      - Complete rewrite of `deleteWordRaw()` with line boundary safety
+      - Word operations now respect line boundaries unlike cursor motions
+    - **Architecture Improvements**: 
+      - Added Raw variants of delete functions for internal use without undo saves
+      - Unified architecture with change commands (count handling, dot support)
+      - Comprehensive test suite covering all edge cases and scenarios
+    - **All d commands now feature-complete**: `dw`, `db`, `de`, `d$`, `d0`, `dd` with proper count, dot, and undo support

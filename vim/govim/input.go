@@ -415,39 +415,63 @@ func (e *GoEngine) Input(s string) {
 			case "d":
 				switch s {
 				case "w":
-					e.deleteWord()
-					e.recordEditCommand("dw", 1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.deleteWordWithCount(count)
+					e.recordEditCommand("dw", count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "$":
-					e.deleteToEndOfLine()
-					e.recordEditCommand("d$", 1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.deleteToEndOfLineWithCount(count)
+					e.recordEditCommand("d$", count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "0":
-					e.deleteToStartOfLine()
-					e.recordEditCommand("d0", 1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.deleteToStartOfLineWithCount(count)
+					e.recordEditCommand("d0", count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "b":
-					e.deleteBackwardWord()
-					e.recordEditCommand("db", 1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.deleteBackwardWordWithCount(count)
+					e.recordEditCommand("db", count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "e":
-					e.deleteToWordEnd()
-					e.recordEditCommand("de", 1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.deleteToWordEndWithCount(count)
+					e.recordEditCommand("de", count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
 				case "d":
 					// Special case for "dd" - delete entire line
-					e.deleteLines(1)
-					e.recordEditCommand("dd", 1)
+					count := e.commandCount
+					if count == 0 {
+						count = 1
+					}
+					e.deleteLines(count)
+					e.recordEditCommand("dd", count)
 					e.awaitingMotion = false
 					e.currentCommand = ""
 					return
@@ -1272,66 +1296,11 @@ func (e *GoEngine) deleteWord() {
 		return
 	}
 
-	// Remember current position
-	startRow := e.currentBuffer.cursorRow
-	startCol := e.currentBuffer.cursorCol
-
-	// Find the destination by using moveWordForward
-	moveWordForward(e, 1)
-
-	// Get destination position
-	endRow := e.currentBuffer.cursorRow
-	endCol := e.currentBuffer.cursorCol
-
-	// Perform deletion
-	if startRow == endRow {
-		// Same line deletion
-		line := e.currentBuffer.GetLine(startRow)
-
-		// Ensure valid indices
-		if startCol > len(line) {
-			startCol = len(line)
-		}
-		if endCol > len(line) {
-			endCol = len(line)
-		}
-
-		// Get the text to yank (store in register)
-		e.yankRegister = line[startCol:endCol]
-
-		// Create new line with deletion
-		newLine := line[:startCol] + line[endCol:]
-		e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
-
-		// Reset cursor to start position
-		e.currentBuffer.cursorRow = startRow
-		e.currentBuffer.cursorCol = startCol
-	} else {
-		// Multi-line deletion
-		startLine := e.currentBuffer.GetLine(startRow)
-		endLine := e.currentBuffer.GetLine(endRow)
-
-		// Ensure valid indices
-		if startCol > len(startLine) {
-			startCol = len(startLine)
-		}
-		if endCol > len(endLine) {
-			endCol = len(endLine)
-		}
-
-		// Get text to yank
-		e.yankRegister = startLine[startCol:] + "\n" + endLine[:endCol]
-
-		// Create new joined line
-		newLine := startLine[:startCol] + endLine[endCol:]
-
-		// Replace the lines
-		e.currentBuffer.SetLines(startRow-1, endRow, []string{newLine})
-
-		// Reset cursor to start position
-		e.currentBuffer.cursorRow = startRow
-		e.currentBuffer.cursorCol = startCol
-	}
+	// Save undo state
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	// Use the fixed raw version
+	e.deleteWordRaw()
 }
 
 // deleteToEndOfLine deletes from cursor to end of line
@@ -1792,6 +1761,338 @@ func (e *GoEngine) deleteToEndOfLineWithCount(count int) {
 		// Position cursor at end of the remaining text
 		e.currentBuffer.cursorCol = len(newLine)
 	}
+}
+
+// deleteWordWithCount deletes count words from cursor position
+func (e *GoEngine) deleteWordWithCount(count int) {
+	if e.currentBuffer == nil || count <= 0 {
+		return
+	}
+	
+	// Save undo state
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	if count == 1 {
+		// Simple case: use existing single-word logic (but without undo save)
+		e.deleteWordRaw()
+		return
+	}
+	
+	// Multi-word case: repeat word deletion count times
+	for i := 0; i < count; i++ {
+		e.deleteWordRaw()
+	}
+}
+
+// deleteWordRaw deletes one word without undo saving (for internal use)
+func (e *GoEngine) deleteWordRaw() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Remember current position
+	startRow := e.currentBuffer.cursorRow
+	startCol := e.currentBuffer.cursorCol
+	line := e.currentBuffer.GetLine(startRow)
+
+	// Find the end of the current word on the same line
+	// Note: dw should not cross line boundaries unlike the w motion
+	endCol := startCol
+	
+	// Skip to end of current word (word characters)
+	for endCol < len(line) && isWordChar(line[endCol]) {
+		endCol++
+	}
+	
+	// Skip trailing whitespace after the word (but not past end of line)
+	for endCol < len(line) && (line[endCol] == ' ' || line[endCol] == '\t') {
+		endCol++
+	}
+	
+	// If we haven't moved at all (e.g., on whitespace), try to delete the whitespace
+	if endCol == startCol {
+		// Skip whitespace to find the next word
+		for endCol < len(line) && !isWordChar(line[endCol]) {
+			endCol++
+		}
+	}
+	
+	// Ensure we don't go beyond the line
+	if endCol > len(line) {
+		endCol = len(line)
+	}
+
+	// Perform deletion (always same-line for dw)
+	if endCol > startCol {
+		// Get the text to yank (store in register)
+		e.yankRegister = line[startCol:endCol]
+
+		// Create new line with deletion
+		newLine := line[:startCol] + line[endCol:]
+		e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+	}
+
+	// Reset cursor to start position
+	e.currentBuffer.cursorRow = startRow
+	e.currentBuffer.cursorCol = startCol
+}
+
+// deleteBackwardWordWithCount deletes count words backward from cursor position
+func (e *GoEngine) deleteBackwardWordWithCount(count int) {
+	if e.currentBuffer == nil || count <= 0 {
+		return
+	}
+	
+	// Save undo state
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	if count == 1 {
+		// Simple case: use existing single-word logic (but without undo save)
+		e.deleteBackwardWordRaw()
+		return
+	}
+	
+	// Multi-word case: repeat backward word deletion count times
+	for i := 0; i < count; i++ {
+		e.deleteBackwardWordRaw()
+	}
+}
+
+// deleteBackwardWordRaw deletes one word backward without undo saving (for internal use)
+func (e *GoEngine) deleteBackwardWordRaw() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Remember current position
+	startRow := e.currentBuffer.cursorRow
+	startCol := e.currentBuffer.cursorCol
+
+	// Find the destination by using moveWordBackward
+	moveWordBackward(e, 1)
+
+	// Get destination position
+	endRow := e.currentBuffer.cursorRow
+	endCol := e.currentBuffer.cursorCol
+
+	// Perform deletion (swap start and end since we're going backward)
+	if startRow == endRow {
+		// Same line deletion
+		line := e.currentBuffer.GetLine(startRow)
+
+		// Ensure valid indices
+		if startCol > len(line) {
+			startCol = len(line)
+		}
+		if endCol > len(line) {
+			endCol = len(line)
+		}
+
+		// Get the text to yank (store in register)
+		e.yankRegister = line[endCol:startCol]
+
+		// Create new line with deletion
+		newLine := line[:endCol] + line[startCol:]
+		e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+
+		// Set cursor to deletion start position
+		e.currentBuffer.cursorRow = startRow
+		e.currentBuffer.cursorCol = endCol
+	} else {
+		// Multi-line deletion
+		startLine := e.currentBuffer.GetLine(startRow)
+		endLine := e.currentBuffer.GetLine(endRow)
+
+		// Ensure valid indices
+		if startCol > len(startLine) {
+			startCol = len(startLine)
+		}
+		if endCol > len(endLine) {
+			endCol = len(endLine)
+		}
+
+		// Build the replacement line
+		newLine := endLine[:endCol] + startLine[startCol:]
+
+		// Store yanked text (simplified for multi-line)
+		e.yankRegister = endLine[endCol:]
+
+		// Replace the range with the new combined line
+		e.currentBuffer.SetLines(endRow-1, startRow, []string{newLine})
+
+		// Set cursor to deletion start position
+		e.currentBuffer.cursorRow = endRow
+		e.currentBuffer.cursorCol = endCol
+	}
+}
+
+// deleteToWordEndWithCount deletes to the end of count words from cursor position
+func (e *GoEngine) deleteToWordEndWithCount(count int) {
+	if e.currentBuffer == nil || count <= 0 {
+		return
+	}
+	
+	// Save undo state
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	if count == 1 {
+		// Simple case: use existing single-word logic (but without undo save)
+		e.deleteToWordEndRaw()
+		return
+	}
+	
+	// Multi-word case: repeat word end deletion count times
+	for i := 0; i < count; i++ {
+		e.deleteToWordEndRaw()
+	}
+}
+
+// deleteToWordEndRaw deletes to the end of one word without undo saving (for internal use)
+func (e *GoEngine) deleteToWordEndRaw() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	// Remember current position
+	startRow := e.currentBuffer.cursorRow
+	startCol := e.currentBuffer.cursorCol
+
+	// Find the destination by using moveWordEnd
+	moveWordEnd(e, 1)
+
+	// Get destination position
+	endRow := e.currentBuffer.cursorRow
+	endCol := e.currentBuffer.cursorCol
+
+	// Perform deletion
+	if startRow == endRow {
+		// Same line deletion
+		line := e.currentBuffer.GetLine(startRow)
+
+		// Ensure valid indices
+		if startCol > len(line) {
+			startCol = len(line)
+		}
+		if endCol > len(line) {
+			endCol = len(line)
+		}
+
+		// Include the character at the end position for 'e' motion
+		if endCol < len(line) {
+			endCol++
+		}
+
+		// Get the text to yank (store in register)
+		e.yankRegister = line[startCol:endCol]
+
+		// Create new line with deletion
+		newLine := line[:startCol] + line[endCol:]
+		e.currentBuffer.SetLines(startRow-1, startRow, []string{newLine})
+
+		// Reset cursor to start position
+		e.currentBuffer.cursorRow = startRow
+		e.currentBuffer.cursorCol = startCol
+	} else {
+		// Multi-line deletion
+		startLine := e.currentBuffer.GetLine(startRow)
+		endLine := e.currentBuffer.GetLine(endRow)
+
+		// Ensure valid indices
+		if startCol > len(startLine) {
+			startCol = len(startLine)
+		}
+		if endCol > len(endLine) {
+			endCol = len(endLine)
+		}
+
+		// Include the character at the end position for 'e' motion
+		if endCol < len(endLine) {
+			endCol++
+		}
+
+		// Build the replacement line
+		newLine := startLine[:startCol] + endLine[endCol:]
+
+		// Store yanked text (simplified for multi-line)
+		e.yankRegister = startLine[startCol:]
+
+		// Replace the range with the new combined line
+		e.currentBuffer.SetLines(startRow-1, endRow, []string{newLine})
+
+		// Reset cursor to start position
+		e.currentBuffer.cursorRow = startRow
+		e.currentBuffer.cursorCol = startCol
+	}
+}
+
+// deleteToStartOfLineWithCount deletes to start of line, optionally including previous lines
+func (e *GoEngine) deleteToStartOfLineWithCount(count int) {
+	if e.currentBuffer == nil || count <= 0 {
+		return
+	}
+	
+	// Save undo state
+	e.UndoSaveRegion(e.currentBuffer.cursorRow, e.currentBuffer.cursorRow)
+	
+	if count == 1 {
+		// Simple case: use existing single-line logic (but without undo save)
+		e.deleteToStartOfLineRaw()
+		return
+	}
+	
+	// Multi-line case: delete to start of current line + previous (count-1) lines
+	startRow := e.currentBuffer.cursorRow
+	startCol := e.currentBuffer.cursorCol
+	
+	// Calculate target row
+	targetRow := startRow - count + 1
+	if targetRow < 1 {
+		targetRow = 1
+	}
+	
+	// Get the text after cursor on current line
+	currentLine := e.currentBuffer.GetLine(startRow)
+	if startCol > len(currentLine) {
+		startCol = len(currentLine)
+	}
+	
+	// Keep only the part after the cursor
+	newLine := ""
+	if startCol < len(currentLine) {
+		newLine = currentLine[startCol:]
+	}
+	
+	// Replace the range with just the partial line
+	e.currentBuffer.SetLines(targetRow-1, startRow, []string{newLine})
+	
+	// Position cursor at start of line
+	e.currentBuffer.cursorRow = targetRow
+	e.currentBuffer.cursorCol = 0
+}
+
+// deleteToStartOfLineRaw deletes to start of line without undo saving (for internal use)
+func (e *GoEngine) deleteToStartOfLineRaw() {
+	if e.currentBuffer == nil {
+		return
+	}
+
+	row := e.currentBuffer.cursorRow
+	col := e.currentBuffer.cursorCol
+	line := e.currentBuffer.GetLine(row)
+
+	if col > len(line) {
+		col = len(line)
+	}
+
+	// Store deleted text in yank register
+	e.yankRegister = line[:col]
+
+	// Create new line with deletion
+	newLine := line[col:]
+	e.currentBuffer.SetLines(row-1, row, []string{newLine})
+
+	// Move cursor to start of line
+	e.currentBuffer.cursorCol = 0
 }
 
 // changeToEndOfLine deletes to end of line and enters insert mode
@@ -2538,39 +2839,63 @@ func (e *GoEngine) Key(s string) {
 		case "d":
 			switch s {
 			case "w":
-				e.deleteWord()
-				e.recordEditCommand("dw", 1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.deleteWordWithCount(count)
+				e.recordEditCommand("dw", count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "$":
-				e.deleteToEndOfLine()
-				e.recordEditCommand("d$", 1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.deleteToEndOfLineWithCount(count)
+				e.recordEditCommand("d$", count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "0":
-				e.deleteToStartOfLine()
-				e.recordEditCommand("d0", 1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.deleteToStartOfLineWithCount(count)
+				e.recordEditCommand("d0", count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "b":
-				e.deleteBackwardWord()
-				e.recordEditCommand("db", 1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.deleteBackwardWordWithCount(count)
+				e.recordEditCommand("db", count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "e":
-				e.deleteToWordEnd()
-				e.recordEditCommand("de", 1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.deleteToWordEndWithCount(count)
+				e.recordEditCommand("de", count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return
 			case "d":
 				// Special case for "dd" - delete entire line
-				e.deleteLines(1)
-				e.recordEditCommand("dd", 1)
+				count := e.commandCount
+				if count == 0 {
+					count = 1
+				}
+				e.deleteLines(count)
+				e.recordEditCommand("dd", count)
 				e.awaitingMotion = false
 				e.currentCommand = ""
 				return

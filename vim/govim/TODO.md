@@ -45,6 +45,14 @@ This document tracks the planned work and priorities for the pure Go vim impleme
    - [x] Implement special cases (cw behaving like ce)
    - [x] Implement r (replace character)
    - [x] Implement ~ (toggle case)
+   - [x] **DELETE COMMANDS COUNT HANDLING (May 2025)**:
+     - [x] Fix critical count handling issues for all d commands (3dw, 2d$, 5dd)
+     - [x] Add count-aware delete functions (deleteWordWithCount, etc.)
+     - [x] Fix dot command replay to properly handle counts and repetition
+     - [x] Fix line merging bug where dw incorrectly merged lines
+     - [x] Implement proper line boundary safety for word operations
+     - [x] Add comprehensive test suite for all delete command scenarios
+     - [x] Achieve feature parity with c commands for count, dot, and undo support
 
 4. **Mode Transitions**
    - [x] Fix Escape key handling for all modes
