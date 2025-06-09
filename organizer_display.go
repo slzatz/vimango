@@ -479,9 +479,11 @@ func (o *Organizer) drawSearchRows() {
 		ab.WriteString(o.rows[fr].sort)
 		ab.WriteString(lf_ret)
 
-		fmt.Print(ab.String())
+		//fmt.Print(ab.String())
 	}
+	fmt.Print(ab.String())
 }
+
 func (o *Organizer) drawSearchRows_() {
 
 	if len(o.rows) == 0 {
