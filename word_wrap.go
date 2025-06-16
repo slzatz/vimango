@@ -7,6 +7,83 @@ import (
 	"github.com/mattn/go-runewidth" // Import the key library
 )
 
+// SegmentType indicates whether a text segment contains words or spaces
+type SegmentType int
+
+const (
+	SegmentWord SegmentType = iota
+	SegmentSpace
+)
+
+// TextSegment represents a portion of text that is either words or spaces
+type TextSegment struct {
+	Type    SegmentType
+	Content string
+}
+
+// parseWordsWithSpaces parses a line into alternating word and space segments,
+// preserving the exact spacing between words
+func parseWordsWithSpaces(line string) []TextSegment {
+	if len(line) == 0 {
+		return []TextSegment{}
+	}
+	
+	var segments []TextSegment
+	var currentSegment strings.Builder
+	var currentType SegmentType
+	var inWord bool
+	
+	// Determine initial state based on first character
+	firstRune := rune(line[0])
+	if firstRune == ' ' || firstRune == '\t' {
+		currentType = SegmentSpace
+		inWord = false
+	} else {
+		currentType = SegmentWord
+		inWord = true
+	}
+	
+	for _, r := range line {
+		isSpace := (r == ' ' || r == '\t')
+		
+		if isSpace && inWord {
+			// Transition from word to space
+			if currentSegment.Len() > 0 {
+				segments = append(segments, TextSegment{
+					Type:    currentType,
+					Content: currentSegment.String(),
+				})
+				currentSegment.Reset()
+			}
+			currentType = SegmentSpace
+			inWord = false
+		} else if !isSpace && !inWord {
+			// Transition from space to word
+			if currentSegment.Len() > 0 {
+				segments = append(segments, TextSegment{
+					Type:    currentType,
+					Content: currentSegment.String(),
+				})
+				currentSegment.Reset()
+			}
+			currentType = SegmentWord
+			inWord = true
+		}
+		
+		currentSegment.WriteRune(r)
+	}
+	
+	// Add the final segment
+	if currentSegment.Len() > 0 {
+		segments = append(segments, TextSegment{
+			Type:    currentType,
+			Content: currentSegment.String(),
+		})
+	}
+	
+	return segments
+}
+
 func visibleWidth(s string) int {
 	width := 0
 	state := 0 // 0: Normal, 1: Saw ESC, 2: Inside CSI
@@ -129,13 +206,27 @@ func WordWrap(text string, limit int) string {
 	for i, line := range originalLines {
 		var currentLineBuilder strings.Builder
 		currentLineWidth := 0
-		spaceWidth := runewidth.StringWidth(" ") // Usually 1
 
-		words := strings.Fields(line)
+		segments := parseWordsWithSpaces(line)
 
-		// Use blank identifier '_' as wordIdx is not needed
-		for _, word := range words { // <--- FIXED HERE
-			wordWidth := visibleWidth(word)
+		for _, segment := range segments {
+			segmentWidth := visibleWidth(segment.Content)
+			
+			// Handle space segments
+			if segment.Type == SegmentSpace {
+				// Include spaces if they fit within the limit
+				// This preserves both inter-word spacing and leading indentation
+				if currentLineWidth+segmentWidth <= limit {
+					currentLineBuilder.WriteString(segment.Content)
+					currentLineWidth += segmentWidth
+				}
+				// If spaces don't fit, skip them (trailing spaces at line breaks)
+				continue
+			}
+			
+			// Handle word segments (original word logic)
+			word := segment.Content
+			wordWidth := segmentWidth
 
 			// --- Check if word needs breaking ---
 			if wordWidth > limit {
@@ -171,18 +262,8 @@ func WordWrap(text string, limit int) string {
 			}
 
 			// --- Normal word fitting logic ---
-			neededWidth := wordWidth
-			// Add space width only if the current line already has content
-			if currentLineWidth > 0 {
-				neededWidth += spaceWidth
-			}
-
-			if currentLineWidth+neededWidth <= limit {
+			if currentLineWidth+wordWidth <= limit {
 				// Word fits
-				if currentLineWidth > 0 {
-					currentLineBuilder.WriteByte(' ')
-					currentLineWidth += spaceWidth
-				}
 				currentLineBuilder.WriteString(word)
 				currentLineWidth += wordWidth
 			} else {
