@@ -479,21 +479,16 @@ func (e *Editor) highlightMispelledWords() {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
 	e.highlightPositions = nil
 	curPos := vim.GetCursorPosition()
-	vim.SendMultiInput("gg^")
-	var pos, prevPos [2]int
-	for {
-		vim.SendInput("w")
-		prevPos = pos
-		pos = vim.GetCursorPosition()
-		if pos == prevPos {
-			break
+	for i, line := range e.ss {
+		wordPositions := GetWordPositionsSingleLine(line)
+		for _, wp := range wordPositions {
+			if h.Spell(wp.Word) {
+				continue
+			}
+			e.highlightPositions = append(e.highlightPositions, Position{i, wp.Start, wp.End + 1})
 		}
-		w := vim.EvaluateExpression("expand('<cword>')")
-		if ok := h.Spell(w); ok {
-			continue
-		}
-		e.highlightPositions = append(e.highlightPositions, Position{pos[0] - 1, pos[1], pos[1] + len(w)})
 	}
+
 	vim.SetCursorPosition(curPos[0], curPos[1]) //return cursor to where it was
 }
 
@@ -507,6 +502,9 @@ func (e *Editor) drawHighlights(pab *strings.Builder) {
 	}
 	for _, p := range e.highlightPositions {
 		row := e.ss[p.rowNum]
+		if p.start < 0 || p.end > len(row) {
+			continue // skip if out of bounds
+		}
 		chars := "\x1b[48;5;31m" + string(row[p.start:p.end]) + "\x1b[0m"
 		start := utf8.RuneCountInString(row[:p.start])
 		y := e.getScreenYFromRowColWW(p.rowNum, start) + e.top_margin - e.lineOffset          // - 1

@@ -390,7 +390,9 @@ func (e *Editor) spellingCheck(_ int) {
 
 func (e *Editor) spellSuggest(_ int) {
 	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
-	w := vim.EvaluateExpression("expand('<cword>')")
+	curPos := vim.GetCursorPosition()
+	w, _, _ := GetWordAtIndex(e.ss[curPos[0]-1], curPos[1])
+	//w := vim.EvaluateExpression("expand('<cword>')")
 	if ok := h.Spell(w); ok {
 		e.ShowMessage(BR, "%q is spelled correctly", w)
 		return
