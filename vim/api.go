@@ -16,21 +16,11 @@ import (
 // either  CGOEngineWrapper or  GoEngineWrapper, which satisfy the VimEngine interface
 var Engine interfaces.VimEngine
 
-// InitializeVim sets up the vim engine with the selected implementation
-func InitializeVim(useGoImplementation bool, argc int) {
-	// Set the implementation
-	if useGoImplementation {
-		SwitchToGoImplementation()
-	} else {
-		SwitchToCImplementation()
-	}
+// activeImpl is the current implementation (C or Go)
+var activeImpl VimImplementation
 
-	// Get the engine wrapper for the active implementation
-	Engine = GetEngineWrapper()
-
-	// Initialize vim
-	Engine.Init(argc)
-}
+// ActiveImplementation tracks which implementation is active
+var ActiveImplementation = ImplC
 
 // API Functions that deal with which implementation is being used
 
@@ -55,12 +45,6 @@ func SwitchToGoImplementation() {
 	activeImpl = goImpl
 }
 
-// SwitchToCImplementation switches to the C implementation
-func SwitchToCImplementation() {
-	ActiveImplementation = ImplC
-	activeImpl = &CGOImplementation{}
-}
-
 // GetActiveImplementation returns the name of the active implementation
 func GetActiveImplementation() string {
 	return activeImpl.GetName()
@@ -71,14 +55,7 @@ func GetEngineWrapper() interfaces.VimEngine {
 	return activeImpl.GetEngineWrapper()
 }
 
-// Init initializes vim
-func Init(argc int) {
-	if Engine == nil {
-		InitializeVim(false, argc)
-	} else {
-		Engine.Init(argc)
-	}
-}
+
 
 // API Functions - These functions are called by package main as vim.OpenBuffer (..) for example
 
@@ -228,29 +205,7 @@ func BufferSetLines(buf cvim.Buffer, start, end int, lines []string, count int) 
 }
 
 // ToggleImplementation switches between Go and C implementations
-func ToggleImplementation() string {
-	// Get current buffer before switching to ensure we can
-	// reset its state after the switch
-	var currentBuffer interfaces.VimBuffer
-	if Engine != nil {
-		currentBuffer = Engine.BufferGetCurrent()
-	}
 
-	// Switch implementation
-	if IsUsingGoImplementation() {
-		SwitchToCImplementation()
-	} else {
-		SwitchToGoImplementation()
-	}
-
-	// Reset buffer state if we had an active buffer
-	if currentBuffer != nil && Engine != nil {
-		// Force buffer reset to clean any stale state
-		Engine.BufferSetCurrent(currentBuffer)
-	}
-
-	return GetActiveImplementation()
-}
 
 // Helper functions to convert between buffer types
 
