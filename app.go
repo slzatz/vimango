@@ -167,7 +167,7 @@ func (a *App) InitDatabases(configPath string) error {
 		return err
 	}
 	// Initialize main database
-	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
+	a.Database.MainDB, err = sql.Open("sqlite", config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (a *App) InitDatabases(configPath string) error {
 		return err
 	}
 	// Initialize FTS database
-	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
+	a.Database.FtsDB, err = sql.Open("sqlite", config.Sqlite3.FTS_DB)
 	if err != nil {
 		return err
 	}

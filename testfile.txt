@@ -1,3 +1,0 @@
-This is ⌘ the first line of a test file
-This is the second line of a test file
-This is the third line of a test file

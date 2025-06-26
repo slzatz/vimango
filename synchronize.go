@@ -11,7 +11,7 @@ import (
 
 	"github.com/lib/pq" //should go eventually
 	// _ "github.com/lib/pq" //should go eventually
-	// _ "github.com/mattn/go-sqlite3"
+	// _ "modernc.org/sqlite"
 )
 
 type EntryPlusTag struct {

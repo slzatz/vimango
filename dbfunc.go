@@ -9,7 +9,7 @@ import (
 
 	//"github.com/lib/pq"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type Database struct {

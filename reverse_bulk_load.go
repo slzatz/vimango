@@ -8,7 +8,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func getEntriesBulkReverse(dbase *sql.DB, count int, plg io.Writer) []NewEntry {
