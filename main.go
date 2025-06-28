@@ -17,14 +17,10 @@ var app *App
 func main() {
 	app = CreateApp()
 
-	// Initialize Vim
-	// Configure Vim - Enable Go implementation with the --go-vim flag
-	useGoVim := false
-	for _, arg := range os.Args {
-		if arg == "--go-vim" {
-			useGoVim = true
-		}
-	}
+	// Configure Vim implementation selection
+	vimConfig := DetermineVimDriver(os.Args)
+	LogVimDriverChoice(vimConfig)
+	useGoVim := vimConfig.ShouldUseGoVim()
 
 	// Set up logging if Go implementation is used
 	if useGoVim {

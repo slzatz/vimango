@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
@@ -92,14 +91,6 @@ func SetCurrentBuffer(buf interfaces.VimBuffer) {
 	Engine.BufferSetCurrent(buf)
 }
 
-// For backward compatibility with existing code
-func BufferSetCurrent(buf cvim.Buffer) {
-	if buf == nil {
-		return
-	}
-	wrapper := &CGOBufferWrapper{buf: buf}
-	Engine.BufferSetCurrent(wrapper)
-}
 
 // GetCursorLine gets the current cursor line
 func GetCursorLine() int {
@@ -177,54 +168,9 @@ func IsUsingGoImplementation() bool {
 
 // Additional backward compatibility functions
 
-// BufferLines gets all lines from a buffer (old style)
-func BufferLines(buf cvim.Buffer) []string {
-	if buf == nil {
-		return nil
-	}
-	wrapper := &CGOBufferWrapper{buf: buf}
-	return wrapper.Lines()
-}
-
-// BufferGetLastChangedTick gets the last changed tick
-func BufferGetLastChangedTick(buf cvim.Buffer) int {
-	if buf == nil {
-		return 0
-	}
-	wrapper := &CGOBufferWrapper{buf: buf}
-	return wrapper.GetLastChangedTick()
-}
-
-// BufferSetLines sets lines in a buffer
-func BufferSetLines(buf cvim.Buffer, start, end int, lines []string, count int) {
-	if buf == nil {
-		return
-	}
-	wrapper := &CGOBufferWrapper{buf: buf}
-	wrapper.SetLines(start, end, lines)
-}
 
 // ToggleImplementation switches between Go and C implementations
 
 
 // Helper functions to convert between buffer types
-
-// BufferToVimBuffer converts an old-style Buffer to a VimBuffer interface
-func BufferToVimBuffer(buf cvim.Buffer) interfaces.VimBuffer {
-	if buf == nil {
-		return nil
-	}
-	return &CGOBufferWrapper{buf: buf}
-}
-
-// VimBufferToBuffer attempts to convert a VimBuffer to a Buffer
-// Returns nil if conversion is not possible
-func VimBufferToBuffer(buf interfaces.VimBuffer) cvim.Buffer {
-	if buf == nil {
-		return nil
-	}
-	if wrapper, ok := buf.(*CGOBufferWrapper); ok {
-		return wrapper.buf
-	}
-	return nil
-}
+// (CGO-specific conversion functions are in api_cgo_compat.go)

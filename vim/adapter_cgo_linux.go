@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build cgo && !windows
 
 package vim
 
@@ -19,6 +19,7 @@ func (c *CGOImplementation) GetEngineWrapper() interfaces.VimEngine {
 func (c *CGOImplementation) GetName() string {
 	return ImplC
 }
+
 
 // activeImpl is the current implementation (C or Go)
 // This is initialized here for non-Windows builds

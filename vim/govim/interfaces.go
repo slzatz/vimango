@@ -1,5 +1,3 @@
-//go:build ignore
-
 package govim
 
 // Buffer interface mirrors the buf_T functionality from C

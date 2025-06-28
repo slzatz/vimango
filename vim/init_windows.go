@@ -23,6 +23,7 @@ func SwitchToCImplementation() {
     panic("Attempted to use CGO implementation on Windows")
 }
 
+
 // ToggleImplementation switches between Go and C implementations
 func ToggleImplementation() string {
 	// Get current buffer before switching to ensure we can
