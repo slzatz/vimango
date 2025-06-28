@@ -39,8 +39,12 @@ func main() {
 	// Initialize Vim with the appropriate implementation
 	vim.InitializeVim(useGoVim, 0)
 
+	// Configure SQLite driver selection
+	sqliteConfig := DetermineSQLiteDriver(os.Args)
+	LogSQLiteDriverChoice(sqliteConfig)
+
 	// Initialize database connections
-	err := app.InitDatabases("config.json")
+	err := app.InitDatabases("config.json", sqliteConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lib/pq" //should go eventually
-	// _ "github.com/lib/pq" //should go eventually
-	// _ "modernc.org/sqlite"
+	"github.com/lib/pq"
+	_ "modernc.org/sqlite"
 )
 
 type EntryPlusTag struct {
