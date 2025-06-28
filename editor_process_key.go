@@ -140,8 +140,10 @@ func (e *Editor) editorProcessKey(c int) bool {
 			// and LastIndex doesn't work for run
 			// so total kluge below
 			//if e.command_line[0] == '%'
-			if strings.Index(e.command_line, "s/") != -1 {
-				if strings.LastIndex(e.command_line, "/") < strings.LastIndex(e.command_line, "c") {
+			//if strings.Index(e.command_line, "s/") != -1 {
+			if strings.HasPrefix(e.command_line, "s/") || strings.HasPrefix(e.command_line, "%s/") {
+				if strings.HasSuffix(e.command_line, "/c") {
+					//if strings.LastIndex(e.command_line, "/") < strings.LastIndex(e.command_line, "c") {
 					e.ShowMessage(BR, "We don't support [c]onfirm")
 					e.mode = NORMAL
 					return false
