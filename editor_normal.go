@@ -6,7 +6,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/slzatz/vimango/hunspell"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -381,6 +380,11 @@ func (e *Editor) readGoTemplate(_ int) {
 
 func (e *Editor) spellingCheck(_ int) {
 	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
+	if !IsSpellCheckAvailable() {
+		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
+		return
+	}
+	
 	if e.isModified() {
 		e.ShowMessage(BR, "%sYou need to write the note before highlighting text%s", RED_BG, RESET)
 		return
@@ -389,16 +393,22 @@ func (e *Editor) spellingCheck(_ int) {
 }
 
 func (e *Editor) spellSuggest(_ int) {
-	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
+	if !IsSpellCheckAvailable() {
+		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
+		return
+	}
+
 	curPos := vim.GetCursorPosition()
 	w, _, _ := GetWordAtIndex(e.ss[curPos[0]-1], curPos[1])
 	//w := vim.EvaluateExpression("expand('<cword>')")
-	if ok := h.Spell(w); ok {
+	
+	if CheckSpelling(w) {
 		e.ShowMessage(BR, "%q is spelled correctly", w)
 		return
 	}
-	s := h.Suggest(w)
-	e.ShowMessage(BR, "%q -> %s", w, strings.Join(s, "|"))
+	
+	suggestions := GetSpellingSuggestions(w)
+	e.ShowMessage(BR, "%q -> %s", w, strings.Join(suggestions, "|"))
 }
 
 func (e *Editor) switchImplementation(_ int) {

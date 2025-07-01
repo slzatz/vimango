@@ -11,7 +11,6 @@ import (
 	//	"time"
 	"unicode/utf8"
 
-	"github.com/slzatz/vimango/hunspell"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -476,13 +475,17 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 }
 
 func (e *Editor) highlightMispelledWords() {
-	h := hunspell.Hunspell("/usr/share/hunspell/en_US.aff", "/usr/share/hunspell/en_US.dic")
+	if !IsSpellCheckAvailable() {
+		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
+		return
+	}
+
 	e.highlightPositions = nil
 	curPos := vim.GetCursorPosition()
 	for i, line := range e.ss {
 		wordPositions := GetWordPositionsSingleLine(line)
 		for _, wp := range wordPositions {
-			if h.Spell(wp.Word) {
+			if CheckSpelling(wp.Word) {
 				continue
 			}
 			e.highlightPositions = append(e.highlightPositions, Position{i, wp.Start, wp.End + 1})
