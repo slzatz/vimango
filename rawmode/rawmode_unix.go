@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func GetWindowSize() (*unix.Winsize, error) {
+func GetWindowSize() (*Winsize, error) {
 
 	ws, err := unix.IoctlGetWinsize(unix.Stdout, unix.TIOCGWINSZ)
 	if err != nil {
@@ -20,7 +20,13 @@ func GetWindowSize() (*unix.Winsize, error) {
 		return nil, fmt.Errorf("Got a zero size column or row")
 	}
 
-	return ws, nil
+	// Convert unix.Winsize to our platform-agnostic Winsize
+	return &Winsize{
+		Row:    ws.Row,
+		Col:    ws.Col,
+		Xpixel: ws.Xpixel,
+		Ypixel: ws.Ypixel,
+	}, nil
 
 }
 

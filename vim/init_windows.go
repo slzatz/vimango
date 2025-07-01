@@ -3,9 +3,7 @@
 package vim
 
 import (
-    "fmt"
-    "log"
-    "os"
+    "github.com/slzatz/vimango/vim/interfaces"
 )
 
 // InitializeVim forces the Go implementation on Windows.

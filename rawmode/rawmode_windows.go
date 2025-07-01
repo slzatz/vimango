@@ -14,17 +14,24 @@ type winConsoleSettings struct {
 	Out uint32
 }
 
-// GetWindowSize returns the number of rows and columns in that order
-// in the current console
-func GetWindowSize() (int, int, error) {
+// GetWindowSize returns the window size in a platform-agnostic way
+func GetWindowSize() (*Winsize, error) {
 
 	info := windows.ConsoleScreenBufferInfo{}
 
 	if err := windows.GetConsoleScreenBufferInfo(windows.Stdout, &info); err != nil {
-		return 0, 0, fmt.Errorf("error fetching Screen Size: %w", err)
+		return nil, fmt.Errorf("error fetching Screen Size: %w", err)
 	}
 
-	return int(info.Window.Bottom - info.Window.Top + 1), int(info.Window.Right - info.Window.Left + 1), nil
+	rows := uint16(info.Window.Bottom - info.Window.Top + 1)
+	cols := uint16(info.Window.Right - info.Window.Left + 1)
+
+	return &Winsize{
+		Row:    rows,
+		Col:    cols,
+		Xpixel: 0, // Not available on Windows console
+		Ypixel: 0, // Not available on Windows console
+	}, nil
 
 }
 

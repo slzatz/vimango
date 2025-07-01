@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/slzatz/vimango/rawmode"
-	"golang.org/x/sys/unix"
 )
 
 type Screen struct {
@@ -17,7 +16,7 @@ type Screen struct {
 	totaleditorcols int
 	imgSizeY        int
 	edPct           int          // percent that editor space takes up of whole horiz screen real estate
-	ws              unix.Winsize //Row,Col,Xpixel,Ypixel unint16
+	ws              rawmode.Winsize //Row,Col,Xpixel,Ypixel unint16
 	Session         *Session
 	//images           map[string]*image.Image
 }

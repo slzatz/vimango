@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/vim"
@@ -45,16 +43,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Set up signal handling for terminal resize
-	signal_chan := make(chan os.Signal, 1)
-	signal.Notify(signal_chan, syscall.SIGWINCH)
-
-	go func() {
-		for {
-			_ = <-signal_chan
-			app.signalHandler()
-		}
-	}()
+	// Set up platform-specific signal handling
+	setupSignalHandling(app)
 
 	// Configure Vim settings
 	vim.ExecuteCommand("set iskeyword+=*")
