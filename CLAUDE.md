@@ -43,7 +43,15 @@ This file provides guidance to GEMINI.md when working with code in this reposito
 
 ## Cross-Compilation Support
 The application now supports full Windows cross-compilation from Linux/Unix systems:
-- Platform-specific signal handling (SIGWINCH on Unix, no-op on Windows)
+- Platform-specific signal handling:
+  - Unix: SIGWINCH signal detection for terminal resize events
+  - Windows: Polling-based terminal resize detection (100ms intervals)
 - Platform-agnostic terminal window size detection via rawmode package
 - Conditional compilation for Unix-specific filesystem operations
 - All platform-specific code isolated using build constraints
+
+## Terminal Resize Handling
+- **Unix/Linux**: Uses SIGWINCH signal for immediate resize detection
+- **Windows**: Implements polling-based resize detection that checks terminal size every 100ms
+- Both platforms call the same `signalHandler()` method to update screen layout
+- Automatic screen redraw and layout adjustment on terminal resize
