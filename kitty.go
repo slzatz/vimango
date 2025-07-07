@@ -3,13 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
-	"image"
-
-	//	_ "image/jpg"
-	"image/png"
 	"io"
-	"os"
 )
 
 const (
@@ -17,29 +13,12 @@ const (
 	KITTY_IMG_FTR = "\x1b\\"
 )
 
-// NOTE: uses $TERM, which is overwritten by tmux
-func IsTermKitty() bool {
-
-	V := GetEnvIdentifiers()
-	return V["TERM"] == "xterm-kitty"
-}
-
-/*
-Encode image using the Kitty terminal graphics protocol:
-https://sw.kovidgoyal.net/kitty/graphics-protocol.html
-*/
-func KittyWriteImage__(out io.Writer, iImg image.Image) error {
-
-	pBuf := new(bytes.Buffer)
-	if err := png.Encode(pBuf, iImg); err != nil {
-		return err
-	}
-
-	return KittyCopyPNGInline(out, pBuf, int64(pBuf.Len()))
-}
-
-// NOTE: Encode raw PNG data into Kitty terminal format
+// Encode raw PNG data into Kitty terminal format
 func KittyCopyPNGInline(out io.Writer, in io.Reader, nLen int64) (E error) {
+
+	if app.kitty == false {
+		return errors.New("This is not a kitty terminal")
+	}
 
 	OSC_OPEN, OSC_CLOSE := KITTY_IMG_HDR, KITTY_IMG_FTR
 
@@ -80,42 +59,3 @@ func KittyCopyPNGInline(out io.Writer, in io.Reader, nLen int64) (E error) {
 	_, E = io.Copy(enc64, in)
 	return
 }
-
-func displayImage(img image.Image) {
-
-	buf := new(bytes.Buffer)
-	err := png.Encode(buf, img)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error encoding image: %v", err)
-		return
-	}
-
-	err = KittyCopyPNGInline(os.Stdout, buf, int64(buf.Len()))
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in KittyCopyPNG...: %v", err)
-	}
-}
-
-/*
-func displayImage3(img image.Image, format string) {
-
-	if format == "jpg" {
-		pBuf := new(bytes.Buffer)
-		err := png.Encode(pBuf, img)
-		if err != nil {
-			sess.showOrgMessage("Error encoding image: %v", err)
-			return
-		}
-
-		err := KittyCopyPNGInline(os.Stdout, pBuf, int64(pBuf.Len()))
-		if err != nil {
-			sess.showOrgMessage("Error writing image: %v", err)
-		}
-	} else {
-		err := KittyCopyPNGInline(os.Stdout, img, len(img))
-		if err != nil {
-			sess.showOrgMessage("Error writing image: %v", err)
-		}
-	}
-}
-*/

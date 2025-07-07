@@ -29,6 +29,7 @@ type App struct {
 	//LastSync      time.Time // calculated when syncing but not saved
 	SyncInProcess bool
 	Run           bool
+	kitty         bool   // true if running in kitty terminal
 	origTermCfg   []byte // original terminal configuration
 }
 
@@ -38,6 +39,7 @@ func CreateApp() *App {
 	sess := &Session{}
 	screen := &Screen{Session: sess}
 	sess.Windows = make([]Window, 0)
+	kitty := IsTermKitty()
 	return &App{
 		Session:  sess,
 		Screen:   screen,
@@ -46,7 +48,8 @@ func CreateApp() *App {
 			Screen:   screen,
 			Database: db,
 		},
-		Run: true,
+		Run:   true,
+		kitty: kitty, // default to false
 	}
 }
 

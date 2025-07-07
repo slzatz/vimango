@@ -1,22 +1,17 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"errors"
-	"fmt"
 	"image"
 	_ "image/jpeg"
+	"image/png"
 	_ "image/png"
 	"net/http"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/disintegration/imaging"
-	"golang.org/x/term"
 )
 
 var (
@@ -25,22 +20,8 @@ var (
 	E_TIMED_OUT       = errors.New("TERM RESPONSE TIMED OUT")
 )
 
-// diplayPNGFromFile
-func readPNGIntoBuffer(path string) (err error) {
-	f, err := os.Open(path)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer f.Close()
-
-	reader := bufio.NewReader(f)
-
-	return KittyCopyPNGInline(os.Stdout, reader, int64(reader.Size()))
-}
-
 func loadImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
-//fmt.Printf("loadImage: path=%s, maxWidth=%d, maxHeight=%d\n", path, maxWidth, maxHeight)
+	//fmt.Printf("loadImage: path=%s, maxWidth=%d, maxHeight=%d\n", path, maxWidth, maxHeight)
 	f, err := os.Open(path)
 	if err != nil {
 		return
@@ -75,6 +56,21 @@ func loadWebImage(URL string) (img image.Image, imgFmt string, err error) {
 	return
 }
 
+func displayImage(img image.Image) {
+
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, img)
+	if err != nil {
+		app.Organizer.ShowMessage(BL, "Error encoding image: %v", err)
+		return
+	}
+
+	err = KittyCopyPNGInline(os.Stdout, buf, int64(buf.Len()))
+	if err != nil {
+		app.Organizer.ShowMessage(BL, "Error in KittyCopyPNG...: %v", err)
+	}
+}
+
 // transforms given open/close terminal escapes to pass through tmux to parent terminal
 func TmuxOscOpenClose(opn, cls string) (string, string) {
 
@@ -89,21 +85,23 @@ func IsTmuxScreen() bool {
 }
 
 /*
-	Handles request/response terminal control sequences like <ESC>[0c
+Handles request/response terminal control sequences like <ESC>[0c
 
-	STDIN & STDOUT are parameterized for special cases.
-	os.Stdin & os.Stdout are usually sufficient.
+STDIN & STDOUT are parameterized for special cases.
+os.Stdin & os.Stdout are usually sufficient.
 
-	`sRq` should be the request control sequence to the terminal.
+`sRq` should be the request control sequence to the terminal.
 
-	NOTE: only captures up to 1KB of response
+NOTE: only captures up to 1KB of response
 
-	NOTE: when println debugging the response, probably want to go-escape
-	it, like:
-		fmt.Printf("%#v\n", sRsp)
-	since most responses begin with <ESC>, which the terminal treats as
-	another control sequence rather than text to output.
-*/
+NOTE: when println debugging the response, probably want to go-escape
+it, like:
+
+	fmt.Printf("%#v\n", sRsp)
+
+since most responses begin with <ESC>, which the terminal treats as
+another control sequence rather than text to output.
+
 func TermRequestResponse(fileIN, fileOUT *os.File, sRq string) (sRsp []byte, E error) {
 
 	// 	defer func() {
@@ -219,7 +217,7 @@ https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_
 		Ps = 2 8  ⇒  Rectangular editing.
 		Ps = 2 9  ⇒  ANSI text locator (i.e., DEC Locator mode).
 */
-
+/*
 func RequestTermAttributes() (sAttrs []int, E error) {
 
 	text, E := TermRequestResponse(os.Stdin, os.Stdout, "\x1b[0c")
@@ -240,7 +238,7 @@ func RequestTermAttributes() (sAttrs []int, E error) {
 
 var rxNumber = regexp.MustCompile(`\d+`)
 
-
+*/
 func lcaseEnv(k string) string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv(k)))
 }
@@ -255,3 +253,26 @@ func GetEnvIdentifiers() map[string]string {
 
 	return V
 }
+
+// NOTE: uses $TERM, which is overwritten by tmux
+func IsTermKitty() bool {
+
+	V := GetEnvIdentifiers()
+	return V["TERM"] == "xterm-kitty"
+}
+
+/*
+// displayPNGFromFile - not in use
+func readPNGIntoBuffer(path string) (err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer f.Close()
+
+	reader := bufio.NewReader(f)
+
+	return KittyCopyPNGInline(os.Stdout, reader, int64(reader.Size()))
+}
+*/

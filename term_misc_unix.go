@@ -1,4 +1,6 @@
-//go:build !windows
+//go:build ignore
+
+//gs:build !windows
 
 package main
 
