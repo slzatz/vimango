@@ -83,7 +83,8 @@
   },
   "image": {
     "color": "212",
-    "underline": true
+    "underline": true,
+    "format": "|{{.text}}|"
   },
   "image_text": {
     "color": "243",

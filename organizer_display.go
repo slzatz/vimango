@@ -253,7 +253,7 @@ func (o *Organizer) drawPreviewWithImages() {
 			continue
 		}
 
-		fmt.Printf("Loading Image ... \x1b[%dG", o.Screen.divider+1)
+		//fmt.Printf("Loading Image ... \x1b[%dG", o.Screen.divider+1)
 		prevY := y
 		s := o.note[fr]
 		for i := range 2 {
@@ -262,26 +262,39 @@ func (o *Organizer) drawPreviewWithImages() {
 			}
 			s = s + o.note[fr+i+1]
 		}
-		//path := extractFilePath(o.note[fr])
-		//fmt.Printf("s: %s\n", s)
 		path := extractFilePath(s)
+		o.ShowMessage(BR, path)
 		//fmt.Printf("path: %s\n", path)
 		//path := getStringInBetween(o.note[fr], "$$", "$$")
 		var img image.Image
+		maxWidth := o.Screen.totaleditorcols * int(o.Screen.ws.Xpixel) / o.Screen.screenCols
+		maxHeight := int(o.Screen.ws.Ypixel)
 		var err error
-		if strings.Contains(path, "http") {
+		if strings.Contains(path, "drive.google.com") {
+			fmt.Printf("Loading Google Drive Image ... \x1b[%dG", o.Screen.divider+1)
+			img, _, err = loadGoogleImage(path, maxWidth-5, maxHeight-150)
+			if err != nil {
+				fmt.Printf("%s%sError:MayDay%s %s%s", path, BOLD, RESET, o.note[fr], lf_ret)
+				y++
+				o.ShowMessage(BR, "Error loading google drive image: "+err.Error())
+				continue
+			}
+		} else if strings.Contains(path, "http") {
+			fmt.Printf("Loading Web Image ... \x1b[%dG", o.Screen.divider+1)
 			img, _, err = loadWebImage(path)
 			if err != nil {
-				fmt.Printf("%sError:%s %s%s", BOLD, RESET, o.note[fr], lf_ret)
+				fmt.Printf("%s%sError:Norm%s %s%s", path, BOLD, RESET, o.note[fr], lf_ret)
 				y++
+				o.ShowMessage(BR, "Error loading web image: "+err.Error())
 				continue
 			}
 		} else {
-			maxWidth := o.Screen.totaleditorcols * int(o.Screen.ws.Xpixel) / o.Screen.screenCols
-			maxHeight := int(o.Screen.ws.Ypixel)
+			fmt.Printf("Loading Local Image ... \x1b[%dG", o.Screen.divider+1)
+			//maxWidth := o.Screen.totaleditorcols * int(o.Screen.ws.Xpixel) / o.Screen.screenCols
+			//maxHeight := int(o.Screen.ws.Ypixel)
 			img, _, err = loadImage(path, maxWidth-5, maxHeight-150)
 			if err != nil {
-				fmt.Printf("%sError:%s %s%s", BOLD, RESET, o.note[fr], lf_ret)
+				fmt.Printf("path=%s%sError:File%s %s%s", path, BOLD, RESET, o.note[fr], lf_ret)
 				y++
 				continue
 			}

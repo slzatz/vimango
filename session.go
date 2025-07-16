@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/alecthomas/chroma/v2"
+	"google.golang.org/api/drive/v3"
 )
 
 type Session struct {
@@ -13,7 +14,8 @@ type Session struct {
 	style            [8]string
 	markdown_style   *chroma.Style
 	styleIndex       int
-	Windows          []Window //slice of Window interfaces (Output, Editor)
+	Windows          []Window       //slice of Window interfaces (Output, Editor)
+	googleDrive      *drive.Service // Google Drive service for file operations
 }
 
 func (s *Session) numberOfEditors() int {

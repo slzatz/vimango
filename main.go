@@ -5,8 +5,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/slzatz/vimango/auth"
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/vim"
+	//"vimango/auth"
 )
 
 // Global app struct
@@ -14,7 +16,11 @@ var app *App
 
 func main() {
 	app = CreateApp()
-
+	srv, err := auth.GetDriveService()
+	if err != nil {
+		log.Fatalf("Failed to get Google Drive service: %v", err)
+	}
+	app.Session.googleDrive = srv
 	// Configure Vim implementation selection
 	vimConfig := DetermineVimDriver(os.Args)
 	LogVimDriverChoice(vimConfig)
@@ -29,7 +35,7 @@ func main() {
 			log.Println("Go Vim implementation initialized")
 		}
 	}
-	
+
 	// Initialize Vim with the appropriate implementation
 	vim.InitializeVim(useGoVim, 0)
 
@@ -38,7 +44,7 @@ func main() {
 	LogSQLiteDriverChoice(sqliteConfig)
 
 	// Initialize database connections
-	err := app.InitDatabases("config.json", sqliteConfig)
+	err = app.InitDatabases("config.json", sqliteConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

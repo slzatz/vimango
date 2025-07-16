@@ -9,6 +9,7 @@ import (
 	_ "image/png"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/disintegration/imaging"
@@ -19,6 +20,48 @@ var (
 	E_NON_TTY         = errors.New("NON TTY")
 	E_TIMED_OUT       = errors.New("TERM RESPONSE TIMED OUT")
 )
+
+func ExtractFileID(url string) (string, error) {
+	// A regular expression to find the file ID.
+	// It looks for a string of letters, numbers, hyphens, and underscores
+	// that is between "/d/" and the next "/".
+	re := regexp.MustCompile(`/d/([a-zA-Z0-9_-]+)`)
+
+	// Find the submatches in the URL string.
+	matches := re.FindStringSubmatch(url)
+
+	// The result of FindStringSubmatch is a slice where:
+	// - matches[0] is the full text that matched the expression (e.g., "/d/1Fj-...")
+	// - matches[1] is the text captured by the first group `(...)` (the file ID)
+	if len(matches) > 1 {
+		return matches[1], nil
+	}
+
+	return "", errors.New("google drive file ID not found in URL")
+}
+func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
+	fileID, err := ExtractFileID(path)
+	resp, err := app.Session.googleDrive.Files.Get(fileID).Download()
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = errors.New("Received non-OK response code")
+		//return fmt.Errorf("received non-OK response status: %s", resp.Status)
+		return
+	}
+
+	img, imgFmt, err = image.Decode(resp.Body)
+	if img.Bounds().Max.X > maxWidth || img.Bounds().Max.Y > maxHeight {
+		img = imaging.Fit(img, maxWidth, maxHeight, imaging.Lanczos)
+	}
+	//if img.Bounds().Max.Y > app.Session.imgSizeY {
+	//	img = imaging.Resize(img, 0, app.Session.imgSizeY, imaging.Lanczos)
+	//}
+	return
+}
 
 func loadImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
 	//fmt.Printf("loadImage: path=%s, maxWidth=%d, maxHeight=%d\n", path, maxWidth, maxHeight)
@@ -45,7 +88,7 @@ func loadWebImage(URL string) (img image.Image, imgFmt string, err error) {
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != 200 {
+	if response.StatusCode != http.StatusOK {
 		err = errors.New("Received non 200 response code")
 		return
 	}

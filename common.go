@@ -352,6 +352,24 @@ func extractFilePath(input string) string {
 	if len(parts) < 2 {
 		return ""
 	}
+	location := strings.Split(parts[1], "|")
+	// Get everything after the arrow
+	if len(location) < 2 {
+		return ""
+	} else {
+		return location[1]
+	}
+}
+
+func extractFilePath_(input string) string {
+	// Normalize line breaks
+	normalized := strings.ReplaceAll(input, "\n", "")
+
+	// Split by the arrow
+	parts := strings.Split(normalized, "→")
+	if len(parts) < 2 {
+		return ""
+	}
 
 	// Get everything after the arrow
 	afterArrow := strings.TrimSpace(parts[1])
@@ -378,7 +396,7 @@ func extractFilePath(input string) string {
 	return match
 }
 
-func extractFilePath_(input string) string {
+func extractFilePath__(input string) string {
 	// First, normalize line breaks to handle word wrapping
 	normalized := strings.ReplaceAll(input, "\n", "")
 
