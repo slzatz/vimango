@@ -28,6 +28,7 @@ func (a *App) setEditorNormalCmds() map[string]func(*Editor, int) {
 		"\x17>":              (*Editor).changeHSplit,
 		"\x17<":              (*Editor).changeHSplit,
 		leader + "m":         (*Editor).showMarkdownPreview,
+		leader + "w":         (*Editor).showWebview,
 		leader + "y":         (*Editor).nextStyle,
 		leader + "t":         (*Editor).readGoTemplate,
 		leader + "sp":        (*Editor).spellingCheck,
@@ -364,6 +365,55 @@ func (e *Editor) showMarkdownPreview(_ int) {
 	e.mode = PREVIEW
 	e.previewLineOffset = 0
 	e.drawPreview()
+}
+
+func (e *Editor) showWebview(_ int) {
+	if len(e.ss) == 0 {
+		return
+	}
+	
+	// Get current note content
+	note := strings.Join(e.vbuf.Lines(), "\n")
+	
+	// Get note title from the editor
+	title := e.title
+	if title == "" {
+		title = "Untitled Note"
+	}
+	
+	// Convert to HTML
+	htmlContent, err := RenderNoteAsHTML(title, note)
+	if err != nil {
+		e.ShowMessage(BR, "Error rendering HTML: %v", err)
+		return
+	}
+	
+	// Check if webview is available
+	if !IsWebviewAvailable() {
+		e.ShowMessage(BR, ShowWebviewNotAvailableMessage())
+		// Fall back to opening in browser
+		err = OpenNoteInWebview(title, htmlContent)
+		if err != nil {
+			e.ShowMessage(BR, "Error opening note: %v", err)
+		}
+		return
+	}
+	
+	// Open in webview in a goroutine since it blocks
+	// This will either create a new webview or update the existing one
+	go func() {
+		err := OpenNoteInWebview(title, htmlContent)
+		if err != nil {
+			// Note: Can't directly show message from goroutine
+			// Could implement a channel-based message system if needed
+		}
+	}()
+	
+	if IsWebviewRunning() {
+		e.ShowMessage(BR, "Updating webview content...")
+	} else {
+		e.ShowMessage(BR, "Opening note in webview...")
+	}
 }
 
 func (e *Editor) nextStyle(_ int) {
