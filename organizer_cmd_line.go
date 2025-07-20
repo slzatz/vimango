@@ -79,6 +79,8 @@ func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
 		"pl":              (*Organizer).printList2,
 		"sort":            (*Organizer).sortEntries,
 		"which":           (*Organizer).whichVim,
+		"webview":         (*Organizer).showWebView,
+		"wv":              (*Organizer).showWebView,
 	}
 }
 
@@ -982,6 +984,60 @@ func (o *Organizer) printDocument(_ int) {
 		o.ShowMessage(BL, "Error printing document: %v", err)
 	}
 	o.mode = o.last_mode
+	o.command_line = ""
+}
+
+func (o *Organizer) showWebView(_ int) {
+
+	if len(o.note) == 0 {
+		return
+	}
+
+	// Get current note content
+	id := o.rows[o.fr].id
+	note := o.Database.readNoteIntoString(id)
+	//note := strings.Join(e.vbuf.Lines(), "\n")
+
+	// Get note title from the editor
+	title := o.rows[o.fr].title
+	if title == "" {
+		title = "Untitled Note"
+	}
+
+	// Convert to HTML
+	htmlContent, err := RenderNoteAsHTML(title, note)
+	if err != nil {
+		o.ShowMessage(BL, "Error rendering HTML: %v", err)
+		return
+	}
+
+	// Check if webview is available
+	if !IsWebviewAvailable() {
+		o.ShowMessage(BL, ShowWebviewNotAvailableMessage())
+		// Fall back to opening in browser
+		err = OpenNoteInWebview(title, htmlContent)
+		if err != nil {
+			o.ShowMessage(BL, "Error opening note: %v", err)
+		}
+		return
+	}
+
+	// Open in webview in a goroutine since it blocks
+	// This will either create a new webview or update the existing one
+	go func() {
+		err := OpenNoteInWebview(title, htmlContent)
+		if err != nil {
+			// Note: Can't directly show message from goroutine
+			// Could implement a channel-based message system if needed
+		}
+	}()
+
+	if IsWebviewRunning() {
+		o.ShowMessage(BL, "Updated webview content")
+	} else {
+		o.ShowMessage(BL, "Launched webview")
+	}
+	o.mode = NORMAL
 	o.command_line = ""
 }
 

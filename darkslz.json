@@ -84,7 +84,7 @@
   "image": {
     "color": "212",
     "underline": true,
-    "format": "|{{.text}}|"
+    "format": "{{.text}}"
   },
   "image_text": {
     "color": "243",

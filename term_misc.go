@@ -54,9 +54,9 @@ func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, img
 	}
 
 	img, imgFmt, err = image.Decode(resp.Body)
-	if img.Bounds().Max.X > maxWidth || img.Bounds().Max.Y > maxHeight {
-		img = imaging.Fit(img, maxWidth, maxHeight, imaging.Lanczos)
-	}
+	//if img.Bounds().Max.X > maxWidth || img.Bounds().Max.Y > maxHeight {
+	//	img = imaging.Fit(img, maxWidth, maxHeight, imaging.Lanczos)
+	//}
 	//if img.Bounds().Max.Y > app.Session.imgSizeY {
 	//	img = imaging.Resize(img, 0, app.Session.imgSizeY, imaging.Lanczos)
 	//}

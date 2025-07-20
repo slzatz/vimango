@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"image"
 	"os"
 	"strings"
 
@@ -231,7 +230,9 @@ func (o *Organizer) drawAltRows() {
 	fmt.Print(ab.String())
 }
 
-func (o *Organizer) drawPreviewWithImages() {
+/*
+// want to remove since only showing images in webview or browser
+func (o *Organizer) drawPreviewWithImages_() {
 	if len(o.note) == 0 {
 		return
 	}
@@ -315,6 +316,7 @@ func (o *Organizer) drawPreviewWithImages() {
 		fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.Screen.divider+1)
 	}
 }
+*/
 
 func (o *Organizer) drawPreviewWithoutImages() {
 	if len(o.note) == 0 {
@@ -547,9 +549,12 @@ func (o *Organizer) drawPreview() {
 	}
 	note = WordWrap(note, o.Screen.totaleditorcols)
 	o.note = strings.Split(note, "\n")
-	if lang != "markdown" || !o.Session.imagePreview {
-		o.drawPreviewWithoutImages()
-	} else {
-		o.drawPreviewWithImages()
-	}
+	/*
+		if lang != "markdown" || !o.Session.imagePreview {
+			o.drawPreviewWithoutImages()
+		} else {
+			o.drawPreviewWithImages()
+		}
+	*/
+	o.drawPreviewWithoutImages()
 }

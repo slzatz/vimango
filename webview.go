@@ -5,11 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
-	"image/png"
 	"image/jpeg"
+	"image/png"
 	"regexp"
 	"strings"
-	
+
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -35,7 +35,7 @@ func openNoteInWebview(title, htmlContent string) error {
 	if isWebviewAvailableDefault {
 		return OpenNoteInWebview(title, htmlContent)
 	}
-	
+
 	// Fallback - should not be reached due to build-specific implementations
 	ShowWebviewUnavailableMessage()
 	return fmt.Errorf("webview not available")
@@ -48,10 +48,10 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to preprocess markdown images: %v", err)
 	}
-	
+
 	// Convert markdown to HTML using goldmark
 	htmlContent := convertMarkdownToHTML(processedMarkdown)
-	
+
 	// Wrap in basic HTML template
 	htmlTemplate := `<!DOCTYPE html>
 <html>
@@ -123,7 +123,7 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse HTML template: %v", err)
 	}
-	
+
 	var buf strings.Builder
 	err = tmpl.Execute(&buf, struct {
 		Title   string
@@ -132,11 +132,11 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
 		Title:   title,
 		Content: template.HTML(htmlContent),
 	})
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to execute HTML template: %v", err)
 	}
-	
+
 	return buf.String(), nil
 }
 
@@ -145,17 +145,17 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 	// Regular expression to find Google Drive URLs in markdown image syntax
 	// Matches ![alt text](google drive url) or ![alt text](google drive url "title")
 	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
-	
+
 	// Find all Google Drive image references
 	matches := googleDriveRegex.FindAllStringSubmatch(markdown, -1)
-	
+
 	processedMarkdown := markdown
-	
+
 	for _, match := range matches {
-		fullMatch := match[0]  // Full match: ![alt](url)
-		altText := match[1]    // Alt text
-		googleURL := match[2]  // Google Drive URL
-		
+		fullMatch := match[0] // Full match: ![alt](url)
+		altText := match[1]   // Alt text
+		googleURL := match[2] // Google Drive URL
+
 		// Download and convert to data URI
 		dataURI, err := convertGoogleDriveImageToDataURI(googleURL)
 		if err != nil {
@@ -163,12 +163,12 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 			fmt.Printf("Warning: Could not convert Google Drive image %s: %v\n", googleURL, err)
 			continue
 		}
-		
+
 		// Replace the Google Drive URL with the data URI
 		newImageTag := fmt.Sprintf("![%s](%s)", altText, dataURI)
 		processedMarkdown = strings.Replace(processedMarkdown, fullMatch, newImageTag, 1)
 	}
-	
+
 	return processedMarkdown, nil
 }
 
@@ -180,7 +180,7 @@ func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to load Google Drive image: %v", err)
 	}
-	
+
 	// Convert image to bytes
 	var buf bytes.Buffer
 	switch imgFmt {
@@ -190,20 +190,22 @@ func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
 		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
 	default:
 		// Default to PNG for unknown formats
-		err = png.Encode(&buf, img)
-		imgFmt = "png"
+		//err = png.Encode(&buf, img)
+		//imgFmt = "png"
+		//heic caused panic with the png assumption
+		return "", fmt.Errorf("Unsupported image format: %s.")
 	}
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to encode image: %v", err)
 	}
-	
+
 	// Convert to base64
 	base64Data := base64.StdEncoding.EncodeToString(buf.Bytes())
-	
+
 	// Create data URI
 	dataURI := fmt.Sprintf("data:image/%s;base64,%s", imgFmt, base64Data)
-	
+
 	return dataURI, nil
 }
 
@@ -212,11 +214,11 @@ func convertMarkdownToHTML(markdown string) string {
 	// Configure goldmark with common extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
-			extension.GFM,        // GitHub Flavored Markdown
-			extension.Table,      // Tables
+			extension.GFM,           // GitHub Flavored Markdown
+			extension.Table,         // Tables
 			extension.Strikethrough, // Strikethrough text
-			extension.Linkify,    // Auto-link URLs
-			extension.TaskList,   // Task lists
+			extension.Linkify,       // Auto-link URLs
+			extension.TaskList,      // Task lists
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs
@@ -225,13 +227,13 @@ func convertMarkdownToHTML(markdown string) string {
 			html.WithUnsafe(), // Allow raw HTML (needed for some markdown features)
 		),
 	)
-	
+
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(markdown), &buf); err != nil {
 		// Fallback to plain text if goldmark fails
 		return fmt.Sprintf("<pre>%s</pre>", markdown)
 	}
-	
+
 	return buf.String()
 }
 

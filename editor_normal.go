@@ -28,7 +28,7 @@ func (a *App) setEditorNormalCmds() map[string]func(*Editor, int) {
 		"\x17>":              (*Editor).changeHSplit,
 		"\x17<":              (*Editor).changeHSplit,
 		leader + "m":         (*Editor).showMarkdownPreview,
-		leader + "w":         (*Editor).showWebview,
+		leader + "w":         (*Editor).showWebView,
 		leader + "y":         (*Editor).nextStyle,
 		leader + "t":         (*Editor).readGoTemplate,
 		leader + "sp":        (*Editor).spellingCheck,
@@ -367,27 +367,27 @@ func (e *Editor) showMarkdownPreview(_ int) {
 	e.drawPreview()
 }
 
-func (e *Editor) showWebview(_ int) {
+func (e *Editor) showWebView(_ int) {
 	if len(e.ss) == 0 {
 		return
 	}
-	
+
 	// Get current note content
 	note := strings.Join(e.vbuf.Lines(), "\n")
-	
+
 	// Get note title from the editor
 	title := e.title
 	if title == "" {
 		title = "Untitled Note"
 	}
-	
+
 	// Convert to HTML
 	htmlContent, err := RenderNoteAsHTML(title, note)
 	if err != nil {
 		e.ShowMessage(BR, "Error rendering HTML: %v", err)
 		return
 	}
-	
+
 	// Check if webview is available
 	if !IsWebviewAvailable() {
 		e.ShowMessage(BR, ShowWebviewNotAvailableMessage())
@@ -398,7 +398,7 @@ func (e *Editor) showWebview(_ int) {
 		}
 		return
 	}
-	
+
 	// Open in webview in a goroutine since it blocks
 	// This will either create a new webview or update the existing one
 	go func() {
@@ -408,7 +408,7 @@ func (e *Editor) showWebview(_ int) {
 			// Could implement a channel-based message system if needed
 		}
 	}()
-	
+
 	if IsWebviewRunning() {
 		e.ShowMessage(BR, "Updating webview content...")
 	} else {
@@ -434,7 +434,7 @@ func (e *Editor) spellingCheck(_ int) {
 		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
 		return
 	}
-	
+
 	if e.isModified() {
 		e.ShowMessage(BR, "%sYou need to write the note before highlighting text%s", RED_BG, RESET)
 		return
@@ -451,12 +451,12 @@ func (e *Editor) spellSuggest(_ int) {
 	curPos := vim.GetCursorPosition()
 	w, _, _ := GetWordAtIndex(e.ss[curPos[0]-1], curPos[1])
 	//w := vim.EvaluateExpression("expand('<cword>')")
-	
+
 	if CheckSpelling(w) {
 		e.ShowMessage(BR, "%q is spelled correctly", w)
 		return
 	}
-	
+
 	suggestions := GetSpellingSuggestions(w)
 	e.ShowMessage(BR, "%q -> %s", w, strings.Join(suggestions, "|"))
 }

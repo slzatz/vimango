@@ -4,7 +4,6 @@ import (
 	//"bufio"
 	"bytes"
 	"fmt"
-	"image"
 	"os"
 	"strings"
 
@@ -796,9 +795,6 @@ func (e *Editor) readFileIntoNote(filename string) error {
 }
 
 func (e *Editor) drawPreview() {
-	//delete any images
-	fmt.Print("\x1b_Ga=d\x1b\\") //delete any images
-
 	rows := strings.Split(e.renderedNote, "\n")
 	fmt.Printf("\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
@@ -818,45 +814,8 @@ func (e *Editor) drawPreview() {
 		if fr > len(rows)-1 || y > e.screenlines-1 {
 			break
 		}
-		if strings.Contains(rows[fr], "Im@ge") {
-			fmt.Printf("Loading Image ... \x1b[%dG", e.left_margin+1)
-			prevY := y
-			path := getStringInBetween(rows[fr], "|", "|")
-			var img image.Image
-			var err error
-			if strings.Contains(path, "http") {
-				img, _, err = loadWebImage(path)
-				if err != nil {
-					fmt.Printf("%sError:%s %s%s", BOLD, RESET, rows[fr], lf_ret)
-					y++
-					continue
-				}
-			} else {
-				maxWidth := e.screencols * int(e.Screen.ws.Xpixel) / e.Screen.screenCols
-				maxHeight := e.screenlines * int(e.Screen.ws.Ypixel) / e.Screen.screenLines
-				img, _, err = loadImage(path, maxWidth-5, maxHeight-150)
-				if err != nil {
-					fmt.Printf("%sError:%s %s%s", BOLD, RESET, rows[fr], lf_ret)
-					y++
-					continue
-				}
-			}
-			height := img.Bounds().Max.Y / (int(e.Screen.ws.Ypixel) / e.Screen.screenLines)
-			y += height
-			if y > e.screenlines-1 {
-				fmt.Printf("\x1b[3m\x1b[4mImage %s doesn't fit!\x1b[0m \x1b[%dG", path, e.left_margin+1)
-				y = y - height + 1
-				fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, e.left_margin+1)
-				continue
-			}
-			displayImage(img)
-			// erases "Loading image ..."
-			fmt.Printf("\x1b[%d;%dH\x1b[0K", e.top_margin+prevY, e.left_margin+1)
-			fmt.Printf("\x1b[%d;%dH", e.top_margin+y, e.left_margin+1)
-		} else {
-			fmt.Printf("%s%s", rows[fr], lf_ret)
-			y++
-		}
+		fmt.Printf("%s%s", rows[fr], lf_ret)
+		y++
 	}
 }
 

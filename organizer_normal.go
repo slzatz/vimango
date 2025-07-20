@@ -12,7 +12,7 @@ func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
 	return map[string]func(*Organizer){
 		//"dd":                 (*Organizer).del, //delete
 		string(0x4):          (*Organizer).del,     //ctrl-d delete
-		string(0x1):          (*Organizer).star,    //ctrl-b starEntry
+		string(0x1):          (*Organizer).star,    //ctrl-a starEntry
 		string(0x18):         (*Organizer).archive, //ctrl-x archive
 		string(ctrlKey('i')): (*Organizer).info,    //{{0x9}} not this is same as '/t' (tab)
 		"m":                  (*Organizer).mark,
@@ -20,7 +20,8 @@ func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
 		":":                  (*Organizer).exCmd,
 		string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
 		string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
-		string(ctrlKey('n')): (*Organizer).previewWithImages,
+		//string(ctrlKey('n')): (*Organizer).previewWithImages,
+		string(ctrlKey('w')): (*Organizer).showWebView_n,
 	}
 }
 
@@ -158,11 +159,19 @@ func controlZ() {
 }
 */
 
-func (o *Organizer) previewWithImages() {
+func (o *Organizer) showWebView_n() {
+	o.showWebView(0)
+}
+
+// want to eliminate, only showing images through webview or browser
+/*
+func (o *Organizer) previewWithImages_() {
 	o.Screen.eraseRightScreen()
 	o.drawPreviewWithImages()
 	o.Session.imagePreview = true
 }
+*/
+
 func (o *Organizer) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder
 	width := o.Screen.totaleditorcols - 10
