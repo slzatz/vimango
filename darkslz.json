@@ -82,13 +82,12 @@
    "unticked": "[ ] "
   },
   "image": {
-    "color": "212",
-    "underline": true,
-    "format": "{{.text}}"
+    "color": "7",
+    "underline": true
   },
   "image_text": {
-    "color": "243",
-    "format": "Im@ge: {{.text}} →"
+    "color": "9",
+    "format": "Image: {{.text}} "
   },
   "code": {
     "color": "9"
