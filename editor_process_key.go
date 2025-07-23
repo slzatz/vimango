@@ -182,7 +182,18 @@ func (e *Editor) editorProcessKey(c int) bool {
 				return false
 			}
 
-			e.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
+			// Try to provide helpful suggestions using command registry
+			if e.commandRegistry != nil {
+				suggestions := e.commandRegistry.SuggestCommand(cmd)
+				if len(suggestions) > 0 {
+					e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Did you mean: %s?\x1b[0m", cmd, strings.Join(suggestions, ", "))
+				} else {
+					e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Use ':help' to see available commands.\x1b[0m", cmd)
+				}
+			} else {
+				// Fallback if registry not available
+				e.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
+			}
 			e.mode = NORMAL
 			e.command_line = ""
 			return false

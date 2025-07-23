@@ -126,6 +126,7 @@ const (
 	SPELLING          // this mode recognizes 'z='
 	PREVIEW_SYNC_LOG  // only in organizer mode
 	LINKS             // only in organizer mode
+	PREVIEW_HELP      // only in organizer mode - for displaying help information
 	VISUAL_MODE
 )
 

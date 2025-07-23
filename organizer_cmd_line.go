@@ -15,73 +15,378 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setOrganizerExCmds() map[string]func(*Organizer, int) {
-	return map[string]func(*Organizer, int){
-		"open":            (*Organizer).open,
-		"o":               (*Organizer).open,
-		"cd":              (*Organizer).open,
-		"opencontext":     (*Organizer).openContext,
-		"oc":              (*Organizer).openContext,
-		"openfolder":      (*Organizer).openFolder,
-		"of":              (*Organizer).openFolder,
-		"openkeyword":     (*Organizer).openKeyword,
-		"ok":              (*Organizer).openKeyword,
-		"quit":            (*Organizer).quitApp,
-		"q":               (*Organizer).quitApp,
-		"q!":              (*Organizer).quitApp,
-		"e":               (*Organizer).editNote,
-		"vertical resize": (*Organizer).verticalResize,
-		"vert res":        (*Organizer).verticalResize,
-		"test":            (*Organizer).sync3,
-		"sync":            (*Organizer).sync3,
-		"bulktest":        (*Organizer).initialBulkLoad,
-		"bulkload":        (*Organizer).initialBulkLoad,
-		"reverseload":     (*Organizer).reverse,
-		"reversetest":     (*Organizer).reverse,
-		"new":             (*Organizer).newEntry,
-		"n":               (*Organizer).newEntry,
-		"refresh":         (*Organizer).refresh,
-		"r":               (*Organizer).refresh,
-		"find":            (*Organizer).find,
-		"contexts":        (*Organizer).contexts,
-		"context":         (*Organizer).contexts,
-		"c":               (*Organizer).contexts,
-		"folders":         (*Organizer).folders,
-		"folder":          (*Organizer).folders,
-		"f":               (*Organizer).folders,
-		"keywords":        (*Organizer).keywords,
-		"keyword":         (*Organizer).keywords,
-		"k":               (*Organizer).keywords,
-		"recent":          (*Organizer).recent,
-		"log":             (*Organizer).log,
-		"deletekeywords":  (*Organizer).deleteKeywords,
-		"delkw":           (*Organizer).deleteKeywords,
-		"delk":            (*Organizer).deleteKeywords,
-		"showall":         (*Organizer).showAll,
-		"show":            (*Organizer).showAll,
-		"cc":              (*Organizer).updateContainer,
-		"ff":              (*Organizer).updateContainer,
-		"kk":              (*Organizer).updateContainer,
-		"write":           (*Organizer).write,
-		"w":               (*Organizer).write,
-		"deletemarks":     (*Organizer).deleteMarks,
-		"delmarks":        (*Organizer).deleteMarks,
-		"delm":            (*Organizer).deleteMarks,
-		"copy":            (*Organizer).copyEntry,
-		"savelog":         (*Organizer).savelog,
-		"save":            (*Organizer).save,
-		"image":           (*Organizer).setImage,
-		"images":          (*Organizer).setImage,
-		"print":           (*Organizer).printDocument,
-		"ha":              (*Organizer).printList,
-		"ha2":             (*Organizer).printList2,
-		"printlist":       (*Organizer).printList2,
-		"pl":              (*Organizer).printList2,
-		"sort":            (*Organizer).sortEntries,
-		"which":           (*Organizer).whichVim,
-		"webview":         (*Organizer).showWebView,
-		"wv":              (*Organizer).showWebView,
+func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organizer, int) {
+	registry := NewCommandRegistry[func(*Organizer, int)]()
+
+	// Navigation commands
+	registry.Register("open", (*Organizer).open, CommandInfo{
+		Name:        "open",
+		Aliases:     []string{"o", "cd"},
+		Description: "Open context, folder, or keyword by name",
+		Usage:       "open <name>",
+		Category:    "Navigation",
+		Examples:    []string{":open work", ":o personal", ":cd project"},
+	})
+
+	registry.Register("opencontext", (*Organizer).openContext, CommandInfo{
+		Name:        "opencontext",
+		Aliases:     []string{"oc"},
+		Description: "Open specific context",
+		Usage:       "opencontext <context_name>",
+		Category:    "Navigation",
+		Examples:    []string{":opencontext work", ":oc personal"},
+	})
+
+	registry.Register("openfolder", (*Organizer).openFolder, CommandInfo{
+		Name:        "openfolder",
+		Aliases:     []string{"of"},
+		Description: "Open specific folder",
+		Usage:       "openfolder <folder_name>",
+		Category:    "Navigation",
+		Examples:    []string{":openfolder projects", ":of archive"},
+	})
+
+	registry.Register("openkeyword", (*Organizer).openKeyword, CommandInfo{
+		Name:        "openkeyword",
+		Aliases:     []string{"ok"},
+		Description: "Open entries with specific keyword",
+		Usage:       "openkeyword <keyword>",
+		Category:    "Navigation",
+		Examples:    []string{":openkeyword urgent", ":ok meeting"},
+	})
+
+	// Data Management commands
+	registry.Register("new", (*Organizer).newEntry, CommandInfo{
+		Name:        "new",
+		Aliases:     []string{"n"},
+		Description: "Create new entry",
+		Usage:       "new",
+		Category:    "Data Management",
+		Examples:    []string{":new", ":n"},
+	})
+
+	registry.Register("write", (*Organizer).write, CommandInfo{
+		Name:        "write",
+		Aliases:     []string{"w"},
+		Description: "Save all modified entries to database",
+		Usage:       "write",
+		Category:    "Data Management",
+		Examples:    []string{":write", ":w"},
+	})
+
+	registry.Register("sync", (*Organizer).sync3, CommandInfo{
+		Name:        "sync",
+		Aliases:     []string{"test"},
+		Description: "Synchronize with remote server (test for dry-run)",
+		Usage:       "sync",
+		Category:    "Data Management",
+		Examples:    []string{":sync", ":test (dry-run)"},
+	})
+
+	registry.Register("bulkload", (*Organizer).initialBulkLoad, CommandInfo{
+		Name:        "bulkload",
+		Aliases:     []string{"bulktest"},
+		Description: "Perform initial bulk data load",
+		Usage:       "bulkload",
+		Category:    "Data Management",
+		Examples:    []string{":bulkload", ":bulktest (dry-run)"},
+	})
+
+	registry.Register("reverseload", (*Organizer).reverse, CommandInfo{
+		Name:        "reverseload",
+		Aliases:     []string{"reversetest"},
+		Description: "Perform reverse bulk data load",
+		Usage:       "reverseload",
+		Category:    "Data Management",
+		Examples:    []string{":reverseload", ":reversetest (dry-run)"},
+	})
+
+	registry.Register("refresh", (*Organizer).refresh, CommandInfo{
+		Name:        "refresh",
+		Aliases:     []string{"r"},
+		Description: "Refresh current view",
+		Usage:       "refresh",
+		Category:    "Data Management",
+		Examples:    []string{":refresh", ":r"},
+	})
+
+	// Search & Filter commands
+	registry.Register("find", (*Organizer).find, CommandInfo{
+		Name:        "find",
+		Description: "Search entries using full-text search",
+		Usage:       "find <search_terms>",
+		Category:    "Search & Filter",
+		Examples:    []string{":find meeting notes", ":find urgent todo"},
+	})
+
+	registry.Register("contexts", (*Organizer).contexts, CommandInfo{
+		Name:        "contexts",
+		Aliases:     []string{"context", "c"},
+		Description: "Show all contexts or move entries to context",
+		Usage:       "contexts [context_name]",
+		Category:    "Search & Filter",
+		Examples:    []string{":contexts", ":c work", ":context personal"},
+	})
+
+	registry.Register("folders", (*Organizer).folders, CommandInfo{
+		Name:        "folders",
+		Aliases:     []string{"folder", "f"},
+		Description: "Show all folders or move entries to folder",
+		Usage:       "folders [folder_name]",
+		Category:    "Search & Filter",
+		Examples:    []string{":folders", ":f projects", ":folder archive"},
+	})
+
+	registry.Register("keywords", (*Organizer).keywords, CommandInfo{
+		Name:        "keywords",
+		Aliases:     []string{"keyword", "k"},
+		Description: "Show all keywords or add keyword to entries",
+		Usage:       "keywords [keyword]",
+		Category:    "Search & Filter",
+		Examples:    []string{":keywords", ":k urgent", ":keyword meeting"},
+	})
+
+	registry.Register("recent", (*Organizer).recent, CommandInfo{
+		Name:        "recent",
+		Description: "Show recently modified entries",
+		Usage:       "recent",
+		Category:    "Search & Filter",
+		Examples:    []string{":recent"},
+	})
+
+	registry.Register("log", (*Organizer).log, CommandInfo{
+		Name:        "log",
+		Description: "Show synchronization log entries",
+		Usage:       "log",
+		Category:    "Search & Filter",
+		Examples:    []string{":log"},
+	})
+
+	// View Control commands
+	registry.Register("sort", (*Organizer).sortEntries, CommandInfo{
+		Name:        "sort",
+		Description: "Sort entries by column",
+		Usage:       "sort <column>",
+		Category:    "View Control",
+		Examples:    []string{":sort modified", ":sort created", ":sort priority"},
+	})
+
+	registry.Register("showall", (*Organizer).showAll, CommandInfo{
+		Name:        "showall",
+		Aliases:     []string{"show"},
+		Description: "Toggle showing completed/deleted entries",
+		Usage:       "showall",
+		Category:    "View Control",
+		Examples:    []string{":showall", ":show"},
+	})
+
+	registry.Register("image", (*Organizer).setImage, CommandInfo{
+		Name:        "image",
+		Aliases:     []string{"images"},
+		Description: "Toggle image preview on/off",
+		Usage:       "image <on|off>",
+		Category:    "View Control",
+		Examples:    []string{":image on", ":images off"},
+	})
+
+	registry.Register("webview", (*Organizer).showWebView, CommandInfo{
+		Name:        "webview",
+		Aliases:     []string{"wv"},
+		Description: "Show current note in web browser",
+		Usage:       "webview",
+		Category:    "View Control",
+		Examples:    []string{":webview", ":wv"},
+	})
+
+	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
+		Name:        "vertical resize",
+		Aliases:     []string{"vert res"},
+		Description: "Resize vertical divider",
+		Usage:       "vertical resize <width>",
+		Category:    "View Control",
+		Examples:    []string{":vertical resize 80", ":vert res +10", ":vert res -5"},
+	})
+
+	// Entry Management commands  
+	registry.Register("e", (*Organizer).editNote, CommandInfo{
+		Name:        "e",
+		Description: "Edit note for current or specified entry",
+		Usage:       "e [entry_id]",
+		Category:    "Entry Management",
+		Examples:    []string{":e", ":e 123"},
+	})
+
+	registry.Register("copy", (*Organizer).copyEntry, CommandInfo{
+		Name:        "copy",
+		Description: "Copy current entry",
+		Usage:       "copy",
+		Category:    "Entry Management",
+		Examples:    []string{":copy"},
+	})
+
+	registry.Register("deletekeywords", (*Organizer).deleteKeywords, CommandInfo{
+		Name:        "deletekeywords",
+		Aliases:     []string{"delkw", "delk"},
+		Description: "Delete all keywords from current entry",
+		Usage:       "deletekeywords",
+		Category:    "Entry Management",
+		Examples:    []string{":deletekeywords", ":delkw"},
+	})
+
+	registry.Register("deletemarks", (*Organizer).deleteMarks, CommandInfo{
+		Name:        "deletemarks",
+		Aliases:     []string{"delmarks", "delm"},
+		Description: "Clear all marked entries",
+		Usage:       "deletemarks",
+		Category:    "Entry Management",
+		Examples:    []string{":deletemarks", ":delm"},
+	})
+
+	// Container Management commands
+	registry.Register("cc", (*Organizer).updateContainer, CommandInfo{
+		Name:        "cc",
+		Description: "Update context for marked or current entry",
+		Usage:       "cc",
+		Category:    "Container Management",
+		Examples:    []string{":cc"},
+	})
+
+	registry.Register("ff", (*Organizer).updateContainer, CommandInfo{
+		Name:        "ff",
+		Description: "Update folder for marked or current entry",
+		Usage:       "ff",
+		Category:    "Container Management",
+		Examples:    []string{":ff"},
+	})
+
+	registry.Register("kk", (*Organizer).updateContainer, CommandInfo{
+		Name:        "kk",
+		Description: "Update keyword for marked or current entry",
+		Usage:       "kk",
+		Category:    "Container Management",
+		Examples:    []string{":kk"},
+	})
+
+	// Output & Export commands
+	registry.Register("print", (*Organizer).printDocument, CommandInfo{
+		Name:        "print",
+		Description: "Print current note as PDF",
+		Usage:       "print",
+		Category:    "Output & Export",
+		Examples:    []string{":print"},
+	})
+
+	registry.Register("ha", (*Organizer).printList, CommandInfo{
+		Name:        "ha",
+		Description: "Print current list using vim hardcopy",
+		Usage:       "ha",
+		Category:    "Output & Export",
+		Examples:    []string{":ha"},
+	})
+
+	registry.Register("printlist", (*Organizer).printList2, CommandInfo{
+		Name:        "printlist",
+		Aliases:     []string{"ha2", "pl"},
+		Description: "Print formatted list as PDF",
+		Usage:       "printlist",
+		Category:    "Output & Export",
+		Examples:    []string{":printlist", ":pl"},
+	})
+
+	registry.Register("save", (*Organizer).save, CommandInfo{
+		Name:        "save",
+		Description: "Save current note to file",
+		Usage:       "save <filename>",
+		Category:    "Output & Export",
+		Examples:    []string{":save note.txt", ":save /tmp/backup.md"},
+	})
+
+	registry.Register("savelog", (*Organizer).savelog, CommandInfo{
+		Name:        "savelog",
+		Description: "Save current sync log to database",
+		Usage:       "savelog",
+		Category:    "Output & Export",
+		Examples:    []string{":savelog"},
+	})
+
+	// System commands
+	registry.Register("quit", (*Organizer).quitApp, CommandInfo{
+		Name:        "quit",
+		Aliases:     []string{"q", "q!"},
+		Description: "Exit application (q! forces quit without saving)",
+		Usage:       "quit",
+		Category:    "System",
+		Examples:    []string{":quit", ":q", ":q!"},
+	})
+
+	registry.Register("which", (*Organizer).whichVim, CommandInfo{
+		Name:        "which",
+		Description: "Show which vim implementation is active",
+		Usage:       "which",
+		Category:    "System",
+		Examples:    []string{":which"},
+	})
+
+	// Help command
+	registry.Register("help", (*Organizer).help, CommandInfo{
+		Name:        "help",
+		Aliases:     []string{"h"},
+		Description: "Show help for commands",
+		Usage:       "help [command|category]",
+		Category:    "Help",
+		Examples:    []string{":help", ":help open", ":help Navigation", ":h"},
+	})
+
+	// Store registry in organizer for help command access
+	organizer.commandRegistry = registry
+
+	return registry.GetFunctionMap()
+}
+
+// help displays help information for organizer commands
+func (o *Organizer) help(pos int) {
+	if o.commandRegistry == nil {
+		o.ShowMessage(BL, "Help system not available")
+		o.mode = o.last_mode
+		return
 	}
+
+	var helpText string
+
+	if pos == -1 {
+		// No arguments - show all commands
+		helpText = o.commandRegistry.FormatAllHelp()
+	} else {
+		// Get the argument after "help "
+		arg := o.command_line[pos+1:]
+		
+		// Check if it's a specific command
+		if _, exists := o.commandRegistry.GetCommandInfo(arg); exists {
+			helpText = o.commandRegistry.FormatCommandHelp(arg)
+		} else {
+			// Check if it's a category
+			categories := o.commandRegistry.GetAllCommands()
+			if _, exists := categories[arg]; exists {
+				helpText = o.commandRegistry.FormatCategoryHelp(arg)
+			} else {
+				// Not found - suggest similar commands
+				suggestions := o.commandRegistry.SuggestCommand(arg)
+				if len(suggestions) > 0 {
+					helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
+				} else {
+					helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
+				}
+			}
+		}
+	}
+
+	// Display help in the preview area
+	o.Screen.eraseRightScreen()
+	o.note = strings.Split(helpText, "\n")
+	o.altRowoff = 0
+	o.drawPreviewWithoutImages()
+	o.mode = PREVIEW_HELP
+	o.command_line = ""
 }
 
 func (o *Organizer) log(_ int) {

@@ -55,3 +55,42 @@ The application now supports full Windows cross-compilation from Linux/Unix syst
 - **Windows**: Implements polling-based resize detection that checks terminal size every 100ms
 - Both platforms call the same `signalHandler()` method to update screen layout
 - Automatic screen redraw and layout adjustment on terminal resize
+
+## Command System
+The application features a comprehensive command registry system with full discoverability:
+
+### Help System
+- `:help` - Show all available commands organized by category
+- `:help <command>` - Show detailed help for specific command with usage and examples
+- `:help <category>` - Show all commands in a specific category (e.g., `:help Navigation`)
+- `:h` - Short alias for help command
+
+### Command Organization
+**Organizer Commands (66+ commands in 8 categories):**
+- **Navigation**: open, opencontext, openfolder, openkeyword
+- **Data Management**: new, write, sync, bulkload, refresh
+- **Search & Filter**: find, contexts, folders, keywords, recent, log
+- **View Control**: sort, showall, image, webview, vertical resize
+- **Entry Management**: e (edit), copy, deletekeywords, deletemarks
+- **Container Management**: cc (context), ff (folder), kk (keyword)
+- **Output & Export**: print, ha, printlist, save, savelog
+- **System**: quit, which
+
+**Editor Commands (20+ commands in 5 categories):**
+- **File Operations**: write, writeall, read, save
+- **Editing**: syntax, number, fmt, run
+- **Layout**: vertical resize, resize
+- **Output**: ha, print, pdf
+- **System**: quit, quitall
+
+### Enhanced Error Messages
+- Smart command suggestions for typos using fuzzy matching
+- "Did you mean" suggestions when commands are not found
+- Helpful guidance to use `:help` for command discovery
+
+### Implementation Details
+- **File**: `command_registry.go` - Core command registry system with metadata
+- **Backward Compatible**: All existing commands and aliases work unchanged
+- **Type Safe**: Uses Go generics for type-safe command function signatures
+- **Self-Documenting**: Help text is co-located with command definitions
+- **Extensible**: New commands require help metadata, ensuring documentation stays current

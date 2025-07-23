@@ -54,9 +54,7 @@ func CreateApp() *App {
 }
 
 func (a *App) NewEditor() *Editor {
-	exCmds := a.setEditorExCmds()
-	normalCmds := a.setEditorNormalCmds()
-	return &Editor{
+	editor := &Editor{
 		cx:                 0, //actual cursor x position (takes into account any scroll/offset)
 		cy:                 0, //actual cursor y position ""
 		fc:                 0, //'file' x position as defined by reading sqlite text into rows vector
@@ -72,8 +70,6 @@ func (a *App) NewEditor() *Editor {
 		output:             nil,
 		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
 		modified:           false,
-		exCmds:             exCmds,
-		normalCmds:         normalCmds,
 		tabCompletion: struct {
 			list  []string
 			index int
@@ -82,6 +78,12 @@ func (a *App) NewEditor() *Editor {
 		Session:  a.Session,
 		Database: a.Database,
 	}
+	
+	// Set up commands after editor creation so help can access registry
+	editor.exCmds = a.setEditorExCmds(editor)
+	editor.normalCmds = a.setEditorNormalCmds()
+	
+	return editor
 }
 
 // FromFile returns a dbConfig struct parsed from a file.
@@ -235,7 +237,7 @@ func (a *App) InitApp() {
 	a.Organizer.tabCompletion.list = nil
 	a.Organizer.tabCompletion.index = 0
 	a.Organizer.normalCmds = a.setOrganizerNormalCmds()
-	a.Organizer.exCmds = a.setOrganizerExCmds()
+	a.Organizer.exCmds = a.setOrganizerExCmds(a.Organizer)
 	a.Organizer.filterList = a.setFilterList()
 
 	if a.Config.Options.Type == "folder" {

@@ -238,8 +238,18 @@ func (o *Organizer) organizerProcessKey(c int) {
 			o.tabCompletion.list = nil
 
 			if !found {
-				o.showMessage("\x1b[41mNot a recognized command: %s\x1b[0m", s)
-				o.showMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
+				// Try to provide helpful suggestions using command registry
+				if o.commandRegistry != nil {
+					suggestions := o.commandRegistry.SuggestCommand(s)
+					if len(suggestions) > 0 {
+						o.showMessage("%sCommand '%s' not found. Did you mean: %s?%s", RED_BG, s, strings.Join(suggestions, ", "), RESET)
+					} else {
+						o.showMessage("%sCommand '%s' not found. Use ':help' to see available commands.%s", RED_BG, s, RESET)
+					}
+				} else {
+					// Fallback if registry not available
+					o.showMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
+				}
 				o.mode = o.last_mode
 			}
 			return

@@ -42,6 +42,7 @@ type Organizer struct {
 	bufferTick          int
 	normalCmds          map[string]func(*Organizer)
 	exCmds              map[string]func(*Organizer, int)
+	commandRegistry     *CommandRegistry[func(*Organizer, int)]
 	filterList          []FilterNames
 	tabCompletion       struct {
 		list  []FilterNames

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -13,38 +14,201 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setEditorExCmds() map[string]func(*Editor) {
-	return map[string]func(*Editor){
-		"write":           (*Editor).writeNote,
-		"w":               (*Editor).writeNote,
-		"wa":              (*Editor).writeAll,
-		"qa":              (*Editor).quitAll,
-		"read":            (*Editor).readFile,
-		"readfile":        (*Editor).readFile,
-		"vertical resize": (*Editor).verticalResize,
-		"vert res":        (*Editor).verticalResize,
-		"resize":          (*Editor).resize,
-		"res":             (*Editor).resize,
-		//"compile":         (*Editor).compile, //with go run and python don't need a separate compile step
-		//"c":               (*Editor).compile,
-		"run":      (*Editor).run,
-		"r":        (*Editor).run,
-		"save":     (*Editor).saveNoteToFile,
-		"savefile": (*Editor).saveNoteToFile,
-		"syntax":   (*Editor).syntax,
-		"number":   (*Editor).number,
-		"num":      (*Editor).number,
-		"ha":       (*Editor).printNote,
-		"quit":     (*Editor).quitActions,
-		"q":        (*Editor).quitActions,
-		"quit!":    (*Editor).quitActions,
-		"q!":       (*Editor).quitActions,
-		"x":        (*Editor).quitActions,
-		"fmt":      (*Editor).goFormat,
-		"pdf":      (*Editor).createPDF,
-		"print":    (*Editor).printDocument,
-		//"spell":  (*Editor).spell,
+func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
+	registry := NewCommandRegistry[func(*Editor)]()
+
+	// File Operations commands
+	registry.Register("write", (*Editor).writeNote, CommandInfo{
+		Name:        "write",
+		Aliases:     []string{"w"},
+		Description: "Save current note to database",
+		Usage:       "write",
+		Category:    "File Operations",
+		Examples:    []string{":write", ":w"},
+	})
+
+	registry.Register("writeall", (*Editor).writeAll, CommandInfo{
+		Name:        "writeall",
+		Aliases:     []string{"wa"},
+		Description: "Save all open notes",
+		Usage:       "writeall",
+		Category:    "File Operations",
+		Examples:    []string{":writeall", ":wa"},
+	})
+
+	registry.Register("read", (*Editor).readFile, CommandInfo{
+		Name:        "read",
+		Aliases:     []string{"readfile"},
+		Description: "Read contents from file into current note",
+		Usage:       "read <filename>",
+		Category:    "File Operations",
+		Examples:    []string{":read todo.txt", ":readfile /tmp/notes.md"},
+	})
+
+	registry.Register("save", (*Editor).saveNoteToFile, CommandInfo{
+		Name:        "save",
+		Aliases:     []string{"savefile"},
+		Description: "Save current note to external file",
+		Usage:       "save <filename>",
+		Category:    "File Operations",
+		Examples:    []string{":save backup.txt", ":savefile /tmp/note.md"},
+	})
+
+	// Editing commands
+	registry.Register("syntax", (*Editor).syntax, CommandInfo{
+		Name:        "syntax",
+		Description: "Set syntax highlighting for current note",
+		Usage:       "syntax <language>",
+		Category:    "Editing",
+		Examples:    []string{":syntax go", ":syntax python", ":syntax markdown"},
+	})
+
+	registry.Register("number", (*Editor).number, CommandInfo{
+		Name:        "number",
+		Aliases:     []string{"num"},
+		Description: "Toggle line numbers on/off",
+		Usage:       "number",
+		Category:    "Editing",
+		Examples:    []string{":number", ":num"},
+	})
+
+	registry.Register("fmt", (*Editor).goFormat, CommandInfo{
+		Name:        "fmt",
+		Description: "Format Go code using gofmt",
+		Usage:       "fmt",
+		Category:    "Editing",
+		Examples:    []string{":fmt"},
+	})
+
+	registry.Register("run", (*Editor).run, CommandInfo{
+		Name:        "run",
+		Aliases:     []string{"r"},
+		Description: "Execute current note as code",
+		Usage:       "run",
+		Category:    "Editing",
+		Examples:    []string{":run", ":r"},
+	})
+
+	// Layout commands
+	registry.Register("vertical resize", (*Editor).verticalResize, CommandInfo{
+		Name:        "vertical resize",
+		Aliases:     []string{"vert res"},
+		Description: "Resize vertical divider",
+		Usage:       "vertical resize <width>",
+		Category:    "Layout",
+		Examples:    []string{":vertical resize 80", ":vert res +10", ":vert res -5"},
+	})
+
+	registry.Register("resize", (*Editor).resize, CommandInfo{
+		Name:        "resize",
+		Aliases:     []string{"res"},
+		Description: "Resize editor window",
+		Usage:       "resize <height>",
+		Category:    "Layout",
+		Examples:    []string{":resize 20", ":res +5", ":res -3"},
+	})
+
+	// Output commands
+	registry.Register("ha", (*Editor).printNote, CommandInfo{
+		Name:        "ha",
+		Description: "Print current note using vim hardcopy",
+		Usage:       "ha",
+		Category:    "Output",
+		Examples:    []string{":ha"},
+	})
+
+	registry.Register("print", (*Editor).printDocument, CommandInfo{
+		Name:        "print",
+		Description: "Print current note as formatted document",
+		Usage:       "print",
+		Category:    "Output",
+		Examples:    []string{":print"},
+	})
+
+	registry.Register("pdf", (*Editor).createPDF, CommandInfo{
+		Name:        "pdf",
+		Description: "Create PDF from current note",
+		Usage:       "pdf",
+		Category:    "Output",
+		Examples:    []string{":pdf"},
+	})
+
+	// System commands
+	registry.Register("quit", (*Editor).quitActions, CommandInfo{
+		Name:        "quit",
+		Aliases:     []string{"q", "quit!", "q!", "x"},
+		Description: "Close current editor (q!/quit! forces without saving)",
+		Usage:       "quit",
+		Category:    "System",
+		Examples:    []string{":quit", ":q", ":q!", ":x"},
+	})
+
+	registry.Register("quitall", (*Editor).quitAll, CommandInfo{
+		Name:        "quitall",
+		Aliases:     []string{"qa"},
+		Description: "Close all editors",
+		Usage:       "quitall",
+		Category:    "System",
+		Examples:    []string{":quitall", ":qa"},
+	})
+
+	// Help command
+	registry.Register("help", (*Editor).help, CommandInfo{
+		Name:        "help",
+		Aliases:     []string{"h"},
+		Description: "Show help for editor commands",
+		Usage:       "help [command|category]",
+		Category:    "Help",
+		Examples:    []string{":help", ":help write", ":help File Operations", ":h"},
+	})
+
+	// Store registry in editor for help command access
+	editor.commandRegistry = registry
+
+	return registry.GetFunctionMap()
+}
+
+// help displays help information for editor commands
+func (e *Editor) help() {
+	if e.commandRegistry == nil {
+		e.ShowMessage(BR, "Help system not available")
+		return
 	}
+
+	var helpText string
+	pos := strings.Index(e.command_line, " ")
+
+	if pos == -1 {
+		// No arguments - show all commands
+		helpText = e.commandRegistry.FormatAllHelp()
+	} else {
+		// Get the argument after "help "
+		arg := e.command_line[pos+1:]
+		
+		// Check if it's a specific command
+		if _, exists := e.commandRegistry.GetCommandInfo(arg); exists {
+			helpText = e.commandRegistry.FormatCommandHelp(arg)
+		} else {
+			// Check if it's a category
+			categories := e.commandRegistry.GetAllCommands()
+			if _, exists := categories[arg]; exists {
+				helpText = e.commandRegistry.FormatCategoryHelp(arg)
+			} else {
+				// Not found - suggest similar commands
+				suggestions := e.commandRegistry.SuggestCommand(arg)
+				if len(suggestions) > 0 {
+					helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
+				} else {
+					helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
+				}
+			}
+		}
+	}
+
+	// Create a temporary editor overlay for help display
+	e.overlay = strings.Split(helpText, "\n")
+	e.redraw = true
+	e.ShowMessage(BR, "Help displayed - press ESC to close")
 }
 
 func (e *Editor) saveNoteToFile() {
