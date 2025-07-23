@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -354,15 +355,56 @@ func (o *Organizer) help(pos int) {
 	var helpText string
 
 	if pos == -1 {
-		// No arguments - show all commands
+		// No arguments - show all ex commands
 		helpText = o.commandRegistry.FormatAllHelp()
 	} else {
 		// Get the argument after "help "
 		arg := o.command_line[pos+1:]
 		
-		// Check if it's a specific command
-		if _, exists := o.commandRegistry.GetCommandInfo(arg); exists {
+		// Check if it's request for normal mode help
+		if arg == "normal" {
+			if o.normalCommandRegistry != nil {
+				helpText = o.formatNormalModeHelp()
+			} else {
+				helpText = "Normal mode help not available"
+			}
+		} else if _, exists := o.commandRegistry.GetCommandInfo(arg); exists {
+			// Check if it's a specific ex command
 			helpText = o.commandRegistry.FormatCommandHelp(arg)
+		} else if o.normalCommandRegistry != nil {
+			// Check if it's a normal mode command (by display name)
+			if normalInfo, exists := o.findNormalCommandByDisplayName(arg); exists {
+				helpText = o.normalCommandRegistry.FormatCommandHelp(normalInfo.Name)
+			} else {
+				// Check if it's a category (ex commands first, then normal)
+				exCategories := o.commandRegistry.GetAllCommands()
+				if _, exists := exCategories[arg]; exists {
+					helpText = o.commandRegistry.FormatCategoryHelp(arg)
+				} else if o.normalCommandRegistry != nil {
+					normalCategories := o.normalCommandRegistry.GetAllCommands()
+					if _, exists := normalCategories[arg]; exists {
+						helpText = o.normalCommandRegistry.FormatCategoryHelp(arg)
+					} else {
+						// Not found - suggest similar commands from both registries
+						exSuggestions := o.commandRegistry.SuggestCommand(arg)
+						normalSuggestions := o.normalCommandRegistry.SuggestCommand(arg)
+						allSuggestions := append(exSuggestions, normalSuggestions...)
+						if len(allSuggestions) > 0 {
+							helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(allSuggestions, ", "))
+						} else {
+							helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' for ex commands or ':help normal' for normal mode commands.", arg)
+						}
+					}
+				} else {
+					// Normal command registry not available
+					suggestions := o.commandRegistry.SuggestCommand(arg)
+					if len(suggestions) > 0 {
+						helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
+					} else {
+						helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
+					}
+				}
+			}
 		} else {
 			// Check if it's a category
 			categories := o.commandRegistry.GetAllCommands()
@@ -387,6 +429,57 @@ func (o *Organizer) help(pos int) {
 	o.drawPreviewWithoutImages()
 	o.mode = PREVIEW_HELP
 	o.command_line = ""
+}
+
+// formatNormalModeHelp returns formatted help for all normal mode commands
+func (o *Organizer) formatNormalModeHelp() string {
+	if o.normalCommandRegistry == nil {
+		return "Normal mode help not available"
+	}
+
+	var help strings.Builder
+	help.WriteString("Normal Mode Commands:\n\n")
+
+	categories := o.normalCommandRegistry.GetAllCommands()
+
+	// Sort categories for consistent output
+	var categoryNames []string
+	for category := range categories {
+		categoryNames = append(categoryNames, category)
+	}
+	sort.Strings(categoryNames)
+
+	for _, category := range categoryNames {
+		commands := categories[category]
+		help.WriteString(fmt.Sprintf("%s:\n", category))
+
+		for _, cmd := range commands {
+			help.WriteString(fmt.Sprintf("  %-15s - %s\n", cmd.Name, cmd.Description))
+		}
+		help.WriteString("\n")
+	}
+
+	help.WriteString("Use ':help <key>' for detailed help on a specific normal mode command.\n")
+	help.WriteString("Use ':help <category>' for commands in a specific category.\n")
+
+	return help.String()
+}
+
+// findNormalCommandByDisplayName finds a normal command by its display name
+func (o *Organizer) findNormalCommandByDisplayName(displayName string) (CommandInfo, bool) {
+	if o.normalCommandRegistry == nil {
+		return CommandInfo{}, false
+	}
+
+	allCommands := o.normalCommandRegistry.GetAllCommands()
+	for _, commands := range allCommands {
+		for _, cmd := range commands {
+			if cmd.Name == displayName {
+				return cmd, true
+			}
+		}
+	}
+	return CommandInfo{}, false
 }
 
 func (o *Organizer) log(_ int) {

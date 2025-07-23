@@ -57,16 +57,18 @@ The application now supports full Windows cross-compilation from Linux/Unix syst
 - Automatic screen redraw and layout adjustment on terminal resize
 
 ## Command System
-The application features a comprehensive command registry system with full discoverability:
+The application features a comprehensive command registry system with full discoverability for both ex commands and normal mode commands:
 
 ### Help System
-- `:help` - Show all available commands organized by category
-- `:help <command>` - Show detailed help for specific command with usage and examples
+- `:help` - Show all available ex commands organized by category
+- `:help normal` - Show all normal mode commands organized by category
+- `:help <command>` - Show detailed help for specific ex command with usage and examples
+- `:help <key>` - Show detailed help for specific normal mode command (e.g., `:help Ctrl-H`)
 - `:help <category>` - Show all commands in a specific category (e.g., `:help Navigation`)
 - `:h` - Short alias for help command
 
-### Command Organization
-**Organizer Commands (66+ commands in 8 categories):**
+### Ex Command Organization
+**Organizer Ex Commands (66+ commands in 8 categories):**
 - **Navigation**: open, opencontext, openfolder, openkeyword
 - **Data Management**: new, write, sync, bulkload, refresh
 - **Search & Filter**: find, contexts, folders, keywords, recent, log
@@ -76,21 +78,41 @@ The application features a comprehensive command registry system with full disco
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
-**Editor Commands (20+ commands in 5 categories):**
+**Editor Ex Commands (20+ commands in 5 categories):**
 - **File Operations**: write, writeall, read, save
 - **Editing**: syntax, number, fmt, run
 - **Layout**: vertical resize, resize
 - **Output**: ha, print, pdf
 - **System**: quit, quitall
 
+### Normal Mode Command Organization
+**Editor Normal Mode Commands (17+ commands in 6 categories):**
+- **Movement**: Ctrl-H (move left), Ctrl-L (move right)
+- **Text Editing**: Ctrl-B (bold), Ctrl-I (italic), Ctrl-E (code), \<leader\>b (bold)
+- **Preview**: \<leader\>m (markdown preview), \<leader\>w (web view)
+- **Window Management**: \<C-w\>L, \<C-w\>J, \<C-w\>=, \<C-w\>_, \<C-w\>-, \<C-w\>+, \<C-w\>\>, \<C-w\>\<
+- **Output Control**: Ctrl-J (scroll down), Ctrl-K (scroll up)
+- **Utility**: \<leader\>y (next style), \<leader\>t (go template), \<leader\>sp (spell check), \<leader\>su (spell suggest)
+- **System**: Ctrl-Z (switch vim implementation)
+
+**Organizer Normal Mode Commands (10+ commands in 5 categories):**
+- **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive)
+- **Navigation**: Ctrl-J (scroll preview down), Ctrl-K (scroll preview up)
+- **Information**: Ctrl-I (show entry info)
+- **Mode Switching**: : (ex command mode), Ctrl-L (switch to editor)
+- **Preview**: Ctrl-W (web view)
+
 ### Enhanced Error Messages
-- Smart command suggestions for typos using fuzzy matching
+- Smart command suggestions for typos using fuzzy matching from both ex and normal command registries
 - "Did you mean" suggestions when commands are not found
-- Helpful guidance to use `:help` for command discovery
+- Helpful guidance to use `:help` for ex commands or `:help normal` for normal mode commands
 
 ### Implementation Details
-- **File**: `command_registry.go` - Core command registry system with metadata
-- **Backward Compatible**: All existing commands and aliases work unchanged
+- **File**: `command_registry.go` - Core command registry system with metadata and key display helpers
+- **Files**: `editor_normal.go`, `organizer_normal.go` - Normal mode command registration
+- **Files**: `editor_cmd_line.go`, `organizer_cmd_line.go` - Enhanced help system integration
+- **Backward Compatible**: All existing commands and key bindings work unchanged
 - **Type Safe**: Uses Go generics for type-safe command function signatures
-- **Self-Documenting**: Help text is co-located with command definitions
+- **Self-Documenting**: Help text is co-located with command definitions for both ex and normal commands
+- **Key Display**: Human-readable key representations in help (e.g., `\x08` displayed as `Ctrl-H`)
 - **Extensible**: New commands require help metadata, ensuring documentation stays current

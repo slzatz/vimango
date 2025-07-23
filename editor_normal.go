@@ -9,35 +9,204 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setEditorNormalCmds() map[string]func(*Editor, int) {
-	return map[string]func(*Editor, int){
-		"\x17L":              (*Editor).moveOutputWindowRight,
-		"\x17J":              (*Editor).moveOutputWindowBelow,
-		"\x08":               (*Editor).moveLeft,         //Ctrl-H
-		"\x0c":               (*Editor).moveRight,        //Ctrl-L
-		"\x0a":               (*Editor).scrollOutputDown, //Ctrl-J
-		"\x0b":               (*Editor).scrollOutputUp,   //Ctrl-K
-		"\x02":               (*Editor).decorateWord,
-		leader + "b":         (*Editor).decorateWord,
-		"\x05":               (*Editor).decorateWord,
-		string(ctrlKey('i')): (*Editor).decorateWord,
-		"\x17=":              (*Editor).changeSplit,
-		"\x17_":              (*Editor).changeSplit,
-		"\x17-":              (*Editor).changeSplit,
-		"\x17+":              (*Editor).changeSplit,
-		"\x17>":              (*Editor).changeHSplit,
-		"\x17<":              (*Editor).changeHSplit,
-		leader + "m":         (*Editor).showMarkdownPreview,
-		leader + "w":         (*Editor).showWebView,
-		leader + "y":         (*Editor).nextStyle,
-		leader + "t":         (*Editor).readGoTemplate,
-		leader + "sp":        (*Editor).spellingCheck,
-		leader + "su":        (*Editor).spellSuggest,
-		//leader + "l": (*Editor).showVimMessageLog,
-		//leader + "xx": (*Editor).test,
-		//"z=": (*Editor).spellSuggest,
-		string(ctrlKey('z')): (*Editor).switchImplementation,
-	}
+func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) {
+	registry := NewCommandRegistry[func(*Editor, int)]()
+
+	// Movement commands
+	registry.Register("\x08", (*Editor).moveLeft, CommandInfo{
+		Name:        keyToDisplayName("\x08"),
+		Description: "Move to previous editor or return to organizer",
+		Usage:       "Ctrl-H",
+		Category:    "Movement",
+		Examples:    []string{"Ctrl-H - Switch to previous editor"},
+	})
+
+	registry.Register("\x0c", (*Editor).moveRight, CommandInfo{
+		Name:        keyToDisplayName("\x0c"),
+		Description: "Move to next editor",
+		Usage:       "Ctrl-L",
+		Category:    "Movement",
+		Examples:    []string{"Ctrl-L - Switch to next editor"},
+	})
+
+	// Text Editing commands
+	registry.Register("\x02", (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName("\x02"),
+		Description: "Make word bold (toggle **word**)",
+		Usage:       "Ctrl-B",
+		Category:    "Text Editing",
+		Examples:    []string{"Ctrl-B - Toggle bold formatting on current word"},
+	})
+
+	registry.Register(leader + "b", (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(leader + "b"),
+		Description: "Make word bold (toggle **word**)",
+		Usage:       "<leader>b",
+		Category:    "Text Editing",
+		Examples:    []string{"<leader>b - Toggle bold formatting on current word"},
+	})
+
+	registry.Register("\x05", (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName("\x05"),
+		Description: "Make word code (toggle `word`)",
+		Usage:       "Ctrl-E",
+		Category:    "Text Editing",
+		Examples:    []string{"Ctrl-E - Toggle code formatting on current word"},
+	})
+
+	registry.Register(string(ctrlKey('i')), (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('i'))),
+		Description: "Make word italic (toggle *word*)",
+		Usage:       "Ctrl-I",
+		Category:    "Text Editing",
+		Examples:    []string{"Ctrl-I - Toggle italic formatting on current word"},
+	})
+
+	// Preview commands
+	registry.Register(leader + "m", (*Editor).showMarkdownPreview, CommandInfo{
+		Name:        keyToDisplayName(leader + "m"),
+		Description: "Show markdown preview of current note",
+		Usage:       "<leader>m",
+		Category:    "Preview",
+		Examples:    []string{"<leader>m - Display formatted markdown preview"},
+	})
+
+	registry.Register(leader + "w", (*Editor).showWebView, CommandInfo{
+		Name:        keyToDisplayName(leader + "w"),
+		Description: "Show current note in web browser",
+		Usage:       "<leader>w",
+		Category:    "Preview",
+		Examples:    []string{"<leader>w - Open note in web browser"},
+	})
+
+	// Window Management commands
+	registry.Register("\x17L", (*Editor).moveOutputWindowRight, CommandInfo{
+		Name:        keyToDisplayName("\x17L"),
+		Description: "Move output window to the right",
+		Usage:       "<C-w>L",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>L - Position output window to the right"},
+	})
+
+	registry.Register("\x17J", (*Editor).moveOutputWindowBelow, CommandInfo{
+		Name:        keyToDisplayName("\x17J"),
+		Description: "Move output window below editor",
+		Usage:       "<C-w>J",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>J - Position output window below editor"},
+	})
+
+	registry.Register("\x17=", (*Editor).changeSplit, CommandInfo{
+		Name:        keyToDisplayName("\x17="),
+		Description: "Equalize split sizes",
+		Usage:       "<C-w>=",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>= - Make editor and output windows equal size"},
+	})
+
+	registry.Register("\x17_", (*Editor).changeSplit, CommandInfo{
+		Name:        keyToDisplayName("\x17_"),
+		Description: "Minimize output window",
+		Usage:       "<C-w>_",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>_ - Minimize output window to 2 lines"},
+	})
+
+	registry.Register("\x17-", (*Editor).changeSplit, CommandInfo{
+		Name:        keyToDisplayName("\x17-"),
+		Description: "Decrease output window height",
+		Usage:       "<C-w>-",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>- - Decrease output window height by 1 line"},
+	})
+
+	registry.Register("\x17+", (*Editor).changeSplit, CommandInfo{
+		Name:        keyToDisplayName("\x17+"),
+		Description: "Increase output window height",
+		Usage:       "<C-w>+",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>+ - Increase output window height by 1 line"},
+	})
+
+	registry.Register("\x17>", (*Editor).changeHSplit, CommandInfo{
+		Name:        keyToDisplayName("\x17>"),
+		Description: "Increase editor width",
+		Usage:       "<C-w>>",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>> - Increase editor width by 1 column"},
+	})
+
+	registry.Register("\x17<", (*Editor).changeHSplit, CommandInfo{
+		Name:        keyToDisplayName("\x17<"),
+		Description: "Decrease editor width",
+		Usage:       "<C-w><",
+		Category:    "Window Management",
+		Examples:    []string{"<C-w>< - Decrease editor width by 1 column"},
+	})
+
+	// Output Control commands
+	registry.Register("\x0a", (*Editor).scrollOutputDown, CommandInfo{
+		Name:        keyToDisplayName("\x0a"),
+		Description: "Scroll output window down",
+		Usage:       "Ctrl-J",
+		Category:    "Output Control",
+		Examples:    []string{"Ctrl-J - Scroll down in output window"},
+	})
+
+	registry.Register("\x0b", (*Editor).scrollOutputUp, CommandInfo{
+		Name:        keyToDisplayName("\x0b"),
+		Description: "Scroll output window up",
+		Usage:       "Ctrl-K",
+		Category:    "Output Control",
+		Examples:    []string{"Ctrl-K - Scroll up in output window"},
+	})
+
+	// Utility commands
+	registry.Register(leader + "y", (*Editor).nextStyle, CommandInfo{
+		Name:        keyToDisplayName(leader + "y"),
+		Description: "Cycle through available styles",
+		Usage:       "<leader>y",
+		Category:    "Utility",
+		Examples:    []string{"<leader>y - Switch to next available style"},
+	})
+
+	registry.Register(leader + "t", (*Editor).readGoTemplate, CommandInfo{
+		Name:        keyToDisplayName(leader + "t"),
+		Description: "Read Go template into current note",
+		Usage:       "<leader>t",
+		Category:    "Utility",
+		Examples:    []string{"<leader>t - Insert Go template content"},
+	})
+
+	registry.Register(leader + "sp", (*Editor).spellingCheck, CommandInfo{
+		Name:        keyToDisplayName(leader + "sp"),
+		Description: "Highlight misspelled words",
+		Usage:       "<leader>sp",
+		Category:    "Utility",
+		Examples:    []string{"<leader>sp - Check spelling and highlight errors"},
+	})
+
+	registry.Register(leader + "su", (*Editor).spellSuggest, CommandInfo{
+		Name:        keyToDisplayName(leader + "su"),
+		Description: "Show spelling suggestions for current word",
+		Usage:       "<leader>su",
+		Category:    "Utility",
+		Examples:    []string{"<leader>su - Get spelling suggestions"},
+	})
+
+	// System commands
+	registry.Register(string(ctrlKey('z')), (*Editor).switchImplementation, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('z'))),
+		Description: "Switch between Go and C vim implementations",
+		Usage:       "Ctrl-Z",
+		Category:    "System",
+		Examples:    []string{"Ctrl-Z - Toggle vim implementation"},
+	})
+
+	// Store registry in editor for help command access
+	editor.normalCommandRegistry = registry
+
+	return registry.GetFunctionMap()
 }
 
 func (e *Editor) changeSplit(flag int) {

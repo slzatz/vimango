@@ -40,9 +40,10 @@ type Organizer struct {
 	highlight           [2]int
 	vbuf                interfaces.VimBuffer
 	bufferTick          int
-	normalCmds          map[string]func(*Organizer)
-	exCmds              map[string]func(*Organizer, int)
-	commandRegistry     *CommandRegistry[func(*Organizer, int)]
+	normalCmds              map[string]func(*Organizer)
+	exCmds                  map[string]func(*Organizer, int)
+	commandRegistry         *CommandRegistry[func(*Organizer, int)]
+	normalCommandRegistry   *CommandRegistry[func(*Organizer)]
 	filterList          []FilterNames
 	tabCompletion       struct {
 		list  []FilterNames

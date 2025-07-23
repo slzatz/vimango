@@ -262,3 +262,55 @@ func min(a, b, c int) int {
 	}
 	return c
 }
+
+// keyToDisplayName converts key sequences to human-readable format for help display
+func keyToDisplayName(key string) string {
+	keyMap := map[string]string{
+		// Control characters using escape sequences
+		"\x08":     "Ctrl-H",
+		"\x0c":     "Ctrl-L", 
+		"\x0a":     "Ctrl-J",
+		"\x0b":     "Ctrl-K",
+		"\x02":     "Ctrl-B",
+		"\x05":     "Ctrl-E",
+		
+		// Ctrl-W combinations
+		"\x17L":    "<C-w>L",
+		"\x17J":    "<C-w>J",
+		"\x17=":    "<C-w>=",
+		"\x17_":    "<C-w>_",
+		"\x17-":    "<C-w>-",
+		"\x17+":    "<C-w>+",
+		"\x17>":    "<C-w>>",
+		"\x17<":    "<C-w><",
+		
+		// Control characters using byte values
+		string(0x4):  "Ctrl-D",
+		string(0x1):  "Ctrl-A",
+		string(0x18): "Ctrl-X",
+		
+		// Control characters using ctrlKey function
+		string(ctrlKey('i')): "Ctrl-I",
+		string(ctrlKey('l')): "Ctrl-L",
+		string(ctrlKey('j')): "Ctrl-J",
+		string(ctrlKey('k')): "Ctrl-K",
+		string(ctrlKey('w')): "Ctrl-W",
+		string(ctrlKey('z')): "Ctrl-Z",
+		
+		// Single characters
+		":": ":",
+		"m": "m",
+	}
+	
+	if display, exists := keyMap[key]; exists {
+		return display
+	}
+	
+	// Handle leader combinations (leader is space character)
+	if strings.HasPrefix(key, leader) {
+		return "<leader>" + key[len(leader):]
+	}
+	
+	// Return the original key if no mapping found
+	return key
+}

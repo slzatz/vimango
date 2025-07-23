@@ -81,7 +81,7 @@ func (a *App) NewEditor() *Editor {
 	
 	// Set up commands after editor creation so help can access registry
 	editor.exCmds = a.setEditorExCmds(editor)
-	editor.normalCmds = a.setEditorNormalCmds()
+	editor.normalCmds = a.setEditorNormalCmds(editor)
 	
 	return editor
 }
@@ -236,7 +236,7 @@ func (a *App) InitApp() {
 	a.Organizer.view = TASK
 	a.Organizer.tabCompletion.list = nil
 	a.Organizer.tabCompletion.index = 0
-	a.Organizer.normalCmds = a.setOrganizerNormalCmds()
+	a.Organizer.normalCmds = a.setOrganizerNormalCmds(a.Organizer)
 	a.Organizer.exCmds = a.setOrganizerExCmds(a.Organizer)
 	a.Organizer.filterList = a.setFilterList()
 

@@ -8,21 +8,98 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setOrganizerNormalCmds() map[string]func(*Organizer) {
-	return map[string]func(*Organizer){
-		//"dd":                 (*Organizer).del, //delete
-		string(0x4):          (*Organizer).del,     //ctrl-d delete
-		string(0x1):          (*Organizer).star,    //ctrl-a starEntry
-		string(0x18):         (*Organizer).archive, //ctrl-x archive
-		string(ctrlKey('i')): (*Organizer).info,    //{{0x9}} not this is same as '/t' (tab)
-		"m":                  (*Organizer).mark,
-		string(ctrlKey('l')): (*Organizer).switchToEditorMode,
-		":":                  (*Organizer).exCmd,
-		string(ctrlKey('j')): (*Organizer).scrollPreviewDown,
-		string(ctrlKey('k')): (*Organizer).scrollPreviewUp,
-		//string(ctrlKey('n')): (*Organizer).previewWithImages,
-		string(ctrlKey('w')): (*Organizer).showWebView_n,
-	}
+func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Organizer) {
+	registry := NewCommandRegistry[func(*Organizer)]()
+
+	// Entry Actions commands
+	registry.Register(string(0x4), (*Organizer).del, CommandInfo{
+		Name:        keyToDisplayName(string(0x4)),
+		Description: "Toggle delete status of current entry",
+		Usage:       "Ctrl-D",
+		Category:    "Entry Actions",
+		Examples:    []string{"Ctrl-D - Mark/unmark entry as deleted"},
+	})
+
+	registry.Register(string(0x1), (*Organizer).star, CommandInfo{
+		Name:        keyToDisplayName(string(0x1)),
+		Description: "Toggle star status of current entry",
+		Usage:       "Ctrl-A",
+		Category:    "Entry Actions",
+		Examples:    []string{"Ctrl-A - Mark/unmark entry as starred"},
+	})
+
+	registry.Register(string(0x18), (*Organizer).archive, CommandInfo{
+		Name:        keyToDisplayName(string(0x18)),
+		Description: "Toggle archive status of current entry",
+		Usage:       "Ctrl-X",
+		Category:    "Entry Actions",
+		Examples:    []string{"Ctrl-X - Mark/unmark entry as archived"},
+	})
+
+	registry.Register("m", (*Organizer).mark, CommandInfo{
+		Name:        keyToDisplayName("m"),
+		Description: "Toggle mark on current entry for batch operations",
+		Usage:       "m",
+		Category:    "Entry Actions",
+		Examples:    []string{"m - Mark/unmark entry for batch operations"},
+	})
+
+	// Navigation commands
+	registry.Register(string(ctrlKey('j')), (*Organizer).scrollPreviewDown, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('j'))),
+		Description: "Scroll preview pane down",
+		Usage:       "Ctrl-J",
+		Category:    "Navigation",
+		Examples:    []string{"Ctrl-J - Scroll down in preview pane"},
+	})
+
+	registry.Register(string(ctrlKey('k')), (*Organizer).scrollPreviewUp, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('k'))),
+		Description: "Scroll preview pane up",
+		Usage:       "Ctrl-K",
+		Category:    "Navigation",
+		Examples:    []string{"Ctrl-K - Scroll up in preview pane"},
+	})
+
+	// Information commands
+	registry.Register(string(ctrlKey('i')), (*Organizer).info, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('i'))),
+		Description: "Show detailed information about current entry",
+		Usage:       "Ctrl-I",
+		Category:    "Information",
+		Examples:    []string{"Ctrl-I - Display entry details (ID, context, folder, etc.)"},
+	})
+
+	// Mode Switching commands
+	registry.Register(":", (*Organizer).exCmd, CommandInfo{
+		Name:        keyToDisplayName(":"),
+		Description: "Enter command line mode",
+		Usage:       ":",
+		Category:    "Mode Switching",
+		Examples:    []string{": - Enter ex command mode to run commands"},
+	})
+
+	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('l'))),
+		Description: "Switch to editor mode",
+		Usage:       "Ctrl-L",
+		Category:    "Mode Switching",
+		Examples:    []string{"Ctrl-L - Switch to active editor if available"},
+	})
+
+	// Preview commands
+	registry.Register(string(ctrlKey('w')), (*Organizer).showWebView_n, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('w'))),
+		Description: "Show current note in web browser",
+		Usage:       "Ctrl-W",
+		Category:    "Preview",
+		Examples:    []string{"Ctrl-W - Open current note in web browser"},
+	})
+
+	// Store registry in organizer for help command access
+	organizer.normalCommandRegistry = registry
+
+	return registry.GetFunctionMap()
 }
 
 // if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {

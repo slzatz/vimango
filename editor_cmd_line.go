@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -188,15 +189,56 @@ func (e *Editor) help() {
 	pos := strings.Index(e.command_line, " ")
 
 	if pos == -1 {
-		// No arguments - show all commands
+		// No arguments - show all ex commands
 		helpText = e.commandRegistry.FormatAllHelp()
 	} else {
 		// Get the argument after "help "
 		arg := e.command_line[pos+1:]
 
-		// Check if it's a specific command
-		if _, exists := e.commandRegistry.GetCommandInfo(arg); exists {
+		// Check if it's request for normal mode help
+		if arg == "normal" {
+			if e.normalCommandRegistry != nil {
+				helpText = e.formatNormalModeHelp()
+			} else {
+				helpText = "Normal mode help not available"
+			}
+		} else if _, exists := e.commandRegistry.GetCommandInfo(arg); exists {
+			// Check if it's a specific ex command
 			helpText = e.commandRegistry.FormatCommandHelp(arg)
+		} else if e.normalCommandRegistry != nil {
+			// Check if it's a normal mode command (by display name)
+			if normalInfo, exists := e.findNormalCommandByDisplayName(arg); exists {
+				helpText = e.normalCommandRegistry.FormatCommandHelp(normalInfo.Name)
+			} else {
+				// Check if it's a category (ex commands first, then normal)
+				exCategories := e.commandRegistry.GetAllCommands()
+				if _, exists := exCategories[arg]; exists {
+					helpText = e.commandRegistry.FormatCategoryHelp(arg)
+				} else if e.normalCommandRegistry != nil {
+					normalCategories := e.normalCommandRegistry.GetAllCommands()
+					if _, exists := normalCategories[arg]; exists {
+						helpText = e.normalCommandRegistry.FormatCategoryHelp(arg)
+					} else {
+						// Not found - suggest similar commands from both registries
+						exSuggestions := e.commandRegistry.SuggestCommand(arg)
+						normalSuggestions := e.normalCommandRegistry.SuggestCommand(arg)
+						allSuggestions := append(exSuggestions, normalSuggestions...)
+						if len(allSuggestions) > 0 {
+							helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(allSuggestions, ", "))
+						} else {
+							helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' for ex commands or ':help normal' for normal mode commands.", arg)
+						}
+					}
+				} else {
+					// Normal command registry not available
+					suggestions := e.commandRegistry.SuggestCommand(arg)
+					if len(suggestions) > 0 {
+						helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
+					} else {
+						helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
+					}
+				}
+			}
 		} else {
 			// Check if it's a category
 			categories := e.commandRegistry.GetAllCommands()
@@ -219,6 +261,57 @@ func (e *Editor) help() {
 	e.drawOverlay()
 	e.redraw = true
 	e.ShowMessage(BR, "Help displayed - press ESC to close")
+}
+
+// formatNormalModeHelp returns formatted help for all normal mode commands
+func (e *Editor) formatNormalModeHelp() string {
+	if e.normalCommandRegistry == nil {
+		return "Normal mode help not available"
+	}
+
+	var help strings.Builder
+	help.WriteString("Normal Mode Commands:\n\n")
+
+	categories := e.normalCommandRegistry.GetAllCommands()
+
+	// Sort categories for consistent output
+	var categoryNames []string
+	for category := range categories {
+		categoryNames = append(categoryNames, category)
+	}
+	sort.Strings(categoryNames)
+
+	for _, category := range categoryNames {
+		commands := categories[category]
+		help.WriteString(fmt.Sprintf("%s:\n", category))
+
+		for _, cmd := range commands {
+			help.WriteString(fmt.Sprintf("  %-15s - %s\n", cmd.Name, cmd.Description))
+		}
+		help.WriteString("\n")
+	}
+
+	help.WriteString("Use ':help <key>' for detailed help on a specific normal mode command.\n")
+	help.WriteString("Use ':help <category>' for commands in a specific category.\n")
+
+	return help.String()
+}
+
+// findNormalCommandByDisplayName finds a normal command by its display name
+func (e *Editor) findNormalCommandByDisplayName(displayName string) (CommandInfo, bool) {
+	if e.normalCommandRegistry == nil {
+		return CommandInfo{}, false
+	}
+
+	allCommands := e.normalCommandRegistry.GetAllCommands()
+	for _, commands := range allCommands {
+		for _, cmd := range commands {
+			if cmd.Name == displayName {
+				return cmd, true
+			}
+		}
+	}
+	return CommandInfo{}, false
 }
 
 func (e *Editor) saveNoteToFile() {
