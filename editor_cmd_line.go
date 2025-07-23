@@ -136,11 +136,20 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	// System commands
 	registry.Register("quit", (*Editor).quitActions, CommandInfo{
 		Name:        "quit",
-		Aliases:     []string{"q", "quit!", "q!", "x"},
+		Aliases:     []string{"q", "quit!", "q!"},
 		Description: "Close current editor (q!/quit! forces without saving)",
 		Usage:       "quit",
 		Category:    "System",
 		Examples:    []string{":quit", ":q", ":q!", ":x"},
+	})
+
+	registry.Register("exit", (*Editor).exit, CommandInfo{
+		Name:        "exit",
+		Aliases:     []string{"x"},
+		Description: "Save and exit the current file",
+		Usage:       "x",
+		Category:    "System",
+		Examples:    []string{":exit", ":x"},
 	})
 
 	registry.Register("quitall", (*Editor).quitAll, CommandInfo{
@@ -184,7 +193,7 @@ func (e *Editor) help() {
 	} else {
 		// Get the argument after "help "
 		arg := e.command_line[pos+1:]
-		
+
 		// Check if it's a specific command
 		if _, exists := e.commandRegistry.GetCommandInfo(arg); exists {
 			helpText = e.commandRegistry.FormatCommandHelp(arg)
@@ -207,6 +216,7 @@ func (e *Editor) help() {
 
 	// Create a temporary editor overlay for help display
 	e.overlay = strings.Split(helpText, "\n")
+	e.drawOverlay()
 	e.redraw = true
 	e.ShowMessage(BR, "Help displayed - press ESC to close")
 }
@@ -514,9 +524,13 @@ func (e *Editor) modified() {
 }
 */
 
+func (e *Editor) exit() {
+	e.quitActions()
+}
+
 func (e *Editor) quitActions() {
 	cmd := e.command_line
-	if cmd == "x" {
+	if cmd == "x" || cmd == "exit" {
 		text := e.bufferToString()
 		err := e.Database.updateNote(e.id, text)
 		if err != nil {
