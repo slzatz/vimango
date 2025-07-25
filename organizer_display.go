@@ -558,3 +558,20 @@ func (o *Organizer) drawPreview() {
 	*/
 	o.drawPreviewWithoutImages()
 }
+
+func (o *Organizer) renderText(s string) {
+	if len(s) == 0 {
+		o.note = []string{}
+		return
+	}
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithStylePath("darkslz.json"),
+		glamour.WithWordWrap(0),
+	)
+	note, _ := r.Render(s)
+	// glamour seems to add a '\n' at the start
+	note = strings.TrimSpace(note)
+
+	note = WordWrap(note, o.Screen.totaleditorcols)
+	o.note = strings.Split(note, "\n")
+}

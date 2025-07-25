@@ -120,18 +120,27 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":find meeting notes", ":find urgent todo"},
 	})
 
-	registry.Register("contexts", (*Organizer).contexts, CommandInfo{
-		Name:        "contexts",
-		Aliases:     []string{"context", "c"},
-		Description: "Show all contexts or move entries to context",
-		Usage:       "contexts [context_name]",
-		Category:    "Search & Filter",
-		Examples:    []string{":contexts", ":c work", ":context personal"},
+	registry.Register("showcontexts", (*Organizer).showContexts, CommandInfo{
+		Name:        "showcontexts",
+		Aliases:     []string{"c", "contexts"},
+		Description: "Show all contexts",
+		Usage:       "showcontexts",
+		Category:    "Container Management",
+		Examples:    []string{":contexts", ":c"},
+	})
+
+	registry.Register("setcontext", (*Organizer).setContext, CommandInfo{
+		Name:        "setcontext",
+		Aliases:     []string{"setc"},
+		Description: "Set context for entries",
+		Usage:       "setcontext [context_name]",
+		Category:    "Container Management",
+		Examples:    []string{":set context work", ":sc work"},
 	})
 
 	registry.Register("folders", (*Organizer).folders, CommandInfo{
 		Name:        "folders",
-		Aliases:     []string{"folder", "f"},
+		Aliases:     []string{"set folder", "f"},
 		Description: "Show all folders or move entries to folder",
 		Usage:       "folders [folder_name]",
 		Category:    "Search & Filter",
@@ -173,8 +182,8 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	registry.Register("showall", (*Organizer).showAll, CommandInfo{
-		Name:        "showall",
-		Aliases:     []string{"show"},
+		Name: "showall",
+		//Aliases:     []string{"show"},
 		Description: "Toggle showing completed/deleted entries",
 		Usage:       "showall",
 		Category:    "View Control",
@@ -208,7 +217,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":vertical resize 80", ":vert res +10", ":vert res -5"},
 	})
 
-	// Entry Management commands  
+	// Entry Management commands
 	registry.Register("e", (*Organizer).editNote, CommandInfo{
 		Name:        "e",
 		Description: "Edit note for current or specified entry",
@@ -360,7 +369,7 @@ func (o *Organizer) help(pos int) {
 	} else {
 		// Get the argument after "help "
 		arg := o.command_line[pos+1:]
-		
+
 		// Check if it's request for normal mode help
 		if arg == "normal" {
 			if o.normalCommandRegistry != nil {
@@ -424,7 +433,8 @@ func (o *Organizer) help(pos int) {
 
 	// Display help in the preview area
 	o.Screen.eraseRightScreen()
-	o.note = strings.Split(helpText, "\n")
+	o.renderText(helpText)
+	//o.note = strings.Split(helpText, "\n")
 	o.altRowoff = 0
 	o.drawPreviewWithoutImages()
 	o.mode = PREVIEW_HELP
@@ -438,7 +448,7 @@ func (o *Organizer) formatNormalModeHelp() string {
 	}
 
 	var help strings.Builder
-	help.WriteString("Normal Mode Commands:\n\n")
+	help.WriteString("# Normal Mode Commands:\n\n")
 
 	categories := o.normalCommandRegistry.GetAllCommands()
 
@@ -451,10 +461,10 @@ func (o *Organizer) formatNormalModeHelp() string {
 
 	for _, category := range categoryNames {
 		commands := categories[category]
-		help.WriteString(fmt.Sprintf("%s:\n", category))
+		help.WriteString(fmt.Sprintf("## %s:\n", category))
 
 		for _, cmd := range commands {
-			help.WriteString(fmt.Sprintf("  %-15s - %s\n", cmd.Name, cmd.Description))
+			help.WriteString(fmt.Sprintf("`  %-15s` - %s\n", cmd.Name, cmd.Description))
 		}
 		help.WriteString("\n")
 	}
@@ -1008,29 +1018,33 @@ func (o *Organizer) reverse(_ int) {
 	o.mode = PREVIEW_SYNC_LOG
 }
 
-func (o *Organizer) contexts(pos int) {
+func (o *Organizer) showContexts(pos int) {
 	o.mode = NORMAL
 
-	if pos == -1 {
-		o.Screen.eraseRightScreen()
-		o.view = CONTEXT
-		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-		o.rows = o.Database.getContainers(o.view)
-		if len(o.rows) == 0 {
-			o.insertRow(0, "", true, false, false, BASE_DATE)
-			o.rows[0].dirty = false
-			o.ShowMessage(BL, "No results were returned")
-		}
-		o.fc, o.fr, o.rowoff = 0, 0, 0
-		o.filter = ""
-		o.readRowsIntoBuffer()
-		vim.SetCursorPosition(1, 0)
-		o.bufferTick = o.vbuf.GetLastChangedTick()
-		o.displayContainerInfo()
-		o.ShowMessage(BL, "Retrieved contexts")
+	if pos != -1 {
+		o.ShowMessage(BL, "Show contexts does not take an argument")
 		return
 	}
 
+	o.Screen.eraseRightScreen()
+	o.view = CONTEXT
+	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+	o.rows = o.Database.getContainers(o.view)
+	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
+		o.ShowMessage(BL, "No results were returned")
+	}
+	o.fc, o.fr, o.rowoff = 0, 0, 0
+	o.filter = ""
+	o.readRowsIntoBuffer()
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
+	o.displayContainerInfo()
+	o.ShowMessage(BL, "Retrieved contexts")
+}
+
+func (o *Organizer) setContext(pos int) {
 	input := o.command_line[pos+1:]
 	var tid int
 	var ok bool

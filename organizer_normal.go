@@ -47,18 +47,18 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	// Navigation commands
 	registry.Register(string(ctrlKey('j')), (*Organizer).scrollPreviewDown, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('j'))),
-		Description: "Scroll preview pane down",
+		Description: "Scroll rendered page down",
 		Usage:       "Ctrl-J",
 		Category:    "Navigation",
-		Examples:    []string{"Ctrl-J - Scroll down in preview pane"},
+		Examples:    []string{"Ctrl-J - Scroll down in rendered page"},
 	})
 
 	registry.Register(string(ctrlKey('k')), (*Organizer).scrollPreviewUp, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('k'))),
-		Description: "Scroll preview pane up",
+		Description: "Scroll rendered page up",
 		Usage:       "Ctrl-K",
 		Category:    "Navigation",
-		Examples:    []string{"Ctrl-K - Scroll up in preview pane"},
+		Examples:    []string{"Ctrl-K - Scroll up in rendered page"},
 	})
 
 	// Information commands
@@ -81,7 +81,7 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 
 	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('l'))),
-		Description: "Switch to editor mode",
+		Description: "Move to editor to the left (or to organizer if no editor)",
 		Usage:       "Ctrl-L",
 		Category:    "Mode Switching",
 		Examples:    []string{"Ctrl-L - Switch to active editor if available"},
