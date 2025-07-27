@@ -17,12 +17,12 @@ func (o *Organizer) organizerProcessKey(c int) {
 		vim.SendKey("<esc>")
 		o.last_mode = o.mode // not sure this is necessary
 		o.mode = NORMAL
-		
+
 		// Get cursor position - now should be preserved correctly by the buffer
 		pos := vim.GetCursorPosition()
 		o.fc = pos[1]
 		o.fr = pos[0] - 1
-		
+
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 		o.Session.imagePreview = false
@@ -198,8 +198,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 			row.dirty = true
 			o.bufferTick = tick
 		}
-		mode := vim.GetCurrentMode()  // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
-		o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		mode := vim.GetCurrentMode() // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
+		o.mode = modeMap[mode]       //note that 8 => SEARCH (8 is also COMMAND)
 		o.command = ""
 		visPos := vim.GetVisualRange()
 		o.highlight[1] = visPos[1][1] + 1
@@ -226,6 +226,8 @@ func (o *Organizer) organizerProcessKey(c int) {
 				s = o.command_line[:pos]
 				if cmd, found = o.exCmds[s]; found {
 					cmd(o, pos)
+				}
+				/* not sure why the code below is needed 07/27/2025
 				} else {
 					pos := strings.Index(o.command_line, " ")
 					s = o.command_line[:pos]
@@ -233,6 +235,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 						cmd(o, pos)
 					}
 				}
+				*/
 			}
 			o.tabCompletion.index = 0
 			o.tabCompletion.list = nil

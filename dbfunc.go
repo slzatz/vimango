@@ -124,14 +124,10 @@ func (db *Database) updateTaskContextByTid(tid, id int) error {
 	return err
 }
 
-func (db *Database) updateTaskFolderByTid(tid, id int) {
+func (db *Database) updateTaskFolderByTid(tid, id int) error {
 	_, err := db.MainDB.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
 		tid, id)
-
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error updating folder for entry %d to tid %d: %v", id, tid, err)
-		return
-	}
+	return err
 }
 
 func (db *Database) updateNote(id int, text string) error {

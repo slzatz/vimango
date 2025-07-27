@@ -120,31 +120,31 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":find meeting notes", ":find urgent todo"},
 	})
 
-	registry.Register("showcontexts", (*Organizer).showContexts, CommandInfo{
-		Name:        "showcontexts",
-		Aliases:     []string{"c", "contexts"},
-		Description: "Show all contexts",
-		Usage:       "showcontexts",
+	registry.Register("list", (*Organizer).list, CommandInfo{
+		Name:        "list",
+		Aliases:     []string{"l"},
+		Description: "list contexts, folders, or keywords",
+		Usage:       "list <context|folder|keyword>",
 		Category:    "Container Management",
-		Examples:    []string{":contexts", ":c"},
+		Examples:    []string{":list contexts", ":l f"},
 	})
 
-	registry.Register("setcontext", (*Organizer).setContext, CommandInfo{
-		Name:        "setcontext",
-		Aliases:     []string{"setc"},
-		Description: "Set context for entries",
-		Usage:       "setcontext [context_name]",
-		Category:    "Container Management",
-		Examples:    []string{":set context work", ":sc work"},
+	registry.Register("set context", (*Organizer).setContext, CommandInfo{
+		Name:        "set context",
+		Aliases:     []string{"set c"},
+		Description: "Set context for entrie(s)",
+		Usage:       "set context <context_name>",
+		Category:    "Entry Management",
+		Examples:    []string{":set context work", ":set c work"},
 	})
 
-	registry.Register("folders", (*Organizer).folders, CommandInfo{
-		Name:        "folders",
-		Aliases:     []string{"set folder", "f"},
-		Description: "Show all folders or move entries to folder",
-		Usage:       "folders [folder_name]",
-		Category:    "Search & Filter",
-		Examples:    []string{":folders", ":f projects", ":folder archive"},
+	registry.Register("folders", (*Organizer).setFolder, CommandInfo{
+		Name:        "set folder",
+		Aliases:     []string{"set f"},
+		Description: "Set folder for entrie(s)",
+		Usage:       "set folder <folder_name>",
+		Category:    "Entry Management",
+		Examples:    []string{":set folder todo", ":set f todo"},
 	})
 
 	registry.Register("keywords", (*Organizer).keywords, CommandInfo{
@@ -1018,16 +1018,28 @@ func (o *Organizer) reverse(_ int) {
 	o.mode = PREVIEW_SYNC_LOG
 }
 
-func (o *Organizer) showContexts(pos int) {
+func (o *Organizer) list(pos int) {
 	o.mode = NORMAL
 
-	if pos != -1 {
-		o.ShowMessage(BL, "Show contexts does not take an argument")
-		return
+	if pos == -1 {
+		o.view = CONTEXT
+	} else {
+		input := o.command_line[pos+1:]
+		if input[0] == 'c' {
+			o.view = CONTEXT
+		} else if input[0] == 'f' {
+			o.view = FOLDER
+		} else if input[0] == 'k' {
+			o.view = KEYWORD
+		} else {
+			o.ShowMessage(BL, "You need to provide a valid view: c for context, f for folder, k for keyword")
+			o.mode = o.last_mode
+			return
+		}
+		o.command_line = ""
 	}
 
 	o.Screen.eraseRightScreen()
-	o.view = CONTEXT
 	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
 	o.rows = o.Database.getContainers(o.view)
 	if len(o.rows) == 0 {
@@ -1043,7 +1055,6 @@ func (o *Organizer) showContexts(pos int) {
 	o.displayContainerInfo()
 	o.ShowMessage(BL, "Retrieved contexts")
 }
-
 func (o *Organizer) setContext(pos int) {
 	input := o.command_line[pos+1:]
 	var tid int
@@ -1059,7 +1070,7 @@ func (o *Organizer) setContext(pos int) {
 		from that number to the server id and now there is not context tid that matches the task's context_tid
 	*/
 	if tid < 1 {
-		o.showMessage("Context is unsynced")
+		o.ShowMessage(BL, "Context is unsynced")
 		return
 	}
 
@@ -1067,11 +1078,11 @@ func (o *Organizer) setContext(pos int) {
 		for id := range o.marked_entries {
 			err := o.Database.updateTaskContextByTid(tid, id)
 			if err != nil {
-				o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+				o.ShowMessage(BL, "Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
 				return
 			}
 		}
-		o.showMessage("Marked entries moved into context %s", input)
+		o.ShowMessage(BL, "Marked entries moved into context %s", input)
 		return
 	}
 	id := o.rows[o.fr].id
@@ -1083,30 +1094,7 @@ func (o *Organizer) setContext(pos int) {
 	o.showMessage("Moved current entry (since none were marked) into context %s", input)
 }
 
-func (o *Organizer) folders(pos int) {
-	o.mode = NORMAL
-
-	if pos == -1 {
-		o.Screen.eraseRightScreen()
-		o.view = FOLDER
-		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-		o.rows = o.Database.getContainers(o.view)
-
-		if len(o.rows) == 0 {
-			o.insertRow(0, "", true, false, false, BASE_DATE)
-			o.rows[0].dirty = false
-			o.ShowMessage(BL, "No results were returned")
-		}
-		o.fc, o.fr, o.rowoff = 0, 0, 0
-		o.filter = ""
-		o.readRowsIntoBuffer()
-		vim.SetCursorPosition(1, 0)
-		o.bufferTick = o.vbuf.GetLastChangedTick()
-		o.displayContainerInfo()
-		o.ShowMessage(BL, "Retrieved folders")
-		return
-	}
-
+func (o *Organizer) setFolder(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var tid int
@@ -1121,18 +1109,27 @@ func (o *Organizer) folders(pos int) {
 	}
 
 	if len(o.marked_entries) > 0 {
-		for entry_id, _ := range o.marked_entries {
-			o.Database.updateTaskFolderByTid(tid, entry_id)
+		for id, _ := range o.marked_entries {
+			err := o.Database.updateTaskFolderByTid(tid, id)
+			if err != nil {
+				o.ShowMessage(BL, "Error updating folder (updateTaskFolderByTid) for entry %d to tid %d: %v", id, tid, err)
+				return
+			}
 		}
 		o.ShowMessage(BL, "Marked entries moved into folder %s", input)
 		return
 	}
-	o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
+	//o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
+	id := o.rows[o.fr].id
+	err := o.Database.updateTaskFolderByTid(tid, id)
+	if err != nil {
+		o.ShowMessage(BL, "Error updating folder (updateTaskFolderByTid) for entry %d to tid %d: %v", id, tid, err)
+		return
+	}
 	o.ShowMessage(BL, "Moved current entry (since none were marked) into folder %s", input)
 }
 
 func (o *Organizer) keywords(pos int) {
-
 	o.mode = NORMAL
 
 	if pos == -1 {
