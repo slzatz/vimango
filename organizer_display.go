@@ -410,6 +410,7 @@ func (o *Organizer) drawSearchRows() {
 	fmt.Print(ab.String())
 }
 
+// change function name to displayRenderedNote
 func (o *Organizer) drawPreview() {
 	if len(o.rows) == 0 {
 		o.Screen.eraseRightScreen()
@@ -417,7 +418,6 @@ func (o *Organizer) drawPreview() {
 	}
 	id := o.rows[o.fr].id ///it appears that coming out of a sync there is a problem - maybe o.rows is not what is expected
 	var note string
-	//if o.mode != FIND {
 	if o.taskview != BY_FIND {
 		note = o.Database.readNoteIntoString(id)
 	} else {
@@ -437,37 +437,14 @@ func (o *Organizer) drawPreview() {
 	}
 
 	if lang == "markdown" {
-		r, _ := glamour.NewTermRenderer(
-			glamour.WithStylePath("darkslz.json"),
-			glamour.WithWordWrap(0),
-		)
-		note, _ = r.Render(note)
-		// glamour seems to add a '\n' at the start
-		note = strings.TrimSpace(note)
+		o.renderMarkdown(note)
 	} else {
-		var buf bytes.Buffer
-		_ = Highlight(&buf, note, lang, "terminal16m", o.Session.style[o.Session.styleIndex])
-		note = buf.String()
+		o.renderCode(note, lang)
 	}
-
-	//if o.mode == FIND {
-	if o.taskview == BY_FIND {
-		// could use strings.Count to make sure they are balanced
-		// n0 = strings.Count(o.note, "^^")
-		// n1 = strings.Count(o.note, "%%")
-		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
-		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
-	}
-	note = WordWrap(note, o.Screen.totaleditorcols)
-	o.note = strings.Split(note, "\n")
 	o.drawRenderedNote()
 }
 
-func (o *Organizer) renderText(s string) {
-	if len(s) == 0 {
-		o.note = []string{}
-		return
-	}
+func (o *Organizer) renderMarkdown(s string) {
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath("darkslz.json"),
 		glamour.WithWordWrap(0),
@@ -476,6 +453,25 @@ func (o *Organizer) renderText(s string) {
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
 
+	if o.taskview == BY_FIND {
+		// could use strings.Count to make sure they are balanced
+		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
+		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
+	}
+	note = WordWrap(note, o.Screen.totaleditorcols)
+	o.note = strings.Split(note, "\n")
+}
+
+func (o *Organizer) renderCode(s string, lang string) {
+	var buf bytes.Buffer
+	_ = Highlight(&buf, s, lang, "terminal16m", o.Session.style[o.Session.styleIndex])
+	note := buf.String()
+
+	if o.taskview == BY_FIND {
+		// could use strings.Count to make sure they are balanced
+		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
+		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
+	}
 	note = WordWrap(note, o.Screen.totaleditorcols)
 	o.note = strings.Split(note, "\n")
 }
