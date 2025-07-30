@@ -436,7 +436,7 @@ func (o *Organizer) help(pos int) {
 	o.renderText(helpText)
 	//o.note = strings.Split(helpText, "\n")
 	o.altRowoff = 0
-	o.drawPreviewWithoutImages()
+	o.drawRenderedNote()
 	o.mode = PREVIEW_HELP
 	o.command_line = ""
 }
@@ -510,7 +510,7 @@ func (o *Organizer) log(_ int) {
 	}
 	note := o.Database.readSyncLog(o.rows[o.fr].id)
 	o.note = strings.Split(note, "\n")
-	o.drawPreviewWithoutImages()
+	o.drawRenderedNote()
 	o.clearMarkedEntries()
 	o.ShowMessage(BL, "")
 }
@@ -962,7 +962,7 @@ func (o *Organizer) sync3(_ int) {
 	note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawPreviewWithoutImages()
+	o.drawRenderedNote()
 	o.mode = PREVIEW_SYNC_LOG
 }
 
@@ -988,7 +988,7 @@ func (o *Organizer) initialBulkLoad(_ int) {
 	}
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawPreviewWithoutImages()
+	o.drawRenderedNote()
 	o.mode = PREVIEW_SYNC_LOG
 }
 
@@ -1014,7 +1014,7 @@ func (o *Organizer) reverse(_ int) {
 	}
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawPreviewWithoutImages()
+	o.drawRenderedNote()
 	o.mode = PREVIEW_SYNC_LOG
 }
 

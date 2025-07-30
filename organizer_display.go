@@ -230,111 +230,22 @@ func (o *Organizer) drawAltRows() {
 	fmt.Print(ab.String())
 }
 
-/*
-// want to remove since only showing images in webview or browser
-func (o *Organizer) drawPreviewWithImages_() {
+func (o *Organizer) drawRenderedNote() {
 	if len(o.note) == 0 {
 		return
 	}
-
-	fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
-
-	fr := o.altRowoff - 1
-	y := 0
-
-	for {
-		fr++
-		if fr > len(o.note)-1 || y > o.Screen.textLines-1 {
-			break
-		}
-		if !strings.Contains(o.note[fr], "Im@ge") {
-			fmt.Printf("%s%s", o.note[fr], lf_ret)
-			y++
-			continue
-		}
-
-		//fmt.Printf("Loading Image ... \x1b[%dG", o.Screen.divider+1)
-		prevY := y
-		s := o.note[fr]
-		for i := range 2 {
-			if fr+1+i >= len(o.note) {
-				break
-			}
-			s = s + o.note[fr+i+1]
-		}
-		path := extractFilePath(s)
-		o.ShowMessage(BR, path)
-		//fmt.Printf("path: %s\n", path)
-		//path := getStringInBetween(o.note[fr], "$$", "$$")
-		var img image.Image
-		maxWidth := o.Screen.totaleditorcols * int(o.Screen.ws.Xpixel) / o.Screen.screenCols
-		maxHeight := int(o.Screen.ws.Ypixel)
-		var err error
-		if strings.Contains(path, "drive.google.com") {
-			fmt.Printf("Loading Google Drive Image ... \x1b[%dG", o.Screen.divider+1)
-			img, _, err = loadGoogleImage(path, maxWidth-5, maxHeight-150)
-			if err != nil {
-				fmt.Printf("%s%sError:MayDay%s %s%s", path, BOLD, RESET, o.note[fr], lf_ret)
-				y++
-				o.ShowMessage(BR, "Error loading google drive image: "+err.Error())
-				continue
-			}
-		} else if strings.Contains(path, "http") {
-			fmt.Printf("Loading Web Image ... \x1b[%dG", o.Screen.divider+1)
-			img, _, err = loadWebImage(path)
-			if err != nil {
-				fmt.Printf("%s%sError:Norm%s %s%s", path, BOLD, RESET, o.note[fr], lf_ret)
-				y++
-				o.ShowMessage(BR, "Error loading web image: "+err.Error())
-				continue
-			}
-		} else {
-			fmt.Printf("Loading Local Image ... \x1b[%dG", o.Screen.divider+1)
-			//maxWidth := o.Screen.totaleditorcols * int(o.Screen.ws.Xpixel) / o.Screen.screenCols
-			//maxHeight := int(o.Screen.ws.Ypixel)
-			img, _, err = loadImage(path, maxWidth-5, maxHeight-150)
-			if err != nil {
-				fmt.Printf("path=%s%sError:File%s %s%s", path, BOLD, RESET, o.note[fr], lf_ret)
-				y++
-				continue
-			}
-		}
-		height := img.Bounds().Max.Y / (int(o.Screen.ws.Ypixel) / o.Screen.screenLines)
-		y += height
-		if y > o.Screen.textLines-1 {
-			fmt.Printf("\x1b[3m\x1b[4mImage %s doesn't fit!\x1b[0m \x1b[%dG", path, o.Screen.divider+1)
-			y = y - height + 1
-			fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.Screen.divider+1)
-			continue
-		}
-
-		displayImage(img)
-
-		// erase "Loading image ..."
-		fmt.Printf("\x1b[%d;%dH\x1b[0K", TOP_MARGIN+1+prevY, o.Screen.divider+1)
-		fmt.Printf("\x1b[%d;%dH", TOP_MARGIN+1+y, o.Screen.divider+1)
-	}
-}
-*/
-
-func (o *Organizer) drawPreviewWithoutImages() {
-	if len(o.note) == 0 {
-		return
+	start := o.altRowoff
+	var end int
+	// check if there are more lines than can fit on the screen
+	if len(o.note)-start > o.Screen.textLines-1 {
+		end = o.Screen.textLines + start
+	} else {
+		//end = len(o.note) - 1
+		end = len(o.note)
 	}
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
-
-	fr := o.altRowoff - 1
-	y := 0
-	for {
-		fr++
-		if fr > len(o.note)-1 || y > o.Screen.textLines-1 {
-			break
-		}
-		fmt.Fprintf(os.Stdout, "%s%s", o.note[fr], lf_ret)
-		y++
-	}
+	fmt.Print(strings.Join(o.note[start:end], lf_ret))
 }
 
 func (o *Organizer) drawStatusBar() {
@@ -549,14 +460,7 @@ func (o *Organizer) drawPreview() {
 	}
 	note = WordWrap(note, o.Screen.totaleditorcols)
 	o.note = strings.Split(note, "\n")
-	/*
-		if lang != "markdown" || !o.Session.imagePreview {
-			o.drawPreviewWithoutImages()
-		} else {
-			o.drawPreviewWithImages()
-		}
-	*/
-	o.drawPreviewWithoutImages()
+	o.drawRenderedNote()
 }
 
 func (o *Organizer) renderText(s string) {

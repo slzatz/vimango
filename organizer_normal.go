@@ -196,16 +196,22 @@ func (o *Organizer) switchToEditorMode() {
 }
 
 func (o *Organizer) scrollPreviewDown() {
-	//if len(org.note) > org.altRowoff+org.textLines {
+	if o.altRowoff == len(o.note)-1 {
+		o.ShowMessage(BL, "Reached end of rendered note")
+		return
+	}
+	o.Screen.eraseRightScreen()
 	o.altRowoff++
-	o.drawPreview()
-	//}
+	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
+	o.drawRenderedNote()
 }
 
 func (o *Organizer) scrollPreviewUp() {
 	if o.altRowoff > 0 {
 		o.altRowoff--
-		o.drawPreview()
+		o.Screen.eraseRightScreen()
+		//o.drawPreview()
+		o.drawRenderedNote()
 	}
 }
 
@@ -227,7 +233,7 @@ func controlZ() {
 	org.note = strings.Split(note, "\n")
 	app.Screen.eraseRightScreen()
 	if !app.Session.imagePreview {
-		org.drawPreviewWithoutImages()
+		org.drawRenderedNote()
 	} else {
 		org.drawPreviewWithImages()
 	}

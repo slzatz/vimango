@@ -404,7 +404,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			o.note = strings.Split(note, "\n")
 			//note = generateWWString(note, org.totaleditorcols)
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 		case ARROW_DOWN, 'j':
 			if len(o.rows) == 0 {
 				return
@@ -418,7 +418,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 			note := o.Database.readSyncLog(o.rows[o.fr].id)
 			//note = generateWWString(note, org.totaleditorcols)
 			o.note = strings.Split(note, "\n")
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 		case ':':
 			o.showMessage(":")
 			o.command_line = ""
@@ -438,11 +438,11 @@ func (o *Organizer) organizerProcessKey(c int) {
 				}
 			}
 			o.Screen.eraseRightScreen()
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 
 			//org.altRowoff++
 			//sess.eraseRightScreen()
-			//org.drawPreviewWithoutImages()
+			//org.drawRenderedNote()
 		//case PAGE_UP:
 		case ctrlKey('k'):
 			if len(o.rows) == 0 {
@@ -454,13 +454,13 @@ func (o *Organizer) organizerProcessKey(c int) {
 				o.altRowoff = 0
 			}
 			o.Screen.eraseRightScreen()
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 
 			//if org.altRowoff > 0 {
 			//	org.altRowoff--
 			//}
 			//sess.eraseRightScreen()
-			//org.drawPreviewWithoutImages()
+			//org.drawRenderedNote()
 		case ctrlKey('d'):
 			if len(o.rows) == 0 {
 				return
@@ -488,14 +488,14 @@ func (o *Organizer) organizerProcessKey(c int) {
 		case ctrlKey('j'):
 			o.altRowoff++
 			o.Screen.eraseRightScreen()
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 		//case ARROW_UP, 'k':
 		case ctrlKey('k'):
 			if o.altRowoff > 0 {
 				o.altRowoff--
 			}
 			o.Screen.eraseRightScreen()
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 		case PAGE_DOWN:
 			if len(o.note) > o.altRowoff+o.Screen.textLines {
 				if len(o.note) < o.altRowoff+2*o.Screen.textLines {
@@ -505,7 +505,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				}
 			}
 			o.Screen.eraseRightScreen()
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 		case PAGE_UP:
 			if o.altRowoff > o.Screen.textLines {
 				o.altRowoff -= o.Screen.textLines
@@ -513,7 +513,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 				o.altRowoff = 0
 			}
 			o.Screen.eraseRightScreen()
-			o.drawPreviewWithoutImages()
+			o.drawRenderedNote()
 		}
 
 	case LINKS:
