@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -96,6 +97,8 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder, y int) {
 
 func (o *Organizer) drawRows() {
 
+	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
+	timeKeywordsRegex := regexp.MustCompile(`seconds|minutes|hours|days`)
 	if len(o.rows) == 0 {
 		return
 	}
@@ -125,8 +128,16 @@ func (o *Organizer) drawRows() {
 			length = titlecols
 		}
 
-		if o.rows[fr].star {
-			ab.WriteString(CYAN_BOLD)
+		id := o.rows[fr].id
+		note := o.Database.readNoteIntoString(id)
+		if googleDriveRegex.MatchString(note) {
+			ab.WriteString(BOLD)
+		}
+		//} else if timeKeywordsRegex.MatchString(o.rows[fr].sort) {
+		if timeKeywordsRegex.MatchString(o.rows[fr].sort) {
+			ab.WriteString(CYAN)
+		} else {
+			ab.WriteString(WHITE)
 		}
 
 		if o.rows[fr].archived && o.rows[fr].deleted {
