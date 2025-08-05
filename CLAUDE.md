@@ -116,3 +116,28 @@ The application features a comprehensive command registry system with full disco
 - **Self-Documenting**: Help text is co-located with command definitions for both ex and normal commands
 - **Key Display**: Human-readable key representations in help (e.g., `\x08` displayed as `Ctrl-H`)
 - **Extensible**: New commands require help metadata, ensuring documentation stays current
+
+## Organizer Key Processing Architecture (newkey)
+The organizer key processing has been refactored into a modular, mode-based architecture:
+
+### Build Options:
+- **Original**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (uses organizer_process_key.go)
+- **Refactored**: `CGO_ENABLED=1 go build --tags="fts5,cgo,newkey"` (uses organizer_process_key_new.go)
+
+### Architecture:
+- **ModeHandler Interface**: Each mode (NORMAL, INSERT, VISUAL, COMMAND_LINE, etc.) has dedicated handler
+- **Cached Handlers**: Handlers are created once per mode and reused for performance
+- **State Management**: All state remains in Organizer struct, handlers are stateless
+- **Mode Transitions**: Handlers return new modes after processing keys
+
+### Key Components:
+- **Common Helpers**: VimKeyHandler, CursorManager, BufferSyncManager, StateResetter
+- **Mode Handlers**: InsertModeHandler, NormalModeHandler, VisualModeHandler, CommandLineModeHandler, plus special modes
+- **Main Dispatcher**: 15-line function replaces 554-line monolithic switch statement
+
+### Benefits:
+- **Maintainability**: Each mode isolated in own handler
+- **Extensibility**: New modes implement ModeHandler interface
+- **Performance**: Cached handlers eliminate repeated object creation
+- **Testability**: Individual handlers can be unit tested
+- **Safety**: Original implementation preserved with build tags

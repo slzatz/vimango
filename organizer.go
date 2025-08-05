@@ -18,34 +18,34 @@ type Organizer struct {
 	altRowoff int
 	coloff    int //the number of columns scrolled (aka number of left rows now off-screen
 
-	rows                []Row
-	altRows             []AltRow
-	altFr               int
-	filter              string
-	sort                string
-	sortPriority        bool
-	command_line        string
-	message             string
-	note                []string // the preview
-	command             string
-	show_deleted        bool
-	show_completed      bool
-	view                View
-	altView             View //int
-	taskview            int
-	current_task_id     int
-	string_buffer       string
-	marked_entries      map[int]struct{} // map instead of list makes toggling a row easier
-	title_search_string string
-	highlight           [2]int
-	vbuf                interfaces.VimBuffer
-	bufferTick          int
-	normalCmds              map[string]func(*Organizer)
-	exCmds                  map[string]func(*Organizer, int)
-	commandRegistry         *CommandRegistry[func(*Organizer, int)]
-	normalCommandRegistry   *CommandRegistry[func(*Organizer)]
-	filterList          []FilterNames
-	tabCompletion       struct {
+	rows                  []Row
+	altRows               []AltRow
+	altFr                 int
+	filter                string
+	sort                  string
+	sortPriority          bool
+	command_line          string
+	message               string
+	note                  []string //slice of rendered lines
+	command               string
+	show_deleted          bool
+	show_completed        bool
+	view                  View
+	altView               View //int
+	taskview              int
+	current_task_id       int
+	string_buffer         string
+	marked_entries        map[int]struct{} // map instead of list makes toggling a row easier
+	title_search_string   string
+	highlight             [2]int
+	vbuf                  interfaces.VimBuffer
+	bufferTick            int
+	normalCmds            map[string]func(*Organizer)
+	exCmds                map[string]func(*Organizer, int)
+	commandRegistry       *CommandRegistry[func(*Organizer, int)]
+	normalCommandRegistry *CommandRegistry[func(*Organizer)]
+	filterList            []FilterNames
+	tabCompletion         struct {
 		list  []FilterNames
 		index int
 	}

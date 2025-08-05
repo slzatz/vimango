@@ -1,3 +1,6 @@
+//go:build !newkey
+// +build !newkey
+
 package main
 
 import (
