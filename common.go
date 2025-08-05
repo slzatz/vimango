@@ -106,28 +106,22 @@ var Lsps = map[string]string{
 type Mode int
 
 const (
-	NORMAL  Mode = iota
-	PENDING      // only editor mode
+	NORMAL Mode = iota
 	INSERT
 	COMMAND_LINE // only in organizer mode
 	EX_COMMAND   // only in editor mode
 	VISUAL_LINE  // only editor mode
 	VISUAL
-	REPLACE      // only explicit in organizer mode
-	FILE_DISPLAY // only organizer mode
-	//NO_ROWS
-	VISUAL_BLOCK      // only editor mode
-	SEARCH            // only editor mode
-	FIND              // only organizer mode
-	ADD_CHANGE_FILTER // only organizer mode
-	SYNC_LOG          // only organizer mode
-	PREVIEW           // only editor mode - for previewing markdown
-	VIEW_LOG          // only in editor mode - for debug viewing of vim message hx
-	SPELLING          // this mode recognizes 'z='
-	PREVIEW_SYNC_LOG  // only in organizer mode
-	LINKS             // only in organizer mode
-	PREVIEW_HELP      // only in organizer mode - for displaying help information
-	VISUAL_MODE
+	VISUAL_BLOCK     // only editor mode
+	SEARCH           // only editor mode
+	FIND             // only organizer mode
+	PREVIEW          // only editor mode - for previewing markdown
+	VIEW_LOG         // only in editor mode - for debug viewing of vim message hx
+	SPELLING         // this mode recognizes 'z='
+	PREVIEW_SYNC_LOG // only in organizer mode
+	LINKS            // only in organizer mode
+	PREVIEW_HELP     // only in organizer mode - for displaying help information
+	PENDING
 )
 
 var modeMap = map[int]Mode{
@@ -279,25 +273,24 @@ const (
 func (m Mode) String() string {
 	return [...]string{
 		"NORMAL",
-		"PENDING",
 		"INSERT",
 		"COMMAND LINE",
 		"EX COMMAND",
 		"VISUAL LINE",
 		"VISUAL",
-		"REPLACE",
 		"FILE DISPLAY",
 		"NO ROWS",
 		"VISUAL BLOCK",
 		"SEARCH",
 		"FIND",
-		"ADD/CHANGE FILTER",
 		"SYNC LOG",
 		"PREVIEW",
 		"VIEW LOG",
 		"SPELLING",
 		"PREVIEW_SYNC_LOG",
 		"LINKS",
+		"PREVIEW_HELP",
+		"PENDING",
 	}[m]
 }
 

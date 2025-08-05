@@ -124,10 +124,12 @@ func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, archive
 
 func (o *Organizer) scroll() {
 
-	if o.mode == ADD_CHANGE_FILTER {
-		o.altScroll()
-		return
-	}
+	/*
+		if o.mode == ADD_CHANGE_FILTER {
+			o.altScroll()
+			return
+		}
+	*/
 
 	if len(o.rows) == 0 {
 		o.fr, o.fc, o.coloff, o.rowoff, o.cx, o.cy = 0, 0, 0, 0, 0, 0

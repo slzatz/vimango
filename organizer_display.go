@@ -20,19 +20,21 @@ func (o *Organizer) refreshScreen() {
 	//Below erase screen from middle to left - `1K` below is cursor to left erasing
 	//Now erases time/sort column (+ 17 in line below)
 	//if (org.view != KEYWORD) {
-	if o.mode != ADD_CHANGE_FILTER {
-		for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
-			// Use 1K to clear from cursor to start of line, preserving vertical lines
-			fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17)
-		}
+	//	if o.mode != ADD_CHANGE_FILTER {
+	for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
+		// Use 1K to clear from cursor to start of line, preserving vertical lines
+		fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17)
 	}
+	//	}
 	// put cursor at upper left after erasing
 	ab.WriteString(fmt.Sprintf("\x1b[%d;%dH", TOP_MARGIN+1, LEFT_MARGIN+1))
 	fmt.Print(ab.String())
 	if o.taskview == BY_FIND {
 		o.drawSearchRows()
-	} else if o.mode == ADD_CHANGE_FILTER {
-		o.drawAltRows()
+		/*
+			} else if o.mode == ADD_CHANGE_FILTER {
+				o.drawAltRows()
+		*/
 	} else {
 		o.drawRows()
 	}

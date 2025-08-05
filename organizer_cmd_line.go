@@ -164,14 +164,15 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":recent"},
 	})
 
-	registry.Register("log", (*Organizer).log, CommandInfo{
-		Name:        "log",
-		Description: "Show synchronization log entries",
-		Usage:       "log",
-		Category:    "Search & Filter",
-		Examples:    []string{":log"},
-	})
-
+	/*
+		registry.Register("log", (*Organizer).log, CommandInfo{
+			Name:        "log",
+			Description: "Show synchronization log entries",
+			Usage:       "log",
+			Category:    "Search & Filter",
+			Examples:    []string{":log"},
+		})
+	*/
 	// View Control commands
 	registry.Register("sort", (*Organizer).sortEntries, CommandInfo{
 		Name:        "sort",
@@ -253,30 +254,31 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// Container Management commands
-	registry.Register("cc", (*Organizer).updateContainer, CommandInfo{
-		Name:        "cc",
-		Description: "Update context for marked or current entry",
-		Usage:       "cc",
-		Category:    "Container Management",
-		Examples:    []string{":cc"},
-	})
+	/*
+			registry.Register("cc", (*Organizer).updateContainer, CommandInfo{
+				Name:        "cc",
+				Description: "Update context for marked or current entry",
+				Usage:       "cc",
+				Category:    "Container Management",
+				Examples:    []string{":cc"},
+			})
 
-	registry.Register("ff", (*Organizer).updateContainer, CommandInfo{
-		Name:        "ff",
-		Description: "Update folder for marked or current entry",
-		Usage:       "ff",
-		Category:    "Container Management",
-		Examples:    []string{":ff"},
-	})
+		registry.Register("ff", (*Organizer).updateContainer, CommandInfo{
+			Name:        "ff",
+			Description: "Update folder for marked or current entry",
+			Usage:       "ff",
+			Category:    "Container Management",
+			Examples:    []string{":ff"},
+		})
 
-	registry.Register("kk", (*Organizer).updateContainer, CommandInfo{
-		Name:        "kk",
-		Description: "Update keyword for marked or current entry",
-		Usage:       "kk",
-		Category:    "Container Management",
-		Examples:    []string{":kk"},
-	})
-
+		registry.Register("kk", (*Organizer).updateContainer, CommandInfo{
+			Name:        "kk",
+			Description: "Update keyword for marked or current entry",
+			Usage:       "kk",
+			Category:    "Container Management",
+			Examples:    []string{":kk"},
+		})
+	*/
 	// Output & Export commands
 	registry.Register("print", (*Organizer).printDocument, CommandInfo{
 		Name:        "print",
@@ -492,6 +494,7 @@ func (o *Organizer) findNormalCommandByDisplayName(displayName string) (CommandI
 	return CommandInfo{}, false
 }
 
+/* would bring back previous syncs, which I never use
 func (o *Organizer) log(_ int) {
 
 	//db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
@@ -514,6 +517,7 @@ func (o *Organizer) log(_ int) {
 	o.clearMarkedEntries()
 	o.ShowMessage(BL, "")
 }
+*/
 
 func (o *Organizer) openContainerSelection() {
 	row := o.rows[o.fr]
@@ -1243,6 +1247,7 @@ func (o *Organizer) showAll(_ int) {
 	}
 }
 
+/*
 func (o *Organizer) updateContainer(_ int) {
 	//o.current_task_id = o.rows[o.fr].id
 	o.Screen.eraseRightScreen()
@@ -1261,6 +1266,7 @@ func (o *Organizer) updateContainer(_ int) {
 		o.ShowMessage(BL, "Select context to add to marked or current entry")
 	}
 }
+*/
 
 func (o *Organizer) deleteMarks(_ int) {
 	o.clearMarkedEntries()
