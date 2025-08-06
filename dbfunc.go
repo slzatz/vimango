@@ -140,7 +140,9 @@ func (db *Database) updateNote(id int, text string) error {
 
 	_, err := db.MainDB.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
 		nullableText, id)
-	return err
+	if err != nil {
+		return err
+	}
 
 	/***************fts virtual table update*********************/
 	entry_tid := db.entryTidFromId(id)
