@@ -166,15 +166,25 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 		pos := strings.LastIndex(o.command_line, " ")
 		if pos == -1 {
 			s = o.command_line
-			if cmd, found = o.exCmds[s]; found {
-				cmd(o, pos)
-			}
 		} else {
 			s = o.command_line[:pos]
-			if cmd, found = o.exCmds[s]; found {
-				cmd(o, pos)
-			}
 		}
+		if cmd, found = o.exCmds[s]; found {
+			cmd(o, pos)
+		}
+		/*
+			if pos == -1 {
+				s = o.command_line
+				if cmd, found = o.exCmds[s]; found {
+					cmd(o, pos)
+				}
+			} else {
+				s = o.command_line[:pos]
+				if cmd, found = o.exCmds[s]; found {
+					cmd(o, pos)
+				}
+			}
+		*/
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 
@@ -196,7 +206,7 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 		return
 
 	case '\t':
-		pos := strings.Index(o.command_line, " ")
+		pos := strings.LastIndex(o.command_line, " ")
 		if pos == -1 {
 			return
 		}
@@ -208,11 +218,13 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 		} else {
 			o.ShowMessage(BR, "tab")
 			o.tabCompletion.index = 0
-			cmd := o.command_line[:pos]
 			option := o.command_line[pos+1:]
-			if !(cmd == "o" || cmd == "cd") {
+			/* NOTE: there may be some commands we do want to exclude from tab completion
+			cmd := o.command_line[:pos]
+			if !(cmd == "o" || cmd == "cd" ) {
 				return
 			}
+			*/
 			for _, k := range o.filterList {
 				if strings.HasPrefix(k.Text, option) {
 					o.tabCompletion.list = append(o.tabCompletion.list, FilterNames{Text: k.Text, Char: k.Char})

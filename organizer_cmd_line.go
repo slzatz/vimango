@@ -131,7 +131,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 	registry.Register("set context", (*Organizer).setContext, CommandInfo{
 		Name:        "set context",
-		Aliases:     []string{"set c"},
+		Aliases:     []string{"set c", "mv"},
 		Description: "Set context for entrie(s)",
 		Usage:       "set context <context_name>",
 		Category:    "Entry Management",
@@ -140,7 +140,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 	registry.Register("folders", (*Organizer).setFolder, CommandInfo{
 		Name:        "set folder",
-		Aliases:     []string{"set f"},
+		Aliases:     []string{"set f", "mvf"},
 		Description: "Set folder for entrie(s)",
 		Usage:       "set folder <folder_name>",
 		Category:    "Entry Management",
@@ -1131,6 +1131,7 @@ func (o *Organizer) setFolder(pos int) {
 		return
 	}
 	o.ShowMessage(BL, "Moved current entry (since none were marked) into folder %s", input)
+	///o.drawStatusBar() /////// won't do anything given the current code
 }
 
 func (o *Organizer) keywords(pos int) {
