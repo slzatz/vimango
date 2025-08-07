@@ -12,7 +12,7 @@ import (
 )
 
 // note that bool returned is whether to redraw
-func (e *Editor) editorProcessKey(c int) bool {
+func (e *Editor) editorProcessKey(c int) (redraw bool) {
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
@@ -26,7 +26,8 @@ func (e *Editor) editorProcessKey(c int) bool {
 			fmt.Print("\x1b_Ga=d\x1b\\")
 			e.ShowMessage(BR, "")
 			e.mode = NORMAL
-			return true
+			redraw = true
+			return
 		}
 
 		e.mode = NORMAL
@@ -43,232 +44,25 @@ func (e *Editor) editorProcessKey(c int) bool {
 		e.ShowMessage(BR, "")
 		return true
 	}
+	skip := false
 
-	// the switch below deals with intercepting c before sending the char to vim
 	switch e.mode {
-
-	// in PREVIEW and VIEW_LOG don't send keys to vim
-	case PREVIEW:
-		switch c {
-		case ARROW_DOWN, ctrlKey('j'):
-			e.previewLineOffset++
-		case ARROW_UP, ctrlKey('k'):
-			if e.previewLineOffset > 0 {
-				e.previewLineOffset--
-			}
-		}
-		e.drawPreview()
-		return false
-
-	case VIEW_LOG:
-		switch c {
-		case PAGE_DOWN, ARROW_DOWN, 'j':
-			e.previewLineOffset++
-			e.drawOverlay()
-			return false
-		case PAGE_UP, ARROW_UP, 'k':
-			if e.previewLineOffset > 0 {
-				e.previewLineOffset--
-				e.drawOverlay()
-				return false
-			}
-		}
-		if c == DEL_KEY || c == BACKSPACE {
-			if len(e.command_line) > 0 {
-				e.command_line = e.command_line[:len(e.command_line)-1]
-			}
-		} else {
-			e.command_line += string(c)
-		}
-		return false
-		// end case VIEW_LOG
-
 	case NORMAL:
-		// characters below make up first char of non-vim commands
-		if len(e.command) == 0 {
-			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
-				e.command = string(c)
-			}
-		} else {
-			e.command += string(c)
-		}
-
-		if len(e.command) > 0 {
-			if cmd, found := e.normalCmds[e.command]; found {
-				cmd(e, c)
-				vim.SendKey("<esc>")
-				if strings.IndexAny(e.command, "\x08\x0c") != -1 {
-					return true
-				}
-				//keep tripping over this
-				//these commands should return a redraw bool = false
-				if strings.Index(" m l c d xz= su", e.command) != -1 {
-					e.command = ""
-					return false
-				}
-
-				e.command = ""
-				e.ss = e.vbuf.Lines()
-				pos := vim.GetCursorPosition() //set screen cx and cy from pos
-				e.fr = pos[0] - 1
-				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-				return true
-			} else {
-				return false
-			}
-		}
-		// end case NORMAL
-
+		redraw, skip = e.NormalModeKeyHandler(c)
 	case VISUAL:
-		// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
-		if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
-			e.decorateWordVisual(c)
-			vim.SendKey("<esc>")
-			e.mode = NORMAL
-			e.command = ""
-			e.ss = e.vbuf.Lines()
-			pos := vim.GetCursorPosition() //set screen cx and cy from pos
-			e.fr = pos[0] - 1
-			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-			return true
-		}
-
-		// end case VISUAL
+		redraw, skip = e.VisualModeKeyHandler(c)
 	case EX_COMMAND:
-		if c == '\r' {
-			// Index doesn't work for vert resize
-			// and LastIndex doesn't work for run
-			// so total kluge below
-			//if e.command_line[0] == '%'
-			//if strings.Index(e.command_line, "s/") != -1 {
-			if strings.HasPrefix(e.command_line, "s/") || strings.HasPrefix(e.command_line, "%s/") {
-				if strings.HasSuffix(e.command_line, "/c") {
-					//if strings.LastIndex(e.command_line, "/") < strings.LastIndex(e.command_line, "c") {
-					e.ShowMessage(BR, "We don't support [c]onfirm")
-					e.mode = NORMAL
-					return false
-				}
-
-				vim.SendInput(":" + e.command_line + "\r")
-				e.mode = NORMAL
-				e.command = ""
-				e.ss = e.vbuf.Lines()
-				pos := vim.GetCursorPosition() //set screen cx and cy from pos
-				e.fr = pos[0] - 1
-				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-				e.ShowMessage(BL, "search and replace: %s", e.command_line)
-				return true
-			}
-			var pos int
-			var cmd string
-			if strings.HasPrefix(e.command_line, "vert") {
-				pos = strings.LastIndex(e.command_line, " ")
-			} else {
-				pos = strings.Index(e.command_line, " ")
-			}
-			if pos != -1 {
-				cmd = e.command_line[:pos]
-			} else {
-				cmd = e.command_line
-			}
-
-			//if cmd0, found := e_lookup_C[cmd]; found {
-			if cmd0, found := e.exCmds[cmd]; found {
-				cmd0(e)
-				e.command_line = ""
-				e.mode = NORMAL
-				e.tabCompletion.index = 0
-				e.tabCompletion.list = nil
-				return false
-			}
-
-			// Try to provide helpful suggestions using command registry
-			if e.commandRegistry != nil {
-				suggestions := e.commandRegistry.SuggestCommand(cmd)
-				if len(suggestions) > 0 {
-					e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Did you mean: %s?\x1b[0m", cmd, strings.Join(suggestions, ", "))
-				} else {
-					e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Use ':help' to see available commands.\x1b[0m", cmd)
-				}
-			} else {
-				// Fallback if registry not available
-				e.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
-			}
-			e.mode = NORMAL
-			e.command_line = ""
-			return false
-		} //end 'r'
-
-		if c == '\t' {
-			pos := strings.Index(e.command_line, " ")
-			if e.tabCompletion.list == nil {
-				e.ShowMessage(BL, "tab")
-				var s string
-				if pos != -1 {
-					s = e.command_line[pos+1:]
-					//cl := p.command_line
-					dir := filepath.Dir(s)
-					if dir == "~" {
-						usr, _ := user.Current()
-						dir = usr.HomeDir
-					} else if strings.HasPrefix(dir, "~/") {
-						usr, _ := user.Current()
-						dir = filepath.Join(usr.HomeDir, dir[2:])
-					}
-
-					partial := filepath.Base(s)
-					paths, _ := ioutil.ReadDir(dir)
-					e.ShowMessage(BL, "dir: %s  base: %s", dir, partial)
-
-					for _, path := range paths {
-						if strings.HasPrefix(path.Name(), partial) {
-							e.tabCompletion.list = append(e.tabCompletion.list, filepath.Join(dir, path.Name()))
-						}
-					}
-				}
-				if len(e.tabCompletion.list) == 0 {
-					return false
-				}
-			} else {
-				e.tabCompletion.index++
-				if e.tabCompletion.index > len(e.tabCompletion.list)-1 {
-					e.tabCompletion.index = 0
-				}
-			}
-			e.command_line = e.command_line[:pos+1] + e.tabCompletion.list[e.tabCompletion.index]
-			e.ShowMessage(BR, ":%s", e.command_line)
-			return false
-		}
-
-		// process the key typed in COMMAND_LINE mode
-		if c == DEL_KEY || c == BACKSPACE {
-			if len(e.command_line) > 0 {
-				e.command_line = e.command_line[:len(e.command_line)-1]
-			}
-		} else {
-			e.command_line += string(c)
-		}
-
-		e.tabCompletion.index = 0
-		e.tabCompletion.list = nil
-
-		e.ShowMessage(BR, ":%s", e.command_line)
-		return false
-		//end case EX_COMMAND
-
+		redraw, skip = e.ExModeKeyHandler(c)
 	case SEARCH:
-		if c == DEL_KEY || c == BACKSPACE {
-			if len(e.command_line) > 0 {
-				e.command_line = e.command_line[:len(e.command_line)-1]
-			}
-		} else {
-			e.command_line += string(c)
-		}
-		e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
-		//process the key in vim below so no return
-		//end SEARCH
-	} //end switch
-
+		redraw, skip = e.SearchModeKeyHandler(c)
+	case PREVIEW:
+		redraw, skip = e.PreviewModeKeyHandler(c)
+	case VIEW_LOG:
+		redraw, skip = e.ViewLogModeKeyHandler(c)
+	}
+	if skip {
+		return
+	}
 	// Process the key
 	if z, found := termcodes[c]; found {
 		vim.SendKey(z)
@@ -339,3 +133,249 @@ func (e *Editor) editorProcessKey(c int) bool {
 
 	return true
 }
+
+// the switch below deals with intercepting c before sending the char to vim
+//	switch e.mode {
+
+// in PREVIEW and VIEW_LOG don't send keys to vim
+// case PREVIEW:
+func (e *Editor) PreviewModeKeyHandler(c int) (bool, bool) {
+	switch c {
+	case ARROW_DOWN, ctrlKey('j'):
+		e.previewLineOffset++
+	case ARROW_UP, ctrlKey('k'):
+		if e.previewLineOffset > 0 {
+			e.previewLineOffset--
+		}
+	}
+	e.drawPreview()
+	return false, true
+}
+
+// case VIEW_LOG:
+func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
+	switch c {
+	case PAGE_DOWN, ARROW_DOWN, 'j':
+		e.previewLineOffset++
+		e.drawOverlay()
+		return false, true
+	case PAGE_UP, ARROW_UP, 'k':
+		if e.previewLineOffset > 0 {
+			e.previewLineOffset--
+			e.drawOverlay()
+			redraw = false
+			skip = true
+			return false, true
+		}
+	}
+	if c == DEL_KEY || c == BACKSPACE {
+		if len(e.command_line) > 0 {
+			e.command_line = e.command_line[:len(e.command_line)-1]
+		}
+	} else {
+		e.command_line += string(c)
+	}
+	return false, true
+}
+
+// end case VIEW_LOG
+
+// case NORMAL:
+func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
+	// characters below make up first char of non-vim commands
+	if len(e.command) == 0 {
+		if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
+			e.command = string(c)
+		}
+	} else {
+		e.command += string(c)
+	}
+
+	if len(e.command) > 0 {
+		if cmd, found := e.normalCmds[e.command]; found {
+			cmd(e, c)
+			vim.SendKey("<esc>")
+			if strings.IndexAny(e.command, "\x08\x0c") != -1 {
+				return true, true
+			}
+			//keep tripping over this
+			//these commands should return a redraw bool = false
+			if strings.Index(" m l c d xz= su", e.command) != -1 {
+				e.command = ""
+				return false, true
+			}
+
+			e.command = ""
+			e.ss = e.vbuf.Lines()
+			pos := vim.GetCursorPosition() //set screen cx and cy from pos
+			e.fr = pos[0] - 1
+			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+			redraw = true
+		} else {
+			redraw = false
+		}
+		skip = true
+	}
+	skip = false
+	return redraw, skip
+}
+
+// end case NORMAL
+
+// case VISUAL:
+func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
+	// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
+	if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
+		e.decorateWordVisual(c)
+		vim.SendKey("<esc>")
+		e.mode = NORMAL
+		e.command = ""
+		e.ss = e.vbuf.Lines()
+		pos := vim.GetCursorPosition() //set screen cx and cy from pos
+		e.fr = pos[0] - 1
+		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+		return true, true
+	}
+	return false, false
+}
+
+// end case VISUAL
+
+// case EX_COMMAND:
+func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
+	if c == '\r' {
+		// Index doesn't work for vert resize
+		// and LastIndex doesn't work for run
+		// so total kluge below
+		//if e.command_line[0] == '%'
+		//if strings.Index(e.command_line, "s/") != -1
+		if strings.HasPrefix(e.command_line, "s/") || strings.HasPrefix(e.command_line, "%s/") {
+			if strings.HasSuffix(e.command_line, "/c") {
+				//if strings.LastIndex(e.command_line, "/") < strings.LastIndex(e.command_line, "c")
+				e.ShowMessage(BR, "We don't support [c]onfirm")
+				e.mode = NORMAL
+				return false, true
+			}
+
+			vim.SendInput(":" + e.command_line + "\r")
+			e.mode = NORMAL
+			e.command = ""
+			e.ss = e.vbuf.Lines()
+			pos := vim.GetCursorPosition() //set screen cx and cy from pos
+			e.fr = pos[0] - 1
+			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+			e.ShowMessage(BL, "search and replace: %s", e.command_line)
+			return true, true
+		}
+		var pos int
+		var cmd string
+		if strings.HasPrefix(e.command_line, "vert") {
+			pos = strings.LastIndex(e.command_line, " ")
+		} else {
+			pos = strings.Index(e.command_line, " ")
+		}
+		if pos != -1 {
+			cmd = e.command_line[:pos]
+		} else {
+			cmd = e.command_line
+		}
+
+		//if cmd0, found := e_lookup_C[cmd]; found
+		if cmd0, found := e.exCmds[cmd]; found {
+			cmd0(e)
+			e.command_line = ""
+			e.mode = NORMAL
+			e.tabCompletion.index = 0
+			e.tabCompletion.list = nil
+			return false, true
+		}
+
+		// Try to provide helpful suggestions using command registry
+		if e.commandRegistry != nil {
+			suggestions := e.commandRegistry.SuggestCommand(cmd)
+			if len(suggestions) > 0 {
+				e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Did you mean: %s?\x1b[0m", cmd, strings.Join(suggestions, ", "))
+			} else {
+				e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Use ':help' to see available commands.\x1b[0m", cmd)
+			}
+		} else {
+			// Fallback if registry not available
+			e.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
+		}
+		e.mode = NORMAL
+		e.command_line = ""
+		return false, true
+	} //end 'r'
+
+	if c == '\t' {
+		pos := strings.Index(e.command_line, " ")
+		if e.tabCompletion.list == nil {
+			e.ShowMessage(BL, "tab")
+			var s string
+			if pos != -1 {
+				s = e.command_line[pos+1:]
+				//cl := p.command_line
+				dir := filepath.Dir(s)
+				if dir == "~" {
+					usr, _ := user.Current()
+					dir = usr.HomeDir
+				} else if strings.HasPrefix(dir, "~/") {
+					usr, _ := user.Current()
+					dir = filepath.Join(usr.HomeDir, dir[2:])
+				}
+
+				partial := filepath.Base(s)
+				paths, _ := ioutil.ReadDir(dir)
+				e.ShowMessage(BL, "dir: %s  base: %s", dir, partial)
+
+				for _, path := range paths {
+					if strings.HasPrefix(path.Name(), partial) {
+						e.tabCompletion.list = append(e.tabCompletion.list, filepath.Join(dir, path.Name()))
+					}
+				}
+			}
+			if len(e.tabCompletion.list) == 0 {
+				return false, true
+			}
+		} else {
+			e.tabCompletion.index++
+			if e.tabCompletion.index > len(e.tabCompletion.list)-1 {
+				e.tabCompletion.index = 0
+			}
+		}
+		e.command_line = e.command_line[:pos+1] + e.tabCompletion.list[e.tabCompletion.index]
+		e.ShowMessage(BR, ":%s", e.command_line)
+		return false, true
+	}
+
+	// process the key typed in COMMAND_LINE mode
+	if c == DEL_KEY || c == BACKSPACE {
+		if len(e.command_line) > 0 {
+			e.command_line = e.command_line[:len(e.command_line)-1]
+		}
+	} else {
+		e.command_line += string(c)
+	}
+
+	e.tabCompletion.index = 0
+	e.tabCompletion.list = nil
+
+	e.ShowMessage(BR, ":%s", e.command_line)
+	return false, true
+	//end case EX_COMMAND
+}
+
+// case SEARCH:
+func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
+	if c == DEL_KEY || c == BACKSPACE {
+		if len(e.command_line) > 0 {
+			e.command_line = e.command_line[:len(e.command_line)-1]
+		}
+	} else {
+		e.command_line += string(c)
+	}
+	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
+	return false, false
+	//process the key in vim below so no return
+	//end SEARCH
+} //end switch
