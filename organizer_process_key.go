@@ -7,6 +7,53 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
+func (o *Organizer) organizerProcessKey(c int) {
+	// Handle global escape key
+	if c == '\x1b' {
+		o.showMessage("")
+		o.command = ""
+		vim.SendKey("<esc>")
+		o.last_mode = o.mode // not sure this is necessary
+		o.mode = NORMAL
+
+		// Get cursor position - now should be preserved correctly by the buffer
+		pos := vim.GetCursorPosition()
+		o.fc = pos[1]
+		o.fr = pos[0] - 1
+
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
+		o.Session.imagePreview = false
+		if o.view == TASK {
+			o.drawPreview()
+		}
+		return
+	}
+
+	switch o.mode {
+	case INSERT:
+		o.InsertModeKeyHandler(c)
+	case NORMAL:
+		o.NormalModeKeyHandler(c)
+	case VISUAL:
+		o.VisualModeKeyHandler(c)
+	case COMMAND_LINE:
+		o.ExModeKeyHandler(c)
+		/*
+			case ADD_CHANGE_FILTER:
+				handler = NewAddChangeFilterModeHandler(o)
+			case SYNC_LOG:
+				handler = NewSyncLogModeHandler(o)
+		*/
+	case PREVIEW_SYNC_LOG, PREVIEW_HELP:
+		o.PreviewSyncLogModeKeyHandler(c)
+	//case LINKS:
+	//	handler = NewLinksModeHandler(o)
+	default:
+		return
+	}
+}
+
 func sendToVim(c int) {
 	if z, found := termcodes[c]; found {
 		vim.SendKey(z)
@@ -163,7 +210,7 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 		var cmd func(*Organizer, int)
 		var found bool
 		var s string
-		pos := strings.LastIndex(o.command_line, " ")
+		pos := strings.LastIndexByte(o.command_line, ' ')
 		if pos == -1 {
 			s = o.command_line
 		} else {
@@ -172,19 +219,14 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 		if cmd, found = o.exCmds[s]; found {
 			cmd(o, pos)
 		}
-		/*
-			if pos == -1 {
-				s = o.command_line
-				if cmd, found = o.exCmds[s]; found {
-					cmd(o, pos)
-				}
-			} else {
-				s = o.command_line[:pos]
-				if cmd, found = o.exCmds[s]; found {
-					cmd(o, pos)
-				}
+		// to catch find with more than one find term
+		if !found && pos != -1 && strings.Count(o.command_line, " ") > 1 {
+			pos := strings.IndexByte(o.command_line, ' ')
+			if cmd, found = o.exCmds[o.command_line[:pos]]; found {
+				// pass the position of the first space
+				cmd(o, pos)
 			}
-		*/
+		}
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 
@@ -266,52 +308,5 @@ func (o *Organizer) PreviewSyncLogModeKeyHandler(c int) {
 		o.scrollPreviewDown()
 	case ctrlKey('k'), PAGE_UP:
 		o.scrollPreviewUp()
-	}
-}
-
-func (o *Organizer) organizerProcessKey(c int) {
-	// Handle global escape key
-	if c == '\x1b' {
-		o.showMessage("")
-		o.command = ""
-		vim.SendKey("<esc>")
-		o.last_mode = o.mode // not sure this is necessary
-		o.mode = NORMAL
-
-		// Get cursor position - now should be preserved correctly by the buffer
-		pos := vim.GetCursorPosition()
-		o.fc = pos[1]
-		o.fr = pos[0] - 1
-
-		o.tabCompletion.index = 0
-		o.tabCompletion.list = nil
-		o.Session.imagePreview = false
-		if o.view == TASK {
-			o.drawPreview()
-		}
-		return
-	}
-
-	switch o.mode {
-	case INSERT:
-		o.InsertModeKeyHandler(c)
-	case NORMAL:
-		o.NormalModeKeyHandler(c)
-	case VISUAL:
-		o.VisualModeKeyHandler(c)
-	case COMMAND_LINE:
-		o.ExModeKeyHandler(c)
-		/*
-			case ADD_CHANGE_FILTER:
-				handler = NewAddChangeFilterModeHandler(o)
-			case SYNC_LOG:
-				handler = NewSyncLogModeHandler(o)
-		*/
-	case PREVIEW_SYNC_LOG, PREVIEW_HELP:
-		o.PreviewSyncLogModeKeyHandler(c)
-	//case LINKS:
-	//	handler = NewLinksModeHandler(o)
-	default:
-		return
 	}
 }
