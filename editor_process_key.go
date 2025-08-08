@@ -17,6 +17,8 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
 		vim.SendKey("<esc>")
+		e.mode = NORMAL
+		e.ShowMessage(BL, "e.mode: %s", e.mode) //////Debug
 		e.command = ""
 		e.command_line = ""
 
@@ -25,7 +27,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 			// delete any images
 			fmt.Print("\x1b_Ga=d\x1b\\")
 			e.ShowMessage(BR, "")
-			e.mode = NORMAL
+			//e.mode = NORMAL
 			redraw = true
 			return
 		}
@@ -47,7 +49,10 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	skip := false
 
 	switch e.mode {
-	case NORMAL:
+	case INSERT:
+		redraw = false // doesn't matter when skip is false
+		skip = false
+	case NORMAL, OTHER:
 		redraw, skip = e.NormalModeKeyHandler(c)
 	case VISUAL:
 		redraw, skip = e.VisualModeKeyHandler(c)
@@ -72,41 +77,46 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 
 	mode := vim.GetCurrentMode()
 
-	//OP_PENDING
-	if mode == 4 {
+	switch mode {
+	case 4: //OP_PENDING
 		return false
-	}
-	// the only way to get into EX_COMMAND or SEARCH; 8 => SEARCH
-	if mode == 8 && e.mode != SEARCH {
-		e.command_line = ""
-		e.command = ""
-		if c == ':' {
-			e.mode = EX_COMMAND
-			// 'park' vim in NORMAL mode and don't feed it keys
-			vim.SendKey("<esc>")
-			e.ShowMessage(BR, ":")
-		} else {
-			e.mode = SEARCH
-			e.searchPrefix = string(c)
-			e.ShowMessage(BL, e.searchPrefix)
+	case 8: //SEARCH and EX_COMMAND
+		if e.mode != SEARCH {
+			e.command_line = ""
+			e.command = ""
+			if c == ':' {
+				e.mode = EX_COMMAND
+				// 'park' vim in NORMAL mode and don't feed it keys
+				vim.SendKey("<esc>")
+				e.ShowMessage(BR, ":")
+			} else {
+				e.mode = SEARCH
+				e.searchPrefix = string(c)
+				e.ShowMessage(BR, e.searchPrefix)
+			}
+			return false
 		}
-		return false
-	} else if mode == 16 && e.mode != INSERT {
-		e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
-	}
-
-	//e.ShowMessage(BL, "Current mode from vim: %d, visual test: %v", mode, mode == 2) //////Debug
-
-	if mode == 2 { //VISUAL_MODE
+	case 16: //INSERT
+		if e.mode != INSERT {
+			e.mode = INSERT
+			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
+		}
+	case 2: //VISUAL_MODE
 		vmode := vim.GetVisualType()
 		e.mode = visualModeMap[vmode]
 		//e.ShowMessage(BR, "Current visualType from vim: %d, visual test: %v", vmode, mode == 118)
 		e.highlightInfo()
-	} else {
-		e.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+		//necessary for recognizing return after typing search term
+	default:
+		m, ok := modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)yy
+		if ok {
+			e.mode = m
+		} else {
+			e.mode = OTHER //257 appears to be the vim number - seems to be a variant of NORMAL
+		}
+		e.ShowMessage(BL, "mode: %d  e.mode: %s", mode, e.mode) //////Debug
 	}
-
-	//below is done for everything except SEARCH and EX_COMMAND
+	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
 	e.ss = e.vbuf.Lines()
 	// Add safety checks to prevent panic with empty buffers
 	if len(e.ss) == 0 {
@@ -180,7 +190,7 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 
 // end case VIEW_LOG
 
-// case NORMAL:
+// case NORMAL, OTHER (257):
 func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 	// characters below make up first char of non-vim commands
 	if len(e.command) == 0 {
@@ -195,7 +205,7 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 		if cmd, found := e.normalCmds[e.command]; found {
 			cmd(e, c)
 			vim.SendKey("<esc>")
-			if strings.IndexAny(e.command, "\x08\x0c") != -1 {
+			if strings.IndexAny(e.command, "\x08\x0c") != -1 { //Ctrl H, Ctrl L
 				return true, true
 			}
 			//keep tripping over this
@@ -367,6 +377,8 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 
 // case SEARCH:
 func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
+	// Below is purely for displaying command line correctly
+	// vim is actually handling the keystrokes whether we do this or not
 	if c == DEL_KEY || c == BACKSPACE {
 		if len(e.command_line) > 0 {
 			e.command_line = e.command_line[:len(e.command_line)-1]

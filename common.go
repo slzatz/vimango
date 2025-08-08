@@ -122,6 +122,7 @@ const (
 	LINKS            // only in organizer mode
 	PREVIEW_HELP     // only in organizer mode - for displaying help information
 	PENDING
+	OTHER // mysterious vim mode 257 ....
 )
 
 var modeMap = map[int]Mode{
@@ -278,12 +279,9 @@ func (m Mode) String() string {
 		"EX COMMAND",
 		"VISUAL LINE",
 		"VISUAL",
-		"FILE DISPLAY",
-		"NO ROWS",
 		"VISUAL BLOCK",
 		"SEARCH",
 		"FIND",
-		"SYNC LOG",
 		"PREVIEW",
 		"VIEW LOG",
 		"SPELLING",
@@ -291,6 +289,7 @@ func (m Mode) String() string {
 		"LINKS",
 		"PREVIEW_HELP",
 		"PENDING",
+		"OTHER",
 	}[m]
 }
 
