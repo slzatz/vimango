@@ -125,10 +125,6 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	return true
 }
 
-// the switch below deals with intercepting c before sending the char to vim
-//	switch e.mode {
-
-// in PREVIEW and VIEW_LOG don't send keys to vim
 // case PREVIEW:
 func (e *Editor) PreviewModeKeyHandler(c int) (bool, bool) {
 	switch c {
@@ -178,17 +174,12 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 		e.command = string(c)
 		return false, true
 	}
-	/*
-		if len(e.command) > 0 {
-			if e.command[0] != ' ' {
-				e.command = ""
-				return false, true
-			} else if c == ' ' {
-				e.command = string(c)
-				return false, true
-			}
+	if len(e.command) > 0 {
+		if e.command[0] != ' ' {
+			e.command = ""
+			return false, false
 		}
-	*/
+	}
 	e.command += string(c)
 	e.ShowMessage(BR, "e.command = *%s*", e.command) //Debug
 	if cmd, found := e.normalCmds[e.command]; found {
@@ -207,46 +198,7 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 	} else {
 		return false, false
 	}
-	// characters below make up first char of non-vim commands
-	/*
-		if len(e.command) == 0 {
-			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
-				e.command = string(c)
-			}
-		} else {
-			e.command += string(c)
-		}
-
-		if len(e.command) > 0 {
-			if cmd, found := e.normalCmds[e.command]; found {
-				cmd(e, c)
-				vim.SendKey("<esc>")
-				if strings.IndexAny(e.command, "\x08\x0c") != -1 { //Ctrl H, Ctrl L
-					return true, true
-				}
-				//keep tripping over this
-				//these commands should return a redraw bool = false
-				if strings.Index(" m l c d xz= su", e.command) != -1 {
-					e.command = ""
-					return false, true
-				}
-				e.command = ""
-				e.ss = e.vbuf.Lines()
-				pos := vim.GetCursorPosition() //set screen cx and cy from pos
-				e.fr = pos[0] - 1
-				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-				redraw = true
-			} else {
-				redraw = false
-			}
-			skip = true
-		}
-		skip = false
-		return redraw, skip
-	*/
 }
-
-// end case NORMAL
 
 // case VISUAL:
 func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
@@ -264,8 +216,6 @@ func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 	}
 	return false, false
 }
-
-// end case VISUAL
 
 // case EX_COMMAND:
 func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
@@ -388,7 +338,6 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 
 	e.ShowMessage(BR, ":%s", e.command_line)
 	return false, true
-	//end case EX_COMMAND
 }
 
 // case SEARCH:
@@ -404,6 +353,4 @@ func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
 	}
 	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
 	return false, false
-	//process the key in vim below so no return
-	//end SEARCH
-} //end switch
+}
