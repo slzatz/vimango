@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os/user"
 	"path/filepath"
@@ -21,38 +20,20 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.ShowMessage(BL, "e.mode: %s", e.mode) //////Debug
 		e.command = ""
 		e.command_line = ""
-
-		if e.mode == PREVIEW {
-			// don't need to call CursorGetPosition - no change in pos
-			// delete any images
-			fmt.Print("\x1b_Ga=d\x1b\\")
-			e.ShowMessage(BR, "")
-			//e.mode = NORMAL
-			redraw = true
-			return
-		}
-
-		e.mode = NORMAL
-
-		/*
-			if previously in visual mode some text may be highlighted so need to return true
-			 also need the cursor position because for example going from INSERT -> NORMAL causes cursor to move back
-			 note you could fall through to getting pos but that recalcs rows which is unnecessary
-		*/
-
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 		e.ShowMessage(BR, "")
 		return true
 	}
+
 	skip := false
 
 	switch e.mode {
 	case INSERT:
 		redraw = false // doesn't matter when skip is false
 		skip = false
-	case NORMAL, OTHER:
+	case NORMAL, OTHER: //?Navigation
 		redraw, skip = e.NormalModeKeyHandler(c)
 	case VISUAL:
 		redraw, skip = e.VisualModeKeyHandler(c)
@@ -192,42 +173,77 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 
 // case NORMAL, OTHER (257):
 func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
-	// characters below make up first char of non-vim commands
-	if len(e.command) == 0 {
-		if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
-			e.command = string(c)
-		}
-	} else {
-		e.command += string(c)
+	//leader := ' ' //vim.GetLeaderKey()
+	if c == ' ' {
+		e.command = string(c)
+		return false, true
 	}
-
-	if len(e.command) > 0 {
-		if cmd, found := e.normalCmds[e.command]; found {
-			cmd(e, c)
-			vim.SendKey("<esc>")
-			if strings.IndexAny(e.command, "\x08\x0c") != -1 { //Ctrl H, Ctrl L
-				return true, true
-			}
-			//keep tripping over this
-			//these commands should return a redraw bool = false
-			if strings.Index(" m l c d xz= su", e.command) != -1 {
+	/*
+		if len(e.command) > 0 {
+			if e.command[0] != ' ' {
 				e.command = ""
 				return false, true
+			} else if c == ' ' {
+				e.command = string(c)
+				return false, true
 			}
-
-			e.command = ""
-			e.ss = e.vbuf.Lines()
-			pos := vim.GetCursorPosition() //set screen cx and cy from pos
-			e.fr = pos[0] - 1
-			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-			redraw = true
-		} else {
+		}
+	*/
+	e.command += string(c)
+	e.ShowMessage(BR, "e.command = *%s*", e.command) //Debug
+	if cmd, found := e.normalCmds[e.command]; found {
+		cmd(e, c)
+		vim.SendKey("<esc>")
+		e.command = ""
+		e.ss = e.vbuf.Lines()
+		pos := vim.GetCursorPosition() //set screen cx and cy from pos
+		e.fr = pos[0] - 1
+		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+		redraw = true
+		if e.mode == PREVIEW {
 			redraw = false
 		}
-		skip = true
+		return redraw, true
+	} else {
+		return false, false
 	}
-	skip = false
-	return redraw, skip
+	// characters below make up first char of non-vim commands
+	/*
+		if len(e.command) == 0 {
+			if strings.IndexAny(string(c), "\x17\x08\x0c\x02\x05\x09\x06\x0a\x0b"+leader) != -1 {
+				e.command = string(c)
+			}
+		} else {
+			e.command += string(c)
+		}
+
+		if len(e.command) > 0 {
+			if cmd, found := e.normalCmds[e.command]; found {
+				cmd(e, c)
+				vim.SendKey("<esc>")
+				if strings.IndexAny(e.command, "\x08\x0c") != -1 { //Ctrl H, Ctrl L
+					return true, true
+				}
+				//keep tripping over this
+				//these commands should return a redraw bool = false
+				if strings.Index(" m l c d xz= su", e.command) != -1 {
+					e.command = ""
+					return false, true
+				}
+				e.command = ""
+				e.ss = e.vbuf.Lines()
+				pos := vim.GetCursorPosition() //set screen cx and cy from pos
+				e.fr = pos[0] - 1
+				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+				redraw = true
+			} else {
+				redraw = false
+			}
+			skip = true
+		}
+		skip = false
+		return redraw, skip
+	*/
 }
 
 // end case NORMAL
