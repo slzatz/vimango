@@ -27,12 +27,11 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		return true
 	}
 
-	skip := false
+	skip := false // if skip is false, doesn't matter if redraw is false
 
 	switch e.mode {
 	case INSERT:
-		redraw = false // doesn't matter when skip is false
-		skip = false
+		redraw, skip = false, false
 	case NORMAL, OTHER: //?Navigation
 		redraw, skip = e.NormalModeKeyHandler(c)
 	case VISUAL:
@@ -62,13 +61,15 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	case 4: //OP_PENDING
 		return false
 	case 8: //SEARCH and EX_COMMAND
+		// Note: will not hit this case if we are in e.mode == Ex_COMMAND because we
+		// park vim in NORMAL mode and don't feed it keys
+		// note that once e.mode is set to SEARCH, this case will not be hit
 		if e.mode != SEARCH {
 			e.command_line = ""
 			e.command = ""
 			if c == ':' {
 				e.mode = EX_COMMAND
-				// 'park' vim in NORMAL mode and don't feed it keys
-				vim.SendKey("<esc>")
+				vim.SendKey("<esc>") // park in NORMAL mode
 				e.ShowMessage(BR, ":")
 			} else {
 				e.mode = SEARCH
@@ -84,18 +85,20 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		}
 	case 2: //VISUAL_MODE
 		vmode := vim.GetVisualType()
-		e.mode = visualModeMap[vmode]
+		e.vmode = visualModeMap[vmode]
+		e.mode = VISUAL
 		//e.ShowMessage(BR, "Current visualType from vim: %d, visual test: %v", vmode, mode == 118)
 		e.highlightInfo()
+		e.ShowMessage(BL, "mode: %d  vmode: %s e.mode: %s", mode, e.vmode, e.mode) //////Debug
 		//necessary for recognizing return after typing search term
 	default:
-		m, ok := modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)yy
+		m, ok := modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 		if ok {
 			e.mode = m
 		} else {
-			e.mode = OTHER //257 appears to be the vim number - seems to be a variant of NORMAL
+			e.mode = OTHER //257 appears to be the vim number - seems to be a variant of NORMAL ? navigation
 		}
-		e.ShowMessage(BL, "mode: %d  e.mode: %s", mode, e.mode) //////Debug
+		e.ShowMessage(BL, "default (no mode match) mode: %d  e.mode: %s", mode, e.mode) //////Debug
 	}
 	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
 	e.ss = e.vbuf.Lines()
@@ -165,23 +168,25 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 	return false, true
 }
 
-// end case VIEW_LOG
-
 // case NORMAL, OTHER (257):
+// note that Crtl-A and Ctrl-X are passed through and perform their usual weird function of incrementing and decrementing the number under the cursor and Ctrl-R also works to undo the last undone change.  All other vim built-in Ctrl commands appear to do nothing.
 func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 	//leader := ' ' //vim.GetLeaderKey()
-	if c == ' ' {
+	if c == ' ' { //should become if c == leader
 		e.command = string(c)
 		return false, true
 	}
+	e.command += string(c)
+
 	if len(e.command) > 0 {
-		if e.command[0] != ' ' {
-			e.command = ""
-			return false, false
+		if e.command[0] != ' ' { //leader
+			//e.command = ""
+			e.command = string(c)
+			//return false, false
 		}
 	}
-	e.command += string(c)
-	e.ShowMessage(BR, "e.command = *%s*", e.command) //Debug
+
+	e.ShowMessage(BR, "e.command = %q", e.command) //Debug
 	if cmd, found := e.normalCmds[e.command]; found {
 		cmd(e, c)
 		vim.SendKey("<esc>")
@@ -196,14 +201,18 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 		}
 		return redraw, true
 	} else {
-		return false, false
+		if e.command[0] == ' ' {
+			return false, true // don't process key
+		} else {
+			return false, false // have vim process key
+		}
 	}
 }
 
 // case VISUAL:
 func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 	// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
-	if strings.IndexAny(string(c), "\x02\x05\x09") != -1 {
+	if strings.IndexAny(string(c), "\x02\x05\x09") != -1 { // this should define commmands like normalCmds, ie visualCmds
 		e.decorateWordVisual(c)
 		vim.SendKey("<esc>")
 		e.mode = NORMAL
@@ -225,14 +234,16 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		// so total kluge below
 		//if e.command_line[0] == '%'
 		//if strings.Index(e.command_line, "s/") != -1
+
+		// search and replace is an Ex-Command, not a search command
 		if strings.HasPrefix(e.command_line, "s/") || strings.HasPrefix(e.command_line, "%s/") {
 			if strings.HasSuffix(e.command_line, "/c") {
-				//if strings.LastIndex(e.command_line, "/") < strings.LastIndex(e.command_line, "c")
 				e.ShowMessage(BR, "We don't support [c]onfirm")
 				e.mode = NORMAL
 				return false, true
 			}
 
+			// if it's a search and replace, we want vim to handle it
 			vim.SendInput(":" + e.command_line + "\r")
 			e.mode = NORMAL
 			e.command = ""

@@ -436,7 +436,6 @@ func (o *Organizer) help(pos int) {
 	// Display help in the preview area
 	o.Screen.eraseRightScreen()
 	o.renderMarkdown(helpText)
-	//o.note = strings.Split(helpText, "\n")
 	o.altRowoff = 0
 	o.drawRenderedNote()
 	o.mode = PREVIEW_HELP

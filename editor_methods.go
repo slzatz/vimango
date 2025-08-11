@@ -195,27 +195,27 @@ func (e *Editor) drawText() {
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}
-	if e.highlightSyntax {
+	if e.highlightSyntax { //includes markdown
 		e.drawCodeRows(&ab)
-		e.drawHighlights(&ab)
-		e.drawVisual(&ab)
-		fmt.Print(ab.String())
-		//go e.drawHighlightedBraces() // this will produce data race
-		e.drawHighlightedBraces() //has to come after drawing rows
-		//e.drawDiagnostics() // if here would update with each text change
 	} else {
 		e.drawPlainRows(&ab)
-		e.drawHighlights(&ab)
-		e.drawVisual(&ab)
-		fmt.Print(ab.String())
 	}
+	if e.highlightPositions != nil {
+		e.drawHighlights(&ab)
+	}
+	if e.mode == VISUAL {
+		e.drawVisual(&ab)
+	}
+	fmt.Print(ab.String())
+	//go e.drawHighlightedBraces() // this will produce data race
+	e.drawHighlightedBraces() //has to come after drawing rows
 }
 
 func (e *Editor) drawVisual(pab *strings.Builder) {
 
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin+e.left_margin_offset)
 
-	if e.mode == VISUAL_LINE {
+	if e.vmode == VISUAL_LINE {
 		startRow := e.highlight[0][0] - 1 // highlight line starts a 1
 		endRow := e.highlight[1][0] - 1   //ditto - done differently for visual and v_block
 
@@ -251,7 +251,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 		}
 	}
 
-	if e.mode == VISUAL {
+	if e.vmode == VISUAL {
 		startCol, endcol := e.highlight[0][1], e.highlight[1][1]
 
 		// startRow always <= endRow and need to subtract 1 since counting starts at 1 not zero
@@ -298,7 +298,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 		}
 	}
 
-	if e.mode == VISUAL_BLOCK {
+	if e.vmode == VISUAL_BLOCK {
 
 		var left, right int
 		if e.highlight[1][1] > e.highlight[0][1] {

@@ -257,10 +257,19 @@ func (e *Editor) help() {
 	}
 
 	// Create a temporary editor overlay for help display
-	e.overlay = strings.Split(helpText, "\n")
-	e.drawOverlay()
-	e.redraw = true
-	e.ShowMessage(BR, "Help displayed - press ESC to close")
+	/*
+		e.overlay = strings.Split(helpText, "\n")
+		e.drawOverlay()
+		e.redraw = true
+		e.ShowMessage(BR, "Help displayed - press ESC to close")
+	*/
+	// Display help in the preview area
+	app.Organizer.Screen.eraseRightScreen()
+	app.Organizer.renderMarkdown(helpText)
+	app.Organizer.altRowoff = 0
+	app.Organizer.drawRenderedNote()
+	e.mode = PREVIEW
+	e.command_line = ""
 }
 
 // formatNormalModeHelp returns formatted help for all normal mode commands
@@ -283,10 +292,10 @@ func (e *Editor) formatNormalModeHelp() string {
 
 	for _, category := range categoryNames {
 		commands := categories[category]
-		help.WriteString(fmt.Sprintf("%s:\n", category))
+		help.WriteString(fmt.Sprintf("## %s:\n", category))
 
 		for _, cmd := range commands {
-			help.WriteString(fmt.Sprintf("  %-15s - %s\n", cmd.Name, cmd.Description))
+			help.WriteString(fmt.Sprintf("`  %-15s` - %s\n", cmd.Name, cmd.Description))
 		}
 		help.WriteString("\n")
 	}

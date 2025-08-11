@@ -21,6 +21,7 @@ type Editor struct {
 	top_margin         int
 	highlight          [2][2]int // [line col][line col] -> note line is 1-based not zero-based
 	mode               Mode
+	vmode              Mode
 	command_line       string //for commands on the command line; string doesn't include ':'
 	command            string // right now includes normal mode commands and command line commands
 	last_command       string
@@ -45,13 +46,13 @@ type Editor struct {
 		list  []string
 		index int
 	}
-	normalCmds             map[string]func(*Editor, int) // map of normal commands
-	exCmds                 map[string]func(*Editor)      // map of ex commands
-	commandRegistry        *CommandRegistry[func(*Editor)]
-	normalCommandRegistry  *CommandRegistry[func(*Editor, int)]
-	Database        *Database // pointer to the database
-	Session    *Session                      // pointer to the session
-	Screen     *Screen                       // pointer to the screen
+	normalCmds            map[string]func(*Editor, int) // map of normal commands
+	exCmds                map[string]func(*Editor)      // map of ex commands
+	commandRegistry       *CommandRegistry[func(*Editor)]
+	normalCommandRegistry *CommandRegistry[func(*Editor, int)]
+	Database              *Database // pointer to the database
+	Session               *Session  // pointer to the session
+	Screen                *Screen   // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
