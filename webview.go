@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -19,15 +20,49 @@ import (
 // Default implementation that will be overridden by build-specific files
 var isWebviewAvailableDefault = false
 
-// IsWebviewAvailable returns true if webview is available
-func IsWebviewAvailable() bool {
-	return isWebviewAvailableDefault
-}
+// Authentication state management for webview
+var (
+	webviewAuthMutex   sync.RWMutex
+	webviewAuthenticated bool
+	authCheckPerformed bool
+)
+
 
 // IsWebviewRunning returns true if a webview is currently running
 // This is a stub that will be overridden by build-specific files
 // Only declare this for non-CGO builds
 var isWebviewRunning = false
+
+// IsWebviewAuthenticated checks if webview has Google Drive authentication
+func IsWebviewAuthenticated() bool {
+	webviewAuthMutex.RLock()
+	defer webviewAuthMutex.RUnlock()
+	
+	if !authCheckPerformed {
+		return false
+	}
+	
+	return webviewAuthenticated
+}
+
+// SetWebviewAuthenticated sets the webview authentication state
+func SetWebviewAuthenticated(authenticated bool) {
+	webviewAuthMutex.Lock()
+	defer webviewAuthMutex.Unlock()
+	
+	webviewAuthenticated = authenticated
+	authCheckPerformed = true
+}
+
+// CheckWebviewAuthentication checks if webview browser authentication exists
+// This is separate from app OAuth2 authentication - webview needs browser cookies
+func CheckWebviewAuthentication() bool {
+	webviewAuthMutex.RLock()
+	defer webviewAuthMutex.RUnlock()
+	
+	// Return current webview authentication state (not app auth)
+	return authCheckPerformed && webviewAuthenticated
+}
 
 // OpenNoteInWebview opens a note in a webview window or falls back to browser
 // This function signature will be implemented by build-specific files
@@ -151,16 +186,29 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 
 	processedMarkdown := markdown
 
+	// Check if webview is authenticated - if so, try direct URLs first
+	authenticated := CheckWebviewAuthentication()
+
 	for _, match := range matches {
 		fullMatch := match[0] // Full match: ![alt](url)
 		altText := match[1]   // Alt text
 		googleURL := match[2] // Google Drive URL
 
-		// Download and convert to data URI
+		if authenticated {
+			// Try to convert to direct Google Drive URL that works with authentication
+			directURL, err := convertToDirectGoogleDriveURL(googleURL)
+			if err == nil {
+				// Use direct URL - webview authentication will handle access
+				newImageTag := fmt.Sprintf("![%s](%s)", altText, directURL)
+				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, newImageTag, 1)
+				continue
+			}
+		}
+
+		// Fallback to data URI conversion (current method)
 		dataURI, err := convertGoogleDriveImageToDataURI(googleURL)
 		if err != nil {
-			// If we can't convert, leave the original URL
-			fmt.Printf("Warning: Could not convert Google Drive image %s: %v\n", googleURL, err)
+			// If we can't convert, leave the original URL (silently)
 			continue
 		}
 
@@ -170,6 +218,21 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 	}
 
 	return processedMarkdown, nil
+}
+
+// convertToDirectGoogleDriveURL converts a Google Drive sharing URL to a direct access URL
+// that works with authenticated webviews
+func convertToDirectGoogleDriveURL(googleURL string) (string, error) {
+	// Extract file ID from the Google Drive URL
+	fileID, err := ExtractFileID(googleURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract file ID: %w", err)
+	}
+	
+	// Return direct Google Drive API URL that works with authenticated sessions
+	// This URL works when the webview has Google authentication cookies
+	directURL := fmt.Sprintf("https://drive.google.com/uc?id=%s&export=view", fileID)
+	return directURL, nil
 }
 
 // convertGoogleDriveImageToDataURI downloads a Google Drive image and converts it to a data URI

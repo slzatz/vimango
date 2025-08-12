@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mandolyte/mdtopdf/v2"
+	"github.com/slzatz/vimango/auth"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -162,6 +163,16 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":quitall", ":qa"},
 	})
 
+	// Authentication command
+	registry.Register("authenticate", (*Editor).authenticateGoogleDrive, CommandInfo{
+		Name:        "authenticate", 
+		Aliases:     []string{"auth"},
+		Description: "Authenticate with Google Drive for faster image loading in webview",
+		Usage:       "authenticate",
+		Category:    "System",
+		Examples:    []string{":authenticate", ":auth"},
+	})
+
 	// Help command
 	registry.Register("help", (*Editor).help, CommandInfo{
 		Name:        "help",
@@ -176,6 +187,32 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	editor.commandRegistry = registry
 
 	return registry.GetFunctionMap()
+}
+
+// authenticateGoogleDrive handles Google Drive browser authentication for webview
+func (e *Editor) authenticateGoogleDrive() {
+	if !IsWebviewAvailable() {
+		e.ShowMessage(BR, "Webview authentication requires CGO build")
+		return
+	}
+	
+	// Check if webview is already authenticated (separate from app auth)
+	if CheckWebviewAuthentication() {
+		e.ShowMessage(BR, "Webview already authenticated with Google Drive")
+		return
+	}
+	
+	// Show status of different authentication types
+	appAuth := auth.IsAuthenticated()
+	e.ShowMessage(BR, "App OAuth2: %v, Webview browser: %v", appAuth, false)
+	e.ShowMessage(BR, "Opening Google Drive signin for webview browser authentication...")
+	
+	// Run authentication - this will block until completed
+	if err := TriggerWebviewAuthentication(); err != nil {
+		e.ShowMessage(BR, "Authentication failed: %v", err)
+	} else {
+		e.ShowMessage(BR, "Webview authentication successful!")
+	}
 }
 
 // help displays help information for editor commands

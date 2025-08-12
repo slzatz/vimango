@@ -576,7 +576,8 @@ func (e *Editor) showWebView(_ int) {
 	// Open in webview in a goroutine since it blocks
 	// This will either create a new webview or update the existing one
 	go func() {
-		err := OpenNoteInWebview(title, htmlContent)
+		// Use the new authenticated webview function
+		err := OpenNoteInWebviewWithAuth(title, htmlContent)
 		if err != nil {
 			// Note: Can't directly show message from goroutine
 			// Could implement a channel-based message system if needed

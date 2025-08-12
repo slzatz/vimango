@@ -99,3 +99,58 @@ func saveToken(path string, token *oauth2.Token) {
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
 }
+
+// GetOAuth2Config returns the OAuth2 configuration for webview authentication
+func GetOAuth2Config() (*oauth2.Config, error) {
+	b, err := ioutil.ReadFile("go_credentials.json")
+	if err != nil {
+		return nil, fmt.Errorf("unable to read client secret file: %w", err)
+	}
+
+	config, err := google.ConfigFromJSON(b, drive.DriveScope)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
+	}
+
+	return config, nil
+}
+
+// GetAuthURL returns the Google OAuth2 authorization URL for webview
+func GetAuthURL() (string, error) {
+	config, err := GetOAuth2Config()
+	if err != nil {
+		return "", err
+	}
+
+	// Use a different redirect URI for webview - this can be localhost or custom scheme
+	config.RedirectURL = "http://localhost:8080/auth/callback"
+	
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	return authURL, nil
+}
+
+// ExchangeCodeForToken exchanges authorization code for access token
+func ExchangeCodeForToken(code string) (*oauth2.Token, error) {
+	config, err := GetOAuth2Config()
+	if err != nil {
+		return nil, err
+	}
+
+	config.RedirectURL = "http://localhost:8080/auth/callback"
+	
+	tok, err := config.Exchange(context.TODO(), code)
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve token from web: %w", err)
+	}
+
+	// Save token for future use
+	saveToken("token.json", tok)
+	
+	return tok, nil
+}
+
+// IsAuthenticated checks if a valid token exists
+func IsAuthenticated() bool {
+	_, err := tokenFromFile("token.json")
+	return err == nil
+}

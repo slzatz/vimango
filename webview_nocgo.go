@@ -53,3 +53,13 @@ func ShowWebviewUnavailableMessage() {
 	fmt.Println("Webview is not available in this build (requires CGO).")
 	fmt.Println("Note will be opened in your default browser instead.")
 }
+
+// OpenNoteInWebviewWithAuth is a stub for non-CGO builds - falls back to regular browser opening
+func OpenNoteInWebviewWithAuth(title, htmlContent string) error {
+	return OpenNoteInWebview(title, htmlContent)
+}
+
+// TriggerWebviewAuthentication is a stub for non-CGO builds - always returns error
+func TriggerWebviewAuthentication() error {
+	return fmt.Errorf("webview authentication not available in non-CGO build")
+}
