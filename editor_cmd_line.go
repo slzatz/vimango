@@ -295,7 +295,17 @@ func (e *Editor) formatNormalModeHelp() string {
 		help.WriteString(fmt.Sprintf("## %s:\n", category))
 
 		for _, cmd := range commands {
-			help.WriteString(fmt.Sprintf("`  %-15s` - %s\n", cmd.Name, cmd.Description))
+			help.WriteString(fmt.Sprintf("`  %-15s` - %s", cmd.Name, cmd.Description))
+			if len(cmd.Aliases) > 0 {
+				translatedName := make([]string, len(cmd.Aliases))
+				for i, alias := range cmd.Aliases {
+					translatedName[i] = keyToDisplayName(alias)
+				}
+				// need backticks because markdown converter will think <> are html tags
+				help.WriteString(fmt.Sprintf(" aliases: ` %-15s`\n", strings.Join(translatedName, ", ")))
+			} else {
+				help.WriteString("\n")
+			}
 		}
 		help.WriteString("\n")
 	}
@@ -784,26 +794,6 @@ func (e *Editor) quitAll() {
 		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 }
-
-/*
-func (e *Editor) spell() {
-	e.checkSpelling = !e.checkSpelling
-	if e.checkSpelling {
-		e.highlightSyntax = false // when you check spelling syntax highlighting off
-		err := v.Command("set spell")
-		if err != nil {
-			sess.showEdMessage("Error in setting spelling %v", err)
-		}
-	} else {
-		err := v.Command("set nospell")
-		if err != nil {
-			sess.showEdMessage("Error in setting no spelling %v", err)
-		}
-	}
-	e.drawText()
-	sess.showEdMessage("Spelling is %t", e.checkSpelling)
-}
-*/
 
 func (e *Editor) number() {
 	e.numberLines = !e.numberLines

@@ -17,7 +17,7 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Name:        keyToDisplayName("\x08"),
 		Description: "Move to previous editor or return to organizer",
 		Usage:       "Ctrl-H",
-		Category:    "Movement",
+		Category:    "Editor Selection",
 		Examples:    []string{"Ctrl-H - Switch to previous editor"},
 	})
 
@@ -25,45 +25,50 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Name:        keyToDisplayName("\x0c"),
 		Description: "Move to next editor",
 		Usage:       "Ctrl-L",
-		Category:    "Movement",
+		Category:    "Editor Selection",
 		Examples:    []string{"Ctrl-L - Switch to next editor"},
 	})
 
 	// Text Editing commands
-	registry.Register("\x02", (*Editor).decorateWord, CommandInfo{
-		Name:        keyToDisplayName("\x02"),
+	registry.Register(string(ctrlKey('b')), (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('b'))),
+		Aliases:     []string{leader + "b"},
 		Description: "Make word bold (toggle **word**)",
 		Usage:       "Ctrl-B",
-		Category:    "Text Editing",
+		Category:    "Markup Shortcuts",
 		Examples:    []string{"Ctrl-B - Toggle bold formatting on current word"},
 	})
 
-	registry.Register(leader + "b", (*Editor).decorateWord, CommandInfo{
-		Name:        keyToDisplayName(leader + "b"),
-		Description: "Make word bold (toggle **word**)",
-		Usage:       "<leader>b",
-		Category:    "Text Editing",
-		Examples:    []string{"<leader>b - Toggle bold formatting on current word"},
-	})
+	/*
+		registry.Register(leader+"b", (*Editor).decorateWord, CommandInfo{
+			Name:        keyToDisplayName(leader + "b"),
+			Description: "Make word bold (toggle **word**)",
+			Usage:       "<leader>b",
+			Category:    "Markup Shortcuts",
+			Examples:    []string{"<leader>b - Toggle bold formatting on current word"},
+		})
+	*/
 
-	registry.Register("\x05", (*Editor).decorateWord, CommandInfo{
-		Name:        keyToDisplayName("\x05"),
+	registry.Register(string(ctrlKey('e')), (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('e'))),
+		Aliases:     []string{leader + "e"},
 		Description: "Make word code (toggle `word`)",
 		Usage:       "Ctrl-E",
-		Category:    "Text Editing",
+		Category:    "Markup Shortcuts",
 		Examples:    []string{"Ctrl-E - Toggle code formatting on current word"},
 	})
 
 	registry.Register(string(ctrlKey('i')), (*Editor).decorateWord, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('i'))),
+		Aliases:     []string{leader + "i"},
 		Description: "Make word italic (toggle *word*)",
 		Usage:       "Ctrl-I",
-		Category:    "Text Editing",
+		Category:    "Markup Shortcuts",
 		Examples:    []string{"Ctrl-I - Toggle italic formatting on current word"},
 	})
 
 	// Preview commands
-	registry.Register(leader + "m", (*Editor).showMarkdownPreview, CommandInfo{
+	registry.Register(leader+"m", (*Editor).showMarkdownPreview, CommandInfo{
 		Name:        keyToDisplayName(leader + "m"),
 		Description: "Show markdown preview of current note",
 		Usage:       "<leader>m",
@@ -71,7 +76,7 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<leader>m - Display formatted markdown preview"},
 	})
 
-	registry.Register(leader + "w", (*Editor).showWebView, CommandInfo{
+	registry.Register(leader+"w", (*Editor).showWebView, CommandInfo{
 		Name:        keyToDisplayName(leader + "w"),
 		Description: "Show current note in web browser",
 		Usage:       "<leader>w",
@@ -162,7 +167,7 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 	})
 
 	// Utility commands
-	registry.Register(leader + "y", (*Editor).nextStyle, CommandInfo{
+	registry.Register(leader+"y", (*Editor).nextStyle, CommandInfo{
 		Name:        keyToDisplayName(leader + "y"),
 		Description: "Cycle through available styles",
 		Usage:       "<leader>y",
@@ -170,7 +175,7 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<leader>y - Switch to next available style"},
 	})
 
-	registry.Register(leader + "t", (*Editor).readGoTemplate, CommandInfo{
+	registry.Register(leader+"t", (*Editor).readGoTemplate, CommandInfo{
 		Name:        keyToDisplayName(leader + "t"),
 		Description: "Read Go template into current note",
 		Usage:       "<leader>t",
@@ -178,7 +183,7 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<leader>t - Insert Go template content"},
 	})
 
-	registry.Register(leader + "sp", (*Editor).spellingCheck, CommandInfo{
+	registry.Register(leader+"sp", (*Editor).spellingCheck, CommandInfo{
 		Name:        keyToDisplayName(leader + "sp"),
 		Description: "Highlight misspelled words",
 		Usage:       "<leader>sp",
@@ -186,7 +191,7 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<leader>sp - Check spelling and highlight errors"},
 	})
 
-	registry.Register(leader + "su", (*Editor).spellSuggest, CommandInfo{
+	registry.Register(leader+"su", (*Editor).spellSuggest, CommandInfo{
 		Name:        keyToDisplayName(leader + "su"),
 		Description: "Show spelling suggestions for current word",
 		Usage:       "<leader>su",

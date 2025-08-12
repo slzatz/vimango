@@ -158,7 +158,7 @@ const (
 	maxInt  = int(maxUint >> 1)
 )
 
-func ctrlKey(b byte) int { //rune
+func ctrlKey(b byte) int {
 	return int(b & 0x1f)
 }
 
