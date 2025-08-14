@@ -22,34 +22,21 @@ var isWebviewAvailableDefault = false
 
 // Authentication state management for webview
 var (
-	webviewAuthMutex   sync.RWMutex
+	webviewAuthMutex     sync.RWMutex
 	webviewAuthenticated bool
-	authCheckPerformed bool
+	authCheckPerformed   bool
 )
-
 
 // IsWebviewRunning returns true if a webview is currently running
 // This is a stub that will be overridden by build-specific files
 // Only declare this for non-CGO builds
 var isWebviewRunning = false
 
-// IsWebviewAuthenticated checks if webview has Google Drive authentication
-func IsWebviewAuthenticated() bool {
-	webviewAuthMutex.RLock()
-	defer webviewAuthMutex.RUnlock()
-	
-	if !authCheckPerformed {
-		return false
-	}
-	
-	return webviewAuthenticated
-}
-
 // SetWebviewAuthenticated sets the webview authentication state
 func SetWebviewAuthenticated(authenticated bool) {
 	webviewAuthMutex.Lock()
 	defer webviewAuthMutex.Unlock()
-	
+
 	webviewAuthenticated = authenticated
 	authCheckPerformed = true
 }
@@ -59,7 +46,7 @@ func SetWebviewAuthenticated(authenticated bool) {
 func CheckWebviewAuthentication() bool {
 	webviewAuthMutex.RLock()
 	defer webviewAuthMutex.RUnlock()
-	
+
 	// Return current webview authentication state (not app auth)
 	return authCheckPerformed && webviewAuthenticated
 }
@@ -78,14 +65,25 @@ func openNoteInWebview(title, htmlContent string) error {
 
 // RenderNoteAsHTML converts a note's markdown content to HTML for webview display
 func RenderNoteAsHTML(title, markdownContent string) (string, error) {
-	// Pre-process markdown to handle Google Drive images
-	processedMarkdown, err := preprocessMarkdownImages(markdownContent)
-	if err != nil {
-		return "", fmt.Errorf("failed to preprocess markdown images: %v", err)
-	}
+	var htmlContent string
 
-	// Convert markdown to HTML using goldmark
-	htmlContent := convertMarkdownToHTML(processedMarkdown)
+	// Check authentication status to determine image processing approach
+	if IsWebviewAuthenticated() {
+		// Skip image processing - use original markdown with Google Drive URLs
+		// Authenticated webview can access Google Drive URLs directly
+		app.Organizer.ShowMessage(BR, "Webview authenticated - using original markdown with Google Drive URLs")
+		htmlContent = convertMarkdownToHTML(markdownContent)
+	} else {
+		// Pre-process markdown to handle Google Drive images (convert to base64)
+		processedMarkdown, err := preprocessMarkdownImages(markdownContent)
+		if err != nil {
+			return "", fmt.Errorf("failed to preprocess markdown images: %v", err)
+		}
+		app.Organizer.ShowMessage(BR, "Webview NOT authenticated - converting images to base 64 data URIs")
+
+		// Convert markdown to HTML using goldmark
+		htmlContent = convertMarkdownToHTML(processedMarkdown)
+	}
 
 	// Wrap in basic HTML template
 	htmlTemplate := `<!DOCTYPE html>
@@ -228,7 +226,7 @@ func convertToDirectGoogleDriveURL(googleURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to extract file ID: %w", err)
 	}
-	
+
 	// Return direct Google Drive API URL that works with authenticated sessions
 	// This URL works when the webview has Google authentication cookies
 	directURL := fmt.Sprintf("https://drive.google.com/uc?id=%s&export=view", fileID)

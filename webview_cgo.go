@@ -5,8 +5,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"sync"
-	"time"
+	"syscall"
 
 	"github.com/webview/webview_go"
 )
@@ -23,9 +24,54 @@ func init() {
 	isWebviewAvailableDefault = true
 }
 
+// suppressStderr temporarily redirects stderr to /dev/null to prevent WebKit warnings
+// from interfering with terminal applications
+func suppressStderr() (func(), error) {
+	// Save the original stderr
+	originalStderr, err := syscall.Dup(int(os.Stderr.Fd()))
+	if err != nil {
+		return nil, err
+	}
+	
+	// Open /dev/null
+	devNull, err := os.OpenFile("/dev/null", os.O_WRONLY, 0)
+	if err != nil {
+		syscall.Close(originalStderr)
+		return nil, err
+	}
+	
+	// Redirect stderr to /dev/null
+	err = syscall.Dup2(int(devNull.Fd()), int(os.Stderr.Fd()))
+	if err != nil {
+		devNull.Close()
+		syscall.Close(originalStderr)
+		return nil, err
+	}
+	
+	// Return cleanup function
+	return func() {
+		// Restore original stderr
+		syscall.Dup2(originalStderr, int(os.Stderr.Fd()))
+		devNull.Close()
+		syscall.Close(originalStderr)
+	}, nil
+}
+
 // IsWebviewAvailable returns true if webview is available
 func IsWebviewAvailable() bool {
 	return true
+}
+
+// IsWebviewAuthenticated checks if webview has Google Drive authentication
+func IsWebviewAuthenticated() bool {
+	webviewAuthMutex.RLock()
+	defer webviewAuthMutex.RUnlock()
+	
+	if !authCheckPerformed {
+		return false
+	}
+	
+	return webviewAuthenticated
 }
 
 // OpenNoteInWebview opens a note in a webview window or updates existing one
@@ -35,7 +81,46 @@ func OpenNoteInWebview(title, htmlContent string) error {
 	if webviewRunning && activeWebview != nil {
 		// Update existing webview content
 		activeWebview.SetTitle(fmt.Sprintf("Vimango - %s", title))
-		activeWebview.SetHtml(htmlContent)
+		
+		// TEST: Add JavaScript to check if we still have Google authentication
+		// This will help us determine if SetHtml() destroys session state
+		testHTML := `
+		<!DOCTYPE html>
+		<html>
+		<head><title>Session Test</title></head>
+		<body>
+		<h2>Testing Session State</h2>
+		<p>Checking if Google authentication cookies are still present...</p>
+		<script>
+		// Test if we can access Google domains
+		fetch('https://drive.google.com/uc?id=test')
+		.then(response => {
+			if (response.status === 401 || response.status === 403) {
+				document.body.innerHTML += '<p style="color: red;">❌ Authentication lost - cookies cleared by SetHtml()</p>';
+			} else {
+				document.body.innerHTML += '<p style="color: green;">✅ Authentication preserved - cookies maintained</p>';
+			}
+		})
+		.catch(error => {
+			document.body.innerHTML += '<p style="color: orange;">⚠️ Network error or CORS: ' + error.message + '</p>';
+		});
+		
+		// Alternative test: check if document.cookie contains Google-related cookies
+		setTimeout(() => {
+			const cookies = document.cookie;
+			if (cookies.includes('google') || cookies.length > 0) {
+				document.body.innerHTML += '<p style="color: blue;">🍪 Cookies found: ' + cookies.substring(0, 100) + '...</p>';
+			} else {
+				document.body.innerHTML += '<p style="color: red;">🚫 No cookies found</p>';
+			}
+		}, 1000);
+		</script>
+		<hr>
+		` + htmlContent + `
+		</body>
+		</html>`;
+		
+		activeWebview.SetHtml(testHTML)
 		webviewMutex.Unlock()
 		return nil
 	}
@@ -48,6 +133,18 @@ func OpenNoteInWebview(title, htmlContent string) error {
 		webviewRunning = false
 		activeWebview = nil
 		webviewMutex.Unlock()
+	}()
+	
+	// Suppress WebKit warnings to prevent terminal interference
+	restoreStderr, err := suppressStderr()
+	if err != nil {
+		// Continue without stderr suppression if it fails
+		log.Printf("Warning: Could not suppress stderr: %v", err)
+	}
+	defer func() {
+		if restoreStderr != nil {
+			restoreStderr()
+		}
 	}()
 	
 	w := webview.New(false) // false = not debug mode
@@ -136,14 +233,22 @@ func ShowWebviewUnavailableMessage() {
 
 // AuthenticateWebviewBrowser opens Google Drive in webview for browser-based signin
 func AuthenticateWebviewBrowser() error {
-	// Ensure only one webview can run at a time
-	webviewMutex.Lock()
-	defer webviewMutex.Unlock()
-	
-	// If a webview is already running, don't start authentication
-	if webviewRunning {
-		return fmt.Errorf("cannot authenticate: webview already running")
+	// Simple check - if already authenticated, we're done
+	if IsWebviewAuthenticated() {
+		return nil
 	}
+	
+	// Suppress WebKit warnings to prevent terminal interference
+	restoreStderr, err := suppressStderr()
+	if err != nil {
+		// Continue without stderr suppression if it fails
+		log.Printf("Warning: Could not suppress stderr: %v", err)
+	}
+	defer func() {
+		if restoreStderr != nil {
+			restoreStderr()
+		}
+	}()
 	
 	// Create webview for authentication
 	w := webview.New(false) // Disable debug mode to avoid terminal UI interference
@@ -152,127 +257,35 @@ func AuthenticateWebviewBrowser() error {
 	// Set up webview
 	w.SetTitle("Google Drive Sign In - Vimango")
 	w.SetSize(900, 700, webview.HintNone)
-	
-	// Mark webview as running
-	webviewRunning = true
-	defer func() {
-		webviewRunning = false
-	}()
 
 	// Navigate to Google sign-in page directly - this should be more compatible with webview
 	w.Navigate("https://accounts.google.com/signin")
 
-	// Track authentication state
-	authCompleted := make(chan bool, 1)
+	// Simple approach - user will manually complete authentication
+	// No JavaScript injection into Google's pages
 
-	// Set up JavaScript to detect successful signin and help with navigation
-	w.Init(`
-		(function() {
-			function checkAuthentication() {
-				// If we successfully reach Google Drive after signin
-				if (window.location.hostname === 'drive.google.com') {
-					// Look for elements that indicate successful signin
-					var userElements = [
-						'[data-hovercard-id]',
-						'img[aria-label*="Account"]', 
-						'[aria-label*="profile"]',
-						'[data-tooltip*="Account"]',
-						'.gb_d.gb_Db.gb_i' // Google apps menu
-					];
-					
-					for (var i = 0; i < userElements.length; i++) {
-						var element = document.querySelector(userElements[i]);
-						if (element) {
-							window.external.invoke('auth_success');
-							return;
-						}
-					}
-				}
-				
-				// If we're on accounts.google.com, check if we can proceed to Drive
-				if (window.location.hostname === 'accounts.google.com') {
-					// Check if signin is complete by looking for redirect or success indicators
-					var signedIn = document.querySelector('.gb_d') || // Google bar
-					              document.querySelector('[data-account-menu]') ||
-					              window.location.href.includes('continue=');
-					              
-					if (signedIn) {
-						window.location.href = 'https://drive.google.com';
-						return;
-					}
-				}
-				
-				// Check again in 2 seconds
-				setTimeout(checkAuthentication, 2000);
-			}
-			
-			// Start checking after page loads
-			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', function() {
-					setTimeout(checkAuthentication, 3000);
-				});
-			} else {
-				setTimeout(checkAuthentication, 3000);
-			}
-		})();
-	`)
+	// Set webview state for unified tracking
+	webviewMutex.Lock()
+	webviewRunning = true
+	activeWebview = w
+	webviewMutex.Unlock()
 
-	// Bind callback for successful authentication
-	w.Bind("auth_success", func() {
-		authCompleted <- true
-	})
-
-	// Add instruction HTML overlay
-	instructionHTML := `
-		<div id="vimango-instructions" style="
-			position: fixed; 
-			top: 10px; 
-			right: 10px; 
-			background: #4285f4; 
-			color: white; 
-			padding: 15px; 
-			border-radius: 8px; 
-			font-family: Arial, sans-serif; 
-			font-size: 14px; 
-			max-width: 300px; 
-			z-index: 10000;
-			box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-		">
-			<h3 style="margin: 0 0 10px 0;">Vimango Authentication</h3>
-			<p style="margin: 0 0 10px 0;">Please sign in with your Google account to enable direct image loading.</p>
-			<p style="margin: 0 0 10px 0; font-size: 12px;">1. Click "Sign in" if button works<br>2. Or manually go to drive.google.com after signin</p>
-			<p style="margin: 0; font-size: 12px;">Window will close automatically when authenticated.</p>
-		</div>
-	`
-
-	// Inject instructions after page loads
-	w.Eval(fmt.Sprintf(`
-		document.addEventListener('DOMContentLoaded', function() {
-			if (!document.getElementById('vimango-instructions')) {
-				document.body.insertAdjacentHTML('beforeend', %q);
-			}
-		});
-	`, instructionHTML))
-
-	// Set up a timeout mechanism that works with blocking Run()
-	go func() {
-		time.Sleep(10 * time.Minute)
-		w.Terminate() // This will cause Run() to exit
+	// Ensure we reset the state when webview closes
+	defer func() {
+		webviewMutex.Lock()
+		webviewRunning = false
+		activeWebview = nil
+		webviewMutex.Unlock()
 	}()
 
-	// Run webview - this blocks until window is closed or terminated
+	// Run webview - this blocks until window is closed
+	// User will complete Google authentication manually in the webview
+	// Then use :authdone command to set authentication state (while webview remains open)
+	// Finally use <leader>w to display content in the same authenticated webview
 	w.Run()
 
-	// Check if authentication was successful
-	select {
-	case <-authCompleted:
-		// Authentication successful
-		SetWebviewAuthenticated(true)
-		return nil
-	default:
-		// Authentication not completed (user closed window or timeout)
-		return fmt.Errorf("authentication cancelled or timed out")
-	}
+	// Webview closed by user - authentication workflow complete
+	return nil
 }
 
 // OpenNoteInWebviewWithAuth opens a note in webview, handling authentication if needed

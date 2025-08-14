@@ -165,12 +165,22 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// Authentication command
 	registry.Register("authenticate", (*Editor).authenticateGoogleDrive, CommandInfo{
-		Name:        "authenticate", 
+		Name:        "authenticate",
 		Aliases:     []string{"auth"},
 		Description: "Authenticate with Google Drive for faster image loading in webview",
 		Usage:       "authenticate",
 		Category:    "System",
 		Examples:    []string{":authenticate", ":auth"},
+	})
+
+	// Manual authentication completion command
+	registry.Register("authdone", (*Editor).authenticateDone, CommandInfo{
+		Name:        "authdone",
+		Aliases:     []string{"authcomplete"},
+		Description: "Manually mark Google Drive authentication as complete",
+		Usage:       "authdone",
+		Category:    "System",
+		Examples:    []string{":authdone", ":authcomplete"},
 	})
 
 	// Help command
@@ -191,28 +201,42 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 // authenticateGoogleDrive handles Google Drive browser authentication for webview
 func (e *Editor) authenticateGoogleDrive() {
+	e.mode = NORMAL
+	e.command_line = ""
 	if !IsWebviewAvailable() {
 		e.ShowMessage(BR, "Webview authentication requires CGO build")
 		return
 	}
-	
+
 	// Check if webview is already authenticated (separate from app auth)
 	if CheckWebviewAuthentication() {
 		e.ShowMessage(BR, "Webview already authenticated with Google Drive")
 		return
 	}
-	
+
 	// Show status of different authentication types
 	appAuth := auth.IsAuthenticated()
 	e.ShowMessage(BR, "App OAuth2: %v, Webview browser: %v", appAuth, false)
 	e.ShowMessage(BR, "Opening Google Drive signin for webview browser authentication...")
+
+	// Run authentication in a goroutine since it blocks (same pattern as regular webview)
+	go func() {
+		if err := TriggerWebviewAuthentication(); err != nil {
+			// Note: Can't directly show message from goroutine
+			// The TriggerWebviewAuthentication function will log errors
+		}
+		// Note: Success messages are also logged by TriggerWebviewAuthentication
+	}()
+}
+
+func (e *Editor) authenticateDone() {
+	e.mode = NORMAL
+	e.command_line = ""
 	
-	// Run authentication - this will block until completed
-	if err := TriggerWebviewAuthentication(); err != nil {
-		e.ShowMessage(BR, "Authentication failed: %v", err)
-	} else {
-		e.ShowMessage(BR, "Webview authentication successful!")
-	}
+	// Manually set webview authentication state
+	SetWebviewAuthenticated(true)
+	e.ShowMessage(BR, "Webview authentication state set to: authenticated")
+	e.ShowMessage(BR, "You can now use <leader>w for direct Google Drive image access")
 }
 
 // help displays help information for editor commands

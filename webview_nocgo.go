@@ -63,3 +63,8 @@ func OpenNoteInWebviewWithAuth(title, htmlContent string) error {
 func TriggerWebviewAuthentication() error {
 	return fmt.Errorf("webview authentication not available in non-CGO build")
 }
+
+// IsWebviewAuthenticated is a stub for non-CGO builds - always returns false
+func IsWebviewAuthenticated() bool {
+	return false
+}
