@@ -21,6 +21,10 @@ func main() {
 		log.Fatalf("Failed to get Google Drive service: %v", err)
 	}
 	app.Session.googleDrive = srv
+	
+	// Initialize image cache early
+	initImageCache()
+	
 	// Configure Vim implementation selection
 	vimConfig := DetermineVimDriver(os.Args)
 	LogVimDriverChoice(vimConfig)

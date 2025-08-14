@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"image/jpeg"
 	"image/png"
+	"log"
 	"regexp"
 	"strings"
 
@@ -18,6 +19,21 @@ import (
 
 // Default implementation that will be overridden by build-specific files
 var isWebviewAvailableDefault = false
+
+// Global image cache instance
+var globalImageCache *ImageCache
+
+// initImageCache initializes the global image cache
+func initImageCache() {
+	if globalImageCache == nil {
+		var err error
+		globalImageCache, err = NewImageCache()
+		if err != nil {
+			log.Printf("Warning: Failed to initialize image cache: %v", err)
+			globalImageCache = nil
+		}
+	}
+}
 
 // IsWebviewAvailable returns true if webview is available
 func IsWebviewAvailable() bool {
@@ -142,6 +158,9 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
 
 // preprocessMarkdownImages processes Google Drive images in markdown before HTML conversion
 func preprocessMarkdownImages(markdown string) (string, error) {
+	// Initialize cache if needed
+	initImageCache()
+
 	// Regular expression to find Google Drive URLs in markdown image syntax
 	// Matches ![alt text](google drive url) or ![alt text](google drive url "title")
 	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
@@ -156,12 +175,36 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 		altText := match[1]   // Alt text
 		googleURL := match[2] // Google Drive URL
 
-		// Download and convert to data URI
-		dataURI, err := convertGoogleDriveImageToDataURI(googleURL)
-		if err != nil {
-			// If we can't convert, leave the original URL
-			fmt.Printf("Warning: Could not convert Google Drive image %s: %v\n", googleURL, err)
-			continue
+		var dataURI string
+		var err error
+
+		// Try cache first
+		if globalImageCache != nil {
+			if cachedData, found := globalImageCache.GetCachedImage(googleURL); found {
+				dataURI = cachedData
+			} else {
+				// Cache miss - download and convert to data URI
+				dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
+				if err != nil {
+					// If we can't convert, leave the original URL
+					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
+					continue
+				}
+				
+				// Store in cache for future use
+				if cacheErr := globalImageCache.StoreCachedImage(googleURL, dataURI); cacheErr != nil {
+					log.Printf("Warning: Could not cache image %s: %v", googleURL, cacheErr)
+					// Continue anyway - we have the data URI
+				}
+			}
+		} else {
+			// No cache available - fallback to direct conversion
+			dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
+			if err != nil {
+				// If we can't convert, leave the original URL
+				log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
+				continue
+			}
 		}
 
 		// Replace the Google Drive URL with the data URI
