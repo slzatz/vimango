@@ -1,4 +1,4 @@
-{ "document": { "block_prefix": "\n", "block_suffix": "\n", "color": "15", "margin": 0 },
+{ "document": { "block_prefix": "\n", "block_suffix": "\n", "color": "250", "margin": 0 },
   "block_quote": {
     "indent": 1,
     "indent_token": "│ "
