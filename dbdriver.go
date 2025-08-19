@@ -60,7 +60,7 @@ func IsCGOSQLiteAvailable() bool {
 	if runtime.GOOS == "windows" {
 		return false
 	}
-	
+
 	// On other platforms, it depends on build tags
 	// This will be true only if the cgo build tag is set and we're not on Windows
 	return cgoSQLiteAvailable()

@@ -78,11 +78,11 @@ func (a *App) NewEditor() *Editor {
 		Session:  a.Session,
 		Database: a.Database,
 	}
-	
+
 	// Set up commands after editor creation so help can access registry
 	editor.exCmds = a.setEditorExCmds(editor)
 	editor.normalCmds = a.setEditorNormalCmds(editor)
-	
+
 	return editor
 }
 
@@ -195,15 +195,12 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 	)
 	a.Database.PG, err = sql.Open("postgres", connect)
 	if err != nil {
-		//fmt.Fprintf("Error opening postgres db: %v", err)
 		return err
 	}
-	//defer pdb.Close() //need to look at this
 
 	// Ping to connection
 	err = a.Database.PG.Ping()
 	if err != nil {
-		//fmt.Fprintf("postgres ping failure!: %v", err)
 		return err
 	}
 	a.Config = config

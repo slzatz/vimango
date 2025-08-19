@@ -8,7 +8,6 @@ import (
 	"github.com/slzatz/vimango/auth"
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/vim"
-	//"vimango/auth"
 )
 
 // Global app struct
@@ -21,13 +20,13 @@ func main() {
 		log.Fatalf("Failed to get Google Drive service: %v", err)
 	}
 	app.Session.googleDrive = srv
-	
-	// Initialize image cache early
+
+	// Initialize image cache
 	initImageCache()
-	
+
 	// Configure Vim implementation selection
 	vimConfig := DetermineVimDriver(os.Args)
-	LogVimDriverChoice(vimConfig)
+	//LogVimDriverChoice(vimConfig) //debugging
 	useGoVim := vimConfig.ShouldUseGoVim()
 
 	// Set up logging if Go implementation is used
@@ -44,8 +43,9 @@ func main() {
 	vim.InitializeVim(useGoVim, 0)
 
 	// Configure SQLite driver selection
+	// currently defaulting to modernc sqlite driver unless --cgo-sqlite3 is specified
 	sqliteConfig := DetermineSQLiteDriver(os.Args)
-	LogSQLiteDriverChoice(sqliteConfig)
+	//LogSQLiteDriverChoice(sqliteConfig) //debugging
 
 	// Initialize database connections
 	err = app.InitDatabases("config.json", sqliteConfig)
@@ -76,6 +76,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error getting window size: %v", err)
 		os.Exit(1)
 	}
+	//os.Exit(0) //debugging
 
 	app.InitApp()
 	app.LoadInitialData()

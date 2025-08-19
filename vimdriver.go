@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"runtime"
 
 	"github.com/slzatz/vimango/vim"
@@ -71,6 +70,8 @@ func (cfg *VimConfig) ShouldUseGoVim() bool {
 }
 
 // LogVimDriverChoice logs which Vim implementation is being used
+/*
 func LogVimDriverChoice(cfg *VimConfig) {
 	fmt.Printf("Using Vim implementation: %s\n", cfg.GetVimDriverDisplayName())
 }
+*/
