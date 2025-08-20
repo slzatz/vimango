@@ -711,6 +711,7 @@ func (e *Editor) drawFrame() {
 	fmt.Print(ab.String())
 }
 
+// note that app.returnCursor uses e.cy and e.cx to position the terminal cursor
 func (e *Editor) scroll() {
 
 	if e.fc == 0 && e.fr == 0 {

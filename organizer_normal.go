@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	//	"github.com/charmbracelet/glamour"
 	"github.com/slzatz/vimango/vim"
+	//	"github.com/charmbracelet/glamour"
 )
 
 func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Organizer) {
@@ -81,7 +81,7 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 
 	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('l'))),
-		Description: "Move to editor to the left (or to organizer if no editor)",
+		Description: "Move to editor to the left (if one is active)",
 		Usage:       "Ctrl-L",
 		Category:    "Mode Switching",
 		Examples:    []string{"Ctrl-L - Switch to active editor if available"},
@@ -186,13 +186,32 @@ func (o *Organizer) info() {
 
 func (o *Organizer) switchToEditorMode() {
 	if len(o.Session.Windows) == 0 {
-		o.ShowMessage(BL, "There are no active editors")
+		o.ShowMessage(BL, "%sThere are no active editors%s", RED_BG, RESET)
 		return
 	}
+	o.Session.editorMode = true
+	ae := app.Session.activeEditor
+	//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
+	vim.SetCurrentBuffer(ae.vbuf)
 	o.Screen.eraseRightScreen()
 	o.Screen.drawRightScreen()
-	o.Session.editorMode = true
-	vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
+	//o.Session.editorMode = true
+	//ae := app.Session.activeEditor
+	//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
+	//vim.SetCurrentBuffer(ae.vbuf)
+	/*
+		ae := app.Session.activeEditor
+		//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
+		vim.SetCurrentBuffer(ae.vbuf)
+		//ae.mode = NORMAL
+		//ae.command = ""
+		ae.ss = ae.vbuf.Lines()
+		pos := vim.GetCursorPosition() //set screen cx and cy from pos
+		ae.fr = pos[0] - 1
+		ae.fr = 5
+		ae.fc = utf8.RuneCountInString(ae.ss[ae.fr][:pos[1]])
+		ae.fc = 5
+	*/
 }
 
 func (o *Organizer) scrollPreviewDown() {

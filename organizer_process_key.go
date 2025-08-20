@@ -96,13 +96,6 @@ func (o *Organizer) InsertModeKeyHandler(c int) {
 
 func (o *Organizer) NormalModeKeyHandler(c int) {
 
-	/*
-		if c == ctrlKey('l') && o.last_mode == ADD_CHANGE_FILTER {
-			o.mode = ADD_CHANGE_FILTER
-			o.Screen.eraseRightScreen()
-		}
-	*/
-
 	if c == '\r' {
 
 		o.command = ""

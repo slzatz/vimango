@@ -180,9 +180,7 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 
 	if len(e.command) > 0 {
 		if e.command[0] != ' ' { //leader
-			//e.command = ""
 			e.command = string(c)
-			//return false, false
 		}
 	}
 
@@ -190,6 +188,11 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 	if cmd, found := e.normalCmds[e.command]; found {
 		cmd(e, c)
 		vim.SendKey("<esc>")
+		// below is kludge becuse moveLeft and moveRight move you out of current editor
+		if e.command == "\x08" || e.command == "\x0c" { //moveLeft or moveRight
+			e.command = ""
+			return true, true
+		}
 		e.command = ""
 		e.ss = e.vbuf.Lines()
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos

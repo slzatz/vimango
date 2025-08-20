@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/slzatz/vimango/vim"
@@ -350,14 +349,11 @@ func (e *Editor) moveLeft(_ int) {
 
 	if index > 0 {
 		ae := eds[index-1]
-		vim.SetCurrentBuffer(ae.vbuf)
-		ae.mode = NORMAL
-		ae.command = ""
-		ae.ss = ae.vbuf.Lines()
 		app.Session.activeEditor = ae
-		pos := vim.GetCursorPosition() //set screen cx and cy from pos
-		ae.fr = pos[0] - 1
-		ae.fc = utf8.RuneCountInString(ae.ss[ae.fr][:pos[1]])
+		vim.SetCurrentBuffer(ae.vbuf)
+		// for some reason when you switch buffers, the cursor column position is not set correctly and is set to zero?!
+		ae.fc = 0 // reset column position because of above
+		ae.ShowMessage(BR, "Cursor position: %+v", vim.GetCursorPosition())
 		return
 	} else {
 
@@ -375,7 +371,7 @@ func (e *Editor) moveLeft(_ int) {
 }
 
 func (e *Editor) moveRight(_ int) {
-	// below "if" really for testing
+	// below "if" for testing but may have use
 	if e.isModified() {
 		e.ShowMessage(BR, "Note you left has been modified")
 	}
@@ -394,14 +390,10 @@ func (e *Editor) moveRight(_ int) {
 	if index < len(eds)-1 {
 		ae := eds[index+1]
 		vim.SetCurrentBuffer(ae.vbuf)
-		ae.mode = NORMAL
-		ae.command = ""
-		ae.ss = ae.vbuf.Lines()
 		app.Session.activeEditor = ae
-		pos := vim.GetCursorPosition() //set screen cx and cy from pos
-		ae.fr = pos[0] - 1
-		ae.fc = utf8.RuneCountInString(ae.ss[ae.fr][:pos[1]])
-		e.ShowMessage(BL, "After move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(eds), ae.fr, ae.fc)
+		// for some reason when you switch buffers, the cursor column position is not set correctly and is set to zero?!
+		ae.fc = 0
+		ae.ShowMessage(BR, "Cursor position: %+v", vim.GetCursorPosition())
 	}
 
 	return

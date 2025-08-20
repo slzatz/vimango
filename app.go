@@ -280,6 +280,8 @@ func (a *App) LoadInitialData() {
 	a.returnCursor()
 }
 
+// organizer and editor scroll methods set cx and cy
+// returnCursor positions the terminal cursor in the right place
 func (a *App) returnCursor() {
 	var ab strings.Builder
 	if a.Session.editorMode {
@@ -355,18 +357,23 @@ func (a *App) MainLoop() {
 		}
 		if a.Session.editorMode {
 			ae := a.Session.activeEditor
-			textChange := ae.editorProcessKey(k)
+			redraw := ae.editorProcessKey(k)
 
 			if !a.Session.editorMode {
 				continue
 			}
-			if textChange {
+			if redraw {
+				ae := a.Session.activeEditor ///// doesn't do anything
 				ae.scroll()
 				ae.drawText()
 				ae.drawStatusBar()
 			}
 		} else {
 			org.organizerProcessKey(k)
+			if a.Session.editorMode {
+				a.returnCursor()
+				continue
+			}
 			org.scroll()
 			org.refreshScreen()
 			if a.Screen.divider > 10 {

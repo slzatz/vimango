@@ -185,6 +185,7 @@ func CBufferSetLines(vbuf *C.buf_T, start, end int, ss []string, count int) {
 
 // v.SetBufferText(e.vbuf, line, startChar, line, endChar, [][]byte{[]byte(edit.NewText)})
 // pos_T vimCursorGetPosition(void);
+// note that when you switch buffers for some reason p.col is always 0
 func CursorGetPosition() [2]int {
 	p := C.vimCursorGetPosition()
 	var pos [2]int
