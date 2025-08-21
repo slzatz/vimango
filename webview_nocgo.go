@@ -38,10 +38,6 @@ func OpenNoteInWebview(title, htmlContent string) error {
 	return cmd.Start()
 }
 
-// IsWebviewAvailable returns false for non-CGO builds
-func IsWebviewAvailable() bool {
-	return false
-}
 
 // IsWebviewRunning returns false for non-CGO builds
 func IsWebviewRunning() bool {
