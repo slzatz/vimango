@@ -351,10 +351,9 @@ func (e *Editor) moveLeft(_ int) {
 		ae := eds[index-1]
 		app.Session.activeEditor = ae
 		vim.SetCurrentBuffer(ae.vbuf)
-		// for some reason when you switch buffers, the cursor column position is not set correctly and is set to zero?!
-		if vim.GetActiveImplementation() == vim.ImplC {
-			ae.fc = 0 // reset column position because of bug in C implementation
-		}
+		// There is a bug in libvim C implementation where the cursor column position is set to zero when switching buffers
+		// so we set the cursor position from the stored values
+		vim.SetCursorPosition(ae.fr+1, ae.fc)
 		ae.ShowMessage(BR, "Cursor position: %+v", vim.GetCursorPosition())
 		return
 	} else {
@@ -393,10 +392,9 @@ func (e *Editor) moveRight(_ int) {
 		ae := eds[index+1]
 		vim.SetCurrentBuffer(ae.vbuf)
 		app.Session.activeEditor = ae
-		// for some reason when you switch buffers in the C implementation, the cursor column position is not set correctly and is set to zero?!
-		if vim.GetActiveImplementation() == vim.ImplC {
-			ae.fc = 0
-		}
+		// There is a bug in libvim C implementation where the cursor column position is set to zero when switching buffers
+		// so we set the cursor position from the stored values
+		vim.SetCursorPosition(ae.fr+1, ae.fc)
 		ae.ShowMessage(BR, "Cursor position: %+v", vim.GetCursorPosition())
 	}
 
