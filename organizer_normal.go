@@ -96,6 +96,14 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 		Examples:    []string{"Ctrl-W - Open current note in web browser"},
 	})
 
+	registry.Register(string(ctrlKey('y')), (*Organizer).showEditorWindows, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('y'))),
+		Description: "Show open editor windows",
+		Usage:       "Ctrl-Y",
+		Category:    "Preview",
+		Examples:    []string{"Ctrl-Y - Show active editor windows"},
+	})
+
 	// Store registry in organizer for help command access
 	organizer.normalCommandRegistry = registry
 
@@ -184,6 +192,11 @@ func (o *Organizer) info() {
 	o.Screen.drawPreviewBox()
 }
 
+func (o *Organizer) showEditorWindows() {
+	o.Screen.eraseRightScreen()
+	o.Screen.drawRightScreen()
+}
+
 func (o *Organizer) switchToEditorMode() {
 	if len(o.Session.Windows) == 0 {
 		o.ShowMessage(BL, "%sThere are no active editors%s", RED_BG, RESET)
@@ -193,6 +206,8 @@ func (o *Organizer) switchToEditorMode() {
 	ae := app.Session.activeEditor
 	//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
 	vim.SetCurrentBuffer(ae.vbuf)
+	// below necessary because libvim does not set cursor column correctly
+	vim.SetCursorPosition(ae.fr+1, ae.fc) //ae.fr is 0-based, vim expects 1-based
 	o.Screen.eraseRightScreen()
 	o.Screen.drawRightScreen()
 	//o.Session.editorMode = true
