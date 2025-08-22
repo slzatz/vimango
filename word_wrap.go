@@ -27,12 +27,12 @@ func parseWordsWithSpaces(line string) []TextSegment {
 	if len(line) == 0 {
 		return []TextSegment{}
 	}
-	
+
 	var segments []TextSegment
 	var currentSegment strings.Builder
 	var currentType SegmentType
 	var inWord bool
-	
+
 	// Determine initial state based on first character
 	firstRune := rune(line[0])
 	if firstRune == ' ' || firstRune == '\t' {
@@ -42,10 +42,10 @@ func parseWordsWithSpaces(line string) []TextSegment {
 		currentType = SegmentWord
 		inWord = true
 	}
-	
+
 	for _, r := range line {
 		isSpace := (r == ' ' || r == '\t')
-		
+
 		if isSpace && inWord {
 			// Transition from word to space
 			if currentSegment.Len() > 0 {
@@ -69,10 +69,10 @@ func parseWordsWithSpaces(line string) []TextSegment {
 			currentType = SegmentWord
 			inWord = true
 		}
-		
+
 		currentSegment.WriteRune(r)
 	}
-	
+
 	// Add the final segment
 	if currentSegment.Len() > 0 {
 		segments = append(segments, TextSegment{
@@ -80,7 +80,7 @@ func parseWordsWithSpaces(line string) []TextSegment {
 			Content: currentSegment.String(),
 		})
 	}
-	
+
 	return segments
 }
 
@@ -112,7 +112,7 @@ func visibleWidth(s string) int {
 	return width
 }
 
-// breakWord takes a single word potentially containing escape codes and breaks
+// breakWord takes a string potentially containing escape codes and breaks
 // it into segments that fit within the limit. Escape codes are preserved
 // but do not count towards the width limit.
 func breakWord(word string, limit int) []string {
@@ -155,18 +155,18 @@ func breakWord(word string, limit int) []string {
 		// Check if adding the rune (if it has width) exceeds the limit
 		if !isEscapeChar && currentSegmentWidth+runeWidth > limit {
 			// Check if the segment is not empty before adding it
-            // This prevents adding empty segments if a break happens at the very beginning
-            if currentSegment.Len() > 0 {
-                segments = append(segments, currentSegment.String())
-                currentSegment.Reset()
-                currentSegmentWidth = 0
-            }
-            // Even if the current segment was empty, we reset the width
-            // because the new rune starts a new line conceptually.
-            currentSegmentWidth = 0
+			// This prevents adding empty segments if a break happens at the very beginning
+			if currentSegment.Len() > 0 {
+				segments = append(segments, currentSegment.String())
+				currentSegment.Reset()
+				currentSegmentWidth = 0
+			}
+			// Even if the current segment was empty, we reset the width
+			// because the new rune starts a new line conceptually.
+			currentSegmentWidth = 0
 
 			// If the rune itself is wider than the limit (e.g., large CJK char, limit=1)
-            // it will still be placed, potentially exceeding limit for this segment.
+			// it will still be placed, potentially exceeding limit for this segment.
 		}
 
 		// Add the rune to the current segment
@@ -187,8 +187,8 @@ func breakWord(word string, limit int) []string {
 	if len(segments) == 0 && len(word) > 0 {
 		segments = append(segments, word) // Preserve escape-only words
 	} else if len(segments) == 0 && len(word) == 0 {
-        return []string{} // Return empty slice if input word was empty
-    }
+		return []string{} // Return empty slice if input word was empty
+	}
 
 	return segments
 }
@@ -211,7 +211,7 @@ func WordWrap(text string, limit int) string {
 
 		for _, segment := range segments {
 			segmentWidth := visibleWidth(segment.Content)
-			
+
 			// Handle space segments
 			if segment.Type == SegmentSpace {
 				// Include spaces if they fit within the limit
@@ -223,7 +223,7 @@ func WordWrap(text string, limit int) string {
 				// If spaces don't fit, skip them (trailing spaces at line breaks)
 				continue
 			}
-			
+
 			// Handle word segments (original word logic)
 			word := segment.Content
 			wordWidth := segmentWidth

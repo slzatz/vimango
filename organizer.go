@@ -148,8 +148,9 @@ func (o *Organizer) showMessage(format string, a ...interface{}) {
 func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) {
 	max_length := o.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
-	if len(str) > max_length {
-		str = str[:max_length]
-	}
+	// breakWord breaks strings (can be several words) into first segment
+	// that fits taking into acount ANSI escape codes
+	ss := breakWord(str, max_length)[0]
+	str = ss + RESET
 	fmt.Print(str)
 }

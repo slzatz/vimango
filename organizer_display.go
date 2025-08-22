@@ -259,6 +259,7 @@ func (o *Organizer) drawRenderedNote() {
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
 	fmt.Print(strings.Join(o.note[start:end], lf_ret))
+	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
 }
 
 func (o *Organizer) drawStatusBar() {
