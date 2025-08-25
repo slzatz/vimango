@@ -4,15 +4,21 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"image/color"
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/vim"
+	"github.com/stephenafamo/goldmark-pdf"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 )
 
 func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
@@ -132,6 +138,14 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Usage:       "pdf",
 		Category:    "Output",
 		Examples:    []string{":pdf"},
+	})
+
+	registry.Register("pdf-goldmark", (*Editor).createPDFGoldmark, CommandInfo{
+		Name:        "pdf-goldmark",
+		Description: "Create PDF from current note using goldmark-pdf (consistent with webview rendering)",
+		Usage:       "pdf-goldmark <filename>",
+		Category:    "Output",
+		Examples:    []string{":pdf-goldmark output.pdf", ":pdf-goldmark /tmp/note.pdf"},
 	})
 
 	// System commands
@@ -985,6 +999,76 @@ func (e *Editor) createPDF() {
 	if err != nil {
 		e.ShowMessage(BL, "pdf error:%v", err)
 	}
+}
+
+// preprocessImageDescriptions removes image description text to prevent it from appearing as visible text in PDFs
+// Transforms ![description text](url) to ![](url) to work around goldmark-pdf rendering issues
+func preprocessImageDescriptions(markdown string) string {
+	// Regular expression to match image markdown: ![anything](url)
+	imageRegex := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+	
+	// Replace with empty description: ![](url)
+	return imageRegex.ReplaceAllString(markdown, `![]($2)`)
+}
+
+func (e *Editor) createPDFGoldmark() {
+	pos := strings.Index(e.command_line, " ")
+	if pos == -1 {
+		e.ShowMessage(BL, "You need to provide a filename")
+		return
+	}
+	filename := e.command_line[pos+1:]
+
+	// Get markdown content from editor
+	content := strings.Join(e.ss, "\n")
+
+	// Pre-process markdown to handle Google Drive images
+	processedMarkdown, err := preprocessMarkdownImages(content)
+	if err != nil {
+		e.ShowMessage(BL, "Error preprocessing images: %v", err)
+		return
+	}
+
+	// Remove image description text to prevent it from appearing as visible text in PDF
+	processedMarkdown = preprocessImageDescriptions(processedMarkdown)
+
+	// Configure goldmark with same extensions as webview for consistency
+	md := goldmark.New(
+		goldmark.WithExtensions(
+			extension.GFM,           // GitHub Flavored Markdown
+			extension.Table,         // Tables
+			extension.Strikethrough, // Strikethrough text
+			extension.Linkify,       // Auto-link URLs
+			extension.TaskList,      // Task lists
+		),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(), // Auto-generate heading IDs
+		),
+		goldmark.WithRenderer(
+			pdf.New(
+				pdf.WithLinkColor(color.RGBA{0x00, 0x66, 0xcc, 0xff}),
+				pdf.WithHeadingFont(pdf.FontOpenSans),
+				pdf.WithCodeFont(pdf.FontRobotoMono),
+			),
+		),
+	)
+
+	// Create the PDF file
+	f, err := os.Create(filename)
+	if err != nil {
+		e.ShowMessage(BL, "Error creating PDF file %s: %v", filename, err)
+		return
+	}
+	defer f.Close()
+
+	// Convert markdown to PDF
+	err = md.Convert([]byte(processedMarkdown), f)
+	if err != nil {
+		e.ShowMessage(BL, "Error converting markdown to PDF: %v", err)
+		return
+	}
+
+	e.ShowMessage(BL, "PDF created successfully: %s", filename)
 }
 
 func (e *Editor) printDocument() {
