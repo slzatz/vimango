@@ -52,6 +52,10 @@ type dbConfig struct {
 	Chroma struct {
 		Style string `json:"style"`
 	} `json:"chroma"`
+
+	Claude struct {
+		ApiKey string `json:"api_key"`
+	} `json:"claude"`
 }
 
 var z0 = struct{}{}

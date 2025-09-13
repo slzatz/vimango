@@ -68,13 +68,14 @@ The application features a comprehensive command registry system with full disco
 - `:h` - Short alias for help command
 
 ### Ex Command Organization
-**Organizer Ex Commands (66+ commands in 8 categories):**
+**Organizer Ex Commands (68+ commands in 9 categories):**
 - **Navigation**: open, opencontext, openfolder, openkeyword
 - **Data Management**: new, write, sync, bulkload, refresh
 - **Search & Filter**: find, contexts, folders, keywords, recent, log
 - **View Control**: sort, showall, image, webview, vertical resize
 - **Entry Management**: e (edit), copy, deletekeywords, deletemarks
 - **Container Management**: cc (context), ff (folder), kk (keyword)
+- **Research**: research, researchdebug (rd)
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
@@ -116,3 +117,34 @@ The application features a comprehensive command registry system with full disco
 - **Self-Documenting**: Help text is co-located with command definitions for both ex and normal commands
 - **Key Display**: Human-readable key representations in help (e.g., `\x08` displayed as `Ctrl-H`)
 - **Extensible**: New commands require help metadata, ensuring documentation stays current
+
+## Deep Research System
+The application includes an AI-powered deep research capability that leverages Claude API with web search tools to generate comprehensive research reports.
+
+### Research Commands
+- `:research` - Perform deep research on current entry content and save results as new note
+- `:researchdebug` (`:rd`) - Same as research but includes debug information and API response analysis
+
+### Research Features
+- **Asynchronous Processing**: Research runs in background without blocking the user interface
+- **Web Search Integration**: Uses Claude API's built-in web search tools for comprehensive information gathering
+- **Automatic Note Creation**: Results are automatically saved as new vimango entries
+- **Usage Statistics**: Tracks and reports token usage, search count, duration, and quality ratings
+- **Error Recovery**: Comprehensive panic recovery and error handling
+- **Debug Mode**: Optional detailed logging for troubleshooting and analysis
+
+### Configuration
+Research functionality requires Claude API key configuration in `config.json`:
+```json
+{
+  "claude": {
+    "api_key": "your-claude-api-key"
+  }
+}
+```
+
+### Implementation
+- **File**: `research.go` - Core research system with ResearchManager and Claude API integration
+- **Modified Files**: `app.go`, `main.go`, `common.go`, `organizer_cmd_line.go` - Integration and command registration
+- **Features**: Notification system, queue management, structured markdown generation
+- **API Integration**: Uses Claude Messages API with web search tools for multi-step research workflows

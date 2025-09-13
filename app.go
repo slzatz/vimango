@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
@@ -21,6 +22,11 @@ type App struct {
 	Organizer *Organizer // Organizer manages tasks and their display
 	Editor    *Editor    // Editor manages text editing - there can be multiple editors
 	Database  *Database  // Database handles database connections and queries
+
+	// Research system
+	ResearchManager *ResearchManager // Manages background research tasks
+	notifications   []string         // Queue of user notifications
+	notificationMux sync.RWMutex     // Mutex for notifications
 
 	// Database connections and other config
 	Config *dbConfig
@@ -48,8 +54,9 @@ func CreateApp() *App {
 			Screen:   screen,
 			Database: db,
 		},
-		Run:   true,
-		kitty: kitty, // default to false
+		notifications: make([]string, 0),
+		Run:           true,
+		kitty:         kitty, // default to false
 	}
 }
 
@@ -345,6 +352,14 @@ func (a *App) quitApp() {
 func (a *App) MainLoop() {
 	org := a.Organizer
 	for a.Run {
+		// Check for research notifications
+		if a.HasNotifications() {
+			notification := a.GetNextNotification()
+			if notification != "" {
+				org.ShowMessage(BL, notification)
+			}
+		}
+		
 		key, err := terminal.ReadKey()
 		if err != nil {
 			org.ShowMessage(BL, "Readkey problem %w", err)
@@ -383,4 +398,39 @@ func (a *App) MainLoop() {
 		a.returnCursor()
 	}
 	a.Cleanup()
+}
+
+// addNotification adds a notification message to the queue
+func (a *App) addNotification(message string) {
+	a.notificationMux.Lock()
+	defer a.notificationMux.Unlock()
+	a.notifications = append(a.notifications, message)
+}
+
+// GetNextNotification retrieves and removes the next notification from the queue
+func (a *App) GetNextNotification() string {
+	a.notificationMux.Lock()
+	defer a.notificationMux.Unlock()
+	
+	if len(a.notifications) == 0 {
+		return ""
+	}
+	
+	message := a.notifications[0]
+	a.notifications = a.notifications[1:]
+	return message
+}
+
+// HasNotifications returns true if there are pending notifications
+func (a *App) HasNotifications() bool {
+	a.notificationMux.RLock()
+	defer a.notificationMux.RUnlock()
+	return len(a.notifications) > 0
+}
+
+// InitResearchManager initializes the research manager with API key
+func (a *App) InitResearchManager(apiKey string) {
+	if apiKey != "" {
+		a.ResearchManager = NewResearchManager(a, apiKey)
+	}
 }

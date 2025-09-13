@@ -111,6 +111,24 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":refresh", ":r"},
 	})
 
+	registry.Register("research", (*Organizer).startResearch, CommandInfo{
+		Name:        "research",
+		Aliases:     []string{},
+		Description: "Start deep research using current note as prompt",
+		Usage:       "research",
+		Category:    "Data Management",
+		Examples:    []string{":research"},
+	})
+
+	registry.Register("researchdebug", (*Organizer).startResearchDebug, CommandInfo{
+		Name:        "researchdebug",
+		Aliases:     []string{"rd"},
+		Description: "Start deep research with full debug information",
+		Usage:       "researchdebug",
+		Category:    "Data Management",
+		Examples:    []string{":researchdebug", ":rd"},
+	})
+
 	// Search & Filter commands
 	registry.Register("find", (*Organizer).find, CommandInfo{
 		Name:        "find",
@@ -1551,4 +1569,90 @@ func (o *Organizer) sortEntries(pos int) {
 		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.drawPreview()
 	*/
+}
+
+// startResearch initiates deep research using the current entry's note as the research prompt
+func (o *Organizer) startResearch(_ int) {
+	// Check if research manager is available
+	if app.ResearchManager == nil {
+		o.ShowMessage(BL, "Research feature not available - Claude API key not configured")
+		return
+	}
+
+	// Get the current entry
+	if o.fr >= len(o.rows) {
+		o.ShowMessage(BL, "No entry selected for research")
+		return
+	}
+
+	currentRow := o.rows[o.fr]
+	if currentRow.id == -1 {
+		o.ShowMessage(BL, "Cannot research unsaved entries")
+		return
+	}
+
+	// Read the current entry's note content to use as research prompt
+	prompt := o.Database.readNoteIntoString(currentRow.id)
+	if len(strings.TrimSpace(prompt)) == 0 {
+		o.ShowMessage(BL, "Entry has no content to use as research prompt")
+		return
+	}
+
+	// Generate a research title from the entry title
+	researchTitle := fmt.Sprintf("Research for: %s", currentRow.title)
+	if len(researchTitle) > 100 {
+		researchTitle = researchTitle[:97] + "..."
+	}
+
+	// Start the research (normal mode - no debug info)
+	taskID, err := app.ResearchManager.StartResearch(researchTitle, prompt, currentRow.id, false)
+	if err != nil {
+		o.ShowMessage(BL, "Failed to start research: %v", err)
+		return
+	}
+
+	o.ShowMessage(BL, "Research started: %s (Task ID: %s)", researchTitle, taskID)
+}
+
+// startResearchDebug initiates deep research with full debug information
+func (o *Organizer) startResearchDebug(_ int) {
+	// Check if research manager is available
+	if app.ResearchManager == nil {
+		o.ShowMessage(BL, "Research feature not available - Claude API key not configured")
+		return
+	}
+
+	// Get the current entry
+	if o.fr >= len(o.rows) {
+		o.ShowMessage(BL, "No entry selected for research")
+		return
+	}
+
+	currentRow := o.rows[o.fr]
+	if currentRow.id == -1 {
+		o.ShowMessage(BL, "Cannot research unsaved entries")
+		return
+	}
+
+	// Read the current entry's note content to use as research prompt
+	prompt := o.Database.readNoteIntoString(currentRow.id)
+	if len(strings.TrimSpace(prompt)) == 0 {
+		o.ShowMessage(BL, "Entry has no content to use as research prompt")
+		return
+	}
+
+	// Generate a research title from the entry title
+	researchTitle := fmt.Sprintf("Research for: %s", currentRow.title)
+	if len(researchTitle) > 100 {
+		researchTitle = researchTitle[:97] + "..."
+	}
+
+	// Start the research (debug mode - with full debug info)
+	taskID, err := app.ResearchManager.StartResearch(researchTitle, prompt, currentRow.id, true)
+	if err != nil {
+		o.ShowMessage(BL, "Failed to start debug research: %v", err)
+		return
+	}
+
+	o.ShowMessage(BL, "Debug research started: %s (Task ID: %s)", researchTitle, taskID)
 }

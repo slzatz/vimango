@@ -53,6 +53,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Initialize research manager if Claude API key is configured
+	if app.Config != nil && app.Config.Claude.ApiKey != "" && app.Config.Claude.ApiKey != "CLAUDE_API_KEY_HERE" {
+		app.InitResearchManager(app.Config.Claude.ApiKey)
+	}
+
 	// Set up platform-specific signal handling
 	setupSignalHandling(app)
 
