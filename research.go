@@ -24,6 +24,7 @@ type ResearchManager struct {
 	lastDebugInfo string // Store debug info for research note
 	lastUsage     Usage  // Store usage statistics
 	lastSearchCount int  // Count of web searches performed
+	lastFetchCount  int  // Count of web fetches performed
 }
 
 type ResearchTask struct {
@@ -52,12 +53,18 @@ type Message struct {
 }
 
 type Tool struct {
-	Type           string      `json:"type"`
-	Name           string      `json:"name"`
-	MaxUses        int         `json:"max_uses,omitempty"`
-	AllowedDomains []string    `json:"allowed_domains,omitempty"`
-	BlockedDomains []string    `json:"blocked_domains,omitempty"`
-	UserLocation   *UserLocation   `json:"user_location,omitempty"`
+	Type             string        `json:"type"`
+	Name             string        `json:"name"`
+	MaxUses          int           `json:"max_uses,omitempty"`
+	AllowedDomains   []string      `json:"allowed_domains,omitempty"`
+	BlockedDomains   []string      `json:"blocked_domains,omitempty"`
+	UserLocation     *UserLocation `json:"user_location,omitempty"`
+	Citations        *Citations    `json:"citations,omitempty"`
+	MaxContentTokens int           `json:"max_content_tokens,omitempty"`
+}
+
+type Citations struct {
+	Enabled bool `json:"enabled"`
 }
 
 type UserLocation struct {
@@ -246,7 +253,15 @@ Please structure your response as a detailed markdown document with:
 5. Implications and Analysis
 6. Sources and References
 
-IMPORTANT: Use web search extensively to gather current, accurate information. Search for multiple aspects of the topic. Cite your sources clearly with URLs when available. Provide a comprehensive analysis suitable for someone who needs deep understanding of this topic.`, prompt)
+IMPORTANT - You have access to both web search and web fetch tools:
+1. **First**: Use web search to discover and evaluate sources on multiple aspects of this topic
+2. **Then**: Use web fetch to access complete content from the most promising sources for deeper analysis
+3. **Prioritize web fetch for**: Scientific papers, botanical databases, official plant guides, comprehensive articles, authoritative sources with detailed information
+4. **Combine tools effectively**: Search provides breadth, fetch provides depth - use both for comprehensive coverage
+5. **Citations**: Cite your sources clearly with URLs, especially for fetched content
+6. **Goal**: Provide a thorough analysis that combines broad discovery (search) with deep document analysis (fetch) suitable for someone who needs complete understanding of this topic.
+
+Use web fetch liberally on high-quality sources to provide the most comprehensive research possible.`, prompt)
 
 	// Configure web search tool with better parameters
 	webSearchTool := Tool{
@@ -260,8 +275,17 @@ IMPORTANT: Use web search extensively to gather current, accurate information. S
 		},
 	}
 
+	// Configure web fetch tool for deep content analysis
+	webFetchTool := Tool{
+		Type:             "web_fetch_20250910",
+		Name:             "web_fetch",
+		MaxUses:          8, // Balanced number for comprehensive analysis
+		Citations:        &Citations{Enabled: true}, // Enable citations for fetched content
+		MaxContentTokens: 100000, // Reasonable limit for large documents
+	}
+
 	request := ClaudeRequest{
-		Model:     "claude-3-5-sonnet-20241022", // Using latest available model
+		Model:     "claude-sonnet-4-20250514", // Using Sonnet 4 with web fetch support
 		MaxTokens: 4000,
 		Messages: []Message{
 			{
@@ -269,22 +293,31 @@ IMPORTANT: Use web search extensively to gather current, accurate information. S
 				Content: researchPrompt,
 			},
 		},
-		Tools: []Tool{webSearchTool},
+		Tools: []Tool{webSearchTool, webFetchTool},
 	}
 
-	rm.logDebug("Starting research with enhanced web search configuration")
+	rm.logDebug("Starting research with combined web search and fetch tools")
 
 	result, err := rm.callClaudeAPI(request, debugMode)
 	if err != nil {
 		// Check for common API permission issues
 		if strings.Contains(err.Error(), "permission") || strings.Contains(err.Error(), "unauthorized") {
-			return "", fmt.Errorf("Claude API key may not have web search permissions enabled. Please check your API key settings at console.anthropic.com. Original error: %w", err)
+			return "", fmt.Errorf("Claude API key may not have web search or web fetch permissions enabled. Please check your API key settings at console.anthropic.com. Original error: %w", err)
 		}
-		
+
+		// Check for web fetch specific errors
+		if strings.Contains(err.Error(), "web_fetch") || strings.Contains(err.Error(), "web-fetch") {
+			return "", fmt.Errorf("web fetch tool may not be enabled for your API key or the model may not support it. Ensure you have web fetch permissions and are using a supported model (claude-sonnet-4). Original error: %w", err)
+		}
+
+		if strings.Contains(err.Error(), "beta") || strings.Contains(err.Error(), "web-fetch-2025-09-10") {
+			return "", fmt.Errorf("web fetch beta feature may not be available. Check that the beta header is correctly set and your API key has beta access. Original error: %w", err)
+		}
+
 		if strings.Contains(err.Error(), "tool_use") {
-			return "", fmt.Errorf("web search tool use may require a different conversation approach. This could indicate API limitations or configuration issues. Original error: %w", err)
+			return "", fmt.Errorf("tool use may require a different conversation approach. This could indicate API limitations, configuration issues, or model compatibility problems. Original error: %w", err)
 		}
-		
+
 		return "", fmt.Errorf("research failed: %w", err)
 	}
 
@@ -320,6 +353,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", rm.apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("anthropic-beta", "web-fetch-2025-09-10")
 
 	// Log request headers (without API key)
 	rm.logDebug("[%s] Request headers: Content-Type=%s, anthropic-version=%s", 
@@ -375,6 +409,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	var textParts []string
 	var hasToolUse bool
 	var searchCount int
+	var fetchCount int
 	var debugInfo []string
 
 	debugInfo = append(debugInfo, fmt.Sprintf("=== API RESPONSE ANALYSIS [%s] ===", requestID))
@@ -401,21 +436,35 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 			}
 		case "tool_use", "server_tool_use":
 			hasToolUse = true
-			searchCount++ // Count each tool use as a search
-			blockInfo += " - Tool use detected"
+			// Tool use blocks indicate tool execution but don't reliably contain tool names
+			// We count actual executions from the result blocks instead
 			if block.ToolUse != nil {
-				blockInfo += fmt.Sprintf(" (name: %s, id: %s)", block.ToolUse.Name, block.ToolUse.ID)
+				toolName := block.ToolUse.Name
+				blockInfo += fmt.Sprintf(" - %s tool use detected (id: %s)", toolName, block.ToolUse.ID)
+				rm.logDebug("[%s] Tool use block %d: %s (id: %s)", requestID, i, toolName, block.ToolUse.ID)
+			} else {
+				blockInfo += " - Tool use detected (awaiting results)"
+				rm.logDebug("[%s] Tool use block %d: tool data not available", requestID, i)
 			}
 			debugInfo = append(debugInfo, blockInfo)
-			rm.logDebug("[%s] Tool use block %d detected", requestID, i)
 		case "web_search_tool_result":
+			searchCount++ // Count each web search result block
 			blockInfo += " - Web search results"
 			if block.ToolResult != nil {
-				blockInfo += fmt.Sprintf(" (tool_use_id: %s, content items: %d)", 
+				blockInfo += fmt.Sprintf(" (tool_use_id: %s, content items: %d)",
 					block.ToolResult.ToolUseID, len(block.ToolResult.Content))
 			}
 			debugInfo = append(debugInfo, blockInfo)
-			rm.logDebug("[%s] Web search results block %d detected", requestID, i)
+			rm.logDebug("[%s] Web search results block %d detected (search #%d)", requestID, i, searchCount)
+		case "web_fetch_tool_result":
+			fetchCount++ // Count each web fetch result block
+			blockInfo += " - Web fetch results"
+			if block.ToolResult != nil {
+				blockInfo += fmt.Sprintf(" (tool_use_id: %s, content items: %d)",
+					block.ToolResult.ToolUseID, len(block.ToolResult.Content))
+			}
+			debugInfo = append(debugInfo, blockInfo)
+			rm.logDebug("[%s] Web fetch results block %d detected (fetch #%d)", requestID, i, fetchCount)
 		default:
 			blockInfo += fmt.Sprintf(" - Unknown type")
 			debugInfo = append(debugInfo, blockInfo)
@@ -423,9 +472,14 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 		}
 	}
 
-	// Store search count and debug info for research note
+	// Store search and fetch counts and debug info for research note
 	rm.lastSearchCount = searchCount
-	debugInfo = append(debugInfo, fmt.Sprintf("Web Searches Performed: %d", searchCount))
+	rm.lastFetchCount = fetchCount
+	debugInfo = append(debugInfo, "")
+	debugInfo = append(debugInfo, "=== TOOL USAGE SUMMARY ===")
+	debugInfo = append(debugInfo, fmt.Sprintf("Web Searches Performed: %d (counted from result blocks)", searchCount))
+	debugInfo = append(debugInfo, fmt.Sprintf("Web Fetches Performed: %d (counted from result blocks)", fetchCount))
+	debugInfo = append(debugInfo, fmt.Sprintf("Total Research Actions: %d", searchCount+fetchCount))
 	rm.lastDebugInfo = strings.Join(debugInfo, "\n")
 
 	if len(textParts) == 0 {
@@ -434,7 +488,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 			errorMsg += " - Response contains only tool use blocks, may require conversation continuation"
 		}
 		rm.logDebug("[%s] %s", requestID, errorMsg)
-		return "", fmt.Errorf(errorMsg)
+		return "", fmt.Errorf("%s", errorMsg)
 	}
 
 	// Combine all text parts
@@ -491,12 +545,17 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-func getResearchQualityDescription(inputTokens, searchCount int) string {
-	if inputTokens > 30000 && searchCount >= 2 {
-		return "Comprehensive (extensive web research)"
-	} else if inputTokens > 15000 && searchCount >= 1 {
+func getResearchQualityDescription(inputTokens, searchCount, fetchCount int) string {
+	// Consider both search and fetch activity for quality assessment
+	totalResearchActions := searchCount + fetchCount
+
+	if inputTokens > 40000 && fetchCount >= 3 && searchCount >= 3 {
+		return "Premium Deep Research (extensive search + full document analysis)"
+	} else if inputTokens > 30000 && (fetchCount >= 2 || (searchCount >= 3 && fetchCount >= 1)) {
+		return "Comprehensive (thorough web research with document analysis)"
+	} else if inputTokens > 20000 && (fetchCount >= 1 || searchCount >= 2) {
 		return "Detailed (moderate web research)"
-	} else if inputTokens > 5000 {
+	} else if inputTokens > 10000 && totalResearchActions >= 1 {
 		return "Standard (basic research)"
 	} else {
 		return "Limited (minimal research)"
@@ -540,15 +599,17 @@ func (rm *ResearchManager) createResearchNote(task *ResearchTask) {
 
 - **Duration:** %v
 - **Web Searches:** %d
+- **Web Fetches:** %d
 - **Claude Usage:** %d input tokens, %d output tokens
 - **Research Quality:** %s
 
 `,
 			task.EndTime.Sub(task.StartTime).Round(time.Second),
 			rm.lastSearchCount,
+			rm.lastFetchCount,
 			rm.lastUsage.InputTokens,
 			rm.lastUsage.OutputTokens,
-			getResearchQualityDescription(rm.lastUsage.InputTokens, rm.lastSearchCount))
+			getResearchQualityDescription(rm.lastUsage.InputTokens, rm.lastSearchCount, rm.lastFetchCount))
 	}
 
 	// Only include full debug info if in debug mode
@@ -580,10 +641,11 @@ func (rm *ResearchManager) createResearchNote(task *ResearchTask) {
 - End Time: %s
 
 ### Tool Configuration
-- Web Search Tool: web_search_20250305
-- Max Uses: 15
+- Web Search Tool: web_search_20250305 (Max Uses: 15)
+- Web Fetch Tool: web_fetch_20250910 (Max Uses: 8)
 - User Location: US, America/New_York
 - API Version: anthropic-version 2023-06-01
+- Beta Headers: web-fetch-2025-09-10
 
 ### Files Generated
 Debug files saved in vimango_research_debug/ directory:

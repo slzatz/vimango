@@ -119,19 +119,30 @@ The application features a comprehensive command registry system with full disco
 - **Extensible**: New commands require help metadata, ensuring documentation stays current
 
 ## Deep Research System
-The application includes an AI-powered deep research capability that leverages Claude API with web search tools to generate comprehensive research reports.
+The application includes an AI-powered deep research capability that leverages Claude API with combined web search and web fetch tools to generate comprehensive research reports with significantly enhanced depth and quality.
 
 ### Research Commands
 - `:research` - Perform deep research on current entry content and save results as new note
 - `:researchdebug` (`:rd`) - Same as research but includes debug information and API response analysis
 
-### Research Features
+### Enhanced Research Features
+- **Dual-Tool Approach**: Combines web search (breadth) with web fetch (depth) for comprehensive coverage
+  - **Web Search**: Discovers and evaluates sources (15 max uses)
+  - **Web Fetch**: Accesses complete content from promising sources (8 max uses)
+  - **Intelligent Workflow**: Search → evaluate → fetch → deep analysis
 - **Asynchronous Processing**: Research runs in background without blocking the user interface
-- **Web Search Integration**: Uses Claude API's built-in web search tools for comprehensive information gathering
+- **Advanced Quality Tiers**:
+  - "Premium Deep Research" - Extensive search + full document analysis
+  - "Comprehensive" - Thorough web research with document analysis
+  - "Detailed" - Moderate web research
+  - "Standard" - Basic research
+  - "Limited" - Minimal research
+- **Enhanced Metrics**: Separate tracking of web searches vs web fetches performed
 - **Automatic Note Creation**: Results are automatically saved as new vimango entries
-- **Usage Statistics**: Tracks and reports token usage, search count, duration, and quality ratings
-- **Error Recovery**: Comprehensive panic recovery and error handling
-- **Debug Mode**: Optional detailed logging for troubleshooting and analysis
+- **Usage Statistics**: Tracks and reports token usage, search count, fetch count, duration, and quality ratings
+- **Citations**: Web fetch enables accurate citations from complete documents
+- **Error Recovery**: Comprehensive panic recovery and error handling with web fetch specific diagnostics
+- **Debug Mode**: Optional detailed logging for troubleshooting and analysis with tool usage summaries
 
 ### Configuration
 Research functionality requires Claude API key configuration in `config.json`:
@@ -143,8 +154,31 @@ Research functionality requires Claude API key configuration in `config.json`:
 }
 ```
 
+#### Web Fetch Requirements
+For enhanced deep research with web fetch capabilities:
+- **API Key Permissions**: Ensure your Claude API key has web search and web fetch permissions enabled
+- **Model Compatibility**: Uses Claude Sonnet 4 (`claude-sonnet-4-20250514`) for web fetch support
+- **Beta Access**: Web fetch requires beta feature access with header `anthropic-beta: web-fetch-2025-09-10`
+- **Content Limits**: Configured with 100,000 token limit for large document processing
+- **Citations**: Automatically enabled for fetched content to provide accurate source attribution
+
 ### Implementation
 - **File**: `research.go` - Core research system with ResearchManager and Claude API integration
 - **Modified Files**: `app.go`, `main.go`, `common.go`, `organizer_cmd_line.go` - Integration and command registration
-- **Features**: Notification system, queue management, structured markdown generation
-- **API Integration**: Uses Claude Messages API with web search tools for multi-step research workflows
+- **Enhanced Features**:
+  - Notification system with web fetch status updates
+  - Queue management for asynchronous processing
+  - Structured markdown generation with enhanced statistics
+  - Dual-tool counting from result blocks for accurate metrics
+  - Web fetch specific error detection and troubleshooting
+- **API Integration**: Uses Claude Messages API with combined web search and web fetch tools
+  - **Web Search Tool**: `web_search_20250305` with location-aware queries
+  - **Web Fetch Tool**: `web_fetch_20250910` with citations and content limits
+  - **Smart Tool Selection**: Claude automatically decides when to search vs fetch based on research needs
+  - **Enhanced Error Handling**: Specific detection for web fetch permission issues, beta access problems, and model compatibility
+
+### Research Workflow Examples
+- **Search-Heavy Research**: Simple factual queries (5+ searches, 0 fetches) → "Standard" quality
+- **Balanced Research**: Topic overviews (8+ searches, 2+ fetches) → "Comprehensive" quality
+- **Deep Research**: Complex analysis (10+ searches, 4+ fetches) → "Premium Deep Research" quality
+- **Document-Focused**: Specialized research targeting authoritative sources (fewer searches, more fetches)
