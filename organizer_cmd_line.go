@@ -1595,6 +1595,8 @@ func (o *Organizer) startResearch(_ int) {
 	prompt := o.Database.readNoteIntoString(currentRow.id)
 	if len(strings.TrimSpace(prompt)) == 0 {
 		o.ShowMessage(BL, "Entry has no content to use as research prompt")
+		o.mode = NORMAL
+		o.command_line = ""
 		return
 	}
 
@@ -1607,10 +1609,14 @@ func (o *Organizer) startResearch(_ int) {
 	// Start the research (normal mode - no debug info)
 	taskID, err := app.ResearchManager.StartResearch(researchTitle, prompt, currentRow.id, false)
 	if err != nil {
+		o.mode = NORMAL
+		o.command_line = ""
 		o.ShowMessage(BL, "Failed to start research: %v", err)
 		return
 	}
 
+	o.mode = NORMAL
+	o.command_line = ""
 	o.ShowMessage(BL, "Research started: %s (Task ID: %s)", researchTitle, taskID)
 }
 

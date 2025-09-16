@@ -238,25 +238,28 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		//if e.command_line[0] == '%'
 		//if strings.Index(e.command_line, "s/") != -1
 
-		// search and replace is an Ex-Command, not a search command
-		if strings.HasPrefix(e.command_line, "s/") || strings.HasPrefix(e.command_line, "%s/") {
-			if strings.HasSuffix(e.command_line, "/c") {
-				e.ShowMessage(BR, "We don't support [c]onfirm")
-				e.mode = NORMAL
-				return false, true
-			}
+		// we want libvim to handle the following Ex-Commands:
+		use_vim := []string{"s/", "%s/", "g/", "g!/", "v/"}
+		for _, p := range use_vim {
+			if strings.HasPrefix(e.command_line, p) {
+				if strings.HasSuffix(e.command_line, "/c") {
+					e.ShowMessage(BR, "We don't support [c]onfirm")
+					e.mode = NORMAL
+					return false, true
+				}
 
-			// if it's a search and replace, we want vim to handle it
-			vim.SendInput(":" + e.command_line + "\r")
-			e.mode = NORMAL
-			e.command = ""
-			e.ss = e.vbuf.Lines()
-			pos := vim.GetCursorPosition() //set screen cx and cy from pos
-			e.fr = pos[0] - 1
-			e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-			e.ShowMessage(BL, "search and replace: %s", e.command_line)
-			return true, true
+				vim.SendInput(":" + e.command_line + "\r")
+				e.mode = NORMAL
+				e.command = ""
+				e.ss = e.vbuf.Lines()
+				pos := vim.GetCursorPosition() //set screen cx and cy from pos
+				e.fr = pos[0] - 1
+				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+				e.ShowMessage(BL, "search and replace: %s", e.command_line)
+				return true, true
+			}
 		}
+
 		var pos int
 		var cmd string
 		if strings.HasPrefix(e.command_line, "vert") {

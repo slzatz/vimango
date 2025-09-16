@@ -14,17 +14,17 @@ import (
 )
 
 type ResearchManager struct {
-	app           *App
-	client        *http.Client
-	apiKey        string
-	queue         chan *ResearchTask
-	running       map[string]*ResearchTask
-	mutex         sync.RWMutex
-	done          chan bool
-	lastDebugInfo string // Store debug info for research note
-	lastUsage     Usage  // Store usage statistics
-	lastSearchCount int  // Count of web searches performed
-	lastFetchCount  int  // Count of web fetches performed
+	app             *App
+	client          *http.Client
+	apiKey          string
+	queue           chan *ResearchTask
+	running         map[string]*ResearchTask
+	mutex           sync.RWMutex
+	done            chan bool
+	lastDebugInfo   string // Store debug info for research note
+	lastUsage       Usage  // Store usage statistics
+	lastSearchCount int    // Count of web searches performed
+	lastFetchCount  int    // Count of web fetches performed
 }
 
 type ResearchTask struct {
@@ -41,10 +41,10 @@ type ResearchTask struct {
 }
 
 type ClaudeRequest struct {
-	Model     string      `json:"model"`
-	MaxTokens int         `json:"max_tokens"`
-	Messages  []Message   `json:"messages"`
-	Tools     []Tool      `json:"tools"`
+	Model     string    `json:"model"`
+	MaxTokens int       `json:"max_tokens"`
+	Messages  []Message `json:"messages"`
+	Tools     []Tool    `json:"tools"`
 }
 
 type Message struct {
@@ -82,11 +82,11 @@ type ClaudeResponse struct {
 }
 
 type ContentBlock struct {
-	Type         string                 `json:"type"`
-	Text         string                 `json:"text,omitempty"`
-	ToolUse      *ToolUseBlock         `json:"tool_use,omitempty"`
-	ToolResult   *ToolResultBlock      `json:"tool_result,omitempty"`
-	Raw          map[string]interface{} `json:"-"` // For debugging unknown fields
+	Type       string                 `json:"type"`
+	Text       string                 `json:"text,omitempty"`
+	ToolUse    *ToolUseBlock          `json:"tool_use,omitempty"`
+	ToolResult *ToolResultBlock       `json:"tool_result,omitempty"`
+	Raw        map[string]interface{} `json:"-"` // For debugging unknown fields
 }
 
 type ToolUseBlock struct {
@@ -124,7 +124,7 @@ func NewResearchManager(app *App, apiKey string) *ResearchManager {
 // testAPIConnection performs a simple API test to validate key and permissions
 func (rm *ResearchManager) testAPIConnection() {
 	rm.logDebug("Testing Claude API connection and web search permissions...")
-	
+
 	// Simple test request with web search tool
 	testRequest := ClaudeRequest{
 		Model:     "claude-3-5-sonnet-20241022",
@@ -150,7 +150,7 @@ func (rm *ResearchManager) testAPIConnection() {
 		if strings.Contains(err.Error(), "permission") || strings.Contains(err.Error(), "unauthorized") {
 			rm.app.addNotification("⚠️ Research: API key may not have web search permissions")
 		} else if strings.Contains(err.Error(), "invalid") {
-			rm.app.addNotification("⚠️ Research: Invalid API key configuration")  
+			rm.app.addNotification("⚠️ Research: Invalid API key configuration")
 		} else {
 			rm.app.addNotification("⚠️ Research: API connection test failed - check network/config")
 		}
@@ -176,14 +176,14 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 	defer func() {
 		if r := recover(); r != nil {
 			rm.logDebug("PANIC in processTask for task %s: %v", task.ID, r)
-			
+
 			rm.mutex.Lock()
 			task.Status = "failed"
 			task.Error = fmt.Sprintf("Task processing panic: %v", r)
 			task.EndTime = time.Now()
 			delete(rm.running, task.ID)
 			rm.mutex.Unlock()
-			
+
 			rm.notifyCompletion(task)
 		}
 	}()
@@ -200,13 +200,13 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 
 	// Perform the research with additional validation
 	result, err := rm.performResearch(task.Prompt, task.DebugMode)
-	
-	rm.logDebug("Research completed for task %s, result length: %d, error: %v", 
+
+	rm.logDebug("Research completed for task %s, result length: %d, error: %v",
 		task.ID, len(result), err != nil)
 
 	rm.mutex.Lock()
 	task.EndTime = time.Now()
-	
+
 	if err != nil {
 		task.Status = "failed"
 		task.Error = err.Error()
@@ -215,7 +215,7 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 		task.Status = "completed"
 		task.Result = result
 		rm.logDebug("Task %s marked as completed, creating research note...", task.ID)
-		
+
 		// Create new note with research results
 		// Run in separate goroutine but with error handling
 		go func(t *ResearchTask) {
@@ -227,7 +227,7 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 			rm.createResearchNote(t)
 		}(task)
 	}
-	
+
 	// Remove from running tasks
 	delete(rm.running, task.ID)
 	rm.mutex.Unlock()
@@ -269,8 +269,8 @@ Use web fetch liberally on high-quality sources to provide the most comprehensiv
 		Name:    "web_search",
 		MaxUses: 15, // Increased for more thorough research
 		UserLocation: &UserLocation{
-			Type:    "approximate",
-			Country: "US",
+			Type:     "approximate",
+			Country:  "US",
 			Timezone: "America/New_York",
 		},
 	}
@@ -279,9 +279,9 @@ Use web fetch liberally on high-quality sources to provide the most comprehensiv
 	webFetchTool := Tool{
 		Type:             "web_fetch_20250910",
 		Name:             "web_fetch",
-		MaxUses:          8, // Balanced number for comprehensive analysis
+		MaxUses:          8,                         // Balanced number for comprehensive analysis
 		Citations:        &Citations{Enabled: true}, // Enable citations for fetched content
-		MaxContentTokens: 100000, // Reasonable limit for large documents
+		MaxContentTokens: 100000,                    // Reasonable limit for large documents
 	}
 
 	request := ClaudeRequest{
@@ -333,7 +333,7 @@ Use web fetch liberally on high-quality sources to provide the most comprehensiv
 func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) (string, error) {
 	// Generate unique request ID for correlation
 	requestID := fmt.Sprintf("research_%d", time.Now().UnixNano())
-	
+
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
@@ -356,7 +356,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	req.Header.Set("anthropic-beta", "web-fetch-2025-09-10")
 
 	// Log request headers (without API key)
-	rm.logDebug("[%s] Request headers: Content-Type=%s, anthropic-version=%s", 
+	rm.logDebug("[%s] Request headers: Content-Type=%s, anthropic-version=%s",
 		requestID, req.Header.Get("Content-Type"), req.Header.Get("anthropic-version"))
 
 	resp, err := rm.client.Do(req)
@@ -395,7 +395,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	}
 
 	// Log detailed response information
-	rm.logDebug("[%s] Claude API Response - StopReason: '%s', ContentBlocks: %d, Usage: %d input/%d output tokens", 
+	rm.logDebug("[%s] Claude API Response - StopReason: '%s', ContentBlocks: %d, Usage: %d input/%d output tokens",
 		requestID, claudeResp.StopReason, len(claudeResp.Content), claudeResp.Usage.InputTokens, claudeResp.Usage.OutputTokens)
 
 	if len(claudeResp.Content) == 0 {
@@ -420,14 +420,20 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 
 	for i, block := range claudeResp.Content {
 		blockInfo := fmt.Sprintf("Block %d: Type='%s'", i, block.Type)
-		
+
 		switch block.Type {
 		case "text":
 			if block.Text != "" {
-				textParts = append(textParts, block.Text)
+				//if blockText := strings.TrimSpace(block.Text); blockText != "" {
+				//blockText := block.Text
+				if strings.HasPrefix(block.Text, ".") && len(textParts) > 0 {
+					textParts[len(textParts)-1] += block.Text // Append to previous block if just a period
+				} else {
+					textParts = append(textParts, block.Text)
+				}
 				blockInfo += fmt.Sprintf(" - Text Length: %d chars", len(block.Text))
 				debugInfo = append(debugInfo, blockInfo)
-				debugInfo = append(debugInfo, fmt.Sprintf("Text Preview: %s...", 
+				debugInfo = append(debugInfo, fmt.Sprintf("Text Preview: %s...",
 					truncateString(block.Text, 100)))
 				rm.logDebug("[%s] Added text block %d (%d chars)", requestID, i, len(block.Text))
 			} else {
@@ -492,8 +498,9 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	}
 
 	// Combine all text parts
-	finalResponse := strings.Join(textParts, "\n\n")
-	rm.logDebug("[%s] Successfully extracted %d text blocks, total length: %d characters", 
+	finalResponse := strings.Join(textParts, "") // was "\n\n"
+	//finalResponse := fmt.Sprintf("*%s*\n%s", "the prompt", strings.Join(textParts, "\n\n")) // was "\n\n"
+	rm.logDebug("[%s] Successfully extracted %d text blocks, total length: %d characters",
 		requestID, len(textParts), len(finalResponse))
 
 	return finalResponse, nil
@@ -524,10 +531,10 @@ func (rm *ResearchManager) saveDebugData(filename string, data []byte) {
 		rm.logDebug("Failed to create debug directory %s: %v", debugDir, err)
 		return
 	}
-	
+
 	// Validate and create safe file path
 	fullPath := filepath.Join(debugDir, filepath.Base(filename)) // Use Base to prevent path traversal
-	
+
 	// Attempt to write file with proper error handling
 	err = os.WriteFile(fullPath, data, 0644)
 	if err != nil {
@@ -586,7 +593,7 @@ func (rm *ResearchManager) createResearchNote(task *ResearchTask) {
 	}
 	title := fmt.Sprintf("Research: %s (%s)", task.Title, time.Now().Format("2006-01-02 15:04"))
 	rm.logDebug("Created research note title: %s", title)
-	
+
 	// Build sections based on debug mode
 	usageSection := ""
 	debugSection := ""
@@ -615,13 +622,13 @@ func (rm *ResearchManager) createResearchNote(task *ResearchTask) {
 	// Only include full debug info if in debug mode
 	if task.DebugMode && rm.lastDebugInfo != "" {
 		rm.logDebug("Building debug section, debug info length: %d", len(rm.lastDebugInfo))
-		
+
 		// Safe string formatting with validation
 		taskID := "unknown"
 		if task.ID != "" {
 			taskID = task.ID
 		}
-		
+
 		duration := time.Duration(0)
 		if !task.EndTime.IsZero() && !task.StartTime.IsZero() {
 			duration = task.EndTime.Sub(task.StartTime).Round(time.Second)
@@ -659,14 +666,14 @@ Debug files saved in vimango_research_debug/ directory:
 	} else {
 		rm.logDebug("No debug info available for research note")
 	}
-	
+
 	// Safely validate task result
 	result := task.Result
 	if result == "" {
 		result = "No research results were generated."
 		rm.logDebug("Warning: Empty research result for task %s", task.ID)
 	}
-	
+
 	// Create research note with appropriate level of information
 	var troubleshootingNote string
 	if task.DebugMode {
@@ -720,7 +727,7 @@ Debug files saved in vimango_research_debug/ directory:
 		rm.app.addNotification(fmt.Sprintf("⚠️ Failed to update research note content: %v", err))
 		return
 	}
-	
+
 	rm.logDebug("Research note created successfully with ID %d, includes debug information", row.id)
 	rm.app.addNotification(fmt.Sprintf("✅ Research note created successfully (ID: %d)", row.id))
 }
@@ -734,14 +741,14 @@ func (rm *ResearchManager) notifyCompletion(task *ResearchTask) {
 	} else {
 		message = fmt.Sprintf("✗ Research failed: %s (%s)", task.Title, task.Error)
 	}
-	
+
 	// Add to a notification queue that the main app can check
 	rm.app.addNotification(message)
 }
 
 func (rm *ResearchManager) StartResearch(title, prompt string, sourceEntryID int, debugMode bool) (string, error) {
 	taskID := fmt.Sprintf("research_%d_%d", time.Now().Unix(), sourceEntryID)
-	
+
 	task := &ResearchTask{
 		ID:          taskID,
 		Title:       title,
@@ -763,7 +770,7 @@ func (rm *ResearchManager) StartResearch(title, prompt string, sourceEntryID int
 func (rm *ResearchManager) GetRunningTasks() []*ResearchTask {
 	rm.mutex.RLock()
 	defer rm.mutex.RUnlock()
-	
+
 	tasks := make([]*ResearchTask, 0, len(rm.running))
 	for _, task := range rm.running {
 		tasks = append(tasks, task)

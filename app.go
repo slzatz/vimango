@@ -357,9 +357,10 @@ func (a *App) MainLoop() {
 			notification := a.GetNextNotification()
 			if notification != "" {
 				org.ShowMessage(BL, notification)
+				a.returnCursor()
 			}
 		}
-		
+
 		key, err := terminal.ReadKey()
 		if err != nil {
 			org.ShowMessage(BL, "Readkey problem %w", err)
@@ -411,11 +412,11 @@ func (a *App) addNotification(message string) {
 func (a *App) GetNextNotification() string {
 	a.notificationMux.Lock()
 	defer a.notificationMux.Unlock()
-	
+
 	if len(a.notifications) == 0 {
 		return ""
 	}
-	
+
 	message := a.notifications[0]
 	a.notifications = a.notifications[1:]
 	return message
