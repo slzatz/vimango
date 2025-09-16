@@ -24,9 +24,12 @@ type App struct {
 	Database  *Database  // Database handles database connections and queries
 
 	// Research system
-	ResearchManager *ResearchManager // Manages background research tasks
-	notifications   []string         // Queue of user notifications
-	notificationMux sync.RWMutex     // Mutex for notifications
+	ResearchManager *ResearchManager  // Manages background research tasks
+	notifications   []string          // Queue of user notifications
+	notificationMux sync.RWMutex      // Mutex for notifications
+	notificationCh  chan struct{}     // Signals pending notifications
+	keyEvents       chan terminal.Key // Key events from reader goroutine
+	keyErrors       chan error        // Key read errors
 
 	// Database connections and other config
 	Config *dbConfig
@@ -54,9 +57,12 @@ func CreateApp() *App {
 			Screen:   screen,
 			Database: db,
 		},
-		notifications: make([]string, 0),
-		Run:           true,
-		kitty:         kitty, // default to false
+		notifications:  make([]string, 0),
+		notificationCh: make(chan struct{}, 1),
+		keyEvents:      make(chan terminal.Key, 16),
+		keyErrors:      make(chan error, 1),
+		Run:            true,
+		kitty:          kitty, // default to false
 	}
 }
 
@@ -349,52 +355,74 @@ func (a *App) quitApp() {
 	os.Exit(0)
 }
 
+func (a *App) startKeyReader() {
+	go func() {
+		for {
+			key, err := terminal.ReadKey()
+			if err != nil {
+				if err == terminal.ErrNoInput {
+					continue
+				}
+				select {
+				case a.keyErrors <- err:
+				default:
+				}
+				continue
+			}
+			a.keyEvents <- key
+		}
+	}()
+}
+
 func (a *App) MainLoop() {
 	org := a.Organizer
+	a.startKeyReader()
+
+	if a.HasNotifications() {
+		a.drainNotifications(org)
+		a.returnCursor()
+	}
+
 	for a.Run {
-		// Check for research notifications
-		if a.HasNotifications() {
-			notification := a.GetNextNotification()
-			if notification != "" {
-				org.ShowMessage(BL, notification)
-				a.returnCursor()
+		select {
+		case key := <-a.keyEvents:
+			var k int
+			if key.Regular != 0 {
+				k = int(key.Regular)
+			} else {
+				k = key.Special
 			}
-		}
-
-		key, err := terminal.ReadKey()
-		if err != nil {
-			org.ShowMessage(BL, "Readkey problem %w", err)
-		}
-		var k int
-		if key.Regular != 0 {
-			k = int(key.Regular)
-		} else {
-			k = key.Special
-		}
-		if a.Session.editorMode {
-			ae := a.Session.activeEditor
-			redraw := ae.editorProcessKey(k)
-
-			if !a.Session.editorMode {
-				continue
-			}
-			if redraw {
-				ae := a.Session.activeEditor ///// doesn't do anything
-				ae.scroll()
-				ae.drawText()
-				ae.drawStatusBar()
-			}
-		} else {
-			org.organizerProcessKey(k)
 			if a.Session.editorMode {
-				a.returnCursor()
-				continue
+				ae := a.Session.activeEditor
+				redraw := ae.editorProcessKey(k)
+
+				if !a.Session.editorMode {
+					continue
+				}
+				if redraw {
+					ae := a.Session.activeEditor ///// doesn't do anything
+					ae.scroll()
+					ae.drawText()
+					ae.drawStatusBar()
+				}
+			} else {
+				org.organizerProcessKey(k)
+				if a.Session.editorMode {
+					a.returnCursor()
+					continue
+				}
+				org.scroll()
+				org.refreshScreen()
+				if a.Screen.divider > 10 {
+					org.drawStatusBar()
+				}
 			}
-			org.scroll()
-			org.refreshScreen()
-			if a.Screen.divider > 10 {
-				org.drawStatusBar()
+		case err := <-a.keyErrors:
+			if err != nil {
+				org.ShowMessage(BL, "Readkey problem %v", err)
 			}
+		case <-a.notificationCh:
+			a.drainNotifications(org)
 		}
 		a.returnCursor()
 	}
@@ -404,8 +432,13 @@ func (a *App) MainLoop() {
 // addNotification adds a notification message to the queue
 func (a *App) addNotification(message string) {
 	a.notificationMux.Lock()
-	defer a.notificationMux.Unlock()
 	a.notifications = append(a.notifications, message)
+	a.notificationMux.Unlock()
+
+	select {
+	case a.notificationCh <- struct{}{}:
+	default:
+	}
 }
 
 // GetNextNotification retrieves and removes the next notification from the queue
@@ -420,6 +453,16 @@ func (a *App) GetNextNotification() string {
 	message := a.notifications[0]
 	a.notifications = a.notifications[1:]
 	return message
+}
+
+func (a *App) drainNotifications(org *Organizer) {
+	for {
+		notification := a.GetNextNotification()
+		if notification == "" {
+			return
+		}
+		org.ShowMessage(BL, notification)
+	}
 }
 
 // HasNotifications returns true if there are pending notifications

@@ -129,6 +129,15 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":researchdebug", ":rd"},
 	})
 
+	registry.Register("researchtest", (*Organizer).startResearchNotificationTest, CommandInfo{
+		Name:        "researchtest",
+		Aliases:     []string{"rtest"},
+		Description: "Generate sample research status notifications for testing",
+		Usage:       "researchtest",
+		Category:    "Data Management",
+		Examples:    []string{":researchtest", ":rtest"},
+	})
+
 	// Search & Filter commands
 	registry.Register("find", (*Organizer).find, CommandInfo{
 		Name:        "find",
@@ -1661,4 +1670,26 @@ func (o *Organizer) startResearchDebug(_ int) {
 	}
 
 	o.ShowMessage(BL, "Debug research started: %s (Task ID: %s)", researchTitle, taskID)
+}
+
+func (o *Organizer) startResearchNotificationTest(_ int) {
+	o.mode = NORMAL
+	o.command_line = ""
+	o.ShowMessage(BL, "Research notification test started; sample updates will appear")
+
+	go func() {
+		steps := []struct {
+			delay   time.Duration
+			message string
+		}{
+			{2 * time.Second, "[TEST] Research: queued background task"},
+			{2 * time.Second, "[TEST] Research: contacting knowledge sources"},
+			{2 * time.Second, "[TEST] Research: synthesizing draft findings"},
+			{2 * time.Second, "[TEST] Research: completed"},
+		}
+		for _, step := range steps {
+			time.Sleep(step.delay)
+			app.addNotification(step.message)
+		}
+	}()
 }
