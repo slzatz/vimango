@@ -25,6 +25,8 @@ type ResearchManager struct {
 	lastUsage       Usage  // Store usage statistics
 	lastSearchCount int    // Count of web searches performed
 	lastFetchCount  int    // Count of web fetches performed
+	debugLogPath    string
+	debugLogMux     sync.Mutex
 }
 
 type ResearchTask struct {
@@ -107,57 +109,19 @@ type Usage struct {
 
 func NewResearchManager(app *App, apiKey string) *ResearchManager {
 	rm := &ResearchManager{
-		app:     app,
-		client:  &http.Client{Timeout: 300 * time.Second}, // 5 minute timeout for research
-		apiKey:  apiKey,
-		queue:   make(chan *ResearchTask, 10),
-		running: make(map[string]*ResearchTask),
-		done:    make(chan bool),
+		app:          app,
+		client:       &http.Client{Timeout: 300 * time.Second}, // 5 minute timeout for research
+		apiKey:       apiKey,
+		queue:        make(chan *ResearchTask, 10),
+		running:      make(map[string]*ResearchTask),
+		done:         make(chan bool),
+		debugLogPath: filepath.Join("vimango_research_debug", "research.log"),
 	}
 
 	// Start background worker
 	go rm.worker()
 
 	return rm
-}
-
-// testAPIConnection performs a simple API test to validate key and permissions
-func (rm *ResearchManager) testAPIConnection() {
-	rm.logDebug("Testing Claude API connection and web search permissions...")
-
-	// Simple test request with web search tool
-	testRequest := ClaudeRequest{
-		Model:     "claude-3-5-sonnet-20241022",
-		MaxTokens: 100,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: "Hello, can you perform a web search? Just respond with a brief acknowledgment.",
-			},
-		},
-		Tools: []Tool{
-			{
-				Type:    "web_search_20250305",
-				Name:    "web_search",
-				MaxUses: 1,
-			},
-		},
-	}
-
-	result, err := rm.callClaudeAPI(testRequest, true) // Enable debug mode for connection test
-	if err != nil {
-		rm.logDebug("API connection test FAILED: %v", err)
-		if strings.Contains(err.Error(), "permission") || strings.Contains(err.Error(), "unauthorized") {
-			rm.app.addNotification("⚠️ Research: API key may not have web search permissions")
-		} else if strings.Contains(err.Error(), "invalid") {
-			rm.app.addNotification("⚠️ Research: Invalid API key configuration")
-		} else {
-			rm.app.addNotification("⚠️ Research: API connection test failed - check network/config")
-		}
-	} else {
-		rm.logDebug("API connection test PASSED: %d characters returned", len(result))
-		rm.app.addNotification("✅ Research: API connection and web search permissions verified")
-	}
 }
 
 func (rm *ResearchManager) worker() {
@@ -561,11 +525,37 @@ func getResearchQualityDescription(inputTokens, searchCount, fetchCount int) str
 	}
 }
 
-// logDebug adds debug logging for research operations
+// logDebug writes debug information for research operations to a persistent log
 func (rm *ResearchManager) logDebug(format string, args ...interface{}) {
-	// Only add to notification queue - no console output to avoid interfering with terminal UI
 	message := fmt.Sprintf("[Research Debug] "+format, args...)
-	rm.app.addNotification(message)
+	if rm == nil {
+		return
+	}
+	logPath := rm.debugLogPath
+	if logPath == "" {
+		logPath = filepath.Join("vimango_research_debug", "research.log")
+	}
+	timestamp := time.Now().Format(time.RFC3339Nano)
+	entry := fmt.Sprintf("%s %s\n", timestamp, message)
+
+	rm.debugLogMux.Lock()
+	defer rm.debugLogMux.Unlock()
+
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "research debug log mkdir failed: %v\n", err)
+		return
+	}
+
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "research debug log open failed: %v\n", err)
+		return
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString(entry); err != nil {
+		fmt.Fprintf(os.Stderr, "research debug log write failed: %v\n", err)
+	}
 }
 
 func (rm *ResearchManager) createResearchNote(task *ResearchTask) {
@@ -772,4 +762,43 @@ func (rm *ResearchManager) GetRunningTasks() []*ResearchTask {
 
 func (rm *ResearchManager) Stop() {
 	close(rm.done)
+}
+
+// testAPIConnection performs a simple API test to validate key and permissions
+func (rm *ResearchManager) testAPIConnection() {
+	rm.logDebug("Testing Claude API connection and web search permissions...")
+
+	// Simple test request with web search tool
+	testRequest := ClaudeRequest{
+		Model:     "claude-3-5-sonnet-20241022",
+		MaxTokens: 100,
+		Messages: []Message{
+			{
+				Role:    "user",
+				Content: "Hello, can you perform a web search? Just respond with a brief acknowledgment.",
+			},
+		},
+		Tools: []Tool{
+			{
+				Type:    "web_search_20250305",
+				Name:    "web_search",
+				MaxUses: 1,
+			},
+		},
+	}
+
+	result, err := rm.callClaudeAPI(testRequest, true) // Enable debug mode for connection test
+	if err != nil {
+		rm.logDebug("API connection test FAILED: %v", err)
+		if strings.Contains(err.Error(), "permission") || strings.Contains(err.Error(), "unauthorized") {
+			rm.app.addNotification("⚠️ Research: API key may not have web search permissions")
+		} else if strings.Contains(err.Error(), "invalid") {
+			rm.app.addNotification("⚠️ Research: Invalid API key configuration")
+		} else {
+			rm.app.addNotification("⚠️ Research: API connection test failed - check network/config")
+		}
+	} else {
+		rm.logDebug("API connection test PASSED: %d characters returned", len(result))
+		rm.app.addNotification("✅ Research: API connection and web search permissions verified")
+	}
 }

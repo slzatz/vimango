@@ -59,3 +59,9 @@ NEVER use grep for project-wide searches (slow, ignores .gitignore). ALWAYS use 
 - Use `:researchtest` (alias `:rtest`) to simulate background research status updates without hitting the API.
 - Messages appear every ~2 seconds so you can type simultaneously and confirm async notifications don’t disrupt editing.
 - Quit the command normally; the test stops after the four canned messages finish.
+
+## Research Debug Logging
+
+- `ResearchManager.logDebug` writes timestamped entries to `vimango_research_debug/research.log`; it no longer queues UI notifications.
+- The log directory is created on demand. Keep `vimango_research_debug/` in `.gitignore`; inspect the log locally when diagnosing research issues.
+- Continue using `app.addNotification(...)` for user-facing updates (e.g., success/failure, API warnings). Use `logDebug` for internal instrumentation that should land in the file.
