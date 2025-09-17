@@ -406,11 +406,11 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	rm.lastUsage = claudeResp.Usage
 
 	// Detailed analysis of each content block
-	var textParts []string
 	var hasToolUse bool
 	var searchCount int
 	var fetchCount int
 	var debugInfo []string
+	var builder strings.Builder
 
 	debugInfo = append(debugInfo, fmt.Sprintf("=== API RESPONSE ANALYSIS [%s] ===", requestID))
 	debugInfo = append(debugInfo, fmt.Sprintf("Stop Reason: %s", claudeResp.StopReason))
@@ -424,13 +424,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 		switch block.Type {
 		case "text":
 			if block.Text != "" {
-				//if blockText := strings.TrimSpace(block.Text); blockText != "" {
-				//blockText := block.Text
-				if strings.HasPrefix(block.Text, ".") && len(textParts) > 0 {
-					textParts[len(textParts)-1] += block.Text // Append to previous block if just a period
-				} else {
-					textParts = append(textParts, block.Text)
-				}
+				builder.WriteString(block.Text)
 				blockInfo += fmt.Sprintf(" - Text Length: %d chars", len(block.Text))
 				debugInfo = append(debugInfo, blockInfo)
 				debugInfo = append(debugInfo, fmt.Sprintf("Text Preview: %s...",
@@ -488,7 +482,7 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 	debugInfo = append(debugInfo, fmt.Sprintf("Total Research Actions: %d", searchCount+fetchCount))
 	rm.lastDebugInfo = strings.Join(debugInfo, "\n")
 
-	if len(textParts) == 0 {
+	if builder.Len() == 0 {
 		errorMsg := fmt.Sprintf("No text content found in %d content blocks", len(claudeResp.Content))
 		if hasToolUse && claudeResp.StopReason == "tool_use" {
 			errorMsg += " - Response contains only tool use blocks, may require conversation continuation"
@@ -497,11 +491,9 @@ func (rm *ResearchManager) callClaudeAPI(request ClaudeRequest, debugMode bool) 
 		return "", fmt.Errorf("%s", errorMsg)
 	}
 
-	// Combine all text parts
-	finalResponse := strings.Join(textParts, "") // was "\n\n"
-	//finalResponse := fmt.Sprintf("*%s*\n%s", "the prompt", strings.Join(textParts, "\n\n")) // was "\n\n"
-	rm.logDebug("[%s] Successfully extracted %d text blocks, total length: %d characters",
-		requestID, len(textParts), len(finalResponse))
+	finalResponse := builder.String()
+	rm.logDebug("[%s] Successfully created a report with total length: %d characters",
+		requestID, builder.Len())
 
 	return finalResponse, nil
 }
