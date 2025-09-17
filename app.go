@@ -406,15 +406,17 @@ func (a *App) MainLoop() {
 					ae.drawStatusBar()
 				}
 			} else {
-				org.organizerProcessKey(k)
+				redraw := org.organizerProcessKey(k)
 				if a.Session.editorMode {
 					a.returnCursor()
 					continue
 				}
-				org.scroll()
-				org.refreshScreen()
-				if a.Screen.divider > 10 {
-					org.drawStatusBar()
+				if redraw {
+					org.scroll()
+					org.refreshScreen()
+					if a.Screen.divider > 10 {
+						org.drawStatusBar()
+					}
 				}
 			}
 		case err := <-a.keyErrors:

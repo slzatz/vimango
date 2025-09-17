@@ -38,16 +38,6 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"Ctrl-B - Toggle bold formatting on current word"},
 	})
 
-	/*
-		registry.Register(leader+"b", (*Editor).decorateWord, CommandInfo{
-			Name:        keyToDisplayName(leader + "b"),
-			Description: "Make word bold (toggle **word**)",
-			Usage:       "<leader>b",
-			Category:    "Markup Shortcuts",
-			Examples:    []string{"<leader>b - Toggle bold formatting on current word"},
-		})
-	*/
-
 	registry.Register(string(ctrlKey('e')), (*Editor).decorateWord, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('e'))),
 		Aliases:     []string{leader + "e"},

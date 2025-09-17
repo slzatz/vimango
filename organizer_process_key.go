@@ -7,7 +7,8 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (o *Organizer) organizerProcessKey(c int) {
+func (o *Organizer) organizerProcessKey(c int) (redraw bool) {
+	redraw = true
 	// Handle global escape key
 	if c == '\x1b' {
 		o.showMessage("")
@@ -34,7 +35,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 	case INSERT:
 		o.InsertModeKeyHandler(c)
 	case NORMAL:
-		o.NormalModeKeyHandler(c)
+		redraw = o.NormalModeKeyHandler(c)
 	case VISUAL:
 		o.VisualModeKeyHandler(c)
 	case COMMAND_LINE:
@@ -52,6 +53,7 @@ func (o *Organizer) organizerProcessKey(c int) {
 	default:
 		return
 	}
+	return
 }
 
 func sendToVim(c int) {
@@ -94,8 +96,9 @@ func (o *Organizer) InsertModeKeyHandler(c int) {
 	o.updateRowStatus()
 }
 
-func (o *Organizer) NormalModeKeyHandler(c int) {
+func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 
+	redraw = true
 	if c == '\r' {
 
 		o.command = ""
@@ -115,6 +118,9 @@ func (o *Organizer) NormalModeKeyHandler(c int) {
 
 	if cmd, found := o.normalCmds[o.command]; found {
 		cmd(o)
+		if o.command == string(ctrlKey('j')) || o.command == string(ctrlKey('k')) {
+			redraw = false
+		}
 		o.command = ""
 		vim.SendKey("<esc>")
 		return
@@ -169,6 +175,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) {
 		o.highlight[0] = pos[0][1]
 	}
 	o.showMessage("%s", s)
+	return
 }
 
 func (o *Organizer) VisualModeKeyHandler(c int) {

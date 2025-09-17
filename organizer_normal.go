@@ -204,29 +204,11 @@ func (o *Organizer) switchToEditorMode() {
 	}
 	o.Session.editorMode = true
 	ae := app.Session.activeEditor
-	//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
 	vim.SetCurrentBuffer(ae.vbuf)
 	// below necessary because libvim does not set cursor column correctly
 	vim.SetCursorPosition(ae.fr+1, ae.fc) //ae.fr is 0-based, vim expects 1-based
 	o.Screen.eraseRightScreen()
 	o.Screen.drawRightScreen()
-	//o.Session.editorMode = true
-	//ae := app.Session.activeEditor
-	//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
-	//vim.SetCurrentBuffer(ae.vbuf)
-	/*
-		ae := app.Session.activeEditor
-		//vim.SetCurrentBuffer(app.Session.activeEditor.vbuf)
-		vim.SetCurrentBuffer(ae.vbuf)
-		//ae.mode = NORMAL
-		//ae.command = ""
-		ae.ss = ae.vbuf.Lines()
-		pos := vim.GetCursorPosition() //set screen cx and cy from pos
-		ae.fr = pos[0] - 1
-		ae.fr = 5
-		ae.fc = utf8.RuneCountInString(ae.ss[ae.fr][:pos[1]])
-		ae.fc = 5
-	*/
 }
 
 func (o *Organizer) scrollPreviewDown() {
@@ -244,7 +226,6 @@ func (o *Organizer) scrollPreviewUp() {
 	if o.altRowoff > 0 {
 		o.altRowoff--
 		o.Screen.eraseRightScreen()
-		//o.drawPreview()
 		o.drawRenderedNote()
 	}
 }
@@ -279,15 +260,6 @@ func controlZ() {
 func (o *Organizer) showWebView_n() {
 	o.showWebView(0)
 }
-
-// want to eliminate, only showing images through webview or browser
-/*
-func (o *Organizer) previewWithImages_() {
-	o.Screen.eraseRightScreen()
-	o.drawPreviewWithImages()
-	o.Session.imagePreview = true
-}
-*/
 
 func (o *Organizer) displayEntryInfo(e *NewEntry) {
 	var ab strings.Builder
