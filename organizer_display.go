@@ -430,7 +430,7 @@ func (o *Organizer) drawPreview() {
 		o.Screen.eraseRightScreen()
 		return
 	}
-	id := o.rows[o.fr].id ///it appears that coming out of a sync there is a problem - maybe o.rows is not what is expected
+	id := o.rows[o.fr].id
 	var note string
 	if o.taskview != BY_FIND {
 		note = o.Database.readNoteIntoString(id)

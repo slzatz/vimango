@@ -465,7 +465,7 @@ func (o *Organizer) help(pos int) {
 	o.renderMarkdown(helpText)
 	o.altRowoff = 0
 	o.drawRenderedNote()
-	o.mode = PREVIEW_HELP
+	o.mode = NAVIGATE_RENDER
 	o.command_line = ""
 }
 
@@ -897,6 +897,7 @@ func (o *Organizer) refresh(flag int) {
 			o.readRowsIntoBuffer()
 			vim.SetCursorPosition(1, 0)
 			o.bufferTick = o.vbuf.GetLastChangedTick()
+			o.ShowMessage(BL, "View refreshed")
 			o.drawPreview()
 		}
 	} else {
@@ -993,7 +994,7 @@ func (o *Organizer) sync3(_ int) {
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
 	o.drawRenderedNote()
-	o.mode = PREVIEW_SYNC_LOG
+	o.mode = NAVIGATE_RENDER
 }
 
 func (o *Organizer) initialBulkLoad(_ int) {
@@ -1019,7 +1020,7 @@ func (o *Organizer) initialBulkLoad(_ int) {
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
 	o.drawRenderedNote()
-	o.mode = PREVIEW_SYNC_LOG
+	o.mode = NAVIGATE_RENDER
 }
 
 func (o *Organizer) reverse(_ int) {
@@ -1045,7 +1046,7 @@ func (o *Organizer) reverse(_ int) {
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
 	o.drawRenderedNote()
-	o.mode = PREVIEW_SYNC_LOG
+	o.mode = NAVIGATE_RENDER
 }
 
 func (o *Organizer) list(pos int) {
@@ -1311,12 +1312,12 @@ func (o *Organizer) copyEntry(_ int) {
 }
 
 func (o *Organizer) savelog(_ int) {
-	if o.last_mode == PREVIEW_SYNC_LOG {
+	if o.last_mode == NAVIGATE_RENDER {
 		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
 		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
 		o.ShowMessage(BL, "Sync log save to database")
 		o.command_line = ""
-		o.mode = PREVIEW_SYNC_LOG
+		o.mode = NAVIGATE_RENDER
 	} else {
 		o.ShowMessage(BL, "There is no sync log to save")
 		o.command_line = ""

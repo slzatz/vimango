@@ -116,15 +116,14 @@ const (
 	EX_COMMAND   // only in editor mode
 	VISUAL_LINE  // only editor mode
 	VISUAL
-	VISUAL_BLOCK     // only editor mode
-	SEARCH           // only editor mode
-	FIND             // only organizer mode
-	PREVIEW          // only editor mode - for previewing markdown
-	VIEW_LOG         // only in editor mode - for debug viewing of vim message hx
-	SPELLING         // this mode recognizes 'z='
-	PREVIEW_SYNC_LOG // only in organizer mode
-	LINKS            // only in organizer mode
-	PREVIEW_HELP     // only in organizer mode - for displaying help information
+	VISUAL_BLOCK    // only editor mode
+	SEARCH          // only editor mode
+	FIND            // only organizer mode
+	PREVIEW         // only editor mode - for previewing markdown
+	VIEW_LOG        // only in editor mode - for debug viewing of vim message hx
+	SPELLING        // this mode recognizes 'z='
+	NAVIGATE_RENDER // only in organizer mode
+	LINKS           // only in organizer mode
 	PENDING
 	OTHER // mysterious vim mode 257 ....
 )
@@ -289,9 +288,8 @@ func (m Mode) String() string {
 		"PREVIEW",
 		"VIEW LOG",
 		"SPELLING",
-		"PREVIEW_SYNC_LOG",
+		"NAVIGATE_RENDER",
 		"LINKS",
-		"PREVIEW_HELP",
 		"PENDING",
 		"OTHER",
 	}[m]

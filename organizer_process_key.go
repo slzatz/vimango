@@ -17,14 +17,18 @@ func (o *Organizer) organizerProcessKey(c int) (redraw bool) {
 		o.last_mode = o.mode // not sure this is necessary
 		o.mode = NORMAL
 
-		// Get cursor position - now should be preserved correctly by the buffer
-		pos := vim.GetCursorPosition()
-		o.fc = pos[1]
-		o.fr = pos[0] - 1
+		// Get cursor position - removed 9/18/2023 as ? unnecessary
+		//pos := vim.GetCursorPosition()
+		//o.fc = pos[1]
+		//o.fr = pos[0] - 1
+
+		//new 9/18/2023 previously wasn't reset so used last value from last displayed render
+		o.altRowoff = 0
 
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 		o.Session.imagePreview = false
+		//o.ShowMessage(BL, "id =%d", o.rows[o.fr].id)
 		if o.view == TASK {
 			o.drawPreview()
 		}
@@ -39,15 +43,9 @@ func (o *Organizer) organizerProcessKey(c int) (redraw bool) {
 	case VISUAL:
 		o.VisualModeKeyHandler(c)
 	case COMMAND_LINE:
-		o.ExModeKeyHandler(c)
-		/*
-			case ADD_CHANGE_FILTER:
-				handler = NewAddChangeFilterModeHandler(o)
-			case SYNC_LOG:
-				handler = NewSyncLogModeHandler(o)
-		*/
-	case PREVIEW_SYNC_LOG, PREVIEW_HELP:
-		o.PreviewSyncLogModeKeyHandler(c)
+		redraw = o.ExModeKeyHandler(c)
+	case NAVIGATE_RENDER:
+		redraw = o.NavigateRenderModeKeyHandler(c)
 	//case LINKS:
 	//	handler = NewLinksModeHandler(o)
 	default:
@@ -98,7 +96,7 @@ func (o *Organizer) InsertModeKeyHandler(c int) {
 
 func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 
-	redraw = true
+	redraw = false
 	if c == '\r' {
 
 		o.command = ""
@@ -108,6 +106,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 			vim.SendKey("<esc>")
 			row.dirty = false
 			o.bufferTick = o.vbuf.GetLastChangedTick()
+			redraw = true
 			return
 		}
 	}
@@ -118,9 +117,14 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 
 	if cmd, found := o.normalCmds[o.command]; found {
 		cmd(o)
-		if o.command == string(ctrlKey('j')) || o.command == string(ctrlKey('k')) {
-			redraw = false
+		// if command is one of j,k,i,l then don't redraw
+		redraw_map := map[string]struct{}{
+			string(ctrlKey('a')): {},
+			string(ctrlKey('d')): {},
+			string(ctrlKey('x')): {},
+			string(ctrlKey('m')): {},
 		}
+		_, redraw = redraw_map[o.command]
 		o.command = ""
 		vim.SendKey("<esc>")
 		return
@@ -136,6 +140,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 		return
 	}
 	sendToVim(c)
+	redraw = true
 	pos := vim.GetCursorPosition()
 	o.fc = pos[1]
 	// if move to a new row then draw task note preview or container info
@@ -203,7 +208,8 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 	o.showMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])
 }
 
-func (o *Organizer) ExModeKeyHandler(c int) {
+func (o *Organizer) ExModeKeyHandler(c int) (redraw bool) {
+	redraw = false
 	switch c {
 
 	case '\r':
@@ -218,6 +224,7 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 		}
 		if cmd, found = o.exCmds[s]; found {
 			cmd(o, pos)
+			redraw = true
 		}
 		// to catch find with more than one find term
 		if !found && pos != -1 && strings.Count(o.command_line, " ") > 1 {
@@ -225,6 +232,7 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 			if cmd, found = o.exCmds[o.command_line[:pos]]; found {
 				// pass the position of the first space
 				cmd(o, pos)
+				redraw = true
 			}
 		}
 		o.tabCompletion.index = 0
@@ -297,10 +305,11 @@ func (o *Organizer) ExModeKeyHandler(c int) {
 	o.tabCompletion.list = nil
 
 	o.showMessage(":%s", o.command_line)
+	return
 }
 
-// case PREVIEW_SYNC_LOG and PREVIEW_HELP:
-func (o *Organizer) PreviewSyncLogModeKeyHandler(c int) {
+// Used for viewing sync log and help
+func (o *Organizer) NavigateRenderModeKeyHandler(c int) (redraw bool) {
 	switch c {
 	case ':':
 		o.exCmd()
@@ -309,4 +318,5 @@ func (o *Organizer) PreviewSyncLogModeKeyHandler(c int) {
 	case ctrlKey('k'), PAGE_UP:
 		o.scrollPreviewUp()
 	}
+	return false
 }
