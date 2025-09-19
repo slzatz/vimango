@@ -1,0 +1,67 @@
+You are conducting deep research on the following topic. Please provide a comprehensive analysis with multiple perspectives, current information, and proper citations.
+
+Research Topic/Instructions:
+%s
+
+Please structure your response as a detailed markdown document with:
+1. Executive Summary
+2. Key Findings (with sections and subsections as appropriate)  
+3. Different Perspectives/Viewpoints
+4. Current Status/Latest Developments
+5. Implications and Analysis
+6. Sources and References
+
+IMPORTANT - You have access to both web search and web fetch tools:
+1. **First**: Use web search to discover and evaluate sources on multiple aspects of this topic
+2. **Then**: Use web fetch to access complete content from the most promising sources for deeper analysis
+3. **Prioritize web fetch for**: Scientific papers, botanical databases, official plant guides, comprehensive articles, authoritative sources with detailed information
+4. **Combine tools effectively**: Search provides breadth, fetch provides depth - use both for comprehensive coverage
+5. **Citations**: Cite your sources clearly with URLs, especially for fetched content
+6. **Goal**: Provide a thorough analysis that combines broad discovery (search) with deep document analysis (fetch) suitable for someone who needs complete understanding of this topic.
+
+Use web fetch liberally on high-quality sources to provide the most comprehensive research possible.
+
+content, err := os.ReadFile("hello.txt")
+	if err != nil {
+		// If an error occurs, print it and exit.
+		fmt.Printf("Error reading file: %v\n", err)
+		return
+	}
+
+	// The returned content is a byte slice ([]byte).
+	// To use it as a string, you must convert it.
+	fileContentAsString := string(content)
+
+	// Print the string. All newlines, tabs, and other
+	// characters are preserved exactly as they were.
+	fmt.Println(fileContentAsString)
+
+content, err := os.ReadFile("yourfile.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Convert the byte slice to a string.
+	// This conversion does not alter the content.
+	// Line feeds, tabs, etc., are all preserved.
+	fileAsString := string(content)
+
+You are conducting deep research on the following topic. Please provide a comprehensive analysis with multiple perspectives, current information, and proper citations.
+
+Research Topic/Instructions:
+%s
+
+Please structure your response as a detailed markdown document with:
+1. Executive Summary
+2. Key Findings (with sections and subsections as appropriate)  
+6. Sources and References
+
+IMPORTANT - You have access to both web search and web fetch tools:
+1. **First**: Use web search to discover and evaluate sources on multiple aspects of this topic
+2. **Then**: Use web fetch to access complete content from the most promising sources for deeper analysis
+3. **Prioritize web fetch for**: Scientific papers, plant guides, comprehensive articles, authoritative sources with detailed information
+4. **Combine tools effectively**: Search provides breadth, fetch provides depth - use both for comprehensive coverage
+5. **Citations**: Cite your sources clearly with URLs, especially for fetched content
+6. **Goal**: Provide a thorough analysis that combines broad discovery (search) with deep document analysis (fetch) suitable for someone who needs complete understanding of this topic.
+
+Use web fetch liberally on high-quality sources to provide the most comprehensive research possible.

@@ -204,6 +204,15 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 
 func (rm *ResearchManager) performResearch(prompt string, debugMode bool) (string, error) {
 	// Enhanced research prompt for comprehensive investigation
+
+	/*
+		  content, err := os.ReadFile("research_prompt")
+			if err != nil {
+				return "", fmt.Errorf("Reading research_prompt file failed: %w", err)
+			}
+			researchPrompt := fmt.Sprintf(string(content), prompt)
+	*/
+
 	researchPrompt := fmt.Sprintf(`You are conducting deep research on the following topic. Please provide a comprehensive analysis with multiple perspectives, current information, and proper citations.
 
 Research Topic/Instructions:
