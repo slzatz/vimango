@@ -65,3 +65,15 @@ NEVER use grep for project-wide searches (slow, ignores .gitignore). ALWAYS use 
 - `ResearchManager.logDebug` writes timestamped entries to `vimango_research_debug/research.log`; it no longer queues UI notifications.
 - The log directory is created on demand. Keep `vimango_research_debug/` in `.gitignore`; inspect the log locally when diagnosing research issues.
 - Continue using `app.addNotification(...)` for user-facing updates (e.g., success/failure, API warnings). Use `logDebug` for internal instrumentation that should land in the file.
+
+## Organizer Redraw Refactor (September 2025)
+
+- Added a typed `RedrawScope` (`None`, `Partial`, `Full`) for organizer key handling so we can request finer-grained paints without touching the editor code (`organizer.go`, `organizer_process_key.go`).
+- Refactored organizer rendering to expose row-level helpers (`drawRowAt`, `appendStandardRow`, `appendSearchRow`) so partial redraws can repaint only the current line and keep the divider clean (`organizer_display.go`).
+- `App.MainLoop` now interprets `RedrawPartial` by calling `Organizer.drawRowAt` while still refreshing the status bar; full redraws continue to go through `refreshScreen` (`app.go`).
+- Insert/normal mode libvim edits that stay on the same row return `RedrawPartial`; pressing <Enter> in insert mode or jumping to a different row still returns `RedrawFull`, which keeps previews, batch operations, and row navigation intact while eliminating flicker for single-line edits.
+
+### Next Steps
+
+1. Extend partial redraw handling to movements that change the active row (redraw outgoing + incoming rows, and keep the cursor indicator aligned).
+2. Detect batch operations (mark/star/delete/archive on multiple rows) and trigger targeted row updates instead of full refreshes—may need a bitset-style redraw scope so preview/status refreshes can be requested independently.

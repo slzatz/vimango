@@ -411,9 +411,14 @@ func (a *App) MainLoop() {
 					a.returnCursor()
 					continue
 				}
-				if redraw {
+				if redraw != RedrawNone {
 					org.scroll()
-					org.refreshScreen()
+					switch redraw {
+					case RedrawFull:
+						org.refreshScreen()
+					case RedrawPartial:
+						org.drawRowAt(org.fr)
+					}
 					if a.Screen.divider > 10 {
 						org.drawStatusBar()
 					}

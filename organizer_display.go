@@ -10,6 +10,11 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
+var (
+	googleDriveRegex  = regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
+	timeKeywordsRegex = regexp.MustCompile(`seconds|minutes|hours|days`)
+)
+
 // should probably be named drawOrgRows
 func (o *Organizer) refreshScreen() {
 	var ab strings.Builder
@@ -40,166 +45,226 @@ func (o *Organizer) refreshScreen() {
 	}
 }
 
-func (o *Organizer) drawActiveRow(ab *strings.Builder, y int) {
-	var j, k int //to swap highlight if org.highlight[1] < org.highlight[0]
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
-	length := len(o.rows[o.fr].title) - o.coloff
+func (o *Organizer) drawActiveRow(ab *strings.Builder, y int, titlecols int) {
+	var j, k int
+	row := &o.rows[o.fr]
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
+
+	length := len(row.title) - o.coloff
 	if length > titlecols {
 		length = titlecols
 	}
-	if o.rows[o.fr].star {
+	if length < 0 {
+		length = 0
+	}
+
+	if row.star {
 		ab.WriteString(CYAN_BOLD)
 	}
-	if o.rows[o.fr].archived && o.rows[o.fr].deleted {
+	if row.archived && row.deleted {
 		ab.WriteString(GREEN)
-	} else if o.rows[o.fr].archived {
+	} else if row.archived {
 		ab.WriteString(YELLOW)
-	} else if o.rows[o.fr].deleted {
+	} else if row.deleted {
 		ab.WriteString(RED)
 	}
 	ab.WriteString(DARK_GRAY_BG)
-	if o.rows[o.fr].dirty {
+	if row.dirty {
 		ab.WriteString(BLACK + WHITE_BG)
 	}
+
 	if o.mode == VISUAL {
-		// below in case org.highlight[1] < org.highlight[0]
 		if o.highlight[1] > o.highlight[0] {
 			j, k = 0, 1
 		} else {
 			k, j = 0, 1
 		}
 
-		ab.WriteString(o.rows[o.fr].title[o.coloff : o.highlight[j]-o.coloff])
+		ab.WriteString(row.title[o.coloff : o.highlight[j]-o.coloff])
 		ab.WriteString(LIGHT_GRAY_BG)
-		ab.WriteString(o.rows[o.fr].title[o.highlight[j] : o.highlight[k]-o.coloff])
+		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
 
 		ab.WriteString(DARK_GRAY_BG)
-		ab.WriteString(o.rows[o.fr].title[o.highlight[k]:])
-
+		ab.WriteString(row.title[o.highlight[k]:])
 	} else {
-		// current row is only row that is scrolled if org.coloff != 0
 		beg := o.coloff
-		if len(o.rows[o.fr].title[beg:]) > length {
-			ab.WriteString(o.rows[o.fr].title[beg : beg+length])
+		if len(row.title[beg:]) > length {
+			ab.WriteString(row.title[beg : beg+length])
 		} else {
-			ab.WriteString(o.rows[o.fr].title[beg:])
+			ab.WriteString(row.title[beg:])
 		}
 	}
-	// the spaces make it look like the whole row is highlighted
-	//note len can't be greater than titlecols so always positive
-	ab.WriteString(strings.Repeat(" ", titlecols-length+1))
 
-	// believe the +2 is just to give some space from the end of long titles
-	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, o.Screen.divider-TIME_COL_WIDTH+2)
-	ab.WriteString(o.rows[o.fr].sort)
+	ab.WriteString(strings.Repeat(" ", titlecols-length+1))
 	ab.WriteString(RESET)
-	ab.WriteString(lf_ret)
+	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
+	width := o.Screen.divider - sortX
+	if width > 0 {
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		ab.WriteString(strings.Repeat(" ", width))
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		if len(row.sort) > width {
+			ab.WriteString(row.sort[:width])
+		} else {
+			ab.WriteString(row.sort)
+		}
+	}
+	ab.WriteString(RESET)
 }
 
-func (o *Organizer) drawRows() {
+func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int) {
+	row := &o.rows[fr]
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
-	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
-	timeKeywordsRegex := regexp.MustCompile(`seconds|minutes|hours|days`)
-	if len(o.rows) == 0 {
+	note := o.Database.readNoteIntoString(row.id)
+	if googleDriveRegex.MatchString(note) {
+		ab.WriteString(BOLD)
+	}
+	if timeKeywordsRegex.MatchString(row.sort) {
+		ab.WriteString(CYAN)
+	} else {
+		ab.WriteString(WHITE)
+	}
+
+	if row.archived && row.deleted {
+		ab.WriteString(GREEN)
+	} else if row.archived {
+		ab.WriteString(YELLOW)
+	} else if row.deleted {
+		ab.WriteString(RED)
+	}
+
+	if fr == o.fr {
+		ab.WriteString(DARK_GRAY_BG)
+	}
+	if row.dirty {
+		ab.WriteString(BLACK + WHITE_BG)
+	}
+	if _, ok := o.marked_entries[row.id]; ok {
+		ab.WriteString(BLACK + YELLOW_BG)
+	}
+
+	var length int
+	var beg int
+	if fr == o.fr {
+		length = len(row.title) - o.coloff
+		if length < 0 {
+			length = 0
+		}
+		beg = o.coloff
+	} else {
+		length = len(row.title)
+	}
+	if length > titlecols {
+		length = titlecols
+	}
+
+	if o.mode == VISUAL && fr == o.fr {
+		var j, k int
+		if o.highlight[1] > o.highlight[0] {
+			j, k = 0, 1
+		} else {
+			k, j = 0, 1
+		}
+		ab.WriteString(row.title[o.coloff : o.highlight[j]-o.coloff])
+		ab.WriteString(LIGHT_GRAY_BG)
+		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
+		ab.WriteString(DARK_GRAY_BG)
+		ab.WriteString(row.title[o.highlight[k]:])
+	} else {
+		if len(row.title[beg:]) > length {
+			ab.WriteString(row.title[beg : beg+length])
+		} else {
+			ab.WriteString(row.title[beg:])
+		}
+	}
+
+	ab.WriteString(strings.Repeat(" ", titlecols-length+1))
+	ab.WriteString(RESET)
+	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
+	width := o.Screen.divider - sortX
+	if width > 0 {
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		ab.WriteString(strings.Repeat(" ", width))
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		if len(row.sort) > width {
+			ab.WriteString(row.sort[:width])
+		} else {
+			ab.WriteString(row.sort)
+		}
+	}
+	ab.WriteString(RESET)
+}
+
+func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
+	if fr == o.fr {
+		o.drawActiveRow(ab, y, titlecols)
 		return
 	}
 
-	var j, k int //to swap highlight if org.highlight[1] < org.highlight[0]
+	row := &o.rows[fr]
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
+
+	if row.star {
+		ab.WriteString("\x1b[1m")
+		ab.WriteString("\x1b[1;36m")
+	}
+	if row.archived && row.deleted {
+		ab.WriteString(GREEN)
+	} else if row.archived {
+		ab.WriteString(YELLOW)
+	} else if row.deleted {
+		ab.WriteString(RED)
+	}
+
+	if len(row.title) <= titlecols {
+		ab.WriteString(row.ftsTitle)
+	} else {
+		pos := strings.Index(row.ftsTitle, "\x1b[49m")
+		if pos > 0 && pos < titlecols+11 && len(row.ftsTitle) >= titlecols+15 {
+			ab.WriteString(row.ftsTitle[:titlecols+15])
+		} else {
+			ab.WriteString(row.title[:titlecols])
+		}
+	}
+
+	length := len(row.title)
+	if length > titlecols {
+		length = titlecols
+	}
+	if spaces := titlecols - length; spaces > 0 {
+		ab.WriteString(strings.Repeat(" ", spaces))
+	}
+	ab.WriteString(RESET)
+
+	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
+	width := o.Screen.divider - sortX
+	if width > 0 {
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		ab.WriteString(strings.Repeat(" ", width))
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		if len(row.sort) > width {
+			ab.WriteString(row.sort[:width])
+		} else {
+			ab.WriteString(row.sort)
+		}
+	}
+	ab.WriteString(RESET)
+}
+
+func (o *Organizer) drawRows() {
+	if len(o.rows) == 0 {
+		return
+	}
 	var ab strings.Builder
 	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
-
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
 
 	for y := 0; y < o.Screen.textLines; y++ {
 		fr := y + o.rowoff
 		if fr > len(o.rows)-1 {
 			break
 		}
-
-		// if a line is long you only draw what fits on the screen
-		//below solves problem when deleting chars from a scrolled long line
-		var length int
-		if fr == o.fr {
-			length = len(o.rows[fr].title) - o.coloff
-		} else {
-			length = len(o.rows[fr].title)
-		}
-
-		if length > titlecols {
-			length = titlecols
-		}
-
-		id := o.rows[fr].id
-		note := o.Database.readNoteIntoString(id)
-		if googleDriveRegex.MatchString(note) {
-			ab.WriteString(BOLD)
-		}
-		//} else if timeKeywordsRegex.MatchString(o.rows[fr].sort) {
-		if timeKeywordsRegex.MatchString(o.rows[fr].sort) {
-			ab.WriteString(CYAN)
-		} else {
-			ab.WriteString(WHITE)
-		}
-
-		if o.rows[fr].archived && o.rows[fr].deleted {
-			ab.WriteString(GREEN)
-		} else if o.rows[fr].archived {
-			ab.WriteString(YELLOW)
-		} else if o.rows[fr].deleted {
-			ab.WriteString(RED)
-		}
-
-		if fr == o.fr {
-			ab.WriteString(DARK_GRAY_BG)
-		}
-		if o.rows[fr].dirty {
-			ab.WriteString(BLACK + WHITE_BG)
-		}
-		if _, ok := o.marked_entries[o.rows[fr].id]; ok {
-			ab.WriteString(BLACK + YELLOW_BG)
-		}
-
-		// below - only will get visual highlighting if it's the active
-		// then also deals with column offset
-		if o.mode == VISUAL && fr == o.fr {
-
-			// below in case org.highlight[1] < org.highlight[0]
-			if o.highlight[1] > o.highlight[0] {
-				j, k = 0, 1
-			} else {
-				k, j = 0, 1
-			}
-
-			ab.WriteString(o.rows[fr].title[o.coloff : o.highlight[j]-o.coloff])
-			ab.WriteString(LIGHT_GRAY_BG)
-			ab.WriteString(o.rows[fr].title[o.highlight[j] : o.highlight[k]-o.coloff])
-
-			ab.WriteString(DARK_GRAY_BG)
-			ab.WriteString(o.rows[fr].title[o.highlight[k]:])
-
-		} else {
-			// current row is only row that is scrolled if org.coloff != 0
-			var beg int
-			if fr == o.fr {
-				beg = o.coloff
-			}
-			if len(o.rows[fr].title[beg:]) > length {
-				ab.WriteString(o.rows[fr].title[beg : beg+length])
-			} else {
-				ab.WriteString(o.rows[fr].title[beg:])
-			}
-		}
-		// the spaces make it look like the whole row is highlighted
-		//note len can't be greater than titlecols so always positive
-		ab.WriteString(strings.Repeat(" ", titlecols-length+1))
-
-		// believe the +2 is just to give some space from the end of long titles
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, o.Screen.divider-TIME_COL_WIDTH+2)
-		//ab.WriteString(o.rows[fr].modified)
-		ab.WriteString(o.rows[fr].sort)
-		ab.WriteString(RESET)
-		ab.WriteString(lf_ret)
+		o.appendStandardRow(&ab, fr, y, titlecols)
 	}
 	fmt.Print(ab.String())
 }
@@ -365,61 +430,31 @@ func (o *Organizer) drawSearchRows() {
 	}
 	var ab strings.Builder
 	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", LEFT_MARGIN)
 
 	for y := 0; y < o.Screen.textLines; y++ {
 		fr := y + o.rowoff
 		if fr > len(o.rows)-1 {
 			break
 		}
-		if fr == o.fr {
-			o.drawActiveRow(&ab, y)
-			continue
-		}
+		o.appendSearchRow(&ab, fr, y, titlecols)
+	}
+	fmt.Print(ab.String())
+}
 
-		if o.rows[fr].star {
-			ab.WriteString("\x1b[1m") //bold
-			ab.WriteString("\x1b[1;36m")
-		}
-
-		if o.rows[fr].archived && o.rows[fr].deleted {
-			ab.WriteString(GREEN) //green foreground
-		} else if o.rows[fr].archived {
-			ab.WriteString(YELLOW) //yellow foreground
-		} else if o.rows[fr].deleted {
-			ab.WriteString(RED) //red foreground
-		}
-		if len(o.rows[fr].title) <= titlecols { // we know it fits
-			ab.WriteString(o.rows[fr].ftsTitle)
-			// note below doesn't handle two highlighted terms in same line
-			// and it might cause display issues if second highlight isn't fully escaped
-			// need to come back and deal with this
-			// coud check if LastIndex"\x1b[49m" or Index(fts_title[pos+1:titlecols+15] contained another escape
-		} else {
-			pos := strings.Index(o.rows[fr].ftsTitle, "\x1b[49m")                          //\x1b[48;5;31m', '\x1b[49m'
-			if pos > 0 && pos < titlecols+11 && len(o.rows[fr].ftsTitle) >= titlecols+15 { //length of highlight escape last check ? shouldn't be necessary added 04032021
-				ab.WriteString(o.rows[fr].ftsTitle[:titlecols+15]) //titlecols + 15); // length of highlight escape + remove formatting escape
-			} else {
-				ab.WriteString(o.rows[fr].title[:titlecols])
-			}
-		}
-		var length int
-		if len(o.rows[fr].title) <= titlecols {
-			length = len(o.rows[fr].title)
-		} else {
-			length = titlecols
-		}
-
-		spaces := titlecols - length
-		ab.WriteString(strings.Repeat(" ", spaces))
-
-		ab.WriteString("\x1b[0m") // return background to normal
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", y+2, o.Screen.divider-TIME_COL_WIDTH+2)
-		//ab.WriteString(o.rows[fr].modified)
-		ab.WriteString(o.rows[fr].sort)
-		ab.WriteString(lf_ret)
-
-		//fmt.Print(ab.String())
+func (o *Organizer) drawRowAt(fr int) {
+	if fr < 0 || fr >= len(o.rows) {
+		return
+	}
+	if fr < o.rowoff || fr >= o.rowoff+o.Screen.textLines {
+		return
+	}
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	y := fr - o.rowoff
+	var ab strings.Builder
+	if o.taskview == BY_FIND {
+		o.appendSearchRow(&ab, fr, y, titlecols)
+	} else {
+		o.appendStandardRow(&ab, fr, y, titlecols)
 	}
 	fmt.Print(ab.String())
 }

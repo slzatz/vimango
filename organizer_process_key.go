@@ -7,8 +7,8 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (o *Organizer) organizerProcessKey(c int) (redraw bool) {
-	redraw = true
+func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
+	redraw = RedrawFull
 	// Handle global escape key
 	if c == '\x1b' {
 		o.showMessage("")
@@ -37,7 +37,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw bool) {
 
 	switch o.mode {
 	case INSERT:
-		o.InsertModeKeyHandler(c)
+		redraw = o.InsertModeKeyHandler(c)
 	case NORMAL:
 		redraw = o.NormalModeKeyHandler(c)
 	case VISUAL:
@@ -71,7 +71,8 @@ func (o *Organizer) updateRowStatus() {
 	}
 }
 
-func (o *Organizer) InsertModeKeyHandler(c int) {
+func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
+	redraw = RedrawPartial
 	if c == '\r' {
 		o.writeTitle() // now updates ftsTitle if taskview == BY_FIND
 		vim.SendKey("<esc>")
@@ -80,7 +81,7 @@ func (o *Organizer) InsertModeKeyHandler(c int) {
 		row.dirty = false
 		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.command = ""
-		return
+		return RedrawFull
 	}
 	sendToVim(c)
 	s := o.vbuf.Lines()[o.fr]
@@ -92,11 +93,12 @@ func (o *Organizer) InsertModeKeyHandler(c int) {
 		vim.SetCursorPosition(o.fr+1, o.fc)
 	}
 	o.updateRowStatus()
+	return
 }
 
-func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
+func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
-	redraw = false
+	redraw = RedrawNone
 	if c == '\r' {
 
 		o.command = ""
@@ -106,7 +108,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 			vim.SendKey("<esc>")
 			row.dirty = false
 			o.bufferTick = o.vbuf.GetLastChangedTick()
-			redraw = true
+			redraw = RedrawFull
 			return
 		}
 	}
@@ -124,29 +126,33 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 			string(ctrlKey('x')): {},
 			string(ctrlKey('m')): {},
 		}
-		_, redraw = redraw_map[o.command]
+		if _, ok := redraw_map[o.command]; ok {
+			redraw = RedrawFull
+		} else {
+			redraw = RedrawNone
+		}
 		o.command = ""
 		vim.SendKey("<esc>")
 		return
 	}
 
-	// in NORMAL mode don't want ' ' (leader), 'O', 'V', 'o' ctrl-V (22)
-	// being passed to vim
-	//if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J'
+	// in NORMAL mode don't want leader, O, o, V, ctrl-V, J being passed to vim
 	if _, ok := noopKeys[c]; ok {
 		if c != int([]byte(leader)[0]) {
 			o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
 		}
 		return
 	}
+	// anything sent to vim should only require the active screen line to be redrawn
+	prevRow := o.fr
 	sendToVim(c)
-	redraw = true
 	pos := vim.GetCursorPosition()
 	o.fc = pos[1]
+	newRow := pos[0] - 1
 	// if move to a new row then draw task note preview or container info
 	// and set cursor back to beginning of line
-	if o.fr != pos[0]-1 {
-		o.fr = pos[0] - 1
+	if newRow != prevRow {
+		o.fr = newRow
 		o.fc = 0
 		vim.SetCursorPosition(o.fr+1, 0)
 		o.altRowoff = 0
@@ -155,6 +161,9 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw bool) {
 		} else {
 			o.displayContainerInfo()
 		}
+		redraw = RedrawFull
+	} else {
+		redraw = RedrawPartial
 	}
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
@@ -208,8 +217,8 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 	o.showMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])
 }
 
-func (o *Organizer) ExModeKeyHandler(c int) (redraw bool) {
-	redraw = false
+func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
+	redraw = RedrawNone
 	switch c {
 
 	case '\r':
@@ -224,7 +233,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw bool) {
 		}
 		if cmd, found = o.exCmds[s]; found {
 			cmd(o, pos)
-			redraw = true
+			redraw = RedrawFull
 		}
 		// to catch find with more than one find term
 		if !found && pos != -1 && strings.Count(o.command_line, " ") > 1 {
@@ -232,7 +241,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw bool) {
 			if cmd, found = o.exCmds[o.command_line[:pos]]; found {
 				// pass the position of the first space
 				cmd(o, pos)
-				redraw = true
+				redraw = RedrawFull
 			}
 		}
 		o.tabCompletion.index = 0
@@ -309,7 +318,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw bool) {
 }
 
 // Used for viewing sync log and help
-func (o *Organizer) NavigateRenderModeKeyHandler(c int) (redraw bool) {
+func (o *Organizer) NavigateRenderModeKeyHandler(c int) RedrawScope {
 	switch c {
 	case ':':
 		o.exCmd()
@@ -318,5 +327,5 @@ func (o *Organizer) NavigateRenderModeKeyHandler(c int) (redraw bool) {
 	case ctrlKey('k'), PAGE_UP:
 		o.scrollPreviewUp()
 	}
-	return false
+	return RedrawNone
 }
