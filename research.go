@@ -205,36 +205,11 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 func (rm *ResearchManager) performResearch(prompt string, debugMode bool) (string, error) {
 	// Enhanced research prompt for comprehensive investigation
 
-	/*
-		  content, err := os.ReadFile("research_prompt")
-			if err != nil {
-				return "", fmt.Errorf("Reading research_prompt file failed: %w", err)
-			}
-			researchPrompt := fmt.Sprintf(string(content), prompt)
-	*/
-
-	researchPrompt := fmt.Sprintf(`You are conducting deep research on the following topic. Please provide a comprehensive analysis with multiple perspectives, current information, and proper citations.
-
-Research Topic/Instructions:
-%s
-
-Please structure your response as a detailed markdown document with:
-1. Executive Summary
-2. Key Findings (with sections and subsections as appropriate)  
-3. Different Perspectives/Viewpoints
-4. Current Status/Latest Developments
-5. Implications and Analysis
-6. Sources and References
-
-IMPORTANT - You have access to both web search and web fetch tools:
-1. **First**: Use web search to discover and evaluate sources on multiple aspects of this topic
-2. **Then**: Use web fetch to access complete content from the most promising sources for deeper analysis
-3. **Prioritize web fetch for**: Scientific papers, botanical databases, official plant guides, comprehensive articles, authoritative sources with detailed information
-4. **Combine tools effectively**: Search provides breadth, fetch provides depth - use both for comprehensive coverage
-5. **Citations**: Cite your sources clearly with URLs, especially for fetched content
-6. **Goal**: Provide a thorough analysis that combines broad discovery (search) with deep document analysis (fetch) suitable for someone who needs complete understanding of this topic.
-
-Use web fetch liberally on high-quality sources to provide the most comprehensive research possible.`, prompt)
+	content, err := os.ReadFile("research_prompt")
+	if err != nil {
+		return "", fmt.Errorf("Reading research_prompt file failed: %w", err)
+	}
+	researchPrompt := fmt.Sprintf(string(content), prompt)
 
 	// Configure web search tool with better parameters
 	webSearchTool := Tool{
