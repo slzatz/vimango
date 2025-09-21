@@ -119,13 +119,13 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		cmd(o)
 		// if command is one of j,k,i,l then don't redraw
 		redraw_map := map[string]struct{}{
-			string(ctrlKey('a')): {},
+			string(ctrlKey('a')): {}, // have retired starring for the moment
 			string(ctrlKey('d')): {},
 			string(ctrlKey('x')): {},
-			string(ctrlKey('m')): {},
+			"m":                  {},
 		}
 		if _, ok := redraw_map[o.command]; ok {
-			redraw = RedrawFull
+			redraw = RedrawPartial
 		} else {
 			redraw = RedrawNone
 		}

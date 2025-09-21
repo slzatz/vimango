@@ -40,30 +40,28 @@ func (o *Organizer) refreshScreen() {
 }
 
 func (o *Organizer) drawActiveRow(ab *strings.Builder) {
+	// When drawing the current row there are only two things
+	// we need to deal with: 1) horizontal scrolling and 2) visual mode highlighting
+
 	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
 	y := o.fr - o.rowoff
 	row := &o.rows[o.fr]
 
-	length := len(row.title) - o.coloff
-	if length > titlecols {
-		length = titlecols
-	}
-	if length < 0 {
-		length = 0
-	}
-
-	if row.dirty {
+	if o.coloff > 0 {
 		fmt.Fprintf(ab, "\x1b[%d;%dH\x1b[1K\x1b[%dG", y+TOP_MARGIN+1, titlecols+LEFT_MARGIN+1, LEFT_MARGIN+1)
-		ab.WriteString(BLACK + WHITE_BG)
-
+		length := len(row.title) - o.coloff
+		if length > titlecols {
+			length = titlecols
+		}
+		if length < 0 {
+			length = 0
+		}
 		beg := o.coloff
 		if len(row.title[beg:]) > length {
 			ab.WriteString(row.title[beg : beg+length])
 		} else {
 			ab.WriteString(row.title[beg:])
 		}
-		ab.WriteString(strings.Repeat(" ", titlecols-length)) //+1))
-		ab.WriteString(RESET)
 	}
 
 	if o.mode == VISUAL {
@@ -79,99 +77,13 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder) {
 		ab.WriteString(LIGHT_GRAY_BG)
 		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
 		ab.WriteString(RESET)
-		//ab.WriteString(DARK_GRAY_BG)
 		ab.WriteString(row.title[o.highlight[k]:])
-		//ab.WriteString(BLACK + WHITE_BG)
-		ab.WriteString(strings.Repeat(" ", titlecols-length)) //+1))
 	}
 }
 
 func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int) {
 	row := &o.rows[fr]
-	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
-
-	note := o.Database.readNoteIntoString(row.id)
-	if googleDriveRegex.MatchString(note) {
-		ab.WriteString(BOLD)
-	}
-	if timeKeywordsRegex.MatchString(row.sort) {
-		ab.WriteString(CYAN)
-	} else {
-		ab.WriteString(WHITE)
-	}
-
-	if row.archived && row.deleted {
-		ab.WriteString(GREEN)
-	} else if row.archived {
-		ab.WriteString(YELLOW)
-	} else if row.deleted {
-		ab.WriteString(RED)
-	}
-
-	if fr == o.fr {
-		ab.WriteString(DARK_GRAY_BG)
-	}
-	if row.dirty {
-		ab.WriteString(BLACK + WHITE_BG)
-	}
-	if _, ok := o.marked_entries[row.id]; ok {
-		ab.WriteString(BLACK + YELLOW_BG)
-	}
-
-	var length int
-	var beg int
-	if fr == o.fr {
-		length = len(row.title) - o.coloff
-		if length < 0 {
-			length = 0
-		}
-		beg = o.coloff
-	} else {
-		length = len(row.title)
-	}
-	if length > titlecols {
-		length = titlecols
-	}
-
-	if o.mode == VISUAL && fr == o.fr {
-		var j, k int
-		if o.highlight[1] > o.highlight[0] {
-			j, k = 0, 1
-		} else {
-			k, j = 0, 1
-		}
-		ab.WriteString(row.title[o.coloff : o.highlight[j]-o.coloff])
-		ab.WriteString(LIGHT_GRAY_BG)
-		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
-		ab.WriteString(DARK_GRAY_BG)
-		ab.WriteString(row.title[o.highlight[k]:])
-	} else {
-		if len(row.title[beg:]) > length {
-			ab.WriteString(row.title[beg : beg+length])
-		} else {
-			ab.WriteString(row.title[beg:])
-		}
-	}
-
-	ab.WriteString(strings.Repeat(" ", titlecols-length+1))
-	ab.WriteString(RESET)
-	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
-	width := o.Screen.divider - sortX
-	if width > 0 {
-		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
-		ab.WriteString(strings.Repeat(" ", width))
-		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
-		if len(row.sort) > width {
-			ab.WriteString(row.sort[:width])
-		} else {
-			ab.WriteString(row.sort)
-		}
-	}
-	ab.WriteString(RESET)
-}
-
-func (o *Organizer) appendStandardRow2(ab *strings.Builder, fr, y, titlecols int) {
-	row := &o.rows[fr]
+	// position cursor -note that you don't use lf/cr to position lines
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
 	note := o.Database.readNoteIntoString(row.id)
@@ -199,28 +111,13 @@ func (o *Organizer) appendStandardRow2(ab *strings.Builder, fr, y, titlecols int
 		ab.WriteString(BLACK + YELLOW_BG)
 	}
 
-	var length int
-	var beg int
-	if fr == o.fr {
-		length = len(row.title) - o.coloff
-		if length < 0 {
-			length = 0
-		}
-		beg = o.coloff
+	if len(row.title) > titlecols {
+		ab.WriteString(row.title[:titlecols])
 	} else {
-		length = len(row.title)
-	}
-	if length > titlecols {
-		length = titlecols
+		ab.WriteString(row.title)
+		ab.WriteString(strings.Repeat(" ", titlecols-len(row.title)))
 	}
 
-	if len(row.title[beg:]) > length {
-		ab.WriteString(row.title[beg : beg+length])
-	} else {
-		ab.WriteString(row.title[beg:])
-	}
-
-	ab.WriteString(strings.Repeat(" ", titlecols-length)) //+1))
 	ab.WriteString(RESET)
 	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
 	width := o.Screen.divider - sortX
@@ -305,9 +202,11 @@ func (o *Organizer) drawRows() {
 		if fr > len(o.rows)-1 {
 			break
 		}
-		o.appendStandardRow2(&ab, fr, y, titlecols)
+		o.appendStandardRow(&ab, fr, y, titlecols)
 	}
+	// instances that require a full redraw do not require separate drawing of active row
 	//o.drawActiveRow(&ab)
+
 	fmt.Print(ab.String())
 }
 
@@ -483,6 +382,7 @@ func (o *Organizer) drawSearchRows() {
 	fmt.Print(ab.String())
 }
 
+// should be removed after more testing
 func (o *Organizer) drawRowAt(fr int) {
 	if fr < 0 || fr >= len(o.rows) {
 		return
@@ -502,10 +402,12 @@ func (o *Organizer) drawRowAt(fr int) {
 }
 
 func (o *Organizer) drawActive() {
-	//titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
-	//y := o.fr - o.rowoff
+	// When doing a partial redraw, we first draw the standard row, then
+	// address horizontal scrolling and visual mode highlighting
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	y := o.fr - o.rowoff
 	var ab strings.Builder
-	//o.drawActiveRow(&ab, y, titlecols)
+	o.appendStandardRow(&ab, o.fr, y, titlecols)
 	o.drawActiveRow(&ab)
 	fmt.Print(ab.String())
 }
