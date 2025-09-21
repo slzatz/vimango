@@ -5,23 +5,11 @@ import (
 	"strings"
 )
 
-/*
-func (o *Organizer) getMode() Mode {
-	if len(o.rows) > 0 {
-		return NORMAL
-	} else {
-		return NO_ROWS
-	}
-}
-*/
-
 func (o *Organizer) moveAltCursor(key int) {
 
 	if len(o.altRows) == 0 {
 		return
 	}
-
-	//o.fc = 0
 
 	switch key {
 
@@ -123,13 +111,6 @@ func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, archive
 }
 
 func (o *Organizer) scroll() {
-
-	/*
-		if o.mode == ADD_CHANGE_FILTER {
-			o.altScroll()
-			return
-		}
-	*/
 
 	if len(o.rows) == 0 {
 		o.fr, o.fc, o.coloff, o.rowoff, o.cx, o.cy = 0, 0, 0, 0, 0, 0

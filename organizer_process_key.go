@@ -28,7 +28,6 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 		o.Session.imagePreview = false
-		//o.ShowMessage(BL, "id =%d", o.rows[o.fr].id)
 		if o.view == TASK {
 			o.drawPreview()
 		}
@@ -42,12 +41,11 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		redraw = o.NormalModeKeyHandler(c)
 	case VISUAL:
 		o.VisualModeKeyHandler(c)
+		redraw = RedrawPartial
 	case COMMAND_LINE:
 		redraw = o.ExModeKeyHandler(c)
 	case NAVIGATE_RENDER:
 		redraw = o.NavigateRenderModeKeyHandler(c)
-	//case LINKS:
-	//	handler = NewLinksModeHandler(o)
 	default:
 		return
 	}

@@ -35,7 +35,6 @@ type App struct {
 	Config *dbConfig
 
 	// Application state
-	//LastSync      time.Time // calculated when syncing but not saved
 	SyncInProcess bool
 	Run           bool
 	kitty         bool   // true if running in kitty terminal
@@ -342,11 +341,7 @@ func (a *App) Cleanup() {
 }
 
 func (a *App) quitApp() {
-	//if lsp.name != "" {
-	//	shutdownLsp()
-	//}
 	fmt.Print("\x1b[2J\x1b[H") //clears the screen and sends cursor home
-	//lsp_shutdown("all");
 
 	if err := rawmode.Restore(a.origTermCfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: disabling raw mode: %s\r\n", err)
@@ -417,7 +412,8 @@ func (a *App) MainLoop() {
 					case RedrawFull:
 						org.refreshScreen()
 					case RedrawPartial:
-						org.drawRowAt(org.fr)
+						//org.drawRowAt(org.fr)
+						org.drawActive()
 					}
 					if a.Screen.divider > 10 {
 						org.drawStatusBar()

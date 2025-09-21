@@ -24,8 +24,6 @@ func (o *Organizer) refreshScreen() {
 
 	//Below erase screen from middle to left - `1K` below is cursor to left erasing
 	//Now erases time/sort column (+ 17 in line below)
-	//if (org.view != KEYWORD) {
-	//	if o.mode != ADD_CHANGE_FILTER {
 	for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
 		// Use 1K to clear from cursor to start of line, preserving vertical lines
 		fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17)
@@ -36,19 +34,15 @@ func (o *Organizer) refreshScreen() {
 	fmt.Print(ab.String())
 	if o.taskview == BY_FIND {
 		o.drawSearchRows()
-		/*
-			} else if o.mode == ADD_CHANGE_FILTER {
-				o.drawAltRows()
-		*/
 	} else {
 		o.drawRows()
 	}
 }
 
-func (o *Organizer) drawActiveRow(ab *strings.Builder, y int, titlecols int) {
-	var j, k int
+func (o *Organizer) drawActiveRow(ab *strings.Builder) {
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	y := o.fr - o.rowoff
 	row := &o.rows[o.fr]
-	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
 	length := len(row.title) - o.coloff
 	if length > titlecols {
@@ -58,58 +52,38 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder, y int, titlecols int) {
 		length = 0
 	}
 
-	if row.star {
-		ab.WriteString(CYAN_BOLD)
-	}
-	if row.archived && row.deleted {
-		ab.WriteString(GREEN)
-	} else if row.archived {
-		ab.WriteString(YELLOW)
-	} else if row.deleted {
-		ab.WriteString(RED)
-	}
-	ab.WriteString(DARK_GRAY_BG)
 	if row.dirty {
+		fmt.Fprintf(ab, "\x1b[%d;%dH\x1b[1K\x1b[%dG", y+TOP_MARGIN+1, titlecols+LEFT_MARGIN+1, LEFT_MARGIN+1)
 		ab.WriteString(BLACK + WHITE_BG)
-	}
 
-	if o.mode == VISUAL {
-		if o.highlight[1] > o.highlight[0] {
-			j, k = 0, 1
-		} else {
-			k, j = 0, 1
-		}
-
-		ab.WriteString(row.title[o.coloff : o.highlight[j]-o.coloff])
-		ab.WriteString(LIGHT_GRAY_BG)
-		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
-
-		ab.WriteString(DARK_GRAY_BG)
-		ab.WriteString(row.title[o.highlight[k]:])
-	} else {
 		beg := o.coloff
 		if len(row.title[beg:]) > length {
 			ab.WriteString(row.title[beg : beg+length])
 		} else {
 			ab.WriteString(row.title[beg:])
 		}
+		ab.WriteString(strings.Repeat(" ", titlecols-length)) //+1))
+		ab.WriteString(RESET)
 	}
 
-	ab.WriteString(strings.Repeat(" ", titlecols-length+1))
-	ab.WriteString(RESET)
-	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
-	width := o.Screen.divider - sortX
-	if width > 0 {
-		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
-		ab.WriteString(strings.Repeat(" ", width))
-		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
-		if len(row.sort) > width {
-			ab.WriteString(row.sort[:width])
+	if o.mode == VISUAL {
+		var j, k int
+		if o.highlight[1] > o.highlight[0] {
+			j, k = 0, 1
 		} else {
-			ab.WriteString(row.sort)
+			k, j = 0, 1
 		}
+
+		fmt.Fprintf(ab, "\x1b[%d;%dH\x1b[1K\x1b[%dG", y+TOP_MARGIN+1, titlecols+LEFT_MARGIN+1, LEFT_MARGIN+1)
+		ab.WriteString(row.title[o.coloff : o.highlight[j]-o.coloff])
+		ab.WriteString(LIGHT_GRAY_BG)
+		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
+		ab.WriteString(RESET)
+		//ab.WriteString(DARK_GRAY_BG)
+		ab.WriteString(row.title[o.highlight[k]:])
+		//ab.WriteString(BLACK + WHITE_BG)
+		ab.WriteString(strings.Repeat(" ", titlecols-length)) //+1))
 	}
-	ab.WriteString(RESET)
 }
 
 func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int) {
@@ -196,9 +170,76 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 	ab.WriteString(RESET)
 }
 
+func (o *Organizer) appendStandardRow2(ab *strings.Builder, fr, y, titlecols int) {
+	row := &o.rows[fr]
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
+
+	note := o.Database.readNoteIntoString(row.id)
+	if googleDriveRegex.MatchString(note) {
+		ab.WriteString(BOLD)
+	}
+	if timeKeywordsRegex.MatchString(row.sort) {
+		ab.WriteString(CYAN)
+	} else {
+		ab.WriteString(WHITE)
+	}
+
+	if row.archived && row.deleted {
+		ab.WriteString(GREEN)
+	} else if row.archived {
+		ab.WriteString(YELLOW)
+	} else if row.deleted {
+		ab.WriteString(RED)
+	}
+
+	if row.dirty {
+		ab.WriteString(BLACK + WHITE_BG)
+	}
+	if _, ok := o.marked_entries[row.id]; ok {
+		ab.WriteString(BLACK + YELLOW_BG)
+	}
+
+	var length int
+	var beg int
+	if fr == o.fr {
+		length = len(row.title) - o.coloff
+		if length < 0 {
+			length = 0
+		}
+		beg = o.coloff
+	} else {
+		length = len(row.title)
+	}
+	if length > titlecols {
+		length = titlecols
+	}
+
+	if len(row.title[beg:]) > length {
+		ab.WriteString(row.title[beg : beg+length])
+	} else {
+		ab.WriteString(row.title[beg:])
+	}
+
+	ab.WriteString(strings.Repeat(" ", titlecols-length)) //+1))
+	ab.WriteString(RESET)
+	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
+	width := o.Screen.divider - sortX
+	if width > 0 {
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		ab.WriteString(strings.Repeat(" ", width))
+		fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, sortX)
+		if len(row.sort) > width {
+			ab.WriteString(row.sort[:width])
+		} else {
+			ab.WriteString(row.sort)
+		}
+	}
+	ab.WriteString(RESET)
+}
+
 func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 	if fr == o.fr {
-		o.drawActiveRow(ab, y, titlecols)
+		o.drawActiveRow(ab)
 		return
 	}
 
@@ -264,8 +305,9 @@ func (o *Organizer) drawRows() {
 		if fr > len(o.rows)-1 {
 			break
 		}
-		o.appendStandardRow(&ab, fr, y, titlecols)
+		o.appendStandardRow2(&ab, fr, y, titlecols)
 	}
+	//o.drawActiveRow(&ab)
 	fmt.Print(ab.String())
 }
 
@@ -456,6 +498,15 @@ func (o *Organizer) drawRowAt(fr int) {
 	} else {
 		o.appendStandardRow(&ab, fr, y, titlecols)
 	}
+	fmt.Print(ab.String())
+}
+
+func (o *Organizer) drawActive() {
+	//titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	//y := o.fr - o.rowoff
+	var ab strings.Builder
+	//o.drawActiveRow(&ab, y, titlecols)
+	o.drawActiveRow(&ab)
 	fmt.Print(ab.String())
 }
 
