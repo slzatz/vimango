@@ -110,12 +110,15 @@ func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, archive
 	o.rows[at] = row
 }
 
-func (o *Organizer) scroll() {
+func (o *Organizer) scroll() (offset_changed bool) {
 
 	if len(o.rows) == 0 {
 		o.fr, o.fc, o.coloff, o.rowoff, o.cx, o.cy = 0, 0, 0, 0, 0, 0
-		return
+		return false
 	}
+
+	prev_offset := o.rowoff
+
 	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
 
 	if o.fr > o.Screen.textLines+o.rowoff-1 {
@@ -136,6 +139,8 @@ func (o *Organizer) scroll() {
 
 	o.cx = o.fc - o.coloff
 	o.cy = o.fr - o.rowoff
+
+	return prev_offset != o.rowoff
 }
 
 func (o *Organizer) altScroll() {

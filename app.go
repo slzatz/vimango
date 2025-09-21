@@ -406,19 +406,38 @@ func (a *App) MainLoop() {
 					a.returnCursor()
 					continue
 				}
-				if redraw != RedrawNone {
-					org.scroll()
-					switch redraw {
-					case RedrawFull:
-						org.refreshScreen()
-					case RedrawPartial:
-						//org.drawRowAt(org.fr)
-						org.drawActive()
-					}
-					if a.Screen.divider > 10 {
-						org.drawStatusBar()
-					}
+				if org.scroll() {
+					org.refreshScreen()
+					a.returnCursor()
+					continue
 				}
+				switch redraw {
+				case RedrawNone:
+					// do nothing
+				case RedrawFull:
+					org.refreshScreen()
+				case RedrawPartial:
+					org.drawActive()
+				}
+
+				if a.Screen.divider > 10 {
+					org.drawStatusBar()
+				}
+				/*
+					if redraw != RedrawNone {
+						org.scroll()
+						switch redraw {
+						case RedrawFull:
+							org.refreshScreen()
+						case RedrawPartial:
+							//org.drawRowAt(org.fr)
+							org.drawActive()
+						}
+						if a.Screen.divider > 10 {
+							org.drawStatusBar()
+						}
+					}
+				*/
 			}
 		case err := <-a.keyErrors:
 			if err != nil {

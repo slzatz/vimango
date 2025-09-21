@@ -412,6 +412,11 @@ func (o *Organizer) drawActive() {
 	fmt.Print(ab.String())
 }
 
+func (o *Organizer) erasePreviousRowMarker(prevRow int) {
+	y := prevRow - o.rowoff
+	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH ", y+TOP_MARGIN+1, 0)
+}
+
 // change function name to displayRenderedNote
 func (o *Organizer) drawPreview() {
 	if len(o.rows) == 0 {

@@ -79,7 +79,7 @@ func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
 		row.dirty = false
 		o.bufferTick = o.vbuf.GetLastChangedTick()
 		o.command = ""
-		return RedrawFull
+		return RedrawPartial // was RedrawFull
 	}
 	sendToVim(c)
 	s := o.vbuf.Lines()[o.fr]
@@ -106,7 +106,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 			vim.SendKey("<esc>")
 			row.dirty = false
 			o.bufferTick = o.vbuf.GetLastChangedTick()
-			redraw = RedrawFull
+			redraw = RedrawPartial
 			return
 		}
 	}
@@ -141,35 +141,43 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 		return
 	}
+
+	// should check for mode 4 be here?
+
 	// anything sent to vim should only require the active screen line to be redrawn
+	// however if the row changes we need to erase the > from the previous row
 	prevRow := o.fr
 	sendToVim(c)
 	pos := vim.GetCursorPosition()
 	o.fc = pos[1]
 	newRow := pos[0] - 1
 	// if move to a new row then draw task note preview or container info
-	// and set cursor back to beginning of line
+	// and set cursor back to beginning of line and erase > from previous row
 	if newRow != prevRow {
 		o.fr = newRow
 		o.fc = 0
 		vim.SetCursorPosition(o.fr+1, 0)
-		o.altRowoff = 0
+		o.altRowoff = 0 // reset scroll in right window
+		// need to erase > from previous row
+		o.erasePreviousRowMarker(prevRow)
 		if o.view == TASK {
 			o.drawPreview()
 		} else {
 			o.displayContainerInfo()
 		}
-		redraw = RedrawFull
-	} else {
-		redraw = RedrawPartial
+		//redraw = RedrawPartial
 	}
+	//redraw = RedrawPartial
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
 	//firstLine := vim.WindowGetTopLine() // doesn't seem to work
 	o.updateRowStatus()
+
+	// should this move up?
 	mode := vim.GetCurrentMode()
 
 	// OP_PENDING like 4da
+	// Seems like this should move up
 	if mode == 4 {
 		return
 	}
@@ -187,6 +195,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		o.highlight[0] = pos[0][1]
 	}
 	o.showMessage("%s", s)
+	redraw = RedrawPartial
 	return
 }
 
