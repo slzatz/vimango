@@ -192,6 +192,7 @@ func (e *Editor) drawText() {
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
 	erase_chars := fmt.Sprintf("\x1b[%dX", e.screencols)
 	for i := 0; i < e.screenlines; i++ {
+		//time.Sleep(10 * time.Millisecond) //helps test if redraws are happening by slowing down redraws
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}

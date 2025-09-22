@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
@@ -54,8 +55,6 @@ func GetEngineWrapper() interfaces.VimEngine {
 	return activeImpl.GetEngineWrapper()
 }
 
-
-
 // API Functions - These functions are called by package main as vim.OpenBuffer (..) for example
 
 // OpenBuffer opens a file and returns a buffer - not currently in use
@@ -90,7 +89,6 @@ func GetCurrentBuffer() interfaces.VimBuffer {
 func SetCurrentBuffer(buf interfaces.VimBuffer) {
 	Engine.BufferSetCurrent(buf)
 }
-
 
 // GetCursorLine gets the current cursor line
 func GetCursorLine() int {
@@ -141,6 +139,11 @@ func GetCurrentMode() int {
 	return Engine.GetMode()
 }
 
+// This is specifically used by the editor to determine the mode
+func GetSubMode() cvim.SubMode {
+	return Engine.GetSubMode()
+}
+
 // GetVisualRange gets the visual selection range
 func GetVisualRange() [2][2]int {
 	return Engine.VisualGetRange()
@@ -168,9 +171,7 @@ func IsUsingGoImplementation() bool {
 
 // Additional backward compatibility functions
 
-
 // ToggleImplementation switches between Go and C implementations
-
 
 // Helper functions to convert between buffer types
 // (CGO-specific conversion functions are in api_cgo_compat.go)

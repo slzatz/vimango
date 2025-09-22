@@ -1,5 +1,7 @@
 package interfaces
 
+import "github.com/slzatz/vimango/vim/cvim"
+
 // VimBuffer mirros the buf_T functionality from C
 type VimBuffer interface {
 	GetID() int
@@ -35,6 +37,7 @@ type VimEngine interface {
 	// Mode operations
 	GetMode() int
 	GetCurrentMode() int // A special version for application compatibility
+	GetSubMode() cvim.SubMode
 
 	// Visual mode
 	VisualGetRange() [2][2]int

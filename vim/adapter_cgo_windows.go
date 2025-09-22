@@ -3,6 +3,7 @@
 package vim
 
 import (
+	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
@@ -75,6 +76,10 @@ func (e *CGOEngineWrapper) Execute(s string) {}
 
 // GetMode is a no-op on Windows.
 func (e *CGOEngineWrapper) GetMode() int {
+	return 0
+}
+
+func (e *CGOEngineWrapper) GetSubMode() cvim.SubMode {
 	return 0
 }
 

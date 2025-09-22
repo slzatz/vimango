@@ -110,7 +110,8 @@ var Lsps = map[string]string{
 type Mode int
 
 const (
-	NORMAL Mode = iota
+	NORMAL      Mode = iota // just seeing this after an escape
+	NORMAL_BUSY             // Replace and almost any other keystroke in normal
 	INSERT
 	COMMAND_LINE // only in organizer mode
 	EX_COMMAND   // only in editor mode
@@ -125,15 +126,16 @@ const (
 	NAVIGATE_RENDER // only in organizer mode
 	LINKS           // only in organizer mode
 	PENDING
-	OTHER // mysterious vim mode 257 ....
+	OTHER // Just in case
 )
 
 var modeMap = map[int]Mode{
-	1:  NORMAL,
-	2:  VISUAL, //VISUAL_MODE,
-	4:  PENDING,
-	8:  SEARCH, // Also COMMAND
-	16: INSERT,
+	1:   NORMAL, // seems to be only after an escape
+	2:   VISUAL, //VISUAL_MODE,
+	4:   PENDING,
+	8:   SEARCH, // Also COMMAND
+	16:  INSERT,
+	257: NORMAL_BUSY, // just about any keystroke when in NORMAL mode
 }
 
 // v -> 118; V -> 86; ctrl-v -> 22
@@ -277,6 +279,7 @@ const (
 func (m Mode) String() string {
 	return [...]string{
 		"NORMAL",
+		"NORMAL BUSY",
 		"INSERT",
 		"COMMAND LINE",
 		"EX COMMAND",

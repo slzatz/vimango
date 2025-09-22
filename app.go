@@ -394,9 +394,10 @@ func (a *App) MainLoop() {
 				if !a.Session.editorMode {
 					continue
 				}
+				ae.scroll()
 				if redraw {
-					ae := a.Session.activeEditor ///// doesn't do anything
-					ae.scroll()
+					//ae := a.Session.activeEditor ///// doesn't do anything
+					//ae.scroll()
 					ae.drawText()
 					ae.drawStatusBar()
 				}

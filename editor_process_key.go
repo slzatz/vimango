@@ -16,6 +16,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {
 		vim.SendKey("<esc>")
+		e.ss = e.vbuf.Lines() /// for commands like 4i
 		e.mode = NORMAL
 		e.ShowMessage(BL, "e.mode: %s", e.mode) //////Debug
 		e.command = ""
@@ -24,28 +25,34 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.fr = pos[0] - 1
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 		e.ShowMessage(BR, "")
-		return true
+		return false
 	}
 
-	skip := false // if skip is false, doesn't matter if redraw is false
+	// if exit is false, doesn't matter if redraw is false since redraw will be determined
+	// by the mode processing below
+	//	skip := false
+	var exit bool
 
+	// Below don't  handle NORMAL_BUSY because just want that to drop through
 	switch e.mode {
-	case INSERT:
-		redraw, skip = false, false
-	case NORMAL, OTHER: //?Navigation
-		redraw, skip = e.NormalModeKeyHandler(c)
+	//case INSERT:
+	//	redraw, skip = false, false
+	case NORMAL: //only gets here from escape, which actually works
+		redraw, exit = e.NormalModeKeyHandler(c)
 	case VISUAL:
-		redraw, skip = e.VisualModeKeyHandler(c)
+		redraw, exit = e.VisualModeKeyHandler(c)
 	case EX_COMMAND:
-		redraw, skip = e.ExModeKeyHandler(c)
+		redraw, exit = e.ExModeKeyHandler(c)
 	case SEARCH:
-		redraw, skip = e.SearchModeKeyHandler(c)
+		redraw, exit = e.SearchModeKeyHandler(c)
 	case PREVIEW:
-		redraw, skip = e.PreviewModeKeyHandler(c)
+		redraw, exit = e.PreviewModeKeyHandler(c)
 	case VIEW_LOG:
-		redraw, skip = e.ViewLogModeKeyHandler(c)
+		redraw, exit = e.ViewLogModeKeyHandler(c)
 	}
-	if skip {
+
+	// if exit true, don't process key any further
+	if exit {
 		return
 	}
 	// Process the key
@@ -56,14 +63,19 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	}
 
 	mode := vim.GetCurrentMode()
+	//submode := vim.GetSubMode() added this 9-22-25 but really only for obscure submodes
 
 	switch mode {
-	case 4: //OP_PENDING
+	case 4: //OP_PENDING delete, change, yank, etc
+		//m, _ := modeMap[mode]
+		//e.mode = m
+		e.mode = PENDING
+		e.ShowMessage(BL, "mode: %d  e.mode: %s ", mode, e.mode) //////Debug
 		return false
 	case 8: //SEARCH and EX_COMMAND
 		// Note: will not hit this case if we are in e.mode == Ex_COMMAND because we
 		// park vim in NORMAL mode and don't feed it keys
-		// note that once e.mode is set to SEARCH, this case will not be hit
+		// note that if e.mode has been set to SEARCH, this code does nothing
 		if e.mode != SEARCH {
 			e.command_line = ""
 			e.command = ""
@@ -76,6 +88,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				e.searchPrefix = string(c)
 				e.ShowMessage(BR, e.searchPrefix)
 			}
+			e.ShowMessage(BL, "mode: %d  %s e.mode: %s", mode, e.mode) //////Debug
 			return false
 		}
 	case 16: //INSERT
@@ -83,6 +96,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 			e.mode = INSERT
 			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 		}
+		redraw = true
 	case 2: //VISUAL_MODE
 		vmode := vim.GetVisualType()
 		e.vmode = visualModeMap[vmode]
@@ -90,16 +104,26 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		//e.ShowMessage(BR, "Current visualType from vim: %d, visual test: %v", vmode, mode == 118)
 		e.highlightInfo()
 		e.ShowMessage(BL, "mode: %d  vmode: %s e.mode: %s", mode, e.vmode, e.mode) //////Debug
-		//necessary for recognizing return after typing search term
+		redraw = true
+	case 257: //NORMAL_BUSY
+		e.mode = NORMAL_BUSY
+		if c >= '0' && c <= '9' {
+			return false
+		}
+		if _, ok := navKeys[c]; ok {
+			redraw = false
+		} else {
+			redraw = true
+		}
 	default:
-		m, ok := modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
-		if ok {
+		if m, ok := modeMap[mode]; ok { //note that 8 => SEARCH (8 is also COMMAND)
 			e.mode = m
 		} else {
-			e.mode = OTHER //257 appears to be the vim number - seems to be a variant of NORMAL ? navigation
+			e.mode = OTHER // not sure this ever happens
 		}
-		e.ShowMessage(BL, "default (no mode match) mode: %d  e.mode: %s", mode, e.mode) //////Debug
+		redraw = false
 	}
+	e.ShowMessage(BL, "mode: %d  e.mode: %s", mode, e.mode) //////Debug
 	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
 	e.ss = e.vbuf.Lines()
 	// Add safety checks to prevent panic with empty buffers
@@ -125,11 +149,11 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 
 	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 
-	return true
+	return
 }
 
 // case PREVIEW:
-func (e *Editor) PreviewModeKeyHandler(c int) (bool, bool) {
+func (e *Editor) PreviewModeKeyHandler(c int) (redraw, exit bool) {
 	switch c {
 	case ARROW_DOWN, ctrlKey('j'):
 		e.previewLineOffset++

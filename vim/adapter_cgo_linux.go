@@ -20,7 +20,6 @@ func (c *CGOImplementation) GetName() string {
 	return ImplC
 }
 
-
 // activeImpl is the current implementation (C or Go)
 // This is initialized here for non-Windows builds
 func init() {
@@ -109,6 +108,10 @@ func (e *CGOEngineWrapper) GetMode() int {
 // For CGO implementation, this is the same as GetMode
 func (e *CGOEngineWrapper) GetCurrentMode() int {
 	return cvim.GetMode()
+}
+
+func (e *CGOEngineWrapper) GetSubMode() cvim.SubMode {
+	return cvim.GetSubMode()
 }
 
 // VisualGetRange gets the visual selection range

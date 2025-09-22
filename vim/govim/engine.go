@@ -1,5 +1,7 @@
 package govim
 
+import "github.com/slzatz/vimango/vim/cvim"
+
 // ModeNormal is the normal mode constant
 const ModeNormal = 1
 
@@ -22,17 +24,17 @@ type GoEngine struct {
 	currentBuffer *GoBuffer
 	//cursorRow      int
 	//cursorCol      int
-	mode            int
-	visualStart     [2]int
-	visualEnd       [2]int
-	visualType      int
-	commandCount    int    // For motion counts like 5j, 3w, etc.
-	awaitingMotion  bool   // True when waiting for a motion after d, c, y, etc.
-	currentCommand  string // Current command (d, c, y) waiting for motion
-	buildingCount   bool   // True when we're in the process of entering a numeric prefix
-	yankRegister    string // Content of the "unnamed" register for yank/put
+	mode             int
+	visualStart      [2]int
+	visualEnd        [2]int
+	visualType       int
+	commandCount     int    // For motion counts like 5j, 3w, etc.
+	awaitingMotion   bool   // True when waiting for a motion after d, c, y, etc.
+	currentCommand   string // Current command (d, c, y) waiting for motion
+	buildingCount    bool   // True when we're in the process of entering a numeric prefix
+	yankRegister     string // Content of the "unnamed" register for yank/put
 	yankRegisterType int    // Type of yanked content: 0=char, 1=line, 2=block
-	awaitingReplace bool   // True when we're waiting for a character to replace (after 'r')
+	awaitingReplace  bool   // True when we're waiting for a character to replace (after 'r')
 
 	// Undo state
 	inInsertUndoGroup bool // True when in insert mode to group all changes as one undo operation
@@ -54,7 +56,7 @@ type GoEngine struct {
 	insertCommandCount  int    // Count used with the insert command
 	insertCommandPos    [2]int // Position where the insert command was executed
 
-	// Change command tracking for dot command support  
+	// Change command tracking for dot command support
 	changeCommandActive bool   // True when insert mode was entered via 'c' command
 	changeCommandType   string // The change command type ("cw", "c$", "cc", etc.)
 	changeCommandCount  int    // Count used with the change command
@@ -69,43 +71,43 @@ type GoEngine struct {
 	searchBuffer     string   // Buffer for search input
 
 	// Indentation settings
-	useTabsForIndent bool // true = use tabs, false = use spaces  
+	useTabsForIndent bool // true = use tabs, false = use spaces
 	indentWidth      int  // number of spaces per indent level
 }
 
 // NewEngine creates a new vim engine
 func NewEngine() *GoEngine {
 	return &GoEngine{
-		buffers:           make(map[int]*GoBuffer),
-		nextBufferId:      1,
-		mode:              ModeNormal,
-		commandCount:      0,
-		awaitingMotion:    false,
-		currentCommand:    "",
-		buildingCount:     false,
-		yankRegister:      "",
-			yankRegisterType:  0, // Default to character-wise,
-		inInsertUndoGroup: false,
-		lastEditCommand:   "",
-		lastEditCount:     0,
-		lastEditText:      "",
-		lastEditPos:       [2]int{1, 0},
-		sCommandActive:    false,
-		sCommandCount:     0,
-		sCommandStartCol:  0,
+		buffers:             make(map[int]*GoBuffer),
+		nextBufferId:        1,
+		mode:                ModeNormal,
+		commandCount:        0,
+		awaitingMotion:      false,
+		currentCommand:      "",
+		buildingCount:       false,
+		yankRegister:        "",
+		yankRegisterType:    0, // Default to character-wise,
+		inInsertUndoGroup:   false,
+		lastEditCommand:     "",
+		lastEditCount:       0,
+		lastEditText:        "",
+		lastEditPos:         [2]int{1, 0},
+		sCommandActive:      false,
+		sCommandCount:       0,
+		sCommandStartCol:    0,
 		changeCommandActive: false,
 		changeCommandType:   "",
 		changeCommandCount:  0,
 		changeCommandPos:    [2]int{1, 0},
-		searchPattern:     "",
-		searchDirection:   1, // Default to forward search
-		searchResults:     make([][2]int, 0),
-		currentSearchIdx:  -1,
-		searching:         false,
-		searchBuffer:      "",
-		awaitingReplace:   false, // Initialize the replace flag
-		useTabsForIndent:  false, // Default to spaces
-		indentWidth:       4,     // Default to 4 spaces per indent
+		searchPattern:       "",
+		searchDirection:     1, // Default to forward search
+		searchResults:       make([][2]int, 0),
+		currentSearchIdx:    -1,
+		searching:           false,
+		searchBuffer:        "",
+		awaitingReplace:     false, // Initialize the replace flag
+		useTabsForIndent:    false, // Default to spaces
+		indentWidth:         4,     // Default to 4 spaces per indent
 	}
 }
 
@@ -177,7 +179,7 @@ func (e *GoEngine) BufferSetCurrent(buf *GoBuffer) {
 	if len(buf.lines) == 0 {
 		buf.lines = []string{""}
 	}
-	
+
 	// Ensure each buffer that gets set as current has a completely independent copy of its lines
 	// This prevents any possible reference sharing between buffers
 	independentLines := make([]string, len(buf.lines))
@@ -185,7 +187,7 @@ func (e *GoEngine) BufferSetCurrent(buf *GoBuffer) {
 		independentLines[i] = string(line) // Force a new string allocation
 	}
 	buf.lines = independentLines
-	
+
 	// Validate the cursor position to ensure it's valid for the current buffer content
 	e.validateCursorPosition()
 
@@ -319,6 +321,10 @@ func (e *GoEngine) CursorSetPosition(row, col int) {
 // GetMode returns the current mode
 func (e *GoEngine) GetMode() int {
 	return e.mode
+}
+
+func (e *GoEngine) GetSubMode() cvim.SubMode {
+	return 0
 }
 
 // VisualGetRange returns the visual selection range
@@ -870,10 +876,10 @@ func (e *GoEngine) recordEditCommand(cmd string, count int) {
 	if count == 0 {
 		e.lastEditCount = 1 // Default to 1 for commands without an explicit count
 	}
-	
+
 	// Store the position
 	e.lastEditPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
-	
+
 	// Clear any previous text (for commands that don't use it)
 	e.lastEditText = ""
 }
@@ -890,7 +896,7 @@ func (e *GoEngine) recordEditCommandWithText(cmd string, count int, text string)
 	if count == 0 {
 		e.lastEditCount = 1 // Default to 1 for commands without an explicit count
 	}
-	
+
 	// Store the position and text
 	e.lastEditPos = [2]int{e.currentBuffer.cursorRow, e.currentBuffer.cursorCol}
 	e.lastEditText = text

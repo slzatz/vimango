@@ -234,8 +234,23 @@ Examples include insert-literal (C-V, C-G), search w/ confirmation, etc.
 */
 //subMode_T vimGetSubMode(void);
 // not in use
+/*
 func GetSubmode() C.subMode_T {
 	return C.vimGetSubMode()
+}
+*/
+type SubMode int
+
+const (
+	// SMNone corresponds to the C enum SM_NONE.
+	SMNone SubMode = C.SM_NONE
+	// SMInsertLiteral corresponds to the C enum SM_INSERT_LITERAL.
+	SMInsertLiteral SubMode = C.SM_INSERT_LITERAL
+)
+
+func GetSubMode() SubMode {
+	sm := C.vimGetSubMode()
+	return SubMode(sm)
 }
 
 type pendingOp_T struct {

@@ -3,6 +3,7 @@ package vim
 import (
 	"log"
 
+	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/govim"
 	"github.com/slzatz/vimango/vim/interfaces"
 )
@@ -50,9 +51,6 @@ func (g *GoImplementation) GetBufferWrapper() interfaces.VimBuffer {
 func (g *GoImplementation) GetName() string {
 	return ImplGo
 }
-
-
-
 
 // GoEngineWrapper wraps the Go-based vim engine in package govim
 // GoEngineWrapper satisfies the VimEngine interface
@@ -144,6 +142,11 @@ func (e *GoEngineWrapper) GetMode() int {
 // GetCurrentMode gets the current mode with application-compatible mappings
 func (e *GoEngineWrapper) GetCurrentMode() int {
 	return e.engine.GetMode()
+}
+
+// GetCurrentMode gets the current mode with application-compatible mappings
+func (e *GoEngineWrapper) GetSubMode() cvim.SubMode {
+	return e.engine.GetSubMode()
 }
 
 // VisualGetRange gets the visual selection range
