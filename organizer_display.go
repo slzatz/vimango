@@ -119,6 +119,7 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 	}
 
 	ab.WriteString(RESET)
+	ab.WriteString(WHITE)
 	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
 	width := o.Screen.divider - sortX
 	if width > 0 {

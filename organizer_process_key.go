@@ -110,27 +110,28 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 	}
 
+	// commands are letters or control characters or :
 	if _, err := strconv.Atoi(string(c)); err != nil {
-		o.command += string(c)
-	}
+		o.command += string(c) //note currently all are single characters although future could use leader+chars
 
-	if cmd, found := o.normalCmds[o.command]; found {
-		cmd(o)
-		// if command is one of j,k,i,l then don't redraw
-		redraw_map := map[string]struct{}{
-			string(ctrlKey('a')): {}, // have retired starring for the moment
-			string(ctrlKey('d')): {},
-			string(ctrlKey('x')): {},
-			"m":                  {},
+		if cmd, found := o.normalCmds[o.command]; found {
+			cmd(o)
+			// if command is one of j,k,i,l then don't redraw
+			redraw_map := map[string]struct{}{
+				string(ctrlKey('a')): {}, // have retired starring for the moment
+				string(ctrlKey('d')): {},
+				string(ctrlKey('x')): {},
+				"m":                  {},
+			}
+			if _, ok := redraw_map[o.command]; ok {
+				redraw = RedrawPartial
+			} else {
+				redraw = RedrawNone
+			}
+			o.command = ""
+			vim.SendKey("<esc>")
+			return
 		}
-		if _, ok := redraw_map[o.command]; ok {
-			redraw = RedrawPartial
-		} else {
-			redraw = RedrawNone
-		}
-		o.command = ""
-		vim.SendKey("<esc>")
-		return
 	}
 
 	// in NORMAL mode don't want leader, O, o, V, ctrl-V, J being passed to vim
@@ -145,9 +146,14 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
 	// anything sent to vim should only require the active screen line to be redrawn
 	// however if the row changes we need to erase the > from the previous row
-	prevRow := o.fr
-	//o.ShowMessage(BR, "Normal mode key %d", c)
 	sendToVim(c)
+
+	mode := vim.GetCurrentMode()
+	if mode == 4 { // OP_PENDING like 4da
+		return
+	}
+
+	prevRow := o.fr
 	pos := vim.GetCursorPosition()
 	o.fc = pos[1]
 	newRow := pos[0] - 1
@@ -165,26 +171,12 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		} else {
 			o.displayContainerInfo()
 		}
-		//redraw = RedrawPartial
 	}
-	//redraw = RedrawPartial
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
 	//firstLine := vim.WindowGetTopLine() // doesn't seem to work
 	o.updateRowStatus()
-
-	// should this move up?
-	mode := vim.GetCurrentMode()
-
-	// OP_PENDING like 4da
-	// Seems like this should move up
-	if mode == 4 {
-		return
-	}
 	o.command = ""
-	// the only way to get into EX_COMMAND or SEARCH
-	//if mode.Mode == "c" && p.mode != SEARCH  //note that "c" => SEARCH
-	//if mode == 8 && org.mode != SEARCH  //note that 8 => SEARCH
 	if mode == 16 && o.mode != INSERT {
 		o.showMessage("\x1b[1m-- INSERT --\x1b[0m")
 	}
@@ -200,7 +192,8 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 }
 
 func (o *Organizer) VisualModeKeyHandler(c int) {
-	if c == 'j' || c == 'k' || c == 'J' || c == 'V' || c == ctrlKey('v') || c == 'g' || c == 'G' {
+	// in VISUAL mode don't want J, V, ctrl-V being passed to vim
+	if c == 'J' || c == 'V' || c == ctrlKey('v') {
 		o.showMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
 		return
 	}
@@ -209,8 +202,7 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 	o.rows[o.fr].title = s
 	pos := vim.GetCursorPosition()
 	o.fc = pos[1]
-	// need to prevent row from changing in INSERT mode; for instance, an when an up or down arrow is pressed
-	// note can probably remove j,k,g,G from the above
+	// need to prevent row from changing in VISUAL mode; this catches j,k,g,G and arrow keys
 	if o.fr != pos[0]-1 {
 		vim.SetCursorPosition(o.fr+1, o.fc)
 	}
