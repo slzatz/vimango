@@ -33,6 +33,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	//	skip := false
 	var exit bool
 
+	// the switch is basically pre-processing before sending key to vim
 	// Below don't  handle NORMAL_BUSY because just want that to drop through
 	switch e.mode {
 	//case INSERT:

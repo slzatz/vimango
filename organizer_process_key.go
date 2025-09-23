@@ -37,7 +37,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 	switch o.mode {
 	case INSERT:
 		redraw = o.InsertModeKeyHandler(c)
-	case NORMAL:
+	case NORMAL, NORMAL_BUSY:
 		redraw = o.NormalModeKeyHandler(c)
 	case VISUAL:
 		o.VisualModeKeyHandler(c)
@@ -95,7 +95,6 @@ func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
 }
 
 func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
-
 	redraw = RedrawNone
 	if c == '\r' {
 
@@ -147,6 +146,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 	// anything sent to vim should only require the active screen line to be redrawn
 	// however if the row changes we need to erase the > from the previous row
 	prevRow := o.fr
+	//o.ShowMessage(BR, "Normal mode key %d", c)
 	sendToVim(c)
 	pos := vim.GetCursorPosition()
 	o.fc = pos[1]
@@ -194,7 +194,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		o.highlight[1] = pos[1][1] + 1
 		o.highlight[0] = pos[0][1]
 	}
-	o.showMessage("%s", s)
+	o.ShowMessage(BL, "%s", s)
 	redraw = RedrawPartial
 	return
 }
