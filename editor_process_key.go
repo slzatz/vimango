@@ -89,7 +89,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				e.searchPrefix = string(c)
 				e.ShowMessage(BR, e.searchPrefix)
 			}
-			e.ShowMessage(BL, "mode: %d  %s e.mode: %s", mode, e.mode) //////Debug
+			e.ShowMessage(BL, "mode: %d | e.mode: %s", mode, e.mode) //////Debug
 			return false
 		}
 	case 16: //INSERT
