@@ -110,7 +110,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 	}
 
-	// commands are letters or control characters or :
+	// commands are letters or control characters
 	if _, err := strconv.Atoi(string(c)); err != nil {
 		o.command += string(c) //note currently all are single characters although future could use leader+chars
 
@@ -134,15 +134,21 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 	}
 
-	// in NORMAL mode don't want leader, O, o, V, ctrl-V, J being passed to vim
-	if _, ok := noopKeys[c]; ok {
-		if c != int([]byte(leader)[0]) {
-			o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
+	/*
+		if _, ok := noopKeys[c]; ok {
+			if c != int([]byte(leader)[0]) {
+				o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
+			}
+			return
 		}
+	*/
+
+	// in NORMAL mode don't want ? leader, O, o, V, ctrl-V, J being passed to vim
+	switch c {
+	case 'J', 'V', ctrlKey('v'), 'o', 'O':
+		o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
 		return
 	}
-
-	// should check for mode 4 be here?
 
 	// anything sent to vim should only require the active screen line to be redrawn
 	// however if the row changes we need to erase the > from the previous row
@@ -150,6 +156,14 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
 	mode := vim.GetCurrentMode()
 	if mode == 4 { // OP_PENDING like 4da
+		return
+	}
+
+	if mode == 8 { // COMMAND or SEARCH
+		o.ShowMessage(BL, ":")
+		o.command_line = ""
+		o.last_mode = o.mode //Should probably be NORMAL
+		o.mode = COMMAND_LINE
 		return
 	}
 
@@ -187,16 +201,27 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		o.highlight[0] = pos[0][1]
 	}
 	o.ShowMessage(BL, "%s", s)
+	//could put this redraw inside if o.mode == VISUAL and then check GetLastChangedTick
 	redraw = RedrawPartial
 	return
 }
 
 func (o *Organizer) VisualModeKeyHandler(c int) {
-	// in VISUAL mode don't want J, V, ctrl-V being passed to vim
-	if c == 'J' || c == 'V' || c == ctrlKey('v') {
+	/*
+		if c == 'J' || c == 'V' || c == ctrlKey('v') || c == ':' {
+			o.showMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
+			return
+		}
+	*/
+
+	// in VISUAL mode don't want J, V, ctrl-V, : being passed to vim
+	// in vim : triggers visual selection range :'<,'>
+	switch c {
+	case 'J', 'V', ctrlKey('v'), ':':
 		o.showMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
 		return
 	}
+
 	sendToVim(c)
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s

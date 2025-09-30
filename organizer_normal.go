@@ -71,13 +71,15 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	})
 
 	// Mode Switching commands
-	registry.Register(":", (*Organizer).exCmd, CommandInfo{
-		Name:        keyToDisplayName(":"),
-		Description: "Enter command line mode",
-		Usage:       ":",
-		Category:    "Mode Switching",
-		Examples:    []string{": - Enter ex command mode to run commands"},
-	})
+	/*
+		registry.Register(":", (*Organizer).exCmd, CommandInfo{
+			Name:        keyToDisplayName(":"),
+			Description: "Enter command line mode",
+			Usage:       ":",
+			Category:    "Mode Switching",
+			Examples:    []string{": - Enter ex command mode to run commands"},
+		})
+	*/
 
 	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('l'))),
@@ -110,6 +112,7 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	return registry.GetFunctionMap()
 }
 
+/*
 // if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
 var noopKeys = map[int]struct{}{
 	int([]byte(leader)[0]): {},
@@ -119,6 +122,7 @@ var noopKeys = map[int]struct{}{
 	'o':                    {},
 	'J':                    {},
 }
+*/
 
 func (o *Organizer) exCmd() {
 	o.ShowMessage(BL, ":")

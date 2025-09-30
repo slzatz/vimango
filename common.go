@@ -74,6 +74,7 @@ var sortColumns = map[string]struct{}{
 	"priority": z0,
 }
 
+/*
 var navKeys = map[int]struct{}{
 	ARROW_UP:    z0,
 	ARROW_DOWN:  z0,
@@ -86,6 +87,7 @@ var navKeys = map[int]struct{}{
 	'g':         z0,
 	'G':         z0,
 }
+*/
 
 var termcodes = map[int]string{
 	ARROW_UP:    "<up>", // could also do with vimKey as <Right>, <Left>, <Up>, <Down>
