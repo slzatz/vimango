@@ -17,15 +17,23 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	if c == '\x1b' {
 		vim.SendKey("<esc>")
 		e.ss = e.vbuf.Lines() /// for commands like 4i
-		e.mode = NORMAL
-		e.ShowMessage(BL, "e.mode: %s", e.mode) //////Debug
+		//e.mode = NORMAL_BUSY
+		prevMode := e.mode
+		mode := vim.GetCurrentMode() ////////
+		e.mode = modeMap[mode]
+		e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 		e.command = ""
 		e.command_line = ""
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 		e.ShowMessage(BR, "")
-		return false
+		//return false
+		if prevMode == VISUAL { //need to redraw to remove highlight
+			return true
+		} else {
+			return false
+		}
 	}
 
 	// if exit is false, doesn't matter if redraw is false since redraw will be determined
@@ -36,9 +44,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	// the switch is basically pre-processing before sending key to vim
 	// Below don't  handle NORMAL_BUSY because just want that to drop through
 	switch e.mode {
-	//case INSERT:
-	//	redraw, skip = false, false
-	case NORMAL: //only gets here from escape, which actually works
+	case NORMAL, NORMAL_BUSY: //NORMAL only occurs after INSERT is escaped
 		redraw, exit = e.NormalModeKeyHandler(c)
 	case VISUAL:
 		redraw, exit = e.VisualModeKeyHandler(c)
@@ -63,15 +69,22 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		vim.SendInput(string(c))
 	}
 
+	tick := e.vbuf.GetLastChangedTick()
+	if tick > e.bufferTick {
+		e.bufferTick = tick
+		redraw = true
+	} else {
+		redraw = false
+	}
 	mode := vim.GetCurrentMode()
 	//submode := vim.GetSubMode() added this 9-22-25 but really only for obscure submodes
 
 	switch mode {
+	//case 1: //NORMAL
+	//	e.mode = NORMAL
 	case 4: //OP_PENDING delete, change, yank, etc
-		//m, _ := modeMap[mode]
-		//e.mode = m
 		e.mode = PENDING
-		e.ShowMessage(BL, "mode: %d  e.mode: %s ", mode, e.mode) //////Debug
+		e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 		return false
 	case 8: //SEARCH and EX_COMMAND
 		// Note: will not hit this case if we are in e.mode == Ex_COMMAND because we
@@ -89,7 +102,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				e.searchPrefix = string(c)
 				e.ShowMessage(BR, e.searchPrefix)
 			}
-			e.ShowMessage(BL, "mode: %d | e.mode: %s", mode, e.mode) //////Debug
+			e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 			return false
 		}
 	case 16: //INSERT
@@ -97,34 +110,26 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 			e.mode = INSERT
 			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 		}
-		redraw = true
+		//redraw = true
 	case 2: //VISUAL_MODE
 		vmode := vim.GetVisualType()
 		e.vmode = visualModeMap[vmode]
 		e.mode = VISUAL
 		//e.ShowMessage(BR, "Current visualType from vim: %d, visual test: %v", vmode, mode == 118)
 		e.highlightInfo()
-		e.ShowMessage(BL, "mode: %d  vmode: %s e.mode: %s", mode, e.vmode, e.mode) //////Debug
+		//e.ShowMessage(BL, "vim mode: %d | vmode: %s | e.mode: %s", mode, e.vmode, e.mode) //////Debug
 		redraw = true
-	case 257: //NORMAL_BUSY
-		e.mode = NORMAL_BUSY
-		if c >= '0' && c <= '9' {
-			return false
-		}
-		if _, ok := navKeys[c]; ok {
-			redraw = false
-		} else {
-			redraw = true
-		}
-	default:
-		if m, ok := modeMap[mode]; ok { //note that 8 => SEARCH (8 is also COMMAND)
-			e.mode = m
-		} else {
-			e.mode = OTHER // not sure this ever happens
-		}
-		redraw = false
+		//case 257: //NORMAL_BUSY
+		//	e.mode = NORMAL_BUSY
 	}
-	e.ShowMessage(BL, "mode: %d  e.mode: %s", mode, e.mode) //////Debug
+	//default:
+	if m, ok := modeMap[mode]; ok { //note that 8 => SEARCH (8 is also COMMAND)
+		e.mode = m
+	} else {
+		e.mode = OTHER // not sure this ever happens
+	}
+	//} // was end of switch mode
+	e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
 	e.ss = e.vbuf.Lines()
 	// Add safety checks to prevent panic with empty buffers

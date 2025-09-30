@@ -40,6 +40,7 @@ type Editor struct {
 	highlightPositions []Position
 	suggestions        []string //spelling suggestions
 	bufferTick         int
+	saveTick           int
 	modified           bool     // tracks if the buffer has been modified
 	title              string   // title of the note
 	tabCompletion      struct { // for tab completion

@@ -394,8 +394,8 @@ func (a *App) MainLoop() {
 				if !a.Session.editorMode {
 					continue
 				}
-				ae.scroll()
-				if redraw {
+				offset_changed := ae.scroll()
+				if redraw || offset_changed {
 					//ae := a.Session.activeEditor ///// doesn't do anything
 					//ae.scroll()
 					ae.drawText()

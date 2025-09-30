@@ -15,7 +15,7 @@ import (
 
 	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/vim"
-	"github.com/stephenafamo/goldmark-pdf"
+	pdf "github.com/stephenafamo/goldmark-pdf"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -385,7 +385,7 @@ func (e *Editor) writeNote() {
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
-	e.bufferTick = e.vbuf.GetLastChangedTick()
+	e.saveTick = e.vbuf.GetLastChangedTick()
 
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 	e.ShowMessage(BR, "isModified = %t", e.isModified())
@@ -1006,7 +1006,7 @@ func (e *Editor) createPDF() {
 func preprocessImageDescriptions(markdown string) string {
 	// Regular expression to match image markdown: ![anything](url)
 	imageRegex := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
-	
+
 	// Replace with empty description: ![](url)
 	return imageRegex.ReplaceAllString(markdown, `![]($2)`)
 }

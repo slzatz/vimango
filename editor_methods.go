@@ -713,11 +713,13 @@ func (e *Editor) drawFrame() {
 }
 
 // note that app.returnCursor uses e.cy and e.cx to position the terminal cursor
-func (e *Editor) scroll() {
+func (e *Editor) scroll() (offset_changed bool) {
+
+	prevOffset := e.lineOffset
 
 	if e.fc == 0 && e.fr == 0 {
 		e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0
-		return
+		return prevOffset != e.lineOffset
 	}
 
 	e.cx = e.getScreenXFromRowColWW(e.fr, e.fc)
@@ -739,6 +741,8 @@ func (e *Editor) scroll() {
 	}
 
 	e.cy = cy - e.lineOffset
+
+	return prevOffset != e.lineOffset
 }
 
 // e.lineOffset determines the first
@@ -855,7 +859,7 @@ func (e *Editor) isModified() bool {
 	//return e.vbuf.IsModified()
 
 	tick := e.vbuf.GetLastChangedTick()
-	if tick > e.bufferTick {
+	if tick > e.saveTick {
 		//e.bufferTick = tick
 		return true
 	}
