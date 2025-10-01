@@ -466,6 +466,7 @@ func (o *Organizer) help(pos int) {
 	o.altRowoff = 0
 	o.drawRenderedNote()
 	o.mode = NAVIGATE_RENDER
+	//o.mode = NORMAL
 	o.command_line = ""
 }
 

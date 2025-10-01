@@ -161,9 +161,12 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
 	if mode == 8 { // COMMAND or SEARCH
 		o.ShowMessage(BL, ":")
+		vim.SendKey("<esc>") // park in NORMAL mode
 		o.command_line = ""
 		o.last_mode = o.mode //Should probably be NORMAL
 		o.mode = COMMAND_LINE
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
 		return
 	}
 
@@ -258,6 +261,8 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		if cmd, found = o.exCmds[s]; found {
 			cmd(o, pos)
 			redraw = RedrawFull
+			//o.mode = o.last_mode - could be NAVIGATE_RENDER
+			return
 		}
 		// to catch find with more than one find term
 		if !found && pos != -1 && strings.Count(o.command_line, " ") > 1 {
@@ -266,26 +271,26 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 				// pass the position of the first space
 				cmd(o, pos)
 				redraw = RedrawFull
+				o.mode = o.last_mode
+				return
 			}
 		}
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 
-		if !found {
-			// Try to provide helpful suggestions using command registry
-			if o.commandRegistry != nil {
-				suggestions := o.commandRegistry.SuggestCommand(s)
-				if len(suggestions) > 0 {
-					o.showMessage("%sCommand '%s' not found. Did you mean: %s?%s", RED_BG, s, strings.Join(suggestions, ", "), RESET)
-				} else {
-					o.showMessage("%sCommand '%s' not found. Use ':help' to see available commands.%s", RED_BG, s, RESET)
-				}
+		// Try to provide helpful suggestions using command registry
+		if o.commandRegistry != nil {
+			suggestions := o.commandRegistry.SuggestCommand(s)
+			if len(suggestions) > 0 {
+				o.showMessage("%sCommand '%s' not found. Did you mean: %s?%s", RED_BG, s, strings.Join(suggestions, ", "), RESET)
 			} else {
-				// Fallback if registry not available
-				o.showMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
+				o.showMessage("%sCommand '%s' not found. Use ':help' to see available commands.%s", RED_BG, s, RESET)
 			}
-			o.mode = o.last_mode
+		} else {
+			// Fallback if registry not available
+			o.showMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
 		}
+		o.mode = o.last_mode
 		return
 
 	case '\t':
@@ -343,9 +348,10 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 
 // Used for viewing sync log and help
 func (o *Organizer) NavigateRenderModeKeyHandler(c int) RedrawScope {
+	o.ShowMessage(BL, "NavigateRender mode")
 	switch c {
-	case ':':
-		o.exCmd()
+	//case ':':
+	//	o.exCmd()
 	case ctrlKey('j'), PAGE_DOWN:
 		o.scrollPreviewDown()
 	case ctrlKey('k'), PAGE_UP:

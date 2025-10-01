@@ -124,12 +124,14 @@ var noopKeys = map[int]struct{}{
 }
 */
 
+/*
 func (o *Organizer) exCmd() {
 	o.ShowMessage(BL, ":")
 	o.command_line = ""
 	o.last_mode = o.mode //at the least picks up NORMAL and NO_ROWS
 	o.mode = COMMAND_LINE
 }
+*/
 
 /*
 func noop() {
