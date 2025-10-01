@@ -71,16 +71,6 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	})
 
 	// Mode Switching commands
-	/*
-		registry.Register(":", (*Organizer).exCmd, CommandInfo{
-			Name:        keyToDisplayName(":"),
-			Description: "Enter command line mode",
-			Usage:       ":",
-			Category:    "Mode Switching",
-			Examples:    []string{": - Enter ex command mode to run commands"},
-		})
-	*/
-
 	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('l'))),
 		Description: "Move to editor to the left (if one is active)",
@@ -111,33 +101,6 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 
 	return registry.GetFunctionMap()
 }
-
-/*
-// if c == int([]byte(leader)[0]) || c == 'O' || c == 'V' || c == ctrlKey('v') || c == 'o' || c == 'J' {
-var noopKeys = map[int]struct{}{
-	int([]byte(leader)[0]): {},
-	'V':                    {},
-	ctrlKey('v'):           {},
-	'O':                    {},
-	'o':                    {},
-	'J':                    {},
-}
-*/
-
-/*
-func (o *Organizer) exCmd() {
-	o.ShowMessage(BL, ":")
-	o.command_line = ""
-	o.last_mode = o.mode //at the least picks up NORMAL and NO_ROWS
-	o.mode = COMMAND_LINE
-}
-*/
-
-/*
-func noop() {
-	return
-}
-*/
 
 func (o *Organizer) mark() {
 	if o.view != TASK {
@@ -217,22 +180,43 @@ func (o *Organizer) switchToEditorMode() {
 	o.Screen.drawRightScreen()
 }
 
+// for scrolling rendered note in report layet (help and sync)
 func (o *Organizer) scrollPreviewDown() {
 	if o.altRowoff == len(o.note)-1 {
 		o.ShowMessage(BL, "Reached end of rendered note")
 		return
 	}
-	o.Screen.eraseRightScreen()
 	o.altRowoff++
 	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
+	o.Screen.eraseRightScreen()
 	o.drawRenderedNote()
 }
 
+// for scrolling rendered note in report layet (help and sync)
 func (o *Organizer) scrollPreviewUp() {
 	if o.altRowoff > 0 {
 		o.altRowoff--
 		o.Screen.eraseRightScreen()
 		o.drawRenderedNote()
+	}
+}
+
+func (o *Organizer) scrollReportDown() {
+	if o.altRowoff == len(o.note)-1 {
+		o.ShowMessage(BL, "Reached end of rendered note")
+		return
+	}
+	o.altRowoff++
+	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
+	o.drawReportLayer()
+	o.drawRenderedNoteInReportLayer()
+}
+
+func (o *Organizer) scrollReportUp() {
+	if o.altRowoff > 0 {
+		o.altRowoff--
+		o.drawReportLayer()
+		o.drawRenderedNoteInReportLayer()
 	}
 }
 

@@ -396,8 +396,6 @@ func (a *App) MainLoop() {
 				}
 				offset_changed := ae.scroll()
 				if redraw || offset_changed {
-					//ae := a.Session.activeEditor ///// doesn't do anything
-					//ae.scroll()
 					ae.drawText()
 					ae.drawStatusBar()
 				}
@@ -407,7 +405,7 @@ func (a *App) MainLoop() {
 					a.returnCursor()
 					continue
 				}
-				if org.scroll() {
+				if org.scroll() || org.taskview == BY_FIND {
 					org.refreshScreen()
 					a.returnCursor()
 					continue

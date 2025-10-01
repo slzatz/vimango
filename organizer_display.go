@@ -34,6 +34,7 @@ func (o *Organizer) refreshScreen() {
 	fmt.Print(ab.String())
 	if o.taskview == BY_FIND {
 		o.drawSearchRows()
+		o.drawActive() //////////////////////////
 	} else {
 		o.drawRows()
 	}
@@ -136,11 +137,6 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 }
 
 func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
-	if fr == o.fr {
-		o.drawActiveRow(ab)
-		return
-	}
-
 	row := &o.rows[fr]
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
@@ -466,7 +462,7 @@ func (o *Organizer) renderMarkdown(s string) {
 		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
 		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
 	}
-	note = WordWrap(note, o.Screen.totaleditorcols)
+	note = WordWrap(note, o.Screen.totaleditorcols-20)
 	o.note = strings.Split(note, "\n")
 }
 
@@ -482,4 +478,54 @@ func (o *Organizer) renderCode(s string, lang string) {
 	}
 	note = WordWrap(note, o.Screen.totaleditorcols)
 	o.note = strings.Split(note, "\n")
+}
+
+func (o *Organizer) drawReportLayer() {
+	var ab strings.Builder
+	width := o.Screen.totaleditorcols - 10
+	length := o.Screen.textLines - 10
+
+	// \x1b[NC moves cursor forward by N columns
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+6)
+
+	//hide the cursor
+	ab.WriteString("\x1b[?25l")
+	// move the cursor
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
+
+	//erase set number of chars on each line
+	erase_chars := fmt.Sprintf("\x1b[%dX", o.Screen.totaleditorcols-10)
+	for i := 0; i < length-1; i++ {
+		ab.WriteString(erase_chars)
+		ab.WriteString(lf_ret)
+	}
+
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
+
+	// \x1b[ 2*x is DECSACE to operate in rectable mode
+	// \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
+	// \x1b[ *x is DECSACE to exit rectangle mode
+	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
+		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
+	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
+	fmt.Print(ab.String())
+	o.Screen.drawPreviewBox()
+}
+func (o *Organizer) drawRenderedNoteInReportLayer() {
+	if len(o.note) == 0 {
+		return
+	}
+	start := o.altRowoff
+	var end int
+	// check if there are more lines than can fit on the screen
+	if len(o.note)-start > o.Screen.textLines-10 {
+		end = o.Screen.textLines + start - 12
+	} else {
+		//end = len(o.note) - 1
+		end = len(o.note)
+	}
+	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+7)
+	fmt.Print(strings.Join(o.note[start:end], lf_ret))
+	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
 }

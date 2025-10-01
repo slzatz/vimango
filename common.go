@@ -119,13 +119,13 @@ const (
 	EX_COMMAND   // only in editor mode
 	VISUAL_LINE  // only editor mode
 	VISUAL
-	VISUAL_BLOCK    // only editor mode
-	SEARCH          // only editor mode
-	FIND            // only organizer mode
+	VISUAL_BLOCK // only editor mode
+	SEARCH       // only editor mode
+	//FIND            // only organizer mode
 	PREVIEW         // only editor mode - for previewing markdown
 	VIEW_LOG        // only in editor mode - for debug viewing of vim message hx
 	SPELLING        // this mode recognizes 'z='
-	NAVIGATE_RENDER // only in organizer mode
+	NAVIGATE_REPORT // only in organizer mode
 	LINKS           // only in organizer mode
 	PENDING
 	OTHER // Just in case
@@ -289,11 +289,11 @@ func (m Mode) String() string {
 		"VISUAL",
 		"VISUAL BLOCK",
 		"SEARCH",
-		"FIND",
+		//"FIND",
 		"PREVIEW",
 		"VIEW LOG",
 		"SPELLING",
-		"NAVIGATE_RENDER",
+		"NAVIGATE_REPORT",
 		"LINKS",
 		"PENDING",
 		"OTHER",

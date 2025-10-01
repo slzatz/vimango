@@ -460,13 +460,11 @@ func (o *Organizer) help(pos int) {
 		}
 	}
 
-	// Display help in the preview area
-	o.Screen.eraseRightScreen()
 	o.renderMarkdown(helpText)
 	o.altRowoff = 0
-	o.drawRenderedNote()
-	o.mode = NAVIGATE_RENDER
-	//o.mode = NORMAL
+	o.drawReportLayer()
+	o.drawRenderedNoteInReportLayer()
+	o.mode = NAVIGATE_REPORT
 	o.command_line = ""
 }
 
@@ -979,7 +977,6 @@ func (o *Organizer) sync3(_ int) {
 		return
 	}
 	o.command_line = ""
-	o.Screen.eraseRightScreen()
 	note := generateWWString(log, o.Screen.totaleditorcols)
 	// below draw log as markeup
 	r, _ := glamour.NewTermRenderer(
@@ -994,8 +991,9 @@ func (o *Organizer) sync3(_ int) {
 	note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawRenderedNote()
-	o.mode = NAVIGATE_RENDER
+	o.drawReportLayer()
+	o.drawRenderedNoteInReportLayer()
+	o.mode = NAVIGATE_REPORT
 }
 
 func (o *Organizer) initialBulkLoad(_ int) {
@@ -1021,7 +1019,7 @@ func (o *Organizer) initialBulkLoad(_ int) {
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
 	o.drawRenderedNote()
-	o.mode = NAVIGATE_RENDER
+	o.mode = NAVIGATE_REPORT
 }
 
 func (o *Organizer) reverse(_ int) {
@@ -1047,7 +1045,7 @@ func (o *Organizer) reverse(_ int) {
 	o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
 	o.drawRenderedNote()
-	o.mode = NAVIGATE_RENDER
+	o.mode = NAVIGATE_REPORT
 }
 
 func (o *Organizer) list(pos int) {
@@ -1313,12 +1311,12 @@ func (o *Organizer) copyEntry(_ int) {
 }
 
 func (o *Organizer) savelog(_ int) {
-	if o.last_mode == NAVIGATE_RENDER {
+	if o.last_mode == NAVIGATE_REPORT {
 		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
 		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
 		o.ShowMessage(BL, "Sync log save to database")
 		o.command_line = ""
-		o.mode = NAVIGATE_RENDER
+		o.mode = NAVIGATE_REPORT
 	} else {
 		o.ShowMessage(BL, "There is no sync log to save")
 		o.command_line = ""

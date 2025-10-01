@@ -16,15 +16,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		vim.SendKey("<esc>")
 		o.last_mode = o.mode // not sure this is necessary
 		o.mode = NORMAL
-
-		// Get cursor position - removed 9/18/2023 as ? unnecessary
-		//pos := vim.GetCursorPosition()
-		//o.fc = pos[1]
-		//o.fr = pos[0] - 1
-
-		//new 9/18/2023 previously wasn't reset so used last value from last displayed render
 		o.altRowoff = 0
-
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 		o.Session.imagePreview = false
@@ -44,8 +36,8 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		redraw = RedrawPartial
 	case COMMAND_LINE:
 		redraw = o.ExModeKeyHandler(c)
-	case NAVIGATE_RENDER:
-		redraw = o.NavigateRenderModeKeyHandler(c)
+	case NAVIGATE_REPORT:
+		redraw = o.NavigateReportModeKeyHandler(c)
 	default:
 		return
 	}
@@ -116,32 +108,30 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
 		if cmd, found := o.normalCmds[o.command]; found {
 			cmd(o)
-			// if command is one of j,k,i,l then don't redraw
-			redraw_map := map[string]struct{}{
-				string(ctrlKey('a')): {}, // have retired starring for the moment
-				string(ctrlKey('d')): {},
-				string(ctrlKey('x')): {},
-				"m":                  {},
-			}
-			if _, ok := redraw_map[o.command]; ok {
+			switch o.command {
+			case string(ctrlKey('a')), string(ctrlKey('d')), string(ctrlKey('x')), "m":
 				redraw = RedrawPartial
-			} else {
+			default:
 				redraw = RedrawNone
 			}
+			/*
+				redraw_map := map[string]struct{}{
+					string(ctrlKey('a')): {}, // have retired starring for the moment
+					string(ctrlKey('d')): {},
+					string(ctrlKey('x')): {},
+					"m":                  {},
+				}
+				if _, ok := redraw_map[o.command]; ok {
+					redraw = RedrawPartial
+				} else {
+					redraw = RedrawNone
+				}
+			*/
 			o.command = ""
 			vim.SendKey("<esc>")
 			return
 		}
 	}
-
-	/*
-		if _, ok := noopKeys[c]; ok {
-			if c != int([]byte(leader)[0]) {
-				o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)
-			}
-			return
-		}
-	*/
 
 	// in NORMAL mode don't want ? leader, O, o, V, ctrl-V, J being passed to vim
 	switch c {
@@ -347,15 +337,15 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 }
 
 // Used for viewing sync log and help
-func (o *Organizer) NavigateRenderModeKeyHandler(c int) RedrawScope {
+func (o *Organizer) NavigateReportModeKeyHandler(c int) RedrawScope {
 	o.ShowMessage(BL, "NavigateRender mode")
 	switch c {
 	//case ':':
 	//	o.exCmd()
 	case ctrlKey('j'), PAGE_DOWN:
-		o.scrollPreviewDown()
+		o.scrollReportDown()
 	case ctrlKey('k'), PAGE_UP:
-		o.scrollPreviewUp()
+		o.scrollReportUp()
 	}
 	return RedrawNone
 }
