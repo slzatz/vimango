@@ -401,6 +401,7 @@ func (a *App) MainLoop() {
 				}
 			} else {
 				redraw := org.organizerProcessKey(k)
+				//org.ShowMessage(BR, "redraw: %d", redraw) ///DEBUG
 				if a.Session.editorMode {
 					a.returnCursor()
 					continue

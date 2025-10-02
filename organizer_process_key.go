@@ -61,6 +61,17 @@ func (o *Organizer) updateRowStatus() {
 	}
 }
 
+func (o *Organizer) updateRowStatus2() bool {
+	row := &o.rows[o.fr]
+	tick := o.vbuf.GetLastChangedTick()
+	if tick > o.bufferTick {
+		row.dirty = true
+		o.bufferTick = tick
+		return true
+	}
+	return false
+}
+
 func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
 	redraw = RedrawPartial
 	if c == '\r' {
@@ -73,7 +84,9 @@ func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
 		o.command = ""
 		return RedrawPartial // was RedrawFull
 	}
+
 	sendToVim(c)
+
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
 	pos := vim.GetCursorPosition()
@@ -130,6 +143,11 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 	// anything sent to vim should only require the active screen line to be redrawn
 	// however if the row changes we need to erase the > from the previous row
 	sendToVim(c)
+	if o.updateRowStatus2() {
+		redraw = RedrawPartial
+	} else {
+		redraw = RedrawNone
+	}
 
 	mode := vim.GetCurrentMode()
 	if mode == 4 { // OP_PENDING like 4da
@@ -169,7 +187,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
 	//firstLine := vim.WindowGetTopLine() // doesn't seem to work
-	o.updateRowStatus()
+	//o.updateRowStatus()
 	o.command = ""
 	if mode == 16 && o.mode != INSERT {
 		o.showMessage("\x1b[1m-- INSERT --\x1b[0m")
@@ -179,10 +197,11 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		pos := vim.GetVisualRange()
 		o.highlight[1] = pos[1][1] + 1
 		o.highlight[0] = pos[0][1]
+		redraw = RedrawPartial
 	}
 	o.ShowMessage(BL, "%s", s)
 	//could put this redraw inside if o.mode == VISUAL and then check GetLastChangedTick
-	redraw = RedrawPartial
+	//redraw = RedrawPartial
 	return
 }
 
@@ -203,6 +222,7 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 	}
 
 	sendToVim(c)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
 	pos := vim.GetCursorPosition()

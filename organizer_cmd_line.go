@@ -788,8 +788,9 @@ func (o *Organizer) editNote(id int) {
 		ae.vbuf = vim.NewBuffer(0)
 		vim.SetCurrentBuffer(ae.vbuf)
 		ae.vbuf.SetLines(0, -1, ae.ss)
-		////////
+		//////// need to look at whether we need both buffer and save tick 10/01/2025
 		ae.bufferTick = ae.vbuf.GetLastChangedTick()
+		ae.saveTick = ae.vbuf.GetLastChangedTick()
 		o.Session.activeEditor = ae
 	}
 

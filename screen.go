@@ -15,7 +15,7 @@ type Screen struct {
 	divider         int
 	totaleditorcols int
 	imgSizeY        int
-	edPct           int          // percent that editor space takes up of whole horiz screen real estate
+	edPct           int             // percent that editor space takes up of whole horiz screen real estate
 	ws              rawmode.Winsize //Row,Col,Xpixel,Ypixel unint16
 	Session         *Session
 	//images           map[string]*image.Image
@@ -54,8 +54,8 @@ func (s *Screen) eraseScreenRedrawLines() {
 func (s *Screen) eraseRightScreen() {
 	var ab strings.Builder
 
-	fmt.Print("\x1b_Ga=d\x1b\\") //delete any images
-	ab.WriteString("\x1b[?25l")  //hides the cursor
+	//fmt.Print("\x1b_Ga=d\x1b\\") //delete any images
+	ab.WriteString("\x1b[?25l") //hides the cursor
 
 	//below positions cursor such that top line is erased the first time through
 	//for loop although ? could really start on second line since need to redraw
@@ -68,7 +68,7 @@ func (s *Screen) eraseRightScreen() {
 		ab.WriteString("\x1b[K")
 		ab.WriteString(lf_ret)
 	}
-	ab.WriteString("\x1b[K") //added 09302020 to erase the last line (message line)
+	//ab.WriteString("\x1b[K") //added 09302020 to erase the last line (message line)
 
 	// redraw top horizontal line which has t's and was erased above
 	// ? if the individual editors draw top lines do we need to just
