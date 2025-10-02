@@ -114,19 +114,6 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 			default:
 				redraw = RedrawNone
 			}
-			/*
-				redraw_map := map[string]struct{}{
-					string(ctrlKey('a')): {}, // have retired starring for the moment
-					string(ctrlKey('d')): {},
-					string(ctrlKey('x')): {},
-					"m":                  {},
-				}
-				if _, ok := redraw_map[o.command]; ok {
-					redraw = RedrawPartial
-				} else {
-					redraw = RedrawNone
-				}
-			*/
 			o.command = ""
 			vim.SendKey("<esc>")
 			return

@@ -34,7 +34,7 @@ func (o *Organizer) refreshScreen() {
 	fmt.Print(ab.String())
 	if o.taskview == BY_FIND {
 		o.drawSearchRows()
-		o.drawActive() //////////////////////////
+		//o.drawActive() //////////////////////////
 	} else {
 		o.drawRows()
 	}
@@ -138,18 +138,32 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 
 func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 	row := &o.rows[fr]
+
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
-	if row.star {
-		ab.WriteString("\x1b[1m")
-		ab.WriteString("\x1b[1;36m")
+	note := o.Database.readNoteIntoString(row.id)
+	if googleDriveRegex.MatchString(note) {
+		ab.WriteString(BOLD)
 	}
+	if timeKeywordsRegex.MatchString(row.sort) {
+		ab.WriteString(CYAN)
+	} else {
+		ab.WriteString(WHITE)
+	}
+
 	if row.archived && row.deleted {
 		ab.WriteString(GREEN)
 	} else if row.archived {
 		ab.WriteString(YELLOW)
 	} else if row.deleted {
 		ab.WriteString(RED)
+	}
+
+	if row.dirty {
+		ab.WriteString(BLACK + WHITE_BG)
+	}
+	if _, ok := o.marked_entries[row.id]; ok {
+		ab.WriteString(BLACK + YELLOW_BG)
 	}
 
 	if len(row.title) <= titlecols {

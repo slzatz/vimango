@@ -405,7 +405,7 @@ func (a *App) MainLoop() {
 					a.returnCursor()
 					continue
 				}
-				if org.scroll() || org.taskview == BY_FIND {
+				if org.scroll() { //|| org.taskview == BY_FIND {
 					org.refreshScreen()
 					a.returnCursor()
 					continue
@@ -416,6 +416,9 @@ func (a *App) MainLoop() {
 				case RedrawFull:
 					org.refreshScreen()
 				case RedrawPartial:
+					if org.taskview == BY_FIND {
+						org.refreshScreen() // not efficient since just need it to redraw previous row
+					}
 					org.drawActive()
 				}
 
