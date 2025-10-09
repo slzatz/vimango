@@ -471,7 +471,6 @@ func (a *App) processNotifications(org *Organizer) {
 		if notification == "" {
 			return
 		}
-		org.ShowMessage(BL, notification)
 		org.drawNotice(notification)
 		org.altRowoff = 0
 		org.mode = NAVIGATE_NOTICE
