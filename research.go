@@ -30,16 +30,25 @@ type ResearchManager struct {
 }
 
 type ResearchTask struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Prompt      string    `json:"prompt"`
-	Status      string    `json:"status"` // pending, running, completed, failed
-	StartTime   time.Time `json:"start_time"`
-	EndTime     time.Time `json:"end_time,omitempty"`
-	Result      string    `json:"result,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	SourceEntry int       `json:"source_entry"` // ID of the entry containing the research prompt
-	DebugMode   bool      `json:"debug_mode"`   // Whether to include full debug info
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	Prompt        string    `json:"prompt"`
+	Status        string    `json:"status"` // pending, running, completed, failed
+	StartTime     time.Time `json:"start_time"`
+	EndTime       time.Time `json:"end_time,omitempty"`
+	Result        string    `json:"result,omitempty"`
+	Error         string    `json:"error,omitempty"`
+	SourceEntry   int       `json:"source_entry"` // ID of the entry containing the research prompt
+	DebugMode     bool      `json:"debug_mode"`   // Whether to include full debug info
+	notifications []string  // Buffer for collecting notifications during research
+	notifyMux     sync.Mutex // Protect notifications slice
+}
+
+// addNotification adds a notification message to the task's buffer
+func (t *ResearchTask) addNotification(message string) {
+	t.notifyMux.Lock()
+	defer t.notifyMux.Unlock()
+	t.notifications = append(t.notifications, message)
 }
 
 type ClaudeRequest struct {
@@ -145,14 +154,18 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 			task.Status = "failed"
 			task.Error = fmt.Sprintf("Task processing panic: %v", r)
 			task.EndTime = time.Now()
+			task.addNotification(fmt.Sprintf("❌ Task processing panic: %v", r))
 			delete(rm.running, task.ID)
 			rm.mutex.Unlock()
 
-			rm.notifyCompletion(task)
+			rm.displayAggregatedNotification(task)
 		}
 	}()
 
 	rm.logDebug("Starting processing for task %s: %s", task.ID, task.Title)
+
+	// Add initial status notification
+	task.addNotification(fmt.Sprintf("🔍 Research started for: %s", task.Title))
 
 	rm.mutex.Lock()
 	task.Status = "running"
@@ -174,32 +187,33 @@ func (rm *ResearchManager) processTask(task *ResearchTask) {
 	if err != nil {
 		task.Status = "failed"
 		task.Error = err.Error()
+		task.addNotification(fmt.Sprintf("❌ Research failed: %s", task.Error))
 		rm.logDebug("Task %s marked as failed: %s", task.ID, task.Error)
 	} else {
 		task.Status = "completed"
 		task.Result = result
+		task.addNotification(fmt.Sprintf("✅ Research completed successfully (%d characters)", len(result)))
 		rm.logDebug("Task %s marked as completed, creating research note...", task.ID)
 
-		// Create new note with research results
-		// Run in separate goroutine but with error handling
-		go func(t *ResearchTask) {
-			defer func() {
-				if r := recover(); r != nil {
-					rm.logDebug("PANIC in research note creation goroutine: %v", r)
-				}
-			}()
-			rm.createResearchNote(t)
-		}(task)
+		// Remove from running tasks before creating note (since we're now synchronous)
+		delete(rm.running, task.ID)
+		rm.mutex.Unlock()
+
+		// Create new note with research results synchronously
+		rm.createResearchNote(task)
+
+		// Lock again to complete the cleanup
+		rm.mutex.Lock()
 	}
 
-	// Remove from running tasks
+	// Remove from running tasks (if not already removed)
 	delete(rm.running, task.ID)
 	rm.mutex.Unlock()
 
-	rm.logDebug("Task %s processing completed, sending notification", task.ID)
+	rm.logDebug("Task %s processing completed, displaying aggregated notification", task.ID)
 
-	// Notify user
-	rm.notifyCompletion(task)
+	// Display aggregated notification to user
+	rm.displayAggregatedNotification(task)
 }
 
 func (rm *ResearchManager) performResearch(prompt string, debugMode bool) (string, error) {
@@ -233,7 +247,7 @@ func (rm *ResearchManager) performResearch(prompt string, debugMode bool) (strin
 	}
 
 	request := ClaudeRequest{
-		Model:     "claude-sonnet-4-20250514", // Using Sonnet 4 with web fetch support
+		Model:     "claude-sonnet-4-5-20250929", // Using Sonnet 4.5 with web fetch support
 		MaxTokens: 4000,
 		Messages: []Message{
 			{
@@ -547,7 +561,7 @@ func (rm *ResearchManager) createResearchNote(task *ResearchTask) {
 	defer func() {
 		if r := recover(); r != nil {
 			rm.logDebug("PANIC in createResearchNote: %v", r)
-			rm.app.addNotification(fmt.Sprintf("⚠️ Research note creation failed: %v", r))
+			task.addNotification(fmt.Sprintf("⚠️ Research note creation failed: %v", r))
 		}
 	}()
 
@@ -680,7 +694,7 @@ Debug files saved in vimango_research_debug/ directory:
 	err := rm.app.Database.insertTitle(row, 1, 1)
 	if err != nil {
 		rm.logDebug("ERROR inserting research note title: %v", err)
-		rm.app.addNotification(fmt.Sprintf("⚠️ Failed to create research note: %v", err))
+		task.addNotification(fmt.Sprintf("⚠️ Failed to create research note: %v", err))
 		return
 	}
 	rm.logDebug("Successfully inserted research note with ID: %d", row.id)
@@ -690,26 +704,68 @@ Debug files saved in vimango_research_debug/ directory:
 	err = rm.app.Database.updateNote(row.id, markdown)
 	if err != nil {
 		rm.logDebug("ERROR updating research note content: %v", err)
-		rm.app.addNotification(fmt.Sprintf("⚠️ Failed to update research note content: %v", err))
+		task.addNotification(fmt.Sprintf("⚠️ Failed to update research note content: %v", err))
 		return
 	}
 
 	rm.logDebug("Research note created successfully with ID %d, includes debug information", row.id)
-	rm.app.addNotification(fmt.Sprintf("✅ Research note created successfully (ID: %d)", row.id))
+	task.addNotification(fmt.Sprintf("✅ Research note created successfully (ID: %d)", row.id))
 }
 
-func (rm *ResearchManager) notifyCompletion(task *ResearchTask) {
-	// This will be implemented to integrate with vimango's notification system
-	// For now, we'll use a simple approach
-	message := ""
+// displayAggregatedNotification creates and displays a single comprehensive notification
+// with all information collected during the research process
+func (rm *ResearchManager) displayAggregatedNotification(task *ResearchTask) {
+	var notificationBuilder strings.Builder
+
+	// Header with status
 	if task.Status == "completed" {
-		message = fmt.Sprintf("✓ Research completed: %s", task.Title)
+		notificationBuilder.WriteString("✅ RESEARCH COMPLETED\n")
 	} else {
-		message = fmt.Sprintf("✗ Research failed: %s (%s)", task.Title, task.Error)
+		notificationBuilder.WriteString("❌ RESEARCH FAILED\n")
+	}
+	notificationBuilder.WriteString(strings.Repeat("─", 50) + "\n")
+
+	// Task information
+	notificationBuilder.WriteString(fmt.Sprintf("Title: %s\n", task.Title))
+
+	// Duration
+	duration := task.EndTime.Sub(task.StartTime).Round(time.Second)
+	notificationBuilder.WriteString(fmt.Sprintf("Duration: %v\n", duration))
+
+	// Research metrics (if available)
+	if rm.lastSearchCount > 0 || rm.lastFetchCount > 0 {
+		notificationBuilder.WriteString(fmt.Sprintf("Web Searches: %d\n", rm.lastSearchCount))
+		notificationBuilder.WriteString(fmt.Sprintf("Web Fetches: %d\n", rm.lastFetchCount))
+
+		// Token usage
+		if rm.lastUsage.InputTokens > 0 || rm.lastUsage.OutputTokens > 0 {
+			notificationBuilder.WriteString(fmt.Sprintf("Tokens: %d input, %d output\n",
+				rm.lastUsage.InputTokens, rm.lastUsage.OutputTokens))
+
+			// Research quality
+			quality := getResearchQualityDescription(rm.lastUsage.InputTokens, rm.lastSearchCount, rm.lastFetchCount)
+			notificationBuilder.WriteString(fmt.Sprintf("Quality: %s\n", quality))
+		}
 	}
 
-	// Add to a notification queue that the main app can check
-	rm.app.addNotification(message)
+	// Add error information if failed
+	if task.Status == "failed" && task.Error != "" {
+		notificationBuilder.WriteString(fmt.Sprintf("\nError: %s\n", task.Error))
+	}
+
+	// Add all collected notifications in chronological order
+	task.notifyMux.Lock()
+	if len(task.notifications) > 0 {
+		notificationBuilder.WriteString("\n" + strings.Repeat("─", 50) + "\n")
+		notificationBuilder.WriteString("Process Log:\n")
+		for i, notification := range task.notifications {
+			notificationBuilder.WriteString(fmt.Sprintf("%d. %s\n", i+1, notification))
+		}
+	}
+	task.notifyMux.Unlock()
+
+	// Send the aggregated notification
+	rm.app.addNotification(notificationBuilder.String())
 }
 
 func (rm *ResearchManager) StartResearch(title, prompt string, sourceEntryID int, debugMode bool) (string, error) {

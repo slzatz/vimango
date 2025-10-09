@@ -166,8 +166,11 @@ For enhanced deep research with web fetch capabilities:
 - **File**: `research.go` - Core research system with ResearchManager and Claude API integration
 - **Modified Files**: `app.go`, `main.go`, `common.go`, `organizer_cmd_line.go` - Integration and command registration
 - **Enhanced Features**:
-  - Notification system with web fetch status updates
-  - Queue management for asynchronous processing
+  - **Aggregated Notification System**: Single comprehensive notification displayed when research completes
+    - Buffers all status messages during research processing
+    - Displays consolidated summary with duration, metrics, quality rating, and chronological process log
+    - Presented via `processNotifications()` in `app.go` after note creation completes
+  - Queue management for asynchronous background processing
   - Structured markdown generation with enhanced statistics
   - Dual-tool counting from result blocks for accurate metrics
   - Web fetch specific error detection and troubleshooting

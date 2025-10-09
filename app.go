@@ -374,7 +374,7 @@ func (a *App) MainLoop() {
 	a.startKeyReader()
 
 	if a.HasNotifications() {
-		a.drainNotifications(org)
+		a.processNotifications(org)
 		a.returnCursor()
 	}
 
@@ -432,7 +432,7 @@ func (a *App) MainLoop() {
 				org.ShowMessage(BL, "Readkey problem %v", err)
 			}
 		case <-a.notificationCh:
-			a.drainNotifications(org)
+			a.processNotifications(org)
 		}
 		a.returnCursor()
 	}
@@ -451,8 +451,8 @@ func (a *App) addNotification(message string) {
 	}
 }
 
-// GetNextNotification retrieves and removes the next notification from the queue
-func (a *App) GetNextNotification() string {
+// GetNotification retrieves and removes the next notification from the queue
+func (a *App) GetNotification() string {
 	a.notificationMux.Lock()
 	defer a.notificationMux.Unlock()
 
@@ -465,9 +465,9 @@ func (a *App) GetNextNotification() string {
 	return message
 }
 
-func (a *App) drainNotifications(org *Organizer) {
+func (a *App) processNotifications(org *Organizer) {
 	for {
-		notification := a.GetNextNotification()
+		notification := a.GetNotification()
 		if notification == "" {
 			return
 		}
