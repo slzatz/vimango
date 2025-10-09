@@ -180,7 +180,7 @@ func (o *Organizer) switchToEditorMode() {
 	o.Screen.drawRightScreen()
 }
 
-// for scrolling rendered note in report layet (help and sync)
+// for scrolling terminal markdown rendered note
 func (o *Organizer) scrollPreviewDown() {
 	if o.altRowoff == len(o.note)-1 {
 		o.ShowMessage(BL, "Reached end of rendered note")
@@ -192,7 +192,7 @@ func (o *Organizer) scrollPreviewDown() {
 	o.drawRenderedNote()
 }
 
-// for scrolling rendered note in report layet (help and sync)
+// for scrolling terminal markdown rendered note
 func (o *Organizer) scrollPreviewUp() {
 	if o.altRowoff > 0 {
 		o.altRowoff--
@@ -201,22 +201,30 @@ func (o *Organizer) scrollPreviewUp() {
 	}
 }
 
-func (o *Organizer) scrollReportDown() {
+// for scrolling reports (notices) like help
+func (o *Organizer) scrollNoticeDown() {
+	if len(o.notice) == 0 {
+		return
+	}
 	if o.altRowoff == len(o.note)-1 {
 		o.ShowMessage(BL, "Reached end of rendered note")
 		return
 	}
 	o.altRowoff++
 	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
-	o.drawReportLayer()
-	o.drawRenderedNoteInReportLayer()
+	o.drawNoticeLayer()
+	o.drawNoticeText()
 }
 
-func (o *Organizer) scrollReportUp() {
+// for scrolling reports (notices) like help
+func (o *Organizer) scrollNoticeUp() {
+	if len(o.notice) == 0 {
+		return
+	}
 	if o.altRowoff > 0 {
 		o.altRowoff--
-		o.drawReportLayer()
-		o.drawRenderedNoteInReportLayer()
+		o.drawNoticeLayer()
+		o.drawNoticeText()
 	}
 }
 

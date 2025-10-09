@@ -494,10 +494,35 @@ func (o *Organizer) renderCode(s string, lang string) {
 	o.note = strings.Split(note, "\n")
 }
 
-func (o *Organizer) drawReportLayer() {
+func (o *Organizer) drawNotice(s string) {
+	o.renderNotice(s)
+	if len(o.notice) == 0 {
+		return
+	}
+	o.drawNoticeLayer()
+	o.drawNoticeText()
+}
+
+func (o *Organizer) renderNotice(s string) {
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithStylePath("darkslz.json"),
+		glamour.WithWordWrap(0),
+	)
+	note, _ := r.Render(s)
+	// glamour seems to add a '\n' at the start
+	note = strings.TrimSpace(note)
+
+	note = WordWrap(note, o.Screen.totaleditorcols-20)
+	o.notice = strings.Split(note, "\n")
+}
+
+func (o *Organizer) drawNoticeLayer() {
 	var ab strings.Builder
 	width := o.Screen.totaleditorcols - 10
-	length := o.Screen.textLines - 10
+	length := len(o.notice)
+	if length > o.Screen.textLines-10 {
+		length = o.Screen.textLines - 10
+	}
 
 	// \x1b[NC moves cursor forward by N columns
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+6)
@@ -509,7 +534,7 @@ func (o *Organizer) drawReportLayer() {
 
 	//erase set number of chars on each line
 	erase_chars := fmt.Sprintf("\x1b[%dX", o.Screen.totaleditorcols-10)
-	for i := 0; i < length-1; i++ {
+	for i := 0; i < length; i++ {
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}
@@ -523,23 +548,70 @@ func (o *Organizer) drawReportLayer() {
 		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
 	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
 	fmt.Print(ab.String())
-	o.Screen.drawPreviewBox()
+	o.drawNoticeBox()
 }
-func (o *Organizer) drawRenderedNoteInReportLayer() {
-	if len(o.note) == 0 {
-		return
+
+func (o *Organizer) drawNoticeBox() {
+	width := o.Screen.totaleditorcols - 10
+	length := len(o.notice) + 1
+	if length > o.Screen.textLines-9 {
+		length = o.Screen.textLines - 9
+	}
+	var ab strings.Builder
+	move_cursor := fmt.Sprintf("\x1b[%dC", width)
+
+	ab.WriteString("\x1b(0") // Enter line drawing mode
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, o.Screen.divider+6)
+	ab.WriteString("\x1b[37;1ml") //upper left corner
+
+	for i := 1; i < length; i++ {
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5+i, o.Screen.divider+6)
+		// x=0x78 vertical line (q=0x71 is horizontal) 37=white; 1m=bold (only need 1 m)
+		ab.WriteString("\x1b[37;1mx")
+		ab.WriteString(move_cursor)
+		ab.WriteString("\x1b[37;1mx")
+	}
+
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+4+length, o.Screen.divider+6)
+	ab.WriteString("\x1b[1B")
+	ab.WriteString("\x1b[37;1mm") //lower left corner
+
+	move_cursor = fmt.Sprintf("\x1b[1D\x1b[%dB", length)
+
+	for i := 1; i < width+1; i++ {
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, o.Screen.divider+6+i)
+		ab.WriteString("\x1b[37;1mq")
+		ab.WriteString(move_cursor)
+		ab.WriteString("\x1b[37;1mq")
+	}
+
+	ab.WriteString("\x1b[37;1mj") //lower right corner
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, o.Screen.divider+7+width)
+	ab.WriteString("\x1b[37;1mk") //upper right corner
+
+	//exit line drawing mode
+	ab.WriteString("\x1b(B")
+	ab.WriteString("\x1b[0m")
+	ab.WriteString("\x1b[?25h")
+	fmt.Print(ab.String())
+}
+
+func (o *Organizer) drawNoticeText() {
+	length := len(o.notice)
+	if length > o.Screen.textLines-10 {
+		length = o.Screen.textLines - 10
 	}
 	start := o.altRowoff
 	var end int
 	// check if there are more lines than can fit on the screen
-	if len(o.note)-start > o.Screen.textLines-10 {
-		end = o.Screen.textLines + start - 12
+	if len(o.notice)-start > length {
+		end = length + start - 2
 	} else {
 		//end = len(o.note) - 1
-		end = len(o.note)
+		end = len(o.notice)
 	}
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+7)
-	fmt.Print(strings.Join(o.note[start:end], lf_ret))
+	fmt.Print(strings.Join(o.notice[start:end], lf_ret))
 	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
 }

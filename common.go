@@ -125,7 +125,7 @@ const (
 	PREVIEW         // only editor mode - for previewing markdown
 	VIEW_LOG        // only in editor mode - for debug viewing of vim message hx
 	SPELLING        // this mode recognizes 'z='
-	NAVIGATE_REPORT // only in organizer mode
+	NAVIGATE_NOTICE // only in organizer mode
 	LINKS           // only in organizer mode
 	PENDING
 	OTHER // Just in case
@@ -293,7 +293,7 @@ func (m Mode) String() string {
 		"PREVIEW",
 		"VIEW LOG",
 		"SPELLING",
-		"NAVIGATE_REPORT",
+		"NAVIGATE_NOTICE",
 		"LINKS",
 		"PENDING",
 		"OTHER",

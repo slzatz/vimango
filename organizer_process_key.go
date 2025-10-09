@@ -36,8 +36,8 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		redraw = RedrawPartial
 	case COMMAND_LINE:
 		redraw = o.ExModeKeyHandler(c)
-	case NAVIGATE_REPORT:
-		redraw = o.NavigateReportModeKeyHandler(c)
+	case NAVIGATE_NOTICE:
+		redraw = o.NavigateNoticeModeKeyHandler(c)
 	default:
 		return
 	}
@@ -344,15 +344,15 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 }
 
 // Used for viewing sync log and help
-func (o *Organizer) NavigateReportModeKeyHandler(c int) RedrawScope {
+func (o *Organizer) NavigateNoticeModeKeyHandler(c int) RedrawScope {
 	o.ShowMessage(BL, "NavigateRender mode")
 	switch c {
 	//case ':':
 	//	o.exCmd()
 	case ctrlKey('j'), PAGE_DOWN:
-		o.scrollReportDown()
+		o.scrollNoticeDown()
 	case ctrlKey('k'), PAGE_UP:
-		o.scrollReportUp()
+		o.scrollNoticeUp()
 	}
 	return RedrawNone
 }

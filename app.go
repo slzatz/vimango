@@ -472,6 +472,9 @@ func (a *App) drainNotifications(org *Organizer) {
 			return
 		}
 		org.ShowMessage(BL, notification)
+		org.drawNotice(notification)
+		org.altRowoff = 0
+		org.mode = NAVIGATE_NOTICE
 	}
 }
 

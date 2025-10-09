@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/vim"
@@ -340,14 +339,15 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":save note.txt", ":save /tmp/backup.md"},
 	})
 
-	registry.Register("savelog", (*Organizer).savelog, CommandInfo{
-		Name:        "savelog",
-		Description: "Save current sync log to database",
-		Usage:       "savelog",
-		Category:    "Output & Export",
-		Examples:    []string{":savelog"},
-	})
-
+	/*
+		registry.Register("savelog", (*Organizer).savelog, CommandInfo{
+			Name:        "savelog",
+			Description: "Save current sync log to database",
+			Usage:       "savelog",
+			Category:    "Output & Export",
+			Examples:    []string{":savelog"},
+		})
+	*/
 	// System commands
 	registry.Register("quit", (*Organizer).quitApp, CommandInfo{
 		Name:        "quit",
@@ -460,11 +460,9 @@ func (o *Organizer) help(pos int) {
 		}
 	}
 
-	o.renderMarkdown(helpText)
+	o.drawNotice(helpText)
 	o.altRowoff = 0
-	o.drawReportLayer()
-	o.drawRenderedNoteInReportLayer()
-	o.mode = NAVIGATE_REPORT
+	o.mode = NAVIGATE_NOTICE
 	o.command_line = ""
 }
 
@@ -979,22 +977,23 @@ func (o *Organizer) sync3(_ int) {
 	}
 	o.command_line = ""
 	note := generateWWString(log, o.Screen.totaleditorcols)
+	o.drawNotice(note)
 	// below draw log as markeup
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
-		glamour.WithWordWrap(0),
-	)
-	note, _ = r.Render(note)
-	note = strings.TrimSpace(note)
-	note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04072022
-	//headings seem to place \x1b[0m after the return
-	note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
-	note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
-	o.note = strings.Split(note, "\n")
+	//r, _ := glamour.NewTermRenderer(
+	//	glamour.WithStylePath("darkslz.json"),
+	//	glamour.WithWordWrap(0),
+	//)
+	//note, _ = r.Render(note)
+	//note = strings.TrimSpace(note)
+	//note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04072022
+	////headings seem to place \x1b[0m after the return
+	//note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
+	//note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
+	//o.notice = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawReportLayer()
-	o.drawRenderedNoteInReportLayer()
-	o.mode = NAVIGATE_REPORT
+	//o.drawNoticeLayer(0) //0 means use full screen height
+	//o.drawRenderedNoteInNoticeLayer(0)
+	o.mode = NAVIGATE_NOTICE
 }
 
 func (o *Organizer) initialBulkLoad(_ int) {
@@ -1008,19 +1007,20 @@ func (o *Organizer) initialBulkLoad(_ int) {
 	o.command_line = ""
 	o.Screen.eraseRightScreen()
 	note := generateWWString(log, o.Screen.totaleditorcols)
+	o.drawNotice(note)
 	// below draw log as markeup
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
-		glamour.WithWordWrap(0),
-	)
-	note, _ = r.Render(note)
-	if note[0] == '\n' {
-		note = note[1:]
-	}
-	o.note = strings.Split(note, "\n")
+	//r, _ := glamour.NewTermRenderer(
+	//	glamour.WithStylePath("darkslz.json"),
+	//	glamour.WithWordWrap(0),
+	//)
+	//note, _ = r.Render(note)
+	//if note[0] == '\n' {
+	//	note = note[1:]
+	//}
+	//o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawRenderedNote()
-	o.mode = NAVIGATE_REPORT
+	//o.drawRenderedNote()
+	o.mode = NAVIGATE_NOTICE
 }
 
 func (o *Organizer) reverse(_ int) {
@@ -1034,19 +1034,20 @@ func (o *Organizer) reverse(_ int) {
 	o.command_line = ""
 	o.Screen.eraseRightScreen()
 	note := generateWWString(log, o.Screen.totaleditorcols)
+	o.drawNotice(note)
 	// below draw log as markeup
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
-		glamour.WithWordWrap(0),
-	)
-	note, _ = r.Render(note)
-	if note[0] == '\n' {
-		note = note[1:]
-	}
-	o.note = strings.Split(note, "\n")
+	//r, _ := glamour.NewTermRenderer(
+	//	glamour.WithStylePath("darkslz.json"),
+	//	glamour.WithWordWrap(0),
+	//)
+	//note, _ = r.Render(note)
+	//if note[0] == '\n' {
+	//	note = note[1:]
+	//}
+	//o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	o.drawRenderedNote()
-	o.mode = NAVIGATE_REPORT
+	//o.drawRenderedNote()
+	o.mode = NAVIGATE_NOTICE
 }
 
 func (o *Organizer) list(pos int) {
@@ -1311,19 +1312,21 @@ func (o *Organizer) copyEntry(_ int) {
 	o.ShowMessage(BL, "Entry copied")
 }
 
+/*
 func (o *Organizer) savelog(_ int) {
-	if o.last_mode == NAVIGATE_REPORT {
+	if o.last_mode == NAVIGATE_NOTICE {
 		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
 		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
 		o.ShowMessage(BL, "Sync log save to database")
 		o.command_line = ""
-		o.mode = NAVIGATE_REPORT
+		o.mode = NAVIGATE_NOTICE
 	} else {
 		o.ShowMessage(BL, "There is no sync log to save")
 		o.command_line = ""
 		o.mode = o.last_mode
 	}
 }
+*/
 
 func (o *Organizer) save(pos int) {
 	if pos == -1 {
