@@ -289,13 +289,15 @@ func (db *Database) insertTitle(row *Row, context_tid, folder_tid int) error { /
 	row.id = id
 	row.dirty = false
 
-	/***************fts virtual table update*********************/
+	/**** note if we are inserting a new entry that there is nothing in the fts table to update
+	/***************fts virtual table update*********************
 	entry_tid := db.entryTidFromId(id)
 
 	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
 	if err != nil {
 		return err
 	}
+	*/
 	return nil
 }
 
