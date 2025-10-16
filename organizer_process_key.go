@@ -14,7 +14,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		o.showMessage("")
 		o.command = ""
 		vim.SendKey("<esc>")
-		o.last_mode = o.mode // not sure this is necessary
+		//o.last_mode = o.mode // not sure this is necessary
 		o.mode = NORMAL
 		o.altRowoff = 0
 		o.tabCompletion.index = 0
@@ -158,7 +158,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		o.ShowMessage(BL, ":")
 		vim.SendKey("<esc>") // park in NORMAL mode
 		o.command_line = ""
-		o.last_mode = o.mode //Should probably be NORMAL
+		//o.last_mode = o.mode //Should probably be NORMAL
 		o.mode = COMMAND_LINE
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
@@ -268,7 +268,8 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 				// pass the position of the first space
 				cmd(o, pos)
 				redraw = RedrawFull
-				o.mode = o.last_mode
+				//o.mode = o.last_mode
+				o.mode = NORMAL
 				return
 			}
 		}
@@ -287,7 +288,8 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 			// Fallback if registry not available
 			o.showMessage("%sNot a recognized command: %s%s", RED_BG, s, RESET)
 		}
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 
 	case '\t':
@@ -347,12 +349,18 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 func (o *Organizer) NavigateNoticeModeKeyHandler(c int) RedrawScope {
 	o.ShowMessage(BL, "NavigateRender mode")
 	switch c {
-	//case ':':
-	//	o.exCmd()
 	case ctrlKey('j'), PAGE_DOWN:
 		o.scrollNoticeDown()
 	case ctrlKey('k'), PAGE_UP:
 		o.scrollNoticeUp()
+	case ':': // COMMAND or SEARCH
+		o.ShowMessage(BL, ":")
+		vim.SendKey("<esc>") // park in NORMAL mode
+		o.command_line = ""
+		//o.last_mode = o.mode //Should probably be NORMAL
+		o.mode = COMMAND_LINE
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
 	}
 	return RedrawNone
 }

@@ -74,7 +74,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":write", ":w"},
 	})
 
-	registry.Register("sync", (*Organizer).sync3, CommandInfo{
+	registry.Register("sync", (*Organizer).synchronize, CommandInfo{
 		Name:        "sync",
 		Aliases:     []string{"test"},
 		Description: "Synchronize with remote server (test for dry-run)",
@@ -217,14 +217,16 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":showall", ":show"},
 	})
 
-	registry.Register("image", (*Organizer).setImage, CommandInfo{
-		Name:        "image",
-		Aliases:     []string{"images"},
-		Description: "Toggle image preview on/off",
-		Usage:       "image <on|off>",
-		Category:    "View Control",
-		Examples:    []string{":image on", ":images off"},
-	})
+	/*
+		registry.Register("image", (*Organizer).setImage, CommandInfo{
+			Name:        "image",
+			Aliases:     []string{"images"},
+			Description: "Toggle image preview on/off",
+			Usage:       "image <on|off>",
+			Category:    "View Control",
+			Examples:    []string{":image on", ":images off"},
+		})
+	*/
 
 	registry.Register("webview", (*Organizer).showWebView, CommandInfo{
 		Name:        "webview",
@@ -384,11 +386,13 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 // help displays help information for organizer commands
 func (o *Organizer) help(pos int) {
-	if o.commandRegistry == nil {
-		o.ShowMessage(BL, "Help system not available")
-		o.mode = o.last_mode
-		return
-	}
+	/*
+		if o.commandRegistry == nil {
+			o.ShowMessage(BL, "Help system not available")
+			o.mode = o.last_mode
+			return
+		}
+	*/
 
 	var helpText string
 
@@ -593,7 +597,9 @@ func (o *Organizer) open(pos int) {
 	}
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not provide a context or folder!")
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		// It might be necessary or prudent to also sendvim an <esc> here
+		o.mode = NORMAL
 		return
 	}
 	var ok bool
@@ -608,7 +614,8 @@ func (o *Organizer) open(pos int) {
 	}
 	if !ok {
 		o.ShowMessage(BL, "%s is not a valid context or folder!", input)
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	o.filter = input
@@ -618,13 +625,15 @@ func (o *Organizer) open(pos int) {
 func (o *Organizer) openContext(pos int) {
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not provide a context!")
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	input := o.command_line[pos+1:]
 	if _, ok := o.Database.contextExists(input); !ok {
 		o.ShowMessage(BL, "%s is either not a valid context or has not been synced!", input)
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	o.taskview = BY_CONTEXT
@@ -635,13 +644,15 @@ func (o *Organizer) openContext(pos int) {
 func (o *Organizer) openFolder(pos int) {
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not provide a folder!")
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	input := o.command_line[pos+1:]
 	if _, ok := o.Database.folderExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	o.taskview = BY_FOLDER
@@ -652,13 +663,15 @@ func (o *Organizer) openFolder(pos int) {
 func (o *Organizer) openKeyword(pos int) {
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not provide a keyword!")
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	input := o.command_line[pos+1:]
 	if _, ok := o.Database.keywordExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	o.taskview = BY_KEYWORD
@@ -707,7 +720,8 @@ func (o *Organizer) write(pos int) {
 	} else {
 		o.ShowMessage(BL, "These ids were updated: %v", updated_rows)
 	}
-	o.mode = o.last_mode
+	//o.mode = o.last_mode
+	o.mode = NORMAL
 	o.command_line = ""
 }
 
@@ -735,7 +749,8 @@ func (o *Organizer) editNote(id int) {
 	var ae *Editor
 	if o.view != TASK {
 		o.command = ""
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		o.ShowMessage(BL, "Only entries have notes to edit!")
 		return
 	}
@@ -747,7 +762,8 @@ func (o *Organizer) editNote(id int) {
 	if id == -1 {
 		o.ShowMessage(BL, "You need to save item before you can create a note")
 		o.command = ""
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 
@@ -815,7 +831,8 @@ func (o *Organizer) verticalResize(pos int) {
 		return
 	}
 	app.moveDividerAbs(width)
-	o.mode = o.last_mode
+	//o.mode = o.last_mode
+	o.mode = NORMAL
 }
 
 /*
@@ -883,7 +900,8 @@ func (o *Organizer) refresh(flag int) {
 			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.drawPreview()
 		} else {
-			o.mode = o.last_mode
+			//o.mode = o.last_mode
+			o.mode = NORMAL
 			o.fc, o.fr, o.rowoff = 0, 0, 0
 			o.FilterEntries(MAX)
 			if len(o.rows) == 0 {
@@ -899,7 +917,8 @@ func (o *Organizer) refresh(flag int) {
 			o.drawPreview()
 		}
 	} else {
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
 		o.rows = o.Database.getContainers(o.view)
 		if len(o.rows) == 0 {
@@ -925,7 +944,8 @@ func (o *Organizer) find(pos int) {
 	var err error
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not enter something to find!")
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 
@@ -959,7 +979,7 @@ func (o *Organizer) find(pos int) {
 	o.drawPreview()
 }
 
-func (o *Organizer) sync3(_ int) {
+func (o *Organizer) synchronize(_ int) {
 	var log string
 	var err error
 	if o.command_line == "test" {
@@ -978,21 +998,7 @@ func (o *Organizer) sync3(_ int) {
 	o.command_line = ""
 	note := generateWWString(log, o.Screen.totaleditorcols)
 	o.drawNotice(note)
-	// below draw log as markeup
-	//r, _ := glamour.NewTermRenderer(
-	//	glamour.WithStylePath("darkslz.json"),
-	//	glamour.WithWordWrap(0),
-	//)
-	//note, _ = r.Render(note)
-	//note = strings.TrimSpace(note)
-	//note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04072022
-	////headings seem to place \x1b[0m after the return
-	//note = strings.ReplaceAll(note, "\n\x1b[0m", "\x1b[0m\n")
-	//note = strings.ReplaceAll(note, "\n\n\n", "\n\n")
-	//o.notice = strings.Split(note, "\n")
 	o.altRowoff = 0
-	//o.drawNoticeLayer(0) //0 means use full screen height
-	//o.drawRenderedNoteInNoticeLayer(0)
 	o.mode = NAVIGATE_NOTICE
 }
 
@@ -1065,7 +1071,8 @@ func (o *Organizer) list(pos int) {
 			o.view = KEYWORD
 		} else {
 			o.ShowMessage(BL, "You need to provide a valid view: c for context, f for folder, k for keyword")
-			o.mode = o.last_mode
+			//o.mode = o.last_mode
+			o.mode = NORMAL
 			return
 		}
 		o.command_line = ""
@@ -1189,7 +1196,8 @@ func (o *Organizer) keywords(pos int) {
 	// not necessary if handled in sync (but not currently handled there)
 	if len(o.marked_entries) == 0 && o.Database.entryTidFromId(o.rows[o.fr].id) < 1 {
 		o.ShowMessage(BL, "The entry has not been synced yet!")
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 
@@ -1198,13 +1206,15 @@ func (o *Organizer) keywords(pos int) {
 	var tid int
 	if tid, ok = o.Database.keywordExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 
 	if tid < 1 {
 		o.ShowMessage(BL, "%q is an unsynced keyword!", input)
-		o.mode = o.last_mode
+		//o.mode = o.last_mode
+		o.mode = NORMAL
 		return
 	}
 	var unsynced []string
@@ -1255,7 +1265,8 @@ func (o *Organizer) recent(_ int) {
 func (o *Organizer) deleteKeywords(_ int) {
 	id := o.getId()
 	res := o.Database.deleteKeywords(id)
-	o.mode = o.last_mode
+	//o.mode = o.last_mode
+	o.mode = NORMAL
 	if res != -1 {
 		o.ShowMessage(BL, "%d keyword(s) deleted from entry %d", res, id)
 	}
@@ -1349,6 +1360,7 @@ func (o *Organizer) save(pos int) {
 	o.ShowMessage(BL, "Note written to file %s", filename)
 }
 
+/*
 func (o *Organizer) setImage(pos int) {
 	if pos == -1 {
 		o.ShowMessage(BL, "You need to provide an option ('on' or 'off')")
@@ -1366,6 +1378,7 @@ func (o *Organizer) setImage(pos int) {
 	o.drawPreview()
 	o.command_line = ""
 }
+*/
 
 func (o *Organizer) printDocument(_ int) {
 	id := o.rows[o.fr].id
@@ -1429,7 +1442,8 @@ func (o *Organizer) printDocument(_ int) {
 	if err != nil {
 		o.ShowMessage(BL, "Error printing document: %v", err)
 	}
-	o.mode = o.last_mode
+	//o.mode = o.last_mode
+	o.mode = NORMAL
 	o.command_line = ""
 }
 
@@ -1512,7 +1526,8 @@ func (o *Organizer) printList(_ int) {
 	if o.Session.activeEditor != nil {
 		vim.SetCurrentBuffer(o.Session.activeEditor.vbuf)
 	}
-	o.mode = o.last_mode
+	//o.mode = o.last_mode
+	o.mode = NORMAL
 	o.command_line = ""
 }
 
@@ -1548,7 +1563,8 @@ func (o *Organizer) printList2(_ int) {
 	if err != nil {
 		o.ShowMessage(BL, "Error printing document: %v", err)
 	}
-	o.mode = o.last_mode
+	//o.mode = o.last_mode
+	o.mode = NORMAL
 	o.command_line = ""
 }
 

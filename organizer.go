@@ -18,8 +18,8 @@ const (
 )
 
 type Organizer struct {
-	mode      Mode
-	last_mode Mode
+	mode Mode
+	//last_mode Mode
 
 	cx, cy    int //cursor x and y position
 	fc, fr    int // file x and y position

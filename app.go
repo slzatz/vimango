@@ -241,7 +241,7 @@ func (a *App) InitApp() {
 	a.Organizer.message = ""
 	a.Organizer.highlight[0], a.Organizer.highlight[1] = -1, -1
 	a.Organizer.mode = NORMAL
-	a.Organizer.last_mode = NORMAL
+	//a.Organizer.last_mode = NORMAL
 	a.Organizer.view = TASK
 	a.Organizer.tabCompletion.list = nil
 	a.Organizer.tabCompletion.index = 0
