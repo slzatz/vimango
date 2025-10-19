@@ -84,7 +84,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	//	e.mode = NORMAL
 	case 4: //OP_PENDING delete, change, yank, etc
 		e.mode = PENDING
-		e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
+		e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %s", mode, e.mode, string(c)) //////Debug
 		return false
 	case 8: //SEARCH and EX_COMMAND
 		// Note: will not hit this case if we are in e.mode == Ex_COMMAND because we
@@ -102,7 +102,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				e.searchPrefix = string(c)
 				e.ShowMessage(BR, e.searchPrefix)
 			}
-			e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
+			e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %s", mode, e.mode, string(c)) //////Debug
 			return false
 		}
 	case 16: //INSERT
@@ -129,7 +129,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.mode = OTHER // not sure this ever happens
 	}
 	//} // was end of switch mode
-	e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
+	e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %s", mode, e.mode, string(c)) //////Debug
 	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
 	e.ss = e.vbuf.Lines()
 	// Add safety checks to prevent panic with empty buffers
