@@ -29,7 +29,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 		e.ShowMessage(BR, "")
 		//return false
-		if prevMode == VISUAL { //need to redraw to remove highlight
+		if prevMode == VISUAL || prevMode == PREVIEW { //need to redraw to remove highlight or if leaving preview
 			return true
 		} else {
 			return false

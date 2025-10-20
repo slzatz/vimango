@@ -218,6 +218,7 @@ func (o *Organizer) drawRows() {
 	// instances that require a full redraw do not require separate drawing of active row
 	//o.drawActiveRow(&ab)
 
+	ab.WriteString(RESET)
 	fmt.Print(ab.String())
 }
 
