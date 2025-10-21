@@ -1,4 +1,4 @@
-{ "document": { "block_prefix": "\n", "block_suffix": "\n", "color": "250", "margin": 0 },
+{ "document": { "block_prefix": "\n", "block_suffix": "\n", "color": "7", "margin": 0 },
   "block_quote": {
     "indent": 1,
     "indent_token": "│ "
@@ -90,14 +90,14 @@
     "format": "Image: {{.text}} "
   },
   "code": {
-    "color": "9"
+    "color": "6"
   },
   "code_block": {
     "color": "244",
     "margin": 4,
     "chroma": {
       "text": {
-        "color": "#ff5f5f"
+        "color": "#928374"
       },
       "error": {
         "color": "#F1F1F1",
