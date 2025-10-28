@@ -27,10 +27,15 @@ func OpenNoteInWebview(title, htmlContent string) error {
 	// Check if webview is already running (with minimal mutex usage)
 	webviewMutex.Lock()
 	if webviewRunning && activeWebview != nil {
-		// Update existing webview content
-		activeWebview.SetTitle(fmt.Sprintf("Vimango - %s", title))
-		activeWebview.SetHtml(htmlContent)
+		// Update existing webview content using Dispatch to ensure thread safety
+		// Dispatch runs the function on the webview's event loop thread
+		w := activeWebview
 		webviewMutex.Unlock()
+
+		w.Dispatch(func() {
+			w.SetTitle(fmt.Sprintf("Vimango - %s", title))
+			w.SetHtml(htmlContent)
+		})
 		return nil
 	}
 	webviewRunning = true
