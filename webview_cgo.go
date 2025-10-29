@@ -77,6 +77,21 @@ func IsWebviewRunning() bool {
 	return webviewRunning
 }
 
+// CloseWebview programmatically closes the active webview window
+func CloseWebview() error {
+	webviewMutex.Lock()
+	defer webviewMutex.Unlock()
+
+	if !webviewRunning || activeWebview == nil {
+		return fmt.Errorf("no webview window is currently open")
+	}
+
+	// Terminate the webview - this will cause w.Run() to return
+	// and the defer cleanup in OpenNoteInWebview will handle state reset
+	activeWebview.Terminate()
+	return nil
+}
+
 // ShowWebviewUnavailableMessage shows a message when webview is not available
 func ShowWebviewUnavailableMessage() {
 	log.Println("Webview is available in this build")

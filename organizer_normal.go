@@ -88,6 +88,14 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 		Examples:    []string{"Ctrl-W - Open current note in web browser"},
 	})
 
+	registry.Register(string(ctrlKey('q')), (*Organizer).closeWebView_n, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('q'))),
+		Description: "Close webkit webview window",
+		Usage:       "Ctrl-Q",
+		Category:    "Preview",
+		Examples:    []string{"Ctrl-Q - Close webview window"},
+	})
+
 	registry.Register(string(ctrlKey('y')), (*Organizer).showEditorWindows, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('y'))),
 		Description: "Show open editor windows",
@@ -257,6 +265,10 @@ func controlZ() {
 
 func (o *Organizer) showWebView_n() {
 	o.showWebView(0)
+}
+
+func (o *Organizer) closeWebView_n() {
+	o.closeWebView(0)
 }
 
 func (o *Organizer) displayEntryInfo(e *NewEntry) {

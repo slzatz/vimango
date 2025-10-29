@@ -39,6 +39,11 @@ func OpenNoteInWebview(title, htmlContent string) error {
 }
 
 
+// CloseWebview returns an error for non-CGO builds (can't close browser programmatically)
+func CloseWebview() error {
+	return fmt.Errorf("webview close not available (browser was opened instead)")
+}
+
 // IsWebviewRunning returns false for non-CGO builds
 func IsWebviewRunning() bool {
 	return isWebviewRunning

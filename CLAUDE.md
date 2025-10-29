@@ -68,11 +68,11 @@ The application features a comprehensive command registry system with full disco
 - `:h` - Short alias for help command
 
 ### Ex Command Organization
-**Organizer Ex Commands (68+ commands in 9 categories):**
+**Organizer Ex Commands (69+ commands in 9 categories):**
 - **Navigation**: open, opencontext, openfolder, openkeyword
 - **Data Management**: new, write, sync, bulkload, refresh
 - **Search & Filter**: find, contexts, folders, keywords, recent, log
-- **View Control**: sort, showall, image, webview, vertical resize
+- **View Control**: sort, showall, image, webview, closewebview, vertical resize
 - **Entry Management**: e (edit), copy, deletekeywords, deletemarks
 - **Container Management**: cc (context), ff (folder), kk (keyword)
 - **Research**: research, researchdebug (rd)
@@ -96,12 +96,12 @@ The application features a comprehensive command registry system with full disco
 - **Utility**: \<leader\>y (next style), \<leader\>t (go template), \<leader\>sp (spell check), \<leader\>su (spell suggest)
 - **System**: Ctrl-Z (switch vim implementation)
 
-**Organizer Normal Mode Commands (10+ commands in 5 categories):**
+**Organizer Normal Mode Commands (11+ commands in 5 categories):**
 - **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive)
 - **Navigation**: Ctrl-J (scroll preview down), Ctrl-K (scroll preview up)
 - **Information**: Ctrl-I (show entry info)
 - **Mode Switching**: : (ex command mode), Ctrl-L (switch to editor)
-- **Preview**: Ctrl-W (web view)
+- **Preview**: Ctrl-W (web view), Ctrl-Q (close web view)
 
 ### Enhanced Error Messages
 - Smart command suggestions for typos using fuzzy matching from both ex and normal command registries

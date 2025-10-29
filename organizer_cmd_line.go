@@ -237,6 +237,15 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":webview", ":wv"},
 	})
 
+	registry.Register("closewebview", (*Organizer).closeWebView, CommandInfo{
+		Name:        "closewebview",
+		Aliases:     []string{"cwv"},
+		Description: "Close webkit webview window",
+		Usage:       "closewebview",
+		Category:    "View Control",
+		Examples:    []string{":closewebview", ":cwv"},
+	})
+
 	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
 		Name:        "vertical resize",
 		Aliases:     []string{"vert res"},
@@ -1496,6 +1505,22 @@ func (o *Organizer) showWebView(_ int) {
 		o.ShowMessage(BL, "Updated webview content")
 	} else {
 		o.ShowMessage(BL, "Launched webview")
+	}
+	o.mode = NORMAL
+}
+
+func (o *Organizer) closeWebView(_ int) {
+	if !IsWebviewRunning() {
+		o.ShowMessage(BL, "No webview window is currently open")
+		o.mode = NORMAL
+		return
+	}
+
+	err := CloseWebview()
+	if err != nil {
+		o.ShowMessage(BL, "Error closing webview: %v", err)
+	} else {
+		o.ShowMessage(BL, "Closed webview window")
 	}
 	o.mode = NORMAL
 	o.command_line = ""
