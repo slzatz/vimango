@@ -12,10 +12,19 @@ This file provides guidance to GEMINI.md when working with code in this reposito
 - Test single function: `go test -run TestFunctionName`
 
 ## Runtime Options
+- `--help`, `-h`: Display help message with all available options and exit
 - `--go-vim`: Use pure Go vim implementation (default: CGO-based libvim)
 - `--go-sqlite`: Use pure Go SQLite driver (modernc.org/sqlite) - default
 - `--cgo-sqlite`: Use CGO SQLite driver (mattn/go-sqlite3) - only available in CGO builds
 - Spell check: Available in CGO builds, shows graceful message in pure Go builds
+
+## Help System
+The application supports standard `--help` and `-h` flags to display comprehensive usage information:
+- Shows all command-line options with descriptions
+- Includes platform-specific behavior notes
+- Displays build instructions and examples
+- Reports runtime platform and architecture information
+- Implementation: `help.go` with early detection in `main.go`
 
 ## Project Structure
 - Main application functionality in root directory

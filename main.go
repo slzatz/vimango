@@ -14,6 +14,11 @@ import (
 var app *App
 
 func main() {
+	// Check for help flag first, before any initialization
+	if CheckForHelp(os.Args) {
+		os.Exit(0)
+	}
+
 	app = CreateApp()
 	srv, err := auth.GetDriveService()
 	if err != nil {
