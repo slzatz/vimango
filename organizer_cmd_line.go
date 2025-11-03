@@ -1023,18 +1023,7 @@ func (o *Organizer) initialBulkLoad(_ int) {
 	o.Screen.eraseRightScreen()
 	note := generateWWString(log, o.Screen.totaleditorcols)
 	o.drawNotice(note)
-	// below draw log as markeup
-	//r, _ := glamour.NewTermRenderer(
-	//	glamour.WithStylePath("darkslz.json"),
-	//	glamour.WithWordWrap(0),
-	//)
-	//note, _ = r.Render(note)
-	//if note[0] == '\n' {
-	//	note = note[1:]
-	//}
-	//o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	//o.drawRenderedNote()
 	o.mode = NAVIGATE_NOTICE
 }
 
@@ -1050,18 +1039,7 @@ func (o *Organizer) reverse(_ int) {
 	o.Screen.eraseRightScreen()
 	note := generateWWString(log, o.Screen.totaleditorcols)
 	o.drawNotice(note)
-	// below draw log as markeup
-	//r, _ := glamour.NewTermRenderer(
-	//	glamour.WithStylePath("darkslz.json"),
-	//	glamour.WithWordWrap(0),
-	//)
-	//note, _ = r.Render(note)
-	//if note[0] == '\n' {
-	//	note = note[1:]
-	//}
-	//o.note = strings.Split(note, "\n")
 	o.altRowoff = 0
-	//o.drawRenderedNote()
 	o.mode = NAVIGATE_NOTICE
 }
 
@@ -1606,7 +1584,7 @@ func (o *Organizer) sortEntries(pos int) {
 			o.sort = sort
 		}
 	} else {
-		o.ShowMessage(BL, "The sort columns are modified, added, created and priority")
+		o.ShowMessage(BL, "The sort columns are modified, added, and priority")
 		return
 	}
 	o.refresh(0)

@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -56,6 +57,55 @@ type dbConfig struct {
 	Claude struct {
 		ApiKey string `json:"api_key"`
 	} `json:"claude"`
+
+	Glamour struct {
+		Style string `json:"style"`
+	} `json:"glamour"`
+}
+
+// validateGlamourStyle checks if a glamour style file exists and returns an error if not.
+// This should be called at application startup.
+func validateGlamourStyle() error {
+	// Try config value first
+	if app.Config != nil && app.Config.Glamour.Style != "" {
+		if _, err := os.Stat(app.Config.Glamour.Style); err == nil {
+			return nil // Found configured style
+		}
+	}
+
+	// Try default.json
+	if _, err := os.Stat("default.json"); err == nil {
+		return nil // Found default style
+	}
+
+	// Neither file exists
+	configuredStyle := "not specified"
+	if app.Config != nil && app.Config.Glamour.Style != "" {
+		configuredStyle = app.Config.Glamour.Style
+	}
+	return fmt.Errorf("glamour style files not found:\n  Configured style: %s\n  Fallback style: default.json\nPlease ensure at least one of these files exists", configuredStyle)
+}
+
+// getGlamourStylePath returns the path to the glamour style file with fallback logic:
+// 1. Try configured style from config.json
+// 2. Try default.json
+// This function assumes validateGlamourStyle() has already been called at startup.
+func getGlamourStylePath() string {
+	// Try config value first
+	if app.Config != nil && app.Config.Glamour.Style != "" {
+		if _, err := os.Stat(app.Config.Glamour.Style); err == nil {
+			return app.Config.Glamour.Style
+		}
+	}
+
+	// Try default.json
+	if _, err := os.Stat("default.json"); err == nil {
+		return "default.json"
+	}
+
+	// This should not happen if validateGlamourStyle() was called at startup
+	// Return empty string as last resort
+	return ""
 }
 
 var z0 = struct{}{}

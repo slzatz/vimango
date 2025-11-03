@@ -163,6 +163,50 @@ Research functionality requires Claude API key configuration in `config.json`:
 }
 ```
 
+## Markdown Rendering Configuration
+The application uses the glamour library to render markdown with custom styling for previews and note display.
+
+### Glamour Style Configuration
+Style files are configured in `config.json`:
+```json
+{
+  "glamour": {
+    "style": "darkslz.json"
+  }
+}
+```
+
+### Style File Requirements
+- **Required Files**: At least one of the following must exist:
+  - Configured style file (specified in config.json)
+  - `default.json` (fallback style)
+- **File Location**: Style files must be in the application's working directory
+- **File Format**: JSON format compatible with glamour's style specification
+- **Startup Validation**: Application validates style file existence at startup and exits gracefully if neither file is found
+
+### Style File Fallback Logic
+1. Try configured style from `config.json` (`glamour.style`)
+2. Fall back to `default.json` if configured style is missing
+3. Exit with clear error message if neither file exists
+
+### Error Handling
+If style files are missing, the application displays:
+```
+Error: glamour style files not found:
+  Configured style: <filename>
+  Fallback style: default.json
+Please ensure at least one of these files exists
+```
+
+### Implementation Details
+- **Files Modified**: `common.go`, `editor_normal.go`, `organizer_display.go`, `main.go`, `config.json`
+- **Validation Function**: `validateGlamourStyle()` in `common.go` (called at startup)
+- **Path Resolution**: `getGlamourStylePath()` in `common.go` (used during rendering)
+- **Used In**:
+  - Editor markdown preview (`<leader>m`)
+  - Organizer note preview (rendered in right panel)
+  - Notice display system
+
 #### Web Fetch Requirements
 For enhanced deep research with web fetch capabilities:
 - **API Key Permissions**: Ensure your Claude API key has web search and web fetch permissions enabled

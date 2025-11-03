@@ -512,7 +512,7 @@ func (e *Editor) showMarkdownPreview(_ int) {
 	//note := e.generateWWStringFromBuffer2()
 	note := strings.Join(e.vbuf.Lines(), "\n")
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
+		glamour.WithStylePath(getGlamourStylePath()),
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)

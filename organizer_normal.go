@@ -236,33 +236,6 @@ func (o *Organizer) scrollNoticeUp() {
 	}
 }
 
-/*
-// this rendered links and I should go back to take a look at it
-func controlZ() {
-	id := org.rows[org.fr].id
-	note := app.Database.readNoteIntoString(id)
-	note = generateWWString(note, org.Screen.totaleditorcols)
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
-		glamour.WithWordWrap(0),
-		//glamour.WithLinkNumbers(true), //12312023 -- trying to use standard glamour
-	)
-	note, _ = r.Render(note)
-	// glamour seems to add a '\n' at the start
-	note = strings.TrimSpace(note)
-	note = strings.ReplaceAll(note, "^^^", "\n") ///////////////04052022
-	org.note = strings.Split(note, "\n")
-	app.Screen.eraseRightScreen()
-	if !app.Session.imagePreview {
-		org.drawRenderedNote()
-	} else {
-		org.drawPreviewWithImages()
-	}
-	org.mode = LINKS
-	org.ShowMessage(BL, "\x1b[1mType a number to choose a link\x1b[0m")
-}
-*/
-
 func (o *Organizer) showWebView_n() {
 	o.showWebView(0)
 }

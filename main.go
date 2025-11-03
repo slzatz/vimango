@@ -58,6 +58,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Validate glamour style file exists
+	if err := validateGlamourStyle(); err != nil {
+		log.Fatalf("Error: %v", err)
+	}
+
 	// Initialize research manager if Claude API key is configured
 	if app.Config != nil && app.Config.Claude.ApiKey != "" && app.Config.Claude.ApiKey != "CLAUDE_API_KEY_HERE" {
 		app.InitResearchManager(app.Config.Claude.ApiKey)

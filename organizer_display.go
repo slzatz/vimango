@@ -465,7 +465,7 @@ func (o *Organizer) drawPreview() {
 
 func (o *Organizer) renderMarkdown(s string) {
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
+		glamour.WithStylePath(getGlamourStylePath()),
 		glamour.WithWordWrap(0),
 	)
 	note, _ := r.Render(s)
@@ -506,7 +506,7 @@ func (o *Organizer) drawNotice(s string) {
 
 func (o *Organizer) renderNotice(s string) {
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath("darkslz.json"),
+		glamour.WithStylePath(getGlamourStylePath()),
 		glamour.WithWordWrap(0),
 	)
 	note, _ := r.Render(s)
