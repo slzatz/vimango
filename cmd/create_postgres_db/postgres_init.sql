@@ -33,7 +33,7 @@ CREATE TABLE public.task (
     context_id integer,
     duetime timestamp without time zone,
     star boolean,
-    added date,
+    added timestamp without time zone,
     completed date,
     duedate date,
     note text,

@@ -13,7 +13,7 @@ CREATE TABLE task (
     note text,
     archived boolean DEFAULT FALSE,
     deleted boolean DEFAULT FALSE,
-    added date NOT NULL,
+    added timestamp without time zone NOT NULL,
     modified timestamp without time zone DEFAULT now()
 );
 

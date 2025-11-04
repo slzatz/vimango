@@ -14,7 +14,7 @@ CREATE TABLE task (
     context_tid integer,
     note text,
     deleted boolean,
-    added date,
+    added timestamp without time zone,
     completed date,
     created timestamp without time zone,
     modified timestamp without time zone
