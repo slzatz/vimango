@@ -935,13 +935,13 @@ func (a *App) Synchronize(reportOnly bool) (log string) {
 		partialHost := "..." + strings.SplitAfterN(a.Config.Postgres.Host, ".", 3)[2]
 		text := fmt.Sprintf("server %s (%s)\n\n%s", a.Config.Postgres.DB, partialHost, lg.String())
 		if reportOnly {
-			log = fmt.Sprintf("### Testing without syncing: %s", text)
+			log = fmt.Sprintf("### (New) Testing without syncing: %s", text)
 			return
 		}
 		if success {
-			log = fmt.Sprintf("### Synchronization succeeded: %s", text)
+			log = fmt.Sprintf("### (New) Synchronization succeeded: %s", text)
 		} else {
-			log = fmt.Sprintf("### Synchronization failed: %s", text)
+			log = fmt.Sprintf("### (New) Synchronization failed: %s", text)
 		}
 	}()
 

@@ -83,24 +83,25 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":sync", ":test (dry-run)"},
 	})
 
-	registry.Register("bulkload", (*Organizer).initialBulkLoad, CommandInfo{
-		Name:        "bulkload",
-		Aliases:     []string{"bulktest"},
-		Description: "Perform initial bulk data load",
-		Usage:       "bulkload",
-		Category:    "Data Management",
-		Examples:    []string{":bulkload", ":bulktest (dry-run)"},
-	})
+	/*
+		registry.Register("bulkload", (*Organizer).initialBulkLoad, CommandInfo{
+			Name:        "bulkload",
+			Aliases:     []string{"bulktest"},
+			Description: "Perform initial bulk data load",
+			Usage:       "bulkload",
+			Category:    "Data Management",
+			Examples:    []string{":bulkload", ":bulktest (dry-run)"},
+		})
 
-	registry.Register("reverseload", (*Organizer).reverse, CommandInfo{
-		Name:        "reverseload",
-		Aliases:     []string{"reversetest"},
-		Description: "Perform reverse bulk data load",
-		Usage:       "reverseload",
-		Category:    "Data Management",
-		Examples:    []string{":reverseload", ":reversetest (dry-run)"},
-	})
-
+		registry.Register("reverseload", (*Organizer).reverse, CommandInfo{
+			Name:        "reverseload",
+			Aliases:     []string{"reversetest"},
+			Description: "Perform reverse bulk data load",
+			Usage:       "reverseload",
+			Category:    "Data Management",
+			Examples:    []string{":reverseload", ":reversetest (dry-run)"},
+		})
+	*/
 	registry.Register("refresh", (*Organizer).refresh, CommandInfo{
 		Name:        "refresh",
 		Aliases:     []string{"r"},
@@ -1011,6 +1012,7 @@ func (o *Organizer) synchronize(_ int) {
 	o.mode = NAVIGATE_NOTICE
 }
 
+/*
 func (o *Organizer) initialBulkLoad(_ int) {
 	var log string
 	if o.command_line == "bulktest" {
@@ -1042,6 +1044,7 @@ func (o *Organizer) reverse(_ int) {
 	o.altRowoff = 0
 	o.mode = NAVIGATE_NOTICE
 }
+*/
 
 func (o *Organizer) list(pos int) {
 	o.mode = NORMAL
