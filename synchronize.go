@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
-	_ "modernc.org/sqlite"
+	//_ "modernc.org/sqlite"
 )
 
 // Constants for default container IDs
