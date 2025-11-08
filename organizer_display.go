@@ -11,14 +11,15 @@ import (
 )
 
 var (
-	googleDriveRegex  = regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
 	timeKeywordsRegex = regexp.MustCompile(`seconds|minutes|hours|days`)
+	emptyImageMarker  = strings.Repeat(" ", IMAGE_MARKER_WIDTH)
+	filledImageMarker = padImageMarker(IMAGE_MARKER_SYMBOL)
 )
 
 // should probably be named drawOrgRows
 func (o *Organizer) refreshScreen() {
 	var ab strings.Builder
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 
 	ab.WriteString("\x1b[?25l") //hides the cursor
 
@@ -26,7 +27,7 @@ func (o *Organizer) refreshScreen() {
 	//Now erases time/sort column (+ 17 in line below)
 	for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
 		// Use 1K to clear from cursor to start of line, preserving vertical lines
-		fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17)
+		fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17+IMAGE_MARKER_WIDTH)
 	}
 	//	}
 	// put cursor at upper left after erasing
@@ -44,7 +45,7 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder) {
 	// When drawing the current row there are only two things
 	// we need to deal with: 1) horizontal scrolling and 2) visual mode highlighting
 
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 	y := o.fr - o.rowoff
 	row := &o.rows[o.fr]
 
@@ -87,8 +88,7 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 	// position cursor -note that you don't use lf/cr to position lines
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
-	note := o.Database.readNoteIntoString(row.id)
-	if googleDriveRegex.MatchString(note) {
+	if row.star {
 		ab.WriteString(BOLD)
 	}
 	if timeKeywordsRegex.MatchString(row.sort) {
@@ -120,6 +120,7 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 	}
 
 	ab.WriteString(RESET)
+	o.writeImageMarker(ab, y, row.hasImage)
 	ab.WriteString(WHITE)
 	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
 	width := o.Screen.divider - sortX
@@ -141,8 +142,7 @@ func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
 
-	note := o.Database.readNoteIntoString(row.id)
-	if googleDriveRegex.MatchString(note) {
+	if row.star {
 		ab.WriteString(BOLD)
 	}
 	if timeKeywordsRegex.MatchString(row.sort) {
@@ -185,6 +185,7 @@ func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 		ab.WriteString(strings.Repeat(" ", spaces))
 	}
 	ab.WriteString(RESET)
+	o.writeImageMarker(ab, y, row.hasImage)
 
 	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
 	width := o.Screen.divider - sortX
@@ -201,12 +202,40 @@ func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 	ab.WriteString(RESET)
 }
 
+func (o *Organizer) writeImageMarker(ab *strings.Builder, y int, hasImage bool) {
+	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
+	markerX := sortX - IMAGE_MARKER_WIDTH
+	if markerX <= LEFT_MARGIN {
+		return
+	}
+
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, markerX)
+	if hasImage {
+		ab.WriteString(filledImageMarker)
+	} else {
+		ab.WriteString(emptyImageMarker)
+	}
+}
+
+func padImageMarker(symbol string) string {
+	if IMAGE_MARKER_WIDTH <= 0 {
+		return ""
+	}
+	if len(symbol) == 0 {
+		return emptyImageMarker
+	}
+	if len(symbol) >= IMAGE_MARKER_WIDTH {
+		return symbol[:IMAGE_MARKER_WIDTH]
+	}
+	return symbol + strings.Repeat(" ", IMAGE_MARKER_WIDTH-len(symbol))
+}
+
 func (o *Organizer) drawRows() {
 	if len(o.rows) == 0 {
 		return
 	}
 	var ab strings.Builder
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 
 	for y := 0; y < o.Screen.textLines; y++ {
 		fr := y + o.rowoff
@@ -382,7 +411,7 @@ func (o *Organizer) drawSearchRows() {
 		return
 	}
 	var ab strings.Builder
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 
 	for y := 0; y < o.Screen.textLines; y++ {
 		fr := y + o.rowoff
@@ -402,7 +431,7 @@ func (o *Organizer) drawRowAt(fr int) {
 	if fr < o.rowoff || fr >= o.rowoff+o.Screen.textLines {
 		return
 	}
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 	y := fr - o.rowoff
 	var ab strings.Builder
 	if o.taskview == BY_FIND {
@@ -416,7 +445,7 @@ func (o *Organizer) drawRowAt(fr int) {
 func (o *Organizer) drawActive() {
 	// When doing a partial redraw, we first draw the standard row, then
 	// address horizontal scrolling and visual mode highlighting
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 	y := o.fr - o.rowoff
 	var ab strings.Builder
 	o.appendStandardRow(&ab, o.fr, y, titlecols)

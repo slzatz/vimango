@@ -119,7 +119,7 @@ func (o *Organizer) scroll() (offset_changed bool) {
 
 	prev_offset := o.rowoff
 
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN
+	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
 
 	if o.fr > o.Screen.textLines+o.rowoff-1 {
 		o.rowoff = o.fr - o.Screen.textLines + 1

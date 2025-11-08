@@ -191,7 +191,7 @@ func (db *Database) deleteSyncItem(id int) {
 
 func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) ([]Row, error) {
 
-	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.%s FROM task ", sort)
+	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.note, task.%s FROM task ", sort)
 
 	switch taskView {
 	case BY_CONTEXT:
@@ -231,6 +231,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 	for rows.Next() {
 		var row Row
 		var sort sql.NullString
+		var note sql.NullString
 
 		err = rows.Scan(
 			&row.id,
@@ -238,6 +239,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 			&row.star,
 			&row.deleted,
 			&row.archived,
+			&note,
 			&sort,
 		)
 
@@ -245,6 +247,10 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 			app.Organizer.ShowMessage(BL, "Error in filterEntries: %v", err)
 			//return orgRows
 			return orgRows, err
+		}
+
+		if note.Valid && note.String != "" {
+			row.hasImage = containsGoogleDriveImage(note.String)
 		}
 
 		if sort.Valid {
@@ -502,7 +508,7 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) ([]Ro
 	}
 
 	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
-	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.%s FROM task WHERE ", sort)
+	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.note, task.%s FROM task WHERE ", sort)
 	if help {
 		stmt += "task.context_tid = 16 and task.tid IN ("
 	} else {
@@ -534,6 +540,7 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) ([]Ro
 	for rows.Next() {
 		var row Row
 		var sort string
+		var note sql.NullString
 
 		err = rows.Scan(
 			&row.id,
@@ -542,11 +549,16 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) ([]Ro
 			&row.star,
 			&row.deleted,
 			&row.archived,
+			&note,
 			&sort,
 		)
 
 		if err != nil {
 			return []Row{}, err
+		}
+
+		if note.Valid && note.String != "" {
+			row.hasImage = containsGoogleDriveImage(note.String)
 		}
 
 		row.sort = timeDelta(sort)
@@ -923,7 +935,6 @@ func generateWWString_(text string, width int, length int, ret string) string {
 	}
 	return ab.String()
 }
-
 
 func (db *Database) updateCodeFile(id int, text string) {
 	var filePath string

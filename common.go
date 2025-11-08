@@ -203,6 +203,7 @@ const (
 	TOP_MARGIN         = 1
 	MAX                = 500
 	TIME_COL_WIDTH     = 18
+	IMAGE_MARKER_WIDTH = 2
 	LEFT_MARGIN        = 1
 	LEFT_MARGIN_OFFSET = 4
 
@@ -210,6 +211,8 @@ const (
 
 	RESET string = "\x1b[0m"
 	BOLD  string = "\x1b[1m"
+	// IMAGE_MARKER_SYMBOL is printed next to the age column when a note has image links
+	IMAGE_MARKER_SYMBOL = "@"
 
 	maxUint = ^uint(0)
 	maxInt  = int(maxUint >> 1)
@@ -239,6 +242,8 @@ func tc(s string, l int, b bool) string {
 	}
 }
 
+var googleDriveRegex = regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
+
 type Row struct {
 	id       int
 	tid      int
@@ -247,12 +252,17 @@ type Row struct {
 	star     bool
 	deleted  bool
 	archived bool
+	hasImage bool
 	//modified  string
 	sort string
 
 	// below not in db
 	dirty  bool
 	marked bool
+}
+
+func containsGoogleDriveImage(note string) bool {
+	return googleDriveRegex.MatchString(note)
 }
 
 type AltRow struct {
