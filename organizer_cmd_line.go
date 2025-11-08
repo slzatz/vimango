@@ -1006,8 +1006,7 @@ func (o *Organizer) synchronize(_ int) {
 		return
 	}
 	o.command_line = ""
-	note := generateWWString(log, o.Screen.totaleditorcols)
-	o.drawNotice(note)
+	o.drawNotice(log)
 	o.altRowoff = 0
 	o.mode = NAVIGATE_NOTICE
 }

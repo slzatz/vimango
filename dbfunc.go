@@ -924,67 +924,6 @@ func generateWWString_(text string, width int, length int, ret string) string {
 	return ab.String()
 }
 
-func generateWWString(text string, width int) string {
-	if text == "" {
-		return ""
-	}
-	ss := strings.Split(text, "\n")
-	var ab strings.Builder
-	y := 0
-	filerow := 0
-
-	for _, s := range ss {
-		if filerow == len(ss) {
-			return ab.String()
-		}
-
-		s = strings.ReplaceAll(s, "\t", "    ")
-
-		if s == "" {
-			ab.WriteString("\n")
-			filerow++
-			y++
-			continue
-		}
-
-		// do not word wrap http[s] links
-		if strings.Index(s, "](http") != -1 {
-			ab.WriteString(s)
-			ab.WriteString("\n")
-			filerow++
-			y++
-			continue
-		}
-
-		start := 0
-		end := 0
-
-		for {
-			if start+width > len(s)-1 {
-				ab.WriteString(s[start:])
-				ab.WriteString("\n")
-				y++
-				filerow++
-				break
-			}
-
-			pos := strings.LastIndex(s[start:start+width], " ")
-			if pos == -1 {
-				end = start + width - 1
-			} else {
-				end = start + pos
-			}
-			ab.WriteString(s[start : end+1])
-			// generating placeholder so markdown handles word wrap \n correctly
-			// things like ** ....\n .....** correctly
-			ab.WriteString("^^^")
-			//ab.WriteString("\n")
-			y++
-			start = end + 1
-		}
-	}
-	return ab.String()
-}
 
 func (db *Database) updateCodeFile(id int, text string) {
 	var filePath string

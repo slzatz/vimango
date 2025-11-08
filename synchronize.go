@@ -420,42 +420,42 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 		totalChanges += len(changes.serverUpdatedContexts)
 		fmt.Fprintf(lg, "- Updated `Contexts`(new and modified): **%d**\n", len(changes.serverUpdatedContexts))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Contexts` updated (new and modified).\n")
+		fmt.Fprint(lg, "- No `Contexts` updated (new and modified).\n")
 	}
 
 	if len(changes.serverDeletedContexts) > 0 {
 		totalChanges += len(changes.serverDeletedContexts)
 		fmt.Fprintf(lg, "- Deleted `Contexts`: %d\n", len(changes.serverDeletedContexts))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Contexts` deleted.\n")
+		fmt.Fprint(lg, "- No `Contexts` deleted.\n")
 	}
 
 	if len(changes.serverUpdatedFolders) > 0 {
 		totalChanges += len(changes.serverUpdatedFolders)
 		fmt.Fprintf(lg, "- `Folders` Updated: %d\n", len(changes.serverUpdatedFolders))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Folders` updated.\n")
+		fmt.Fprint(lg, "- No `Folders` updated.\n")
 	}
 
 	if len(changes.serverDeletedFolders) > 0 {
 		totalChanges += len(changes.serverDeletedFolders)
 		fmt.Fprintf(lg, "- Deleted `Folders`: %d\n", len(changes.serverDeletedFolders))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Folders` deleted.\n")
+		fmt.Fprint(lg, "- No `Folders` deleted.\n")
 	}
 
 	if len(changes.serverUpdatedKeywords) > 0 {
 		totalChanges += len(changes.serverUpdatedKeywords)
 		fmt.Fprintf(lg, "- Updated `Keywords`: %d\n", len(changes.serverUpdatedKeywords))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Keywords` updated.\n")
+		fmt.Fprint(lg, "- No `Keywords` updated.\n")
 	}
 
 	if len(changes.serverDeletedKeywords) > 0 {
 		totalChanges += len(changes.serverDeletedKeywords)
 		fmt.Fprintf(lg, "- Deleted server `Keywords`: %d\n", len(changes.serverDeletedKeywords))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Keywords` deleted.\n")
+		fmt.Fprint(lg, "- No `Keywords` deleted.\n")
 	}
 
 	if len(changes.serverUpdatedEntries) > 0 {
@@ -467,14 +467,14 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			}
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Entries` updated.\n")
+		fmt.Fprint(lg, "- No `Entries` updated.\n")
 	}
 
 	if len(changes.serverDeletedEntries) > 0 {
 		totalChanges += len(changes.serverDeletedEntries)
 		fmt.Fprintf(lg, "- Deleted `Entries`: %d\n", len(changes.serverDeletedEntries))
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Entries` deleted.\n")
+		fmt.Fprint(lg, "- No `Entries` deleted.\n")
 	}
 
 	fmt.Fprint(lg, "## Client Changes\n")
@@ -486,7 +486,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d; tid: %d %q; modified: %v\n", c.id, c.tid, tc(c.title, 15, true), tc(c.modified, 19, false))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Contexts` updated.\n")
+		fmt.Fprint(lg, "- No `Contexts` updated.\n")
 	}
 
 	if len(changes.clientDeletedContexts) > 0 {
@@ -496,7 +496,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Contexts` deleted.\n")
+		fmt.Fprint(lg, "- No `Contexts` deleted.\n")
 	}
 
 	if len(changes.clientUpdatedFolders) > 0 {
@@ -506,7 +506,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d; tid: %d %q; modified: %v\n", c.id, c.tid, tc(c.title, 15, true), tc(c.modified, 19, false))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Folders` updated.\n")
+		fmt.Fprint(lg, "- No `Folders` updated.\n")
 	}
 
 	if len(changes.clientDeletedFolders) > 0 {
@@ -516,7 +516,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Folders` deleted.\n")
+		fmt.Fprint(lg, "- No `Folders` deleted.\n")
 	}
 
 	if len(changes.clientUpdatedKeywords) > 0 {
@@ -526,7 +526,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d; tid: %d %q; modified: %v\n", c.id, c.tid, tc(c.title, 15, true), tc(c.modified, 19, false))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Keywords` updated.\n")
+		fmt.Fprint(lg, "- No `Keywords` updated.\n")
 	}
 
 	if len(changes.clientDeletedKeywords) > 0 {
@@ -536,7 +536,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Keywords` deleted.\n")
+		fmt.Fprint(lg, "- No `Keywords` deleted.\n")
 	}
 
 	if len(changes.clientUpdatedEntries) > 0 {
@@ -546,7 +546,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d tid: %d star: %t *%q* context_tid: %d folder_tid: %d  modified: %v\n", e.id, e.tid, e.star, truncate(e.title, 15), e.context_tid, e.folder_tid, tc(e.modified, 19, false))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Entries` updated.\n")
+		fmt.Fprint(lg, "- No `Entries` updated.\n")
 	}
 
 	if len(changes.clientDeletedEntries) > 0 {
@@ -556,7 +556,7 @@ func (changes *syncChanges) reportChanges(lg io.Writer) int {
 			fmt.Fprintf(lg, "    - id: %d tid: %d *%q*\n", e.id, e.tid, truncate(e.title, 15))
 		}
 	} else {
-		lg.(*strings.Builder).WriteString("- No `Entries` deleted.\n")
+		fmt.Fprint(lg, "- No `Entries` deleted.\n")
 	}
 
 	return totalChanges
@@ -683,20 +683,14 @@ func (a *App) syncEntriesToClient(entries []EntryPlusTag, lg io.Writer) map[int]
 			fmt.Fprintf(lg, "Keywords updated for task tids: %v\n", tids)
 		}
 
-		tags := getTagsPQ(a.Database.PG, tids, lg)
-		i := 0
-		for j := 0; ; j++ {
-			if j == len(entries) {
-				break
-			}
-			entry := &entries[j]
-			if entry.tid == tags[i].taskTid {
-				entry.tag = tags[i].tag
-				fmt.Fprintf(lg, "FTS tag will be updated for tid: %d, tag: %s\n", entry.tid, entry.tag.String)
-				i += 1
-				if i == len(tags) {
-					break
-				}
+		tagMap := make(map[int]sql.NullString)
+		for _, tag := range getTagsPQ(a.Database.PG, tids, lg) {
+			tagMap[tag.taskTid] = tag.tag
+		}
+		for i := range entries {
+			if tag, ok := tagMap[entries[i].tid]; ok {
+				entries[i].tag = tag
+				fmt.Fprintf(lg, "FTS tag will be updated for tid: %d, tag: %s\n", entries[i].tid, tag.String)
 			}
 		}
 	}
@@ -833,20 +827,18 @@ func (a *App) deleteClientEntriesFromServer(entries []Entry, lg io.Writer) {
 
 // deleteContainerFromBoth deletes a container from both server and client, updating task references
 func (a *App) deleteContainerFromBoth(containerType containerType, c Container, isServerDeleted bool, taskField string, lg io.Writer) {
-	// Update tasks to reference default container (ID 1 = "none")
-	if !isServerDeleted {
-		query := fmt.Sprintf("UPDATE task SET %s=1, modified=now() WHERE %s=$1;", taskField, taskField)
-		res, err := a.Database.PG.Exec(query, c.tid)
-		if err != nil {
-			fmt.Fprintf(lg, "Error trying to change server entry %s for a deleted %s: %v\n", taskField, containerType, err)
-		} else {
-			rowsAffected, _ := res.RowsAffected()
-			fmt.Fprintf(lg, "The number of server entries that were changed to 'none': **%d**\n", rowsAffected)
-		}
+	// Update tasks to reference default container (ID 1 = "none") on server and client
+	query := fmt.Sprintf("UPDATE task SET %s=%d, modified=now() WHERE %s=$1;", taskField, DefaultContainerID, taskField)
+	res, err := a.Database.PG.Exec(query, c.tid)
+	if err != nil {
+		fmt.Fprintf(lg, "Error trying to change server entry %s for a deleted %s: %v\n", taskField, containerType, err)
+	} else {
+		rowsAffected, _ := res.RowsAffected()
+		fmt.Fprintf(lg, "The number of server entries that were changed to 'none': **%d**\n", rowsAffected)
 	}
 
-	query := fmt.Sprintf("UPDATE task SET %s=1, modified=datetime('now') WHERE %s=?;", taskField, taskField)
-	res, err := a.Database.MainDB.Exec(query, c.tid)
+	query = fmt.Sprintf("UPDATE task SET %s=%d, modified=datetime('now') WHERE %s=?;", taskField, DefaultContainerID, taskField)
+	res, err = a.Database.MainDB.Exec(query, c.tid)
 	if err != nil {
 		fmt.Fprintf(lg, "Error trying to change client entry %s for a deleted %s: %v\n", taskField, containerType, err)
 	} else {
