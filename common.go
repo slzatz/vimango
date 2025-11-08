@@ -198,21 +198,22 @@ var visualModeMap = map[int]Mode{
 }
 
 const (
-	TZ_OFFSET          = 4
-	LINKED_NOTE_HEIGHT = 20
-	TOP_MARGIN         = 1
-	MAX                = 500
-	TIME_COL_WIDTH     = 18
-	IMAGE_MARKER_WIDTH = 2
-	LEFT_MARGIN        = 1
-	LEFT_MARGIN_OFFSET = 4
+	TZ_OFFSET            = 4
+	LINKED_NOTE_HEIGHT   = 20
+	TOP_MARGIN           = 1
+	MAX                  = 500
+	TIME_COL_WIDTH       = 18
+	IMAGE_MARKER_WIDTH   = 2
+	IMAGE_MARKER_AGE_GAP = 1
+	LEFT_MARGIN          = 1
+	LEFT_MARGIN_OFFSET   = 4
 
 	BASE_DATE string = "1970-01-01 00:00"
 
 	RESET string = "\x1b[0m"
 	BOLD  string = "\x1b[1m"
 	// IMAGE_MARKER_SYMBOL is printed next to the age column when a note has image links
-	IMAGE_MARKER_SYMBOL = "@"
+	IMAGE_MARKER_SYMBOL = "\uf03e"
 
 	maxUint = ^uint(0)
 	maxInt  = int(maxUint >> 1)

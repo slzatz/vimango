@@ -16,18 +16,44 @@ var (
 	filledImageMarker = padImageMarker(IMAGE_MARKER_SYMBOL)
 )
 
+func (o *Organizer) sortColumnStart() int {
+	return o.Screen.divider - TIME_COL_WIDTH + 2
+}
+
+func (o *Organizer) markerColumnStart() int {
+	sortX := o.sortColumnStart()
+	markerX := sortX - IMAGE_MARKER_WIDTH - IMAGE_MARKER_AGE_GAP
+	if markerX <= LEFT_MARGIN+1 {
+		return LEFT_MARGIN + 2
+	}
+	return markerX
+}
+
+func (o *Organizer) titleColumnWidth() int {
+	markerX := o.markerColumnStart()
+	width := markerX - LEFT_MARGIN - 1
+	if width < 0 {
+		return 0
+	}
+	return width
+}
+
 // should probably be named drawOrgRows
 func (o *Organizer) refreshScreen() {
 	var ab strings.Builder
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
+	leftClearWidth := o.Screen.divider - LEFT_MARGIN - 1
+	if leftClearWidth < 0 {
+		leftClearWidth = 0
+	}
+	leftBlank := strings.Repeat(" ", leftClearWidth)
 
 	ab.WriteString("\x1b[?25l") //hides the cursor
 
 	//Below erase screen from middle to left - `1K` below is cursor to left erasing
 	//Now erases time/sort column (+ 17 in line below)
 	for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
-		// Use 1K to clear from cursor to start of line, preserving vertical lines
-		fmt.Fprintf(&ab, "\x1b[%d;%dH\x1b[1K", j+TOP_MARGIN, titlecols+LEFT_MARGIN+17+IMAGE_MARKER_WIDTH)
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", j+TOP_MARGIN, LEFT_MARGIN+1)
+		ab.WriteString(leftBlank)
 	}
 	//	}
 	// put cursor at upper left after erasing
@@ -45,7 +71,7 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder) {
 	// When drawing the current row there are only two things
 	// we need to deal with: 1) horizontal scrolling and 2) visual mode highlighting
 
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
+	titlecols := o.titleColumnWidth()
 	y := o.fr - o.rowoff
 	row := &o.rows[o.fr]
 
@@ -203,17 +229,21 @@ func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 }
 
 func (o *Organizer) writeImageMarker(ab *strings.Builder, y int, hasImage bool) {
-	sortX := o.Screen.divider - TIME_COL_WIDTH + 2
-	markerX := sortX - IMAGE_MARKER_WIDTH
+	markerX := o.markerColumnStart()
 	if markerX <= LEFT_MARGIN {
 		return
 	}
 
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, markerX)
+	ab.WriteString(WHITE)
 	if hasImage {
 		ab.WriteString(filledImageMarker)
 	} else {
 		ab.WriteString(emptyImageMarker)
+	}
+	ab.WriteString(RESET)
+	for i := 0; i < IMAGE_MARKER_AGE_GAP; i++ {
+		fmt.Fprintf(ab, "\x1b[%d;%dH \x1b[37;1mx\x1b[0m", y+TOP_MARGIN+1, markerX+IMAGE_MARKER_WIDTH+i)
 	}
 }
 
@@ -221,13 +251,15 @@ func padImageMarker(symbol string) string {
 	if IMAGE_MARKER_WIDTH <= 0 {
 		return ""
 	}
-	if len(symbol) == 0 {
+	runes := []rune(symbol)
+	runeLen := len(runes)
+	if runeLen == 0 {
 		return emptyImageMarker
 	}
-	if len(symbol) >= IMAGE_MARKER_WIDTH {
-		return symbol[:IMAGE_MARKER_WIDTH]
+	if runeLen >= IMAGE_MARKER_WIDTH {
+		return string(runes[:IMAGE_MARKER_WIDTH])
 	}
-	return symbol + strings.Repeat(" ", IMAGE_MARKER_WIDTH-len(symbol))
+	return symbol + strings.Repeat(" ", IMAGE_MARKER_WIDTH-runeLen)
 }
 
 func (o *Organizer) drawRows() {
@@ -235,7 +267,7 @@ func (o *Organizer) drawRows() {
 		return
 	}
 	var ab strings.Builder
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
+	titlecols := o.titleColumnWidth()
 
 	for y := 0; y < o.Screen.textLines; y++ {
 		fr := y + o.rowoff
@@ -411,7 +443,7 @@ func (o *Organizer) drawSearchRows() {
 		return
 	}
 	var ab strings.Builder
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
+	titlecols := o.titleColumnWidth()
 
 	for y := 0; y < o.Screen.textLines; y++ {
 		fr := y + o.rowoff
@@ -431,7 +463,7 @@ func (o *Organizer) drawRowAt(fr int) {
 	if fr < o.rowoff || fr >= o.rowoff+o.Screen.textLines {
 		return
 	}
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
+	titlecols := o.titleColumnWidth()
 	y := fr - o.rowoff
 	var ab strings.Builder
 	if o.taskview == BY_FIND {
@@ -445,7 +477,7 @@ func (o *Organizer) drawRowAt(fr int) {
 func (o *Organizer) drawActive() {
 	// When doing a partial redraw, we first draw the standard row, then
 	// address horizontal scrolling and visual mode highlighting
-	titlecols := o.Screen.divider - TIME_COL_WIDTH - LEFT_MARGIN - IMAGE_MARKER_WIDTH
+	titlecols := o.titleColumnWidth()
 	y := o.fr - o.rowoff
 	var ab strings.Builder
 	o.appendStandardRow(&ab, o.fr, y, titlecols)
