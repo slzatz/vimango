@@ -994,7 +994,7 @@ func (o *Organizer) synchronize(_ int) {
 	var err error
 	if o.command_line == "test" {
 		// true => reportOnly
-		log = app.Synchronize(true) //Synchronize should return an error:wa
+		log = app.Synchronize(true) //Synchronize should return an error
 		err = nil                   //FIXME
 	} else {
 		log = app.Synchronize(false)

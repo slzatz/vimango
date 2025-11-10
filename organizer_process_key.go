@@ -22,6 +22,9 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		o.Session.imagePreview = false
 		if o.view == TASK {
 			o.drawPreview()
+		} else {
+			o.Screen.eraseRightScreen()
+			o.displayContainerInfo()
 		}
 		return
 	}

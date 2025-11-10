@@ -672,7 +672,7 @@ func (o *Organizer) drawNoticeText() {
 		//end = len(o.note) - 1
 		end = len(o.notice)
 	}
-	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
+	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+8)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+7)
 	fmt.Print(strings.Join(o.notice[start:end], lf_ret))
 	fmt.Print(RESET) //sometimes there is an unclosed escape sequence

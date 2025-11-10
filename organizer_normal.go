@@ -165,8 +165,10 @@ func (o *Organizer) info() {
 		return
 	}
 	e := o.Database.getEntryInfo(o.getId())
-	o.displayEntryInfo(&e)
-	o.Screen.drawPreviewBox()
+	info := o.displayEntryInfo(&e)
+	o.drawNotice(info)
+	o.altRowoff = 0
+	o.mode = NAVIGATE_NOTICE
 }
 
 func (o *Organizer) showEditorWindows() {
@@ -244,62 +246,35 @@ func (o *Organizer) closeWebView_n() {
 	o.closeWebView(0)
 }
 
-func (o *Organizer) displayEntryInfo(e *NewEntry) {
-	var ab strings.Builder
+func (o *Organizer) displayEntryInfo(e *NewEntry) string {
 	width := o.Screen.totaleditorcols - 10
-	length := o.Screen.textLines - 10
+	var ab strings.Builder
 
-	// \x1b[NC moves cursor forward by N columns
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+6)
-
-	//hide the cursor
-	ab.WriteString("\x1b[?25l")
-	// move the cursor
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
-
-	//erase set number of chars on each line
-	erase_chars := fmt.Sprintf("\x1b[%dX", o.Screen.totaleditorcols-10)
-	for i := 0; i < length-1; i++ {
-		ab.WriteString(erase_chars)
-		ab.WriteString(lf_ret)
-	}
-
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
-
-	// \x1b[ 2*x is DECSACE to operate in rectable mode
-	// \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
-	// \x1b[ *x is DECSACE to exit rectangle mode
-	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
-	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
-
-	fmt.Fprintf(&ab, "id: %d%s", e.id, lf_ret)
-	fmt.Fprintf(&ab, "tid: %d%s", e.tid, lf_ret)
+	fmt.Fprintf(&ab, "id: %d%s", e.id, "\n")
+	fmt.Fprintf(&ab, "tid: %d%s", e.tid, "\n")
 
 	title := fmt.Sprintf("title: %s", e.title)
 	if len(title) > width {
 		title = title[:width-3] + "..."
 	}
-	//coloring labels will take some work b/o gray background
-	//s.append(fmt::format("{}title:{} {}{}", COLOR_1, "\x1b[m", title, lf_ret));
-	fmt.Fprintf(&ab, "%s%s", title, lf_ret)
+	fmt.Fprintf(&ab, "%s%s", title, "\n")
 
 	context := o.Database.filterTitle("context", e.context_tid)
-	fmt.Fprintf(&ab, "context: %s%s", context, lf_ret)
+	fmt.Fprintf(&ab, "**context**: %s%s", context, "\n")
 
 	folder := o.Database.filterTitle("folder", e.folder_tid)
-	fmt.Fprintf(&ab, "folder: %s%s", folder, lf_ret)
+	fmt.Fprintf(&ab, "folder: %s%s", folder, "\n")
 
-	fmt.Fprintf(&ab, "star: %t%s", e.star, lf_ret)
-	fmt.Fprintf(&ab, "deleted: %t%s", e.deleted, lf_ret)
+	fmt.Fprintf(&ab, "star: %t%s", e.star, "\n")
+	fmt.Fprintf(&ab, "deleted: %t%s", e.deleted, "\n")
 
-	fmt.Fprintf(&ab, "completed: %t%s", e.archived, lf_ret)
-	fmt.Fprintf(&ab, "modified: %s%s", e.modified, lf_ret)
-	fmt.Fprintf(&ab, "added: %s%s", e.added, lf_ret)
+	fmt.Fprintf(&ab, "completed: %t%s", e.archived, "\n")
+	fmt.Fprintf(&ab, "modified: %s%s", e.modified, "\n")
+	fmt.Fprintf(&ab, "added: %s%s", e.added, "\n")
 
-	fmt.Fprintf(&ab, "keywords: %s%s", app.Database.getTaskKeywords(e.id), lf_ret)
+	fmt.Fprintf(&ab, "keywords: %s%s", app.Database.getTaskKeywords(e.id), "\n")
 
-	fmt.Print(ab.String())
+	return ab.String()
 }
 
 func (o *Organizer) displayContainerInfo() {
@@ -322,45 +297,18 @@ func (o *Organizer) displayContainerInfo() {
 	}
 
 	var ab strings.Builder
-	width := o.Screen.totaleditorcols - 10
-	length := o.Screen.textLines - 10
 
-	// \x1b[NC moves cursor forward by N columns
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+6)
+	fmt.Fprintf(&ab, "id: %d%s", c.id, "\n")
+	fmt.Fprintf(&ab, "tid: %d%s", c.tid, "\n")
 
-	//hide the cursor
-	ab.WriteString("\x1b[?25l")
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
+	fmt.Fprintf(&ab, "title: %s%s", c.title, "\n")
+	//title := fmt.Sprintf("**title**: %s", c.title)
 
-	//erase set number of chars on each line
-	erase_chars := fmt.Sprintf("\x1b[%dX", o.Screen.totaleditorcols-10)
-	for i := 0; i < length-1; i++ {
-		ab.WriteString(erase_chars)
-		ab.WriteString(lf_ret)
-	}
+	fmt.Fprintf(&ab, "star: %t%s", c.star, "\n")
+	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, "\n")
 
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, o.Screen.divider+7)
+	fmt.Fprintf(&ab, "modified: %s%s", c.modified, "\n")
+	fmt.Fprintf(&ab, "entry count: %d%s", c.count, "\n")
 
-	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-		TOP_MARGIN+6, o.Screen.divider+7, TOP_MARGIN+4+length, o.Screen.divider+7+width)
-	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
-
-	//ab.append(COLOR_6); // Blue depending on theme
-
-	fmt.Fprintf(&ab, "id: %d%s", c.id, lf_ret)
-	fmt.Fprintf(&ab, "tid: %d%s", c.tid, lf_ret)
-
-	title := fmt.Sprintf("title: %s", c.title)
-	if len(title) > width {
-		title = title[:width-3] + "..."
-	}
-
-	fmt.Fprintf(&ab, "star: %t%s", c.star, lf_ret)
-	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, lf_ret)
-
-	fmt.Fprintf(&ab, "modified: %s%s", c.modified, lf_ret)
-	fmt.Fprintf(&ab, "entry count: %d%s", c.count, lf_ret)
-
-	fmt.Print(ab.String())
-	o.Screen.drawPreviewBox()
+	o.drawNotice(ab.String())
 }
