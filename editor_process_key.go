@@ -269,7 +269,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		//if strings.Index(e.command_line, "s/") != -1
 
 		// we want libvim to handle the following Ex-Commands:
-		use_vim := []string{"s/", "%s/", "g/", "g!/", "v/"}
+		use_vim := []string{"s/", "%s/", "g/", "g!/", "v/", "set", "r", "read"} //set for set paste, set nopaste
 		for _, p := range use_vim {
 			if strings.HasPrefix(e.command_line, p) {
 				if strings.HasSuffix(e.command_line, "/c") {
