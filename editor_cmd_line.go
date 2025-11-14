@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"image/color"
-	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -45,11 +43,11 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	registry.Register("read", (*Editor).readFile, CommandInfo{
 		Name:        "read",
-		Aliases:     []string{"readfile"},
+		Aliases:     []string{"r"},
 		Description: "Read contents from file into current note",
 		Usage:       "read <filename>",
 		Category:    "File Operations",
-		Examples:    []string{":read todo.txt", ":readfile /tmp/notes.md"},
+		Examples:    []string{":read todo.txt", ":r /tmp/notes.md"},
 	})
 
 	registry.Register("save", (*Editor).saveNoteToFile, CommandInfo{
@@ -79,22 +77,41 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":number", ":num"},
 	})
 
-	registry.Register("fmt", (*Editor).goFormat, CommandInfo{
-		Name:        "fmt",
-		Description: "Format Go code using gofmt",
-		Usage:       "fmt",
+	registry.Register("paste", (*Editor).paste, CommandInfo{
+		Name: "paste",
+		//Aliases:     []string{"num"},
+		Description: "Autoindent off - good for pasting content",
+		Usage:       "paste",
 		Category:    "Editing",
-		Examples:    []string{":fmt"},
+		Examples:    []string{":paste"},
 	})
 
-	registry.Register("run", (*Editor).run, CommandInfo{
-		Name:        "run",
-		Aliases:     []string{"r"},
-		Description: "Execute current note as code",
-		Usage:       "run",
+	registry.Register("nopaste", (*Editor).nopaste, CommandInfo{
+		Name: "nopaste",
+		//Aliases:     []string{"num"},
+		Description: "Autoindent on - not good for pasting content",
+		Usage:       "nopaste",
 		Category:    "Editing",
-		Examples:    []string{":run", ":r"},
+		Examples:    []string{":nopaste"},
 	})
+	/*
+		registry.Register("fmt", (*Editor).goFormat, CommandInfo{
+			Name:        "fmt",
+			Description: "Format Go code using gofmt",
+			Usage:       "fmt",
+			Category:    "Editing",
+			Examples:    []string{":fmt"},
+		})
+
+			registry.Register("run", (*Editor).run, CommandInfo{
+				Name:        "run",
+				Aliases:     []string{"r"},
+				Description: "Execute current note as code",
+				Usage:       "run",
+				Category:    "Editing",
+				Examples:    []string{":run", ":r"},
+			})
+	*/
 
 	// Layout commands
 	registry.Register("vertical resize", (*Editor).verticalResize, CommandInfo{
@@ -392,6 +409,18 @@ func (e *Editor) writeNote() {
 }
 
 func (e *Editor) readFile() {
+	vim.SendInput(":" + e.command_line + "\r")
+}
+
+func (e *Editor) paste() {
+	vim.SendInput(":set paste\r")
+}
+
+func (e *Editor) nopaste() {
+	vim.SendInput(":set nopaste\r")
+}
+
+func (e *Editor) readFile_() {
 	pos := strings.Index(e.command_line, " ")
 	if pos == -1 {
 		e.ShowMessage(BR, "You need to provide a filename")
@@ -471,6 +500,7 @@ func (e *Editor) resize() {
 	}
 }
 
+/*
 func (e *Editor) compile() {
 
 	var dir string
@@ -621,6 +651,7 @@ func (e *Editor) run() {
 	op.drawText()
 	// no need to call drawFrame or drawStatusBar
 }
+*/
 
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax
@@ -912,58 +943,59 @@ func (e *Editor) number() {
 	e.ShowMessage(BR, "Line numbering is %t", e.numberLines)
 }
 
-func (e *Editor) goFormat() {
-	ss := []string{}
-	//cmd := exec.Command("gofmt")
-	cmd := exec.Command("goimports")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		e.ShowMessage(BR, "Problem in goimports stdout: %v", err)
-		return
-	}
-	buf_out := bufio.NewReader(stdout)
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		e.ShowMessage(BR, "Problem in goimports stdin: %v", err)
-		return
-	}
-	err = cmd.Start()
-	if err != nil {
-		e.ShowMessage(BR, "Problem in cmd.Start (goimports) stdin: %v", err)
-		return
-	}
-
-	for _, row := range e.ss {
-		io.WriteString(stdin, row+"\n")
-	}
-	stdin.Close()
-
-	for {
-		s, err := buf_out.ReadString('\n')
-		if err == io.EOF {
-			break
+/*
+	func (e *Editor) goFormat() {
+		ss := []string{}
+		//cmd := exec.Command("gofmt")
+		cmd := exec.Command("goimports")
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			e.ShowMessage(BR, "Problem in goimports stdout: %v", err)
+			return
 		}
-		ss = append(ss, s[:len(s)-1])
+		buf_out := bufio.NewReader(stdout)
+
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			e.ShowMessage(BR, "Problem in goimports stdin: %v", err)
+			return
+		}
+		err = cmd.Start()
+		if err != nil {
+			e.ShowMessage(BR, "Problem in cmd.Start (goimports) stdin: %v", err)
+			return
+		}
+
+		for _, row := range e.ss {
+			io.WriteString(stdin, row+"\n")
+		}
+		stdin.Close()
+
+		for {
+			s, err := buf_out.ReadString('\n')
+			if err == io.EOF {
+				break
+			}
+			ss = append(ss, s[:len(s)-1])
+		}
+		if len(ss) == 0 {
+			e.ShowMessage(BL, "Return from goimports has length zero - likely code errors")
+			return
+		}
+
+		e.ss = ss
+
+		e.vbuf.SetLines(0, -1, e.ss)
+		lines := e.vbuf.GetLineCount()
+		e.ShowMessage(BL, "Number of lines in the formatted text = %d", lines)
+		vim.SetCursorPosition(1, 0)
+		e.fr = 0
+		e.fc = 0
+		e.scroll()
+		e.drawText()
+		app.returnCursor()
 	}
-	if len(ss) == 0 {
-		e.ShowMessage(BL, "Return from goimports has length zero - likely code errors")
-		return
-	}
-
-	e.ss = ss
-
-	e.vbuf.SetLines(0, -1, e.ss)
-	lines := e.vbuf.GetLineCount()
-	e.ShowMessage(BL, "Number of lines in the formatted text = %d", lines)
-	vim.SetCursorPosition(1, 0)
-	e.fr = 0
-	e.fc = 0
-	e.scroll()
-	e.drawText()
-	app.returnCursor()
-}
-
+*/
 func (e *Editor) createPDF() {
 	pos := strings.Index(e.command_line, " ")
 	if pos == -1 {
@@ -983,13 +1015,11 @@ func (e *Editor) createPDF() {
 
 	//pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log", nil, mdtopdf.LIGHT)
 	pf := mdtopdf.NewPdfRenderer(params)
-	/*
-		pf.Pdf.SetSubject("How to convert markdown to PDF", true)
-		pf.Pdf.SetTitle("Example PDF converted from Markdown", true)
-		pf.THeader = mdtopdf.Styler{Font: "Times", Style: "IUB", Size: 20, Spacing: 2,
-			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-			FillColor: mdtopdf.Color{Red: 179, Green: 179, Blue: 255}}
-	*/
+	//		pf.Pdf.SetSubject("How to convert markdown to PDF", true)
+	//		pf.Pdf.SetTitle("Example PDF converted from Markdown", true)
+	//		pf.THeader = mdtopdf.Styler{Font: "Times", Style: "IUB", Size: 20, Spacing: 2,
+	//			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
+	//			FillColor: mdtopdf.Color{Red: 179, Green: 179, Blue: 255}}
 	pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
 		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
 		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
