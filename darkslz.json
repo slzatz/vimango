@@ -81,14 +81,6 @@
    "ticked": "[✓] ",
    "unticked": "[ ] "
   },
-  "image": {
-    "color": "7",
-    "underline": true
-  },
-  "image_text": {
-    "color": "9",
-    "format": "Image: {{.text}} "
-  },
   "code": {
     "color": "6"
   },

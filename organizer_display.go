@@ -812,10 +812,10 @@ func transmitKittyImage(url string, maxCols int) uint32 {
 
 	targetCols := maxCols - 2
 	if targetCols <= 0 {
-		targetCols = 30
+		targetCols = 45  // 50% larger than previous 30
 	}
-	if targetCols > 30 {
-		targetCols = 30
+	if targetCols > 45 {
+		targetCols = 45  // Cap at 45 columns (50% larger)
 	}
 	rows := int(float64(imgH) / float64(imgW) * float64(targetCols) * 0.5)
 	if rows < 1 {
@@ -1150,6 +1150,17 @@ func (o *Organizer) renderMarkdown(s string) {
 
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 		fmt.Fprintf(debugLog, "renderMarkdown: r.Render() returned, note length=%d\n", len(note))
+		// Show where markers appear in rendered text
+		markerIdx := strings.Index(note, "[KITTY_IMAGE:")
+		previewLen := 200
+		if len(note) < previewLen {
+			previewLen = len(note)
+		}
+		if markerIdx >= 0 {
+			fmt.Fprintf(debugLog, "MARKER POSITION: Found at index %d (first 200 chars: %q)\n", markerIdx, note[:previewLen])
+		} else {
+			fmt.Fprintf(debugLog, "MARKER POSITION: NOT FOUND in rendered output (first 200 chars: %q)\n", note[:previewLen])
+		}
 		debugLog.Close()
 	}
 
@@ -1159,6 +1170,12 @@ func (o *Organizer) renderMarkdown(s string) {
 
 		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 			fmt.Fprintf(debugLog, "renderMarkdown: after replaceKittyImageMarkers, note length=%d\n", len(note))
+			// Show first part of text to see if placeholder is at top
+			previewLen := 200
+			if len(note) < previewLen {
+				previewLen = len(note)
+			}
+			fmt.Fprintf(debugLog, "AFTER REPLACEMENT: First 200 chars: %q\n", note[:previewLen])
 			debugLog.Close()
 		}
 	}
