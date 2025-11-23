@@ -20,6 +20,10 @@ func main() {
 	}
 
 	app = CreateApp()
+
+	// Detect kitty terminal capabilities
+	app.DetectKittyCapabilities()
+
 	srv, err := auth.GetDriveService()
 	if err != nil {
 		log.Fatalf("Failed to get Google Drive service: %v", err)

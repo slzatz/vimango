@@ -2,10 +2,17 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
+	"errors"
 	"fmt"
+	"image"
+	"image/png"
+	net_url "net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/glamour"
 )
@@ -14,6 +21,55 @@ var (
 	timeKeywordsRegex = regexp.MustCompile(`seconds|minutes|hours|days`)
 	emptyImageMarker  = strings.Repeat(" ", IMAGE_MARKER_WIDTH)
 	filledImageMarker = padImageMarker(IMAGE_MARKER_SYMBOL)
+
+	// Kitty image cache: URL -> (image ID, cols, rows)
+	kittyImageCache    = make(map[string]kittyImageCacheEntry)
+	kittyImageCacheMux sync.RWMutex
+)
+
+// kittyImageCacheEntry stores image ID and dimensions
+type kittyImageCacheEntry struct {
+	imageID       uint32
+	cols          int
+	rows          int
+	placementID   uint32 // For relative placements
+}
+
+const (
+	// Transparent placeholder image ID (constant, reused for all images)
+	KITTY_PLACEHOLDER_IMAGE_ID = 1
+	KITTY_PLACEHOLDER_PLACEMENT_ID = 1
+)
+
+type pendingRelativePlacement struct {
+	imageID     uint32
+	placementID uint32
+	cols        int
+	rows        int
+}
+
+var (
+	// Track if transparent placeholder has been transmitted
+	transparentPlaceholderTransmitted = false
+
+	// Counter for relative placement IDs
+	nextRelativePlacementID uint32 = 2 // Start at 2 (1 is reserved for transparent placeholder)
+
+	// Pending relative placements to create after rendering
+	pendingRelativePlacements []pendingRelativePlacement
+	pendingPlacementsMux      sync.Mutex
+
+
+	// Regex to extract markdown images
+	markdownImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+
+	// Diacritic table for encoding row/column positions in kitty placeholders
+	kittyDiacritics = []rune{
+		'\u0305', '\u030D', '\u030E', '\u0310', '\u0312', '\u033D', '\u033E', '\u033F',
+		'\u0346', '\u034A', '\u034B', '\u034C', '\u0350', '\u0351', '\u0352', '\u0357',
+		'\u035B', '\u0363', '\u0364', '\u0365', '\u0366', '\u0367', '\u0368', '\u0369',
+		'\u036A', '\u036B', '\u036C', '\u036D', '\u036E', '\u036F', '\u0483', '\u0484',
+	}
 )
 
 func (o *Organizer) sortColumnStart() int {
@@ -323,6 +379,11 @@ func (o *Organizer) drawAltRows() {
 }
 
 func (o *Organizer) drawRenderedNote() {
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "drawRenderedNote: ENTER (note has %d lines)\n", len(o.note))
+		debugLog.Close()
+	}
+
 	if len(o.note) == 0 {
 		return
 	}
@@ -335,10 +396,167 @@ func (o *Organizer) drawRenderedNote() {
 		//end = len(o.note) - 1
 		end = len(o.note)
 	}
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "drawRenderedNote: printing lines %d to %d\n", start, end)
+		debugLog.Close()
+	}
+
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
 	fmt.Print(strings.Join(o.note[start:end], lf_ret))
 	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
+
+	// Now create image placements at the correct screen positions
+	o.createImagePlacementsAtPositions(start, end)
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "drawRenderedNote: COMPLETE\n")
+		debugLog.Close()
+	}
+}
+
+// deleteAllKittyPlacements deletes all kitty image placements
+func deleteAllKittyPlacements() {
+	if !app.kitty {
+		return
+	}
+
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if IsTmuxScreen() {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	// Delete all placements: a=d (delete), d=A (all placements)
+	cmd := oscOpen + "a=d,d=A,q=1" + oscClose
+	fmt.Fprint(os.Stdout, cmd)
+	os.Stdout.Sync()
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "DELETED: all kitty placements\n")
+		debugLog.Close()
+	}
+}
+
+// createKittyPlacement creates a placement at the current cursor position
+func createKittyPlacement(imageID uint32, cols, rows int) error {
+	if !app.kitty {
+		return errors.New("kitty terminal not detected")
+	}
+
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if IsTmuxScreen() {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	// Create placement at current cursor position: a=p (place), i=imageID, c=cols, r=rows
+	args := []string{
+		"a=p",
+		"q=1", // show errors
+		fmt.Sprintf("i=%d", imageID),
+	}
+	if cols > 0 {
+		args = append(args, fmt.Sprintf("c=%d", cols))
+	}
+	if rows > 0 {
+		args = append(args, fmt.Sprintf("r=%d", rows))
+	}
+
+	cmd := oscOpen + strings.Join(args, ",") + oscClose
+	_, err := fmt.Fprint(os.Stdout, cmd)
+	return err
+}
+
+// createImagePlacementsAtPositions creates kitty image placements at the correct screen positions
+func (o *Organizer) createImagePlacementsAtPositions(startLine, endLine int) {
+	if !app.kitty {
+		return
+	}
+
+	// First, delete all existing placements
+	deleteAllKittyPlacements()
+
+	// Parse each visible line for image markers
+	imageMarkerRegex := regexp.MustCompile(`\[KITTY_IMAGE:id=(\d+),cols=(\d+),rows=(\d+)\]`)
+
+	for lineIdx := startLine; lineIdx < endLine && lineIdx < len(o.note); lineIdx++ {
+		line := o.note[lineIdx]
+		matches := imageMarkerRegex.FindAllStringSubmatch(line, -1)
+
+		for _, match := range matches {
+			if len(match) != 4 {
+				continue
+			}
+
+			imageID, _ := strconv.ParseUint(match[1], 10, 32)
+			cols, _ := strconv.Atoi(match[2])
+			rows, _ := strconv.Atoi(match[3])
+
+			// Calculate screen position
+			screenRow := TOP_MARGIN + 1 + (lineIdx - startLine)
+			screenCol := o.Screen.divider + 1
+
+			// Move cursor to position
+			fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", screenRow, screenCol)
+
+			// Create placement at current cursor position
+			if err := createKittyPlacement(uint32(imageID), cols, rows); err != nil {
+				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+					fmt.Fprintf(debugLog, "ERROR creating placement: %v\n", err)
+					debugLog.Close()
+				}
+			} else {
+				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+					fmt.Fprintf(debugLog, "PLACEMENT: created i=%d at row=%d,col=%d (%dx%d cells)\n",
+						imageID, screenRow, screenCol, cols, rows)
+					debugLog.Close()
+				}
+			}
+		}
+	}
+
+	// Flush output
+	os.Stdout.Sync()
+}
+
+// createPendingRelativePlacements creates all pending relative placements after Unicode placeholders are drawn
+func createPendingRelativePlacements() {
+	pendingPlacementsMux.Lock()
+	defer pendingPlacementsMux.Unlock()
+
+	if len(pendingRelativePlacements) == 0 {
+		return
+	}
+
+	for _, p := range pendingRelativePlacements {
+		if err := kittyCreateRelativePlacement(os.Stdout, p.imageID, p.placementID,
+			KITTY_PLACEHOLDER_IMAGE_ID, KITTY_PLACEHOLDER_PLACEMENT_ID,
+			p.cols, p.rows, 0, 0); err != nil {
+			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+				fmt.Fprintf(debugLog, "ERROR creating relative placement: %v\n", err)
+				debugLog.Close()
+			}
+		} else {
+			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+				fmt.Fprintf(debugLog, "CREATED RELATIVE PLACEMENT: i=%d, p=%d, P=%d, Q=%d, c=%d, r=%d\n",
+					p.imageID, p.placementID, KITTY_PLACEHOLDER_IMAGE_ID, KITTY_PLACEHOLDER_PLACEMENT_ID, p.cols, p.rows)
+				debugLog.Close()
+			}
+		}
+	}
+
+	// Clear pending list
+	pendingRelativePlacements = nil
+
+	// Ensure all commands are sent to kitty immediately
+	os.Stdout.Sync()
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "FLUSHED: all relative placement commands sent to kitty\n")
+		debugLog.Close()
+	}
 }
 
 func (o *Organizer) drawStatusBar() {
@@ -490,12 +708,33 @@ func (o *Organizer) erasePreviousRowMarker(prevRow int) {
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH ", y+TOP_MARGIN+1, 0)
 }
 
+// deleteAllKittyImages sends delete command for all cached kitty images
+func deleteAllKittyImages() {
+	if !app.kitty || !app.kittyPlace {
+		return
+	}
+
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if IsTmuxScreen() {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	// Delete all images: a=d (delete), d=A (all images)
+	deleteCmd := oscOpen + "a=d,d=A" + oscClose
+	os.Stdout.WriteString(deleteCmd)
+}
+
 // change function name to displayRenderedNote
 func (o *Organizer) drawPreview() {
 	if len(o.rows) == 0 {
 		o.Screen.eraseRightScreen()
 		return
 	}
+
+	// Don't delete images - let them persist in kitty for reuse
+	// deleteAllKittyImages()
+
 	id := o.rows[o.fr].id
 	var note string
 	if o.taskview != BY_FIND {
@@ -524,12 +763,406 @@ func (o *Organizer) drawPreview() {
 	o.drawRenderedNote()
 }
 
+// extractImageURLs extracts all image URLs from markdown
+func extractImageURLs(markdown string) []string {
+	matches := markdownImageRegex.FindAllStringSubmatch(markdown, -1)
+	urls := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) > 2 {
+			urls = append(urls, match[2]) // match[2] is the URL
+		}
+	}
+	return urls
+}
+
+// transmitKittyImage transmits an image to the kitty terminal and returns the image ID
+// Returns 0 if transmission fails
+func transmitKittyImage(url string, maxCols int) uint32 {
+	// Check cache first
+	kittyImageCacheMux.RLock()
+	if entry, exists := kittyImageCache[url]; exists {
+		kittyImageCacheMux.RUnlock()
+		return entry.imageID
+	}
+	kittyImageCacheMux.RUnlock()
+
+	// Load the image
+	imgObj, err := loadImageForGlamour(url)
+	if err != nil {
+		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+			fmt.Fprintf(debugLog, "transmitKittyImage: failed to load %s: %v\n", url, err)
+			debugLog.Close()
+		}
+		return 0
+	}
+
+	// Encode to PNG
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, imgObj); err != nil {
+		return 0
+	}
+	data := buf.Bytes()
+
+	// Calculate cell size
+	imgW := imgObj.Bounds().Dx()
+	imgH := imgObj.Bounds().Dy()
+	if imgW == 0 || imgH == 0 {
+		return 0
+	}
+
+	targetCols := maxCols - 2
+	if targetCols <= 0 {
+		targetCols = 30
+	}
+	if targetCols > 30 {
+		targetCols = 30
+	}
+	rows := int(float64(imgH) / float64(imgW) * float64(targetCols) * 0.5)
+	if rows < 1 {
+		rows = 1
+	}
+
+	// Get new image ID and placement ID
+	imageID := nextKittyImageID()
+	placementID := nextRelativePlacementID
+	nextRelativePlacementID++
+
+	// Transmit directly to stdout
+	isTmux := IsTmuxScreen()
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "transmitKittyImage: imgW=%d, imgH=%d, targetCols=%d, rows=%d, imageID=%d\n",
+			imgW, imgH, targetCols, rows, imageID)
+		debugLog.Close()
+	}
+
+	// Transmit image with a=T (creates regular placement) - Unicode placeholder will reference it
+	if err := kittyTransmitActualImage(data, imageID, targetCols, rows, isTmux); err != nil {
+		return 0
+	}
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "IMAGE: transmitted i=%d with a=T,U=1 (virtual placement, %dx%d cells)\n", imageID, targetCols, rows)
+		debugLog.Close()
+	}
+
+	// Cache the image ID, placement ID, and dimensions
+	kittyImageCacheMux.Lock()
+	kittyImageCache[url] = kittyImageCacheEntry{
+		imageID:     imageID,
+		placementID: placementID,
+		cols:        targetCols,
+		rows:        rows,
+	}
+	kittyImageCacheMux.Unlock()
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "transmitKittyImage: transmitted %s as ID %d (%dx%d cells)\n", url, imageID, targetCols, rows)
+		debugLog.Close()
+	}
+
+	return imageID
+}
+
+// replaceImagesWithPlaceholders replaces glamour's image output with kitty placeholders
+
+// kittyTransmitImageToStdout transmits image data directly to stdout using kitty protocol
+func kittyTransmitImageToStdout(data []byte, imageID uint32, cols, rows int, isTmux bool) error {
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if isTmux {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	// Single-step: transmit with U=1 for Unicode placeholders (like Yazi)
+	header := []string{"a=T", "f=100", "q=2", "U=1"} // a=T (transmit), U=1 (Unicode placeholders)
+	if imageID != 0 {
+		header = append(header, fmt.Sprintf("i=%d", imageID))
+	}
+	header = append(header, fmt.Sprintf("S=%d", len(data)))
+	// Include size for proper virtual placement
+	if cols > 0 {
+		header = append(header, fmt.Sprintf("c=%d", cols))
+	}
+	if rows > 0 {
+		header = append(header, fmt.Sprintf("r=%d", rows))
+	}
+	bsHdr := []byte(strings.Join(header, ",") + ",")
+
+	// Chunk and transmit
+	chunkSize := 4096
+	encoded := base64.StdEncoding.EncodeToString(data)
+
+	for i := 0; i < len(encoded); i += chunkSize {
+		end := i + chunkSize
+		if end > len(encoded) {
+			end = len(encoded)
+		}
+		chunk := encoded[i:end]
+
+		parts := [][]byte{[]byte(oscOpen)}
+		if bsHdr != nil {
+			parts = append(parts, bsHdr)
+			bsHdr = nil
+		}
+		parts = append(parts, []byte("m=1;"), []byte(chunk), []byte(oscClose))
+
+		if _, err := os.Stdout.Write(bytes.Join(parts, nil)); err != nil {
+			return err
+		}
+	}
+
+	// Final chunk marker
+	_, err := os.Stdout.WriteString(oscOpen + "m=0;" + oscClose)
+	return err
+}
+
+// createTransparentPNG creates a 1x1 transparent PNG
+func createTransparentPNG() []byte {
+	// 1x1 transparent PNG (67 bytes)
+	// This is the minimal valid PNG with full transparency
+	transparentPNG := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+		0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 size
+		0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, // RGBA mode
+		0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, // IDAT chunk
+		0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, // Compressed data
+		0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+		0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, // IEND chunk
+		0x42, 0x60, 0x82,
+	}
+	return transparentPNG
+}
+
+// transmitTransparentPlaceholder transmits the 1x1 transparent placeholder image once
+func transmitTransparentPlaceholder() error {
+	if transparentPlaceholderTransmitted {
+		return nil
+	}
+
+	pngData := createTransparentPNG()
+	isTmux := IsTmuxScreen()
+
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if isTmux {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	// STEP 1: Transmit transparent image data (a=T to transmit and display)
+	header1 := []string{
+		"a=T",
+		"f=100",
+		"q=1", // q=1 to see errors
+		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID), // image ID = 1
+		fmt.Sprintf("S=%d", len(pngData)),                // data size
+	}
+
+	bsHdr := []byte(strings.Join(header1, ",") + ",")
+
+	// Transmit in one chunk (it's tiny)
+	encoded := base64.StdEncoding.EncodeToString(pngData)
+	parts := [][]byte{
+		[]byte(oscOpen),
+		bsHdr,
+		[]byte("m=0;"), // single chunk
+		[]byte(encoded),
+		[]byte(oscClose),
+	}
+
+	if _, err := os.Stdout.Write(bytes.Join(parts, nil)); err != nil {
+		return err
+	}
+
+	// STEP 2: Create virtual placement (a=p with U=1) - SEPARATE command!
+	header2 := []string{
+		"a=p",                                             // create placement
+		"U=1",                                             // virtual placement
+		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID),  // image ID = 1
+		fmt.Sprintf("p=%d", KITTY_PLACEHOLDER_PLACEMENT_ID), // placement ID = 1
+		"c=1",                                             // 1 column
+		"r=1",                                             // 1 row
+		"q=1",                                             // q=1 to see errors
+	}
+
+	cmd2 := oscOpen + strings.Join(header2, ",") + oscClose
+	if _, err := os.Stdout.WriteString(cmd2); err != nil {
+		return err
+	}
+
+	transparentPlaceholderTransmitted = true
+
+	// DEBUG: Log successful transmission
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "TRANSPARENT PLACEHOLDER: transmitted i=%d with a=T\n", KITTY_PLACEHOLDER_IMAGE_ID)
+		fmt.Fprintf(debugLog, "VIRTUAL PLACEMENT: created p=%d with U=1, c=1, r=1\n", KITTY_PLACEHOLDER_PLACEMENT_ID)
+		debugLog.Close()
+	}
+
+	return nil
+}
+
+// kittyTransmitActualImage transmits actual image data and creates a placement
+func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmux bool) error {
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if isTmux {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	// Transmit image data and create virtual placement (a=T,U=1)
+	header := []string{
+		"a=T",           // Transmit data AND create placement
+		"f=100",         // PNG format
+		"q=2",           // Quiet mode (no terminal responses)
+		"U=1",           // Create Unicode placeholder virtual placement
+		fmt.Sprintf("i=%d", imageID),
+		fmt.Sprintf("p=%d", imageID),  // Placement ID (must match placeholder grids)
+		fmt.Sprintf("c=%d", cols),
+		fmt.Sprintf("r=%d", rows),
+		fmt.Sprintf("S=%d", len(data)),
+	}
+	bsHdr := []byte(strings.Join(header, ",") + ",")
+
+	// Chunk and transmit
+	chunkSize := 4096
+	encoded := base64.StdEncoding.EncodeToString(data)
+
+	for i := 0; i < len(encoded); i += chunkSize {
+		end := i + chunkSize
+		if end > len(encoded) {
+			end = len(encoded)
+		}
+		chunk := encoded[i:end]
+
+		parts := [][]byte{[]byte(oscOpen)}
+		if bsHdr != nil {
+			parts = append(parts, bsHdr)
+			bsHdr = nil
+		}
+		parts = append(parts, []byte("m=1;"), []byte(chunk), []byte(oscClose))
+
+		if _, err := os.Stdout.Write(bytes.Join(parts, nil)); err != nil {
+			return err
+		}
+	}
+
+	// Final chunk marker
+	_, err := os.Stdout.WriteString(oscOpen + "m=0;" + oscClose)
+	return err
+}
+
+var renderingMarkdown bool // Guard against re-entrant calls
+
+// kittyImageCacheLookup returns image info from cache for glamour
+func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
+	kittyImageCacheMux.RLock()
+	defer kittyImageCacheMux.RUnlock()
+	entry, exists := kittyImageCache[url]
+	if !exists {
+		return 0, 0, 0, false
+	}
+	return entry.imageID, entry.cols, entry.rows, true
+}
+
+// replaceKittyImageMarkers converts glamour's text markers into actual Unicode placeholder grids
+// Markers have format: [KITTY_IMAGE:id=42,cols=30,rows=15]
+func replaceKittyImageMarkers(text string) string {
+	markerRegex := regexp.MustCompile(`\[KITTY_IMAGE:id=(\d+),cols=(\d+),rows=(\d+)\]`)
+
+	return markerRegex.ReplaceAllStringFunc(text, func(match string) string {
+		submatches := markerRegex.FindStringSubmatch(match)
+		if len(submatches) != 4 {
+			// Parse error - return original marker
+			return match
+		}
+
+		// Parse image ID, cols, rows from marker
+		imageID, err1 := strconv.ParseUint(submatches[1], 10, 32)
+		cols, err2 := strconv.Atoi(submatches[2])
+		rows, err3 := strconv.Atoi(submatches[3])
+
+		if err1 != nil || err2 != nil || err3 != nil {
+			// Parse error - return original marker
+			return match
+		}
+
+		// For virtual placements (a=T,U=1), placementID = imageID
+		placementID := uint32(imageID)
+
+		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+			fmt.Fprintf(debugLog, "REPLACE: Converting marker to grid: id=%d, cols=%d, rows=%d\n", imageID, cols, rows)
+			debugLog.Close()
+		}
+
+		// Generate the Unicode placeholder grid
+		return buildPlaceholderGrid(uint32(imageID), placementID, cols, rows)
+	})
+}
+
 func (o *Organizer) renderMarkdown(s string) {
-	r, _ := glamour.NewTermRenderer(
+	// Prevent infinite loop from re-entrant calls
+	if renderingMarkdown {
+		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+			fmt.Fprintf(debugLog, "WARNING: Prevented re-entrant renderMarkdown call!\n")
+			debugLog.Close()
+		}
+		return
+	}
+	renderingMarkdown = true
+	defer func() { renderingMarkdown = false }()
+
+	// Pre-transmit kitty images if kitty is available
+	if app.kitty && app.kittyPlace {
+		imageURLs := extractImageURLs(s)
+		if len(imageURLs) > 0 {
+			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+				fmt.Fprintf(debugLog, "renderMarkdown: pre-transmitting %d images\n", len(imageURLs))
+				debugLog.Close()
+			}
+
+			for _, url := range imageURLs {
+				transmitKittyImage(url, o.Screen.totaleditorcols-20)
+			}
+		}
+	}
+
+	// Configure renderer options WITH kitty support
+	options := []glamour.TermRendererOption{
 		glamour.WithStylePath(getGlamourStylePath()),
 		glamour.WithWordWrap(0),
-	)
+	}
+
+	// Enable kitty image rendering if available
+	if app.kitty && app.kittyPlace {
+		options = append(options, glamour.WithKittyImages(true, kittyImageCacheLookup))
+	}
+
+	r, _ := glamour.NewTermRenderer(options...)
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "renderMarkdown: calling r.Render()\n")
+		debugLog.Close()
+	}
+
 	note, _ := r.Render(s)
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "renderMarkdown: r.Render() returned, note length=%d\n", len(note))
+		debugLog.Close()
+	}
+
+	// Replace glamour's text markers with actual Unicode placeholder grids
+	if app.kitty && app.kittyPlace {
+		note = replaceKittyImageMarkers(note)
+
+		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+			fmt.Fprintf(debugLog, "renderMarkdown: after replaceKittyImageMarkers, note length=%d\n", len(note))
+			debugLog.Close()
+		}
+	}
+
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
 
@@ -538,8 +1171,71 @@ func (o *Organizer) renderMarkdown(s string) {
 		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
 		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
 	}
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "renderMarkdown: calling WordWrap()\n")
+		debugLog.Close()
+	}
+
 	note = WordWrap(note, o.Screen.totaleditorcols-20)
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "renderMarkdown: WordWrap() returned\n")
+		debugLog.Close()
+	}
+
 	o.note = strings.Split(note, "\n")
+
+	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		fmt.Fprintf(debugLog, "renderMarkdown: FINISHED (note has %d lines)\n", len(o.note))
+		debugLog.Close()
+	}
+}
+
+// loadImageForGlamour loads images for glamour's kitty renderer
+// It handles local files, Google Drive, and web URLs
+func loadImageForGlamour(url string) (image.Image, error) {
+	parsed, _ := net_url.Parse(url)
+	maxW := int(app.Screen.ws.Xpixel)
+	maxH := int(app.Screen.ws.Ypixel)
+	if maxW == 0 {
+		maxW = app.Screen.totaleditorcols * 8
+	}
+	if maxH == 0 {
+		maxH = app.Session.imgSizeY
+	}
+
+	isHTTP := parsed.Scheme == "http" || parsed.Scheme == "https"
+	isFile := parsed.Scheme == "file"
+
+	// Try Google Drive first if we can extract a file ID
+	if id, err := ExtractFileID(url); err == nil && id != "" {
+		img, _, gErr := loadGoogleImage(url, maxW, maxH)
+		if gErr == nil {
+			return img, nil
+		}
+		// Fall through to other methods on error
+	}
+
+	// Try HTTP/HTTPS URLs
+	if isHTTP {
+		img, _, err := loadWebImage(url)
+		return img, err
+	}
+
+	// Try file:// URLs
+	if isFile {
+		path := parsed.Path
+		if path == "" {
+			path = url
+		}
+		img, _, err := loadImage(path, maxW, maxH)
+		return img, err
+	}
+
+	// Try as local filesystem path (supports mounted Drive paths)
+	img, _, err := loadImage(url, maxW, maxH)
+	return img, err
 }
 
 func (o *Organizer) renderCode(s string, lang string) {

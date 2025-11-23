@@ -38,6 +38,9 @@ type App struct {
 	SyncInProcess bool
 	Run           bool
 	kitty         bool   // true if running in kitty terminal
+	kittyVersion  string // kitty graphics protocol version
+	kittyPlace    bool   // true if kitty supports Unicode placeholders
+	kittyRelative bool   // true if kitty supports relative placements
 	origTermCfg   []byte // original terminal configuration
 }
 

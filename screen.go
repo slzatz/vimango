@@ -54,7 +54,10 @@ func (s *Screen) eraseScreenRedrawLines() {
 func (s *Screen) eraseRightScreen() {
 	var ab strings.Builder
 
-	//fmt.Print("\x1b_Ga=d\x1b\\") //delete any images
+	// NOTE: With Unicode placeholders (U=1), we DON'T delete placements!
+	// The placeholders are part of the text and scroll naturally.
+	// The virtual placement is just metadata that the placeholders reference.
+
 	ab.WriteString("\x1b[?25l") //hides the cursor
 
 	//below positions cursor such that top line is erased the first time through
