@@ -41,6 +41,8 @@ type App struct {
 	kittyVersion  string // kitty graphics protocol version
 	kittyPlace    bool   // true if kitty supports Unicode placeholders
 	kittyRelative bool   // true if kitty supports relative placements
+	showImages    bool   // true if inline images should be displayed
+	imageScale    int    // image width in columns (default: 45)
 	origTermCfg   []byte // original terminal configuration
 }
 

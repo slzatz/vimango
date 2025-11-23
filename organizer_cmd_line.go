@@ -247,6 +247,24 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":closewebview", ":cwv"},
 	})
 
+	registry.Register("toggleimages", (*Organizer).toggleImages, CommandInfo{
+		Name:        "toggleimages",
+		Aliases:     []string{"ti"},
+		Description: "Toggle inline image display on/off",
+		Usage:       "toggleimages",
+		Category:    "View Control",
+		Examples:    []string{":toggleimages", ":ti"},
+	})
+
+	registry.Register("imagescale", (*Organizer).scaleImages, CommandInfo{
+		Name:        "imagescale",
+		Aliases:     []string{"is"},
+		Description: "Scale inline images up (+), down (-), or to specific size (N columns)",
+		Usage:       "imagescale [+|-|N]",
+		Category:    "View Control",
+		Examples:    []string{":imagescale +", ":imagescale -", ":imagescale 30", ":imagescale 60"},
+	})
+
 	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
 		Name:        "vertical resize",
 		Aliases:     []string{"vert res"},
@@ -1717,4 +1735,73 @@ func (o *Organizer) startResearchNotificationTest(_ int) {
 			app.addNotification(step.message)
 		}
 	}()
+}
+
+// toggleImages toggles inline image display on/off
+func (o *Organizer) toggleImages(_ int) {
+	o.mode = NORMAL
+	o.command_line = ""
+
+	app.showImages = !app.showImages
+
+	status := "OFF"
+	if app.showImages {
+		status = "ON"
+	}
+
+	o.ShowMessage(BL, fmt.Sprintf("Images: %s", status))
+	o.drawPreview()
+}
+
+// scaleImages changes the image scale (width in columns)
+func (o *Organizer) scaleImages(pos int) {
+	// Parse argument from command line
+	var argStr string
+	if pos+1 < len(o.command_line) {
+		argStr = strings.TrimSpace(o.command_line[pos+1:])
+	}
+
+	o.mode = NORMAL
+	o.command_line = ""
+
+	if argStr == "" {
+		o.ShowMessage(BL, fmt.Sprintf("Current image scale: %d columns", app.imageScale))
+		return
+	}
+
+	var newScale int
+	var err error
+
+	switch argStr {
+	case "+":
+		newScale = app.imageScale + 5
+	case "-":
+		newScale = app.imageScale - 5
+	default:
+		newScale, err = strconv.Atoi(argStr)
+		if err != nil {
+			o.ShowMessage(BL, fmt.Sprintf("Invalid scale value: %s (use +, -, or number)", argStr))
+			return
+		}
+	}
+
+	// Validate range
+	if newScale < 10 {
+		o.ShowMessage(BL, "Image scale too small (minimum: 10 columns)")
+		return
+	}
+	if newScale > 100 {
+		o.ShowMessage(BL, "Image scale too large (maximum: 100 columns)")
+		return
+	}
+
+	// Update scale
+	app.imageScale = newScale
+
+	// Delete all existing kitty images (they're at the old scale)
+	// Next render will transmit at the new scale
+	deleteAllKittyImages()
+
+	o.ShowMessage(BL, fmt.Sprintf("Image scale: %d columns", app.imageScale))
+	o.drawPreview()
 }

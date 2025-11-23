@@ -204,6 +204,16 @@ func WordWrap(text string, limit int) string {
 	originalLines := strings.Split(text, "\n")
 
 	for i, line := range originalLines {
+		// Skip wrapping for lines containing kitty Unicode placeholders (U+10EEEE)
+		// These are image placeholder grids that must not be broken
+		if strings.Contains(line, string(rune(0x10EEEE))) {
+			finalResult.WriteString(line)
+			if i < len(originalLines)-1 {
+				finalResult.WriteByte('\n')
+			}
+			continue
+		}
+
 		var currentLineBuilder strings.Builder
 		currentLineWidth := 0
 

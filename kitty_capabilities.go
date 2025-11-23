@@ -48,6 +48,10 @@ func (a *App) DetectKittyCapabilities() {
 	if os.Getenv("VIMANGO_ENABLE_KITTY_RELATIVE") != "" {
 		a.kittyRelative = true
 	}
+
+	// Initialize image display settings
+	a.showImages = (a.kitty && a.kittyPlace) // Enable images if kitty supports placeholders
+	a.imageScale = 45                         // Default image width in columns
 }
 
 func kittyBinaryVersion() (string, error) {
