@@ -21,19 +21,7 @@ var (
 	timeKeywordsRegex = regexp.MustCompile(`seconds|minutes|hours|days`)
 	emptyImageMarker  = strings.Repeat(" ", IMAGE_MARKER_WIDTH)
 	filledImageMarker = padImageMarker(IMAGE_MARKER_SYMBOL)
-
-	// Kitty image cache: URL -> (image ID, cols, rows)
-	kittyImageCache    = make(map[string]kittyImageCacheEntry)
-	kittyImageCacheMux sync.RWMutex
 )
-
-// kittyImageCacheEntry stores image ID and dimensions
-type kittyImageCacheEntry struct {
-	imageID       uint32
-	cols          int
-	rows          int
-	placementID   uint32 // For relative placements
-}
 
 const (
 	// Transparent placeholder image ID (constant, reused for all images)
@@ -778,15 +766,54 @@ func extractImageURLs(markdown string) []string {
 // transmitKittyImage transmits an image to the kitty terminal and returns the image ID
 // Returns 0 if transmission fails
 func transmitKittyImage(url string, maxCols int) uint32 {
-	// Check cache first
-	kittyImageCacheMux.RLock()
-	if entry, exists := kittyImageCache[url]; exists {
-		kittyImageCacheMux.RUnlock()
-		return entry.imageID
-	}
-	kittyImageCacheMux.RUnlock()
+	// Initialize cache if needed
+	initImageCache()
 
-	// Load the image
+	// Check cache first (disk-based cache with metadata)
+	if globalImageCache != nil {
+		cachedData, cachedImageID, cachedCols, cachedRows, exists := globalImageCache.GetKittyCachedImage(url)
+		if exists {
+			// Cache hit - check if we need to re-transmit the image
+			isGoogleDrive := strings.Contains(url, "drive.google.com")
+
+			if isGoogleDrive && len(cachedData) > 0 {
+				// Google Drive image with cached data - decode and transmit
+				data, err := base64.StdEncoding.DecodeString(string(cachedData))
+				if err == nil {
+					isTmux := IsTmuxScreen()
+					if err := kittyTransmitActualImage(data, cachedImageID, cachedCols, cachedRows, isTmux); err == nil {
+						if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+							fmt.Fprintf(debugLog, "transmitKittyImage: cache hit (Google Drive) %s, re-transmitted ID %d (%dx%d)\n",
+								url, cachedImageID, cachedCols, cachedRows)
+							debugLog.Close()
+						}
+						return cachedImageID
+					}
+				}
+			} else if !isGoogleDrive {
+				// Local file with metadata only - re-load and transmit with same ID
+				imgObj, err := loadImageForGlamour(url)
+				if err == nil {
+					var buf bytes.Buffer
+					if err := png.Encode(&buf, imgObj); err == nil {
+						data := buf.Bytes()
+						isTmux := IsTmuxScreen()
+						if err := kittyTransmitActualImage(data, cachedImageID, cachedCols, cachedRows, isTmux); err == nil {
+							if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+								fmt.Fprintf(debugLog, "transmitKittyImage: cache hit (local file) %s, re-transmitted ID %d (%dx%d)\n",
+									url, cachedImageID, cachedCols, cachedRows)
+								debugLog.Close()
+							}
+							return cachedImageID
+						}
+					}
+				}
+			}
+			// Fall through to full reload if cache data is unusable
+		}
+	}
+
+	// Cache miss or cache unavailable - load image fresh
 	imgObj, err := loadImageForGlamour(url)
 	if err != nil {
 		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
@@ -846,15 +873,24 @@ func transmitKittyImage(url string, maxCols int) uint32 {
 		debugLog.Close()
 	}
 
-	// Cache the image ID, placement ID, and dimensions
-	kittyImageCacheMux.Lock()
-	kittyImageCache[url] = kittyImageCacheEntry{
-		imageID:     imageID,
-		placementID: placementID,
-		cols:        targetCols,
-		rows:        rows,
+	// Store in disk cache
+	if globalImageCache != nil {
+		isGoogleDrive := strings.Contains(url, "drive.google.com")
+		var cacheData []byte
+
+		if isGoogleDrive {
+			// For Google Drive images, cache the full image data (base64 encoded)
+			cacheData = []byte(base64.StdEncoding.EncodeToString(data))
+		}
+		// For local files, pass empty data (metadata only)
+
+		if err := globalImageCache.StoreKittyCachedImage(url, cacheData, imageID, targetCols, rows, placementID); err != nil {
+			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+				fmt.Fprintf(debugLog, "Warning: failed to cache image %s: %v\n", url, err)
+				debugLog.Close()
+			}
+		}
 	}
-	kittyImageCacheMux.Unlock()
 
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 		fmt.Fprintf(debugLog, "transmitKittyImage: transmitted %s as ID %d (%dx%d cells)\n", url, imageID, targetCols, rows)
@@ -1057,13 +1093,15 @@ var renderingMarkdown bool // Guard against re-entrant calls
 
 // kittyImageCacheLookup returns image info from cache for glamour
 func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
-	kittyImageCacheMux.RLock()
-	defer kittyImageCacheMux.RUnlock()
-	entry, exists := kittyImageCache[url]
-	if !exists {
+	// Initialize cache if needed
+	initImageCache()
+
+	if globalImageCache == nil {
 		return 0, 0, 0, false
 	}
-	return entry.imageID, entry.cols, entry.rows, true
+
+	_, imageID, cols, rows, exists := globalImageCache.GetKittyCachedImage(url)
+	return imageID, cols, rows, exists
 }
 
 // replaceKittyImageMarkers converts glamour's text markers into actual Unicode placeholder grids

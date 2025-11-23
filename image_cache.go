@@ -12,13 +12,22 @@ import (
 	"time"
 )
 
+// KittyMetadata holds kitty-specific image metadata
+type KittyMetadata struct {
+	ImageID     uint32 `json:"image_id"`
+	Cols        int    `json:"cols"`
+	Rows        int    `json:"rows"`
+	PlacementID uint32 `json:"placement_id"`
+}
+
 // CacheEntry represents a single cached image entry
 type CacheEntry struct {
-	URL          string    `json:"url"`
-	Filename     string    `json:"filename"`
-	Created      time.Time `json:"created"`
-	LastAccessed time.Time `json:"last_accessed"`
-	SizeBytes    int64     `json:"size_bytes"`
+	URL          string          `json:"url"`
+	Filename     string          `json:"filename"`
+	Created      time.Time       `json:"created"`
+	LastAccessed time.Time       `json:"last_accessed"`
+	SizeBytes    int64           `json:"size_bytes"`
+	KittyMeta    *KittyMetadata  `json:"kitty_metadata,omitempty"` // Optional kitty-specific metadata
 }
 
 // CacheIndex represents the cache metadata structure
@@ -283,4 +292,122 @@ func (c *ImageCache) GetCacheStats() (int, int64) {
 	}
 
 	return len(c.index.Entries), totalSize
+}
+
+// GetKittyCachedImage retrieves cached image data and kitty metadata by URL
+// Returns (imageData, imageID, cols, rows, exists)
+// For local files, imageData may be empty (only metadata cached)
+func (c *ImageCache) GetKittyCachedImage(url string) ([]byte, uint32, int, int, bool) {
+	key := c.generateCacheKey(url)
+
+	c.mutex.RLock()
+	entry, exists := c.index.Entries[key]
+	c.mutex.RUnlock()
+
+	if !exists || entry.KittyMeta == nil {
+		return nil, 0, 0, 0, false
+	}
+
+	// Read cached image data (may not exist for local files - metadata only)
+	cacheFile := filepath.Join(c.cacheDir, entry.Filename)
+	data, err := os.ReadFile(cacheFile)
+	if err != nil {
+		// If data file is missing but we have metadata, that's OK for local files
+		// Return empty data with valid metadata
+		if entry.KittyMeta != nil {
+			c.mutex.Lock()
+			entry.LastAccessed = time.Now()
+			c.index.Entries[key] = entry
+			c.saveIndex() // Best effort
+			c.mutex.Unlock()
+			return nil, entry.KittyMeta.ImageID, entry.KittyMeta.Cols, entry.KittyMeta.Rows, true
+		}
+		// No metadata either - remove stale entry
+		c.mutex.Lock()
+		delete(c.index.Entries, key)
+		c.saveIndex() // Best effort
+		c.mutex.Unlock()
+		return nil, 0, 0, 0, false
+	}
+
+	// Update last accessed time
+	c.mutex.Lock()
+	entry.LastAccessed = time.Now()
+	c.index.Entries[key] = entry
+	c.saveIndex() // Best effort
+	c.mutex.Unlock()
+
+	return data, entry.KittyMeta.ImageID, entry.KittyMeta.Cols, entry.KittyMeta.Rows, true
+}
+
+// StoreKittyCachedImage stores image data and kitty metadata in cache
+// For Google Drive URLs: stores both data and metadata
+// For local files: can store metadata only (pass empty imageData)
+func (c *ImageCache) StoreKittyCachedImage(url string, imageData []byte, imageID uint32, cols, rows int, placementID uint32) error {
+	key := c.generateCacheKey(url)
+	filename := key + ".b64"
+	cacheFile := filepath.Join(c.cacheDir, filename)
+
+	var fileSize int64 = 0
+
+	// Only write image data file if data provided (Google Drive images)
+	if len(imageData) > 0 {
+		// Write image data to cache file atomically
+		tempFile := cacheFile + ".tmp"
+		if err := os.WriteFile(tempFile, imageData, 0644); err != nil {
+			return fmt.Errorf("failed to write cache file: %v", err)
+		}
+
+		if err := os.Rename(tempFile, cacheFile); err != nil {
+			os.Remove(tempFile) // Clean up temp file
+			return fmt.Errorf("failed to rename cache file: %v", err)
+		}
+
+		// Get file size for index
+		fileInfo, err := os.Stat(cacheFile)
+		if err != nil {
+			return fmt.Errorf("failed to get cache file size: %v", err)
+		}
+		fileSize = fileInfo.Size()
+	}
+	// For local files (no imageData), we still create an index entry with metadata only
+
+	// Update cache index
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// Check if we need to evict entries before adding new one
+	if len(c.index.Entries) >= c.maxEntries {
+		if err := c.evictOldestEntry(); err != nil {
+			log.Printf("Warning: Failed to evict cache entry: %v", err)
+			// Continue anyway - better to have oversized cache than fail
+		}
+	}
+
+	// Add new entry with kitty metadata
+	now := time.Now()
+	c.index.Entries[key] = CacheEntry{
+		URL:          url,
+		Filename:     filename,
+		Created:      now,
+		LastAccessed: now,
+		SizeBytes:    fileSize,
+		KittyMeta: &KittyMetadata{
+			ImageID:     imageID,
+			Cols:        cols,
+			Rows:        rows,
+			PlacementID: placementID,
+		},
+	}
+
+	// Save updated index
+	if err := c.saveIndex(); err != nil {
+		// If index save fails, try to clean up cache file if we created one
+		if len(imageData) > 0 {
+			os.Remove(cacheFile)
+		}
+		return fmt.Errorf("failed to update cache index: %v", err)
+	}
+
+	return nil
 }
