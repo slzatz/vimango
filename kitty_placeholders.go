@@ -197,9 +197,15 @@ func buildPlaceholderGrid(imgID, placementID uint32, cols, rows int) string {
 			b.WriteString(rowDia)
 			b.WriteString(colDia)
 		}
-		b.WriteString("\n")  // Always add newline after each row
+		// Add reset and newline - reset first to close color codes before newline
+		if r < rows-1 {
+			b.WriteString("\n")
+		}
 	}
 	b.WriteString(reset)
+	if rows > 0 {
+		b.WriteString("\n")
+	}
 	return b.String()
 }
 

@@ -780,15 +780,19 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 	var imgObj image.Image
 	isGoogleDrive := strings.Contains(url, "drive.google.com")
 
+	var cachedWidth, cachedHeight int
+
 	// Try to load from cache (Google Drive only)
 	if isGoogleDrive && globalImageCache != nil {
-		if cachedBase64, found := globalImageCache.GetCachedImageData(url); found {
+		if cachedBase64, width, height, found := globalImageCache.GetCachedImageData(url); found {
 			// Decode base64 cached data
 			decoded, err := base64.StdEncoding.DecodeString(cachedBase64)
 			if err == nil {
 				data = decoded
+				cachedWidth = width
+				cachedHeight = height
 				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-					fmt.Fprintf(debugLog, "transmitKittyImage: using cached data for %s (%d bytes)\n", url, len(data))
+					fmt.Fprintf(debugLog, "transmitKittyImage: using cached data for %s (%d bytes, %dx%d pixels)\n", url, len(data), width, height)
 					debugLog.Close()
 				}
 			}
@@ -814,10 +818,12 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 		}
 		data = buf.Bytes()
 
-		// Cache the data for Google Drive images
+		// Cache the data and dimensions for Google Drive images
 		if isGoogleDrive && globalImageCache != nil {
 			base64Data := base64.StdEncoding.EncodeToString(data)
-			if err := globalImageCache.StoreCachedImageData(url, base64Data); err != nil {
+			imgW := imgObj.Bounds().Dx()
+			imgH := imgObj.Bounds().Dy()
+			if err := globalImageCache.StoreCachedImageData(url, base64Data, imgW, imgH); err != nil {
 				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 					fmt.Fprintf(debugLog, "Warning: failed to cache %s: %v\n", url, err)
 					debugLog.Close()
@@ -826,18 +832,27 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 		}
 	}
 
-	// Decode PNG to get dimensions (if we got cached data, we need to decode it)
-	if imgObj == nil {
+	// Get image dimensions - use cached values if available to avoid expensive decode
+	var imgW, imgH int
+	if cachedWidth > 0 && cachedHeight > 0 {
+		// Use cached pixel dimensions (no need to decode PNG)
+		imgW = cachedWidth
+		imgH = cachedHeight
+	} else if imgObj != nil {
+		// Already have decoded image object
+		imgW = imgObj.Bounds().Dx()
+		imgH = imgObj.Bounds().Dy()
+	} else {
+		// Need to decode to get dimensions (fallback for non-cached images)
 		var err error
 		imgObj, _, err = image.Decode(bytes.NewReader(data))
 		if err != nil {
 			return 0, 0, 0
 		}
+		imgW = imgObj.Bounds().Dx()
+		imgH = imgObj.Bounds().Dy()
 	}
 
-	// Calculate dimensions based on current imageScale
-	imgW := imgObj.Bounds().Dx()
-	imgH := imgObj.Bounds().Dy()
 	if imgW == 0 || imgH == 0 {
 		return 0, 0, 0
 	}
@@ -846,7 +861,9 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 	if targetCols <= 0 || targetCols > app.imageScale {
 		targetCols = app.imageScale
 	}
-	rows := int(float64(imgH) / float64(imgW) * float64(targetCols) * 0.5)
+	// Calculate rows based on aspect ratio and terminal cell dimensions
+	// Terminal cells are roughly 2:1 (height:width), but adjust factor for better fit
+	rows := int(float64(imgH) / float64(imgW) * float64(targetCols) * 0.42)
 	if rows < 1 {
 		rows = 1
 	}
@@ -1125,11 +1142,16 @@ func replaceKittyImageMarkers(text string) string {
 		}
 
 		// Generate the Unicode placeholder grid
+		grid := buildPlaceholderGrid(uint32(imageID), placementID, cols, rows)
+
 		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 			fmt.Fprintf(debugLog, "PLACEHOLDER GRID: Building grid for id=%d, cols=%d, rows=%d\n", imageID, cols, rows)
+			// Count actual newlines in the grid
+			newlineCount := strings.Count(grid, "\n")
+			fmt.Fprintf(debugLog, "GRID STATS: grid length=%d, newline count=%d, expected rows=%d\n", len(grid), newlineCount, rows)
 			debugLog.Close()
 		}
-		return buildPlaceholderGrid(uint32(imageID), placementID, cols, rows)
+		return grid
 	})
 }
 
@@ -1202,6 +1224,21 @@ func (o *Organizer) renderMarkdown(s string) {
 		}
 		if markerIdx >= 0 {
 			fmt.Fprintf(debugLog, "MARKER POSITION: Found at index %d (first 200 chars: %q)\n", markerIdx, note[:previewLen])
+			// Show context around second marker if it exists
+			secondMarkerIdx := strings.Index(note[markerIdx+1:], "[KITTY_IMAGE:")
+			if secondMarkerIdx >= 0 {
+				secondMarkerIdx += markerIdx + 1
+				// Show 100 chars before and after second marker
+				contextStart := secondMarkerIdx - 100
+				if contextStart < 0 {
+					contextStart = 0
+				}
+				contextEnd := secondMarkerIdx + 100
+				if contextEnd > len(note) {
+					contextEnd = len(note)
+				}
+				fmt.Fprintf(debugLog, "SECOND MARKER CONTEXT (index %d): %q\n", secondMarkerIdx, note[contextStart:contextEnd])
+			}
 		} else {
 			fmt.Fprintf(debugLog, "MARKER POSITION: NOT FOUND in rendered output (first 200 chars: %q)\n", note[:previewLen])
 		}

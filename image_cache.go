@@ -19,6 +19,8 @@ type CacheEntry struct {
 	Created      time.Time `json:"created"`
 	LastAccessed time.Time `json:"last_accessed"`
 	SizeBytes    int64     `json:"size_bytes"`
+	Width        int       `json:"width"`  // Image width in pixels
+	Height       int       `json:"height"` // Image height in pixels
 }
 
 // CacheIndex represents the cache metadata structure
@@ -148,95 +150,7 @@ func (c *ImageCache) saveIndex() error {
 	return nil
 }
 
-// GetCachedImage retrieves a cached image by URL
-// Returns (base64Data, true) if found, ("", false) if not found
-func (c *ImageCache) GetCachedImage(url string) (string, bool) {
-	key := c.generateCacheKey(url)
 
-	c.mutex.RLock()
-	entry, exists := c.index.Entries[key]
-	c.mutex.RUnlock()
-
-	if !exists {
-		return "", false
-	}
-
-	// Check if cache file still exists
-	cacheFile := filepath.Join(c.cacheDir, entry.Filename)
-	data, err := os.ReadFile(cacheFile)
-	if err != nil {
-		// File missing or unreadable - remove from index
-		c.mutex.Lock()
-		delete(c.index.Entries, key)
-		c.saveIndex() // Best effort, ignore errors
-		c.mutex.Unlock()
-		return "", false
-	}
-
-	// Update last accessed time
-	c.mutex.Lock()
-	entry.LastAccessed = time.Now()
-	c.index.Entries[key] = entry
-	c.saveIndex() // Best effort, ignore errors
-	c.mutex.Unlock()
-
-	return string(data), true
-}
-
-// StoreCachedImage stores a base64 image in the cache
-func (c *ImageCache) StoreCachedImage(url, base64Data string) error {
-	key := c.generateCacheKey(url)
-	filename := key + ".b64"
-	cacheFile := filepath.Join(c.cacheDir, filename)
-
-	// Write image data to cache file atomically
-	tempFile := cacheFile + ".tmp"
-	if err := os.WriteFile(tempFile, []byte(base64Data), 0644); err != nil {
-		return fmt.Errorf("failed to write cache file: %v", err)
-	}
-
-	if err := os.Rename(tempFile, cacheFile); err != nil {
-		os.Remove(tempFile) // Clean up temp file
-		return fmt.Errorf("failed to rename cache file: %v", err)
-	}
-
-	// Get file size for index
-	fileInfo, err := os.Stat(cacheFile)
-	if err != nil {
-		return fmt.Errorf("failed to get cache file size: %v", err)
-	}
-
-	// Update cache index
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	// Check if we need to evict entries before adding new one
-	if len(c.index.Entries) >= c.maxEntries {
-		if err := c.evictOldestEntry(); err != nil {
-			log.Printf("Warning: Failed to evict cache entry: %v", err)
-			// Continue anyway - better to have oversized cache than fail
-		}
-	}
-
-	// Add new entry
-	now := time.Now()
-	c.index.Entries[key] = CacheEntry{
-		URL:          url,
-		Filename:     filename,
-		Created:      now,
-		LastAccessed: now,
-		SizeBytes:    fileInfo.Size(),
-	}
-
-	// Save updated index
-	if err := c.saveIndex(); err != nil {
-		// If index save fails, try to clean up cache file
-		os.Remove(cacheFile)
-		return fmt.Errorf("failed to update cache index: %v", err)
-	}
-
-	return nil
-}
 
 // evictOldestEntry removes the oldest cache entry (FIFO)
 // Note: Caller must hold write lock
@@ -285,10 +199,23 @@ func (c *ImageCache) GetCacheStats() (int, int64) {
 	return len(c.index.Entries), totalSize
 }
 
-// GetCachedImageData retrieves cached base64 image data by URL
-// Returns (base64Data, exists)
+// GetCachedImage retrieves cached data by URL (for webview data URIs)
+// Returns (base64Data, true) if found, ("", false) if not found
+func (c *ImageCache) GetCachedImage(url string) (string, bool) {
+	data, _, _, found := c.GetCachedImageData(url)
+	return data, found
+}
+
+// StoreCachedImage stores base64 data in cache (for webview data URIs without dimensions)
+func (c *ImageCache) StoreCachedImage(url, base64Data string) error {
+	return c.StoreCachedImageData(url, base64Data, 0, 0)
+}
+
+// GetCachedImageData retrieves cached base64 image data and pixel dimensions by URL
+// Returns (base64Data, width, height, exists)
+// Width and height are the original image dimensions in pixels (not terminal cells)
 // Only stores data for Google Drive images (local files are fast to re-read)
-func (c *ImageCache) GetCachedImageData(url string) (string, bool) {
+func (c *ImageCache) GetCachedImageData(url string) (string, int, int, bool) {
 	key := c.generateCacheKey(url)
 
 	c.mutex.RLock()
@@ -296,7 +223,7 @@ func (c *ImageCache) GetCachedImageData(url string) (string, bool) {
 	c.mutex.RUnlock()
 
 	if !exists {
-		return "", false
+		return "", 0, 0, false
 	}
 
 	// Check if cache file still exists
@@ -308,7 +235,7 @@ func (c *ImageCache) GetCachedImageData(url string) (string, bool) {
 		delete(c.index.Entries, key)
 		c.saveIndex() // Best effort, ignore errors
 		c.mutex.Unlock()
-		return "", false
+		return "", 0, 0, false
 	}
 
 	// Update last accessed time
@@ -318,12 +245,13 @@ func (c *ImageCache) GetCachedImageData(url string) (string, bool) {
 	c.saveIndex() // Best effort, ignore errors
 	c.mutex.Unlock()
 
-	return string(data), true
+	return string(data), entry.Width, entry.Height, true
 }
 
-// StoreCachedImageData stores base64 image data in cache
+// StoreCachedImageData stores base64 image data and pixel dimensions in cache
+// width and height are the original image dimensions in pixels (not terminal cells)
 // Only call this for Google Drive images (local files don't need caching)
-func (c *ImageCache) StoreCachedImageData(url, base64Data string) error {
+func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height int) error {
 	key := c.generateCacheKey(url)
 	filename := key + ".b64"
 	cacheFile := filepath.Join(c.cacheDir, filename)
@@ -365,6 +293,8 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string) error {
 		Created:      now,
 		LastAccessed: now,
 		SizeBytes:    fileInfo.Size(),
+		Width:        width,
+		Height:       height,
 	}
 
 	// Save updated index
