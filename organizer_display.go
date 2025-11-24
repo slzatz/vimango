@@ -30,7 +30,7 @@ var (
 
 const (
 	// Transparent placeholder image ID (constant, reused for all images)
-	KITTY_PLACEHOLDER_IMAGE_ID = 1
+	KITTY_PLACEHOLDER_IMAGE_ID     = 1
 	KITTY_PLACEHOLDER_PLACEMENT_ID = 1
 )
 
@@ -51,7 +51,6 @@ var (
 	// Pending relative placements to create after rendering
 	pendingRelativePlacements []pendingRelativePlacement
 	pendingPlacementsMux      sync.Mutex
-
 
 	// Regex to extract markdown images
 	markdownImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
@@ -781,9 +780,17 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 	isGoogleDrive := strings.Contains(url, "drive.google.com")
 
 	var cachedWidth, cachedHeight int
+	var cachedImageID uint32
+	var cachedFingerprint string
 
-	// Try to load from cache (Google Drive only)
+	// Try to load from cache (Google Drive only for now)
 	if isGoogleDrive && globalImageCache != nil {
+		if entry, ok := globalImageCache.GetKittyMeta(url); ok {
+			cachedImageID = entry.ImageID
+			cachedFingerprint = entry.Fingerprint
+			cachedWidth = entry.Width
+			cachedHeight = entry.Height
+		}
 		if cachedBase64, width, height, found := globalImageCache.GetCachedImageData(url); found {
 			// Decode base64 cached data
 			decoded, err := base64.StdEncoding.DecodeString(cachedBase64)
@@ -791,6 +798,7 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 				data = decoded
 				cachedWidth = width
 				cachedHeight = height
+				cachedFingerprint = hashString(cachedBase64)
 				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 					fmt.Fprintf(debugLog, "transmitKittyImage: using cached data for %s (%d bytes, %dx%d pixels)\n", url, len(data), width, height)
 					debugLog.Close()
@@ -823,12 +831,15 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 			base64Data := base64.StdEncoding.EncodeToString(data)
 			imgW := imgObj.Bounds().Dx()
 			imgH := imgObj.Bounds().Dy()
+			cachedFingerprint = hashString(base64Data)
 			if err := globalImageCache.StoreCachedImageData(url, base64Data, imgW, imgH); err != nil {
 				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 					fmt.Fprintf(debugLog, "Warning: failed to cache %s: %v\n", url, err)
 					debugLog.Close()
 				}
 			}
+			cachedWidth = imgW
+			cachedHeight = imgH
 		}
 	}
 
@@ -868,6 +879,19 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 		rows = 1
 	}
 
+	isTmux := IsTmuxScreen()
+
+	// Reuse previously transmitted image when fingerprint matches
+	if cachedImageID != 0 && cachedFingerprint != "" {
+		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+			fmt.Fprintf(debugLog, "transmitKittyImage: reusing image ID=%d for %s (cols=%d, rows=%d)\n",
+				cachedImageID, url, targetCols, rows)
+			debugLog.Close()
+		}
+		_ = kittyUpdateVirtualPlacement(cachedImageID, targetCols, rows, isTmux)
+		return cachedImageID, targetCols, rows
+	}
+
 	// Get new image ID
 	imageID := nextKittyImageID()
 
@@ -878,9 +902,13 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 	}
 
 	// Transmit to kitty
-	isTmux := IsTmuxScreen()
 	if err := kittyTransmitActualImage(data, imageID, targetCols, rows, isTmux); err != nil {
 		return 0, 0, 0
+	}
+
+	// Persist kitty metadata for reuse (Google Drive only for now)
+	if isGoogleDrive && globalImageCache != nil {
+		_ = globalImageCache.UpdateKittyMeta(url, imageID, targetCols, rows, cachedFingerprint)
 	}
 
 	return imageID, targetCols, rows
@@ -978,7 +1006,7 @@ func transmitTransparentPlaceholder() error {
 		"f=100",
 		"q=1", // q=1 to see errors
 		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID), // image ID = 1
-		fmt.Sprintf("S=%d", len(pngData)),                // data size
+		fmt.Sprintf("S=%d", len(pngData)),               // data size
 	}
 
 	bsHdr := []byte(strings.Join(header1, ",") + ",")
@@ -999,13 +1027,13 @@ func transmitTransparentPlaceholder() error {
 
 	// STEP 2: Create virtual placement (a=p with U=1) - SEPARATE command!
 	header2 := []string{
-		"a=p",                                             // create placement
-		"U=1",                                             // virtual placement
-		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID),  // image ID = 1
+		"a=p", // create placement
+		"U=1", // virtual placement
+		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID),     // image ID = 1
 		fmt.Sprintf("p=%d", KITTY_PLACEHOLDER_PLACEMENT_ID), // placement ID = 1
-		"c=1",                                             // 1 column
-		"r=1",                                             // 1 row
-		"q=1",                                             // q=1 to see errors
+		"c=1", // 1 column
+		"r=1", // 1 row
+		"q=1", // q=1 to see errors
 	}
 
 	cmd2 := oscOpen + strings.Join(header2, ",") + oscClose
@@ -1035,12 +1063,12 @@ func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmu
 
 	// Transmit image data and create virtual placement (a=T,U=1)
 	header := []string{
-		"a=T",           // Transmit data AND create placement
-		"f=100",         // PNG format
-		"q=2",           // Quiet mode (no terminal responses)
-		"U=1",           // Create Unicode placeholder virtual placement
+		"a=T",   // Transmit data AND create placement
+		"f=100", // PNG format
+		"q=2",   // Quiet mode (no terminal responses)
+		"U=1",   // Create Unicode placeholder virtual placement
 		fmt.Sprintf("i=%d", imageID),
-		fmt.Sprintf("p=%d", imageID),  // Placement ID (must match placeholder grids)
+		fmt.Sprintf("p=%d", imageID), // Placement ID (must match placeholder grids)
 		fmt.Sprintf("c=%d", cols),
 		fmt.Sprintf("r=%d", rows),
 		fmt.Sprintf("S=%d", len(data)),
@@ -1072,6 +1100,33 @@ func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmu
 
 	// Final chunk marker
 	_, err := os.Stdout.WriteString(oscOpen + "m=0;" + oscClose)
+	return err
+}
+
+// kittyUpdateVirtualPlacement refreshes (or creates) a virtual placement without sending image data.
+// This lets us reuse cached images while resizing to new cols/rows when imageScale changes.
+func kittyUpdateVirtualPlacement(imageID uint32, cols, rows int, isTmux bool) error {
+	oscOpen, oscClose := "\x1b_G", "\x1b\\"
+	if isTmux {
+		oscOpen = "\x1bPtmux;\x1b\x1b_G"
+		oscClose = "\x1b\x1b\\\\\x1b\\"
+	}
+
+	args := []string{
+		"a=p",
+		"U=1",
+		fmt.Sprintf("i=%d", imageID),
+		fmt.Sprintf("p=%d", imageID),
+		"q=2",
+	}
+	if cols > 0 {
+		args = append(args, fmt.Sprintf("c=%d", cols))
+	}
+	if rows > 0 {
+		args = append(args, fmt.Sprintf("r=%d", rows))
+	}
+
+	_, err := fmt.Fprintf(os.Stdout, "%s%s%s", oscOpen, strings.Join(args, ","), oscClose)
 	return err
 }
 

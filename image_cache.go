@@ -21,12 +21,18 @@ type CacheEntry struct {
 	SizeBytes    int64     `json:"size_bytes"`
 	Width        int       `json:"width"`  // Image width in pixels
 	Height       int       `json:"height"` // Image height in pixels
+	// Kitty graphics metadata
+	ImageID     uint32 `json:"image_id,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty"` // Content hash or mtime+size signature
+	LastCols    int    `json:"last_cols,omitempty"`   // Last terminal cols used with this ID
+	LastRows    int    `json:"last_rows,omitempty"`   // Last terminal rows used with this ID
 }
 
 // CacheIndex represents the cache metadata structure
 type CacheIndex struct {
-	Version int                    `json:"version"`
-	Entries map[string]CacheEntry  `json:"entries"`
+	Version     int                   `json:"version"`
+	Entries     map[string]CacheEntry `json:"entries"`
+	NextImageID uint32                `json:"next_image_id,omitempty"`
 }
 
 // ImageCache manages the disk-based image cache
@@ -66,6 +72,11 @@ func NewImageCache() (*ImageCache, error) {
 	}
 
 	return cache, nil
+}
+
+func hashString(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }
 
 // ensureCacheDirectory creates the cache directory with proper permissions
@@ -125,6 +136,17 @@ func (c *ImageCache) loadIndex() error {
 	}
 	c.index.Entries = validEntries
 
+	// Initialize NextImageID to avoid collisions across runs
+	if c.index.NextImageID == 0 {
+		var maxID uint32 = 50 // start above the early hard-coded 40 range
+		for _, entry := range c.index.Entries {
+			if entry.ImageID > maxID {
+				maxID = entry.ImageID
+			}
+		}
+		c.index.NextImageID = maxID + 1
+	}
+
 	return nil
 }
 
@@ -150,7 +172,58 @@ func (c *ImageCache) saveIndex() error {
 	return nil
 }
 
+// NextKittyImageID reserves and returns the next kitty image ID, persisted in the index.
+func (c *ImageCache) NextKittyImageID() uint32 {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
+	if c.index.NextImageID == 0 {
+		c.index.NextImageID = 50
+	}
+	id := c.index.NextImageID
+	c.index.NextImageID++
+	_ = c.saveIndex()
+	return id
+}
+
+// GetKittyMeta returns the cache entry (including kitty fields) if present.
+func (c *ImageCache) GetKittyMeta(url string) (CacheEntry, bool) {
+	key := c.generateCacheKey(url)
+
+	c.mutex.RLock()
+	entry, exists := c.index.Entries[key]
+	c.mutex.RUnlock()
+	return entry, exists
+}
+
+// UpdateKittyMeta updates kitty-related fields and persists the index.
+func (c *ImageCache) UpdateKittyMeta(url string, imageID uint32, cols, rows int, fingerprint string) error {
+	key := c.generateCacheKey(url)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	entry, exists := c.index.Entries[key]
+	if !exists {
+		return fmt.Errorf("cache entry not found for url: %s", url)
+	}
+
+	entry.ImageID = imageID
+	entry.LastCols = cols
+	entry.LastRows = rows
+	if fingerprint != "" {
+		entry.Fingerprint = fingerprint
+	}
+	entry.LastAccessed = time.Now()
+	c.index.Entries[key] = entry
+
+	// Ensure monotonic NextImageID
+	if imageID >= c.index.NextImageID {
+		c.index.NextImageID = imageID + 1
+	}
+
+	return c.saveIndex()
+}
 
 // evictOldestEntry removes the oldest cache entry (FIFO)
 // Note: Caller must hold write lock
@@ -255,6 +328,7 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 	key := c.generateCacheKey(url)
 	filename := key + ".b64"
 	cacheFile := filepath.Join(c.cacheDir, filename)
+	fingerprint := hashString(base64Data)
 
 	// Write image data to cache file atomically
 	tempFile := cacheFile + ".tmp"
@@ -295,6 +369,7 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 		SizeBytes:    fileInfo.Size(),
 		Width:        width,
 		Height:       height,
+		Fingerprint:  fingerprint,
 	}
 
 	// Save updated index

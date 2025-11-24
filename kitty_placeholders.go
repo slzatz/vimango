@@ -30,9 +30,14 @@ type kittyImageTxOptions struct {
 	ZIndex           int
 }
 
-var kittyImageCounter uint32 = 40 // start away from very small ids to avoid collisions
+var kittyImageCounter uint32 = 100 // fallback counter if cache not available
 
 func nextKittyImageID() uint32 {
+	if globalImageCache != nil {
+		if id := globalImageCache.NextKittyImageID(); id != 0 {
+			return id
+		}
+	}
 	return atomic.AddUint32(&kittyImageCounter, 1)
 }
 
