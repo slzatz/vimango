@@ -10,6 +10,7 @@ import (
 	net_url "net/url"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,7 +27,21 @@ var (
 	// Cleared at start of each renderMarkdown() call
 	currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
 	currentRenderImageMux  sync.RWMutex
+	// Track which image IDs have been transmitted in this process (kitty session)
+	kittySessionImageMux sync.RWMutex
+	kittySessionImages   = make(map[uint32]kittySessionEntry) // imageID -> metadata
+	seededKittyCache     bool
+	trustKittyCache      bool
 )
+
+type kittySessionEntry struct {
+	fingerprint string
+	confirmed   bool // true if this process sent the image data
+}
+
+func currentKittyWindowID() string {
+	return os.Getenv("KITTY_WINDOW_ID")
+}
 
 const (
 	// Transparent placeholder image ID (constant, reused for all images)
@@ -41,6 +56,18 @@ type pendingRelativePlacement struct {
 	rows        int
 }
 
+// preparedImage holds the heavy work (load/decode/encode) for a markdown image.
+type preparedImage struct {
+	url               string
+	data              []byte
+	imgW              int
+	imgH              int
+	isGoogleDrive     bool
+	cachedImageID     uint32
+	cachedFingerprint string
+	err               error
+}
+
 var (
 	// Track if transparent placeholder has been transmitted
 	transparentPlaceholderTransmitted = false
@@ -51,6 +78,10 @@ var (
 	// Pending relative placements to create after rendering
 	pendingRelativePlacements []pendingRelativePlacement
 	pendingPlacementsMux      sync.Mutex
+
+	// Ordered list of image IDs for this render (to give deterministic lookups)
+	currentRenderImageOrder []uint32
+	currentRenderOrderIdx   int
 
 	// Regex to extract markdown images
 	markdownImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
@@ -768,103 +799,80 @@ func extractImageURLs(markdown string) []string {
 	return urls
 }
 
-// transmitKittyImage transmits an image to the kitty terminal and returns (imageID, cols, rows)
-// Always calculates fresh dimensions based on current app.imageScale
-// Uses cached image data for Google Drive images to avoid re-downloads
-func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
-	// Initialize cache if needed
+// prepareKittyImage loads and encodes an image (possibly from cache) without transmitting it.
+// It is safe to run concurrently.
+func prepareKittyImage(url string) *preparedImage {
 	initImageCache()
 
-	var data []byte
+	res := &preparedImage{
+		url:           url,
+		isGoogleDrive: strings.Contains(url, "drive.google.com"),
+	}
+
 	var imgObj image.Image
-	isGoogleDrive := strings.Contains(url, "drive.google.com")
 
-	var cachedWidth, cachedHeight int
-	var cachedImageID uint32
-	var cachedFingerprint string
-
-	// Try to load from cache (Google Drive only for now)
-	if isGoogleDrive && globalImageCache != nil {
+	// Try cache metadata first (kitty reuse)
+	if globalImageCache != nil {
 		if entry, ok := globalImageCache.GetKittyMeta(url); ok {
-			cachedImageID = entry.ImageID
-			cachedFingerprint = entry.Fingerprint
-			cachedWidth = entry.Width
-			cachedHeight = entry.Height
+			res.cachedImageID = entry.ImageID
+			res.cachedFingerprint = entry.Fingerprint
+			res.imgW = entry.Width
+			res.imgH = entry.Height
 		}
+	}
+
+	// Load cached base64 if available (Drive only)
+	if res.isGoogleDrive && globalImageCache != nil {
 		if cachedBase64, width, height, found := globalImageCache.GetCachedImageData(url); found {
-			// Decode base64 cached data
 			decoded, err := base64.StdEncoding.DecodeString(cachedBase64)
 			if err == nil {
-				data = decoded
-				cachedWidth = width
-				cachedHeight = height
-				cachedFingerprint = hashString(cachedBase64)
-				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-					fmt.Fprintf(debugLog, "transmitKittyImage: using cached data for %s (%d bytes, %dx%d pixels)\n", url, len(data), width, height)
-					debugLog.Close()
+				res.data = decoded
+				res.imgW = width
+				res.imgH = height
+				if res.cachedFingerprint == "" {
+					res.cachedFingerprint = hashString(cachedBase64)
 				}
+				return res
 			}
 		}
 	}
 
-	// If no cached data, load the image fresh
-	if data == nil {
-		var err error
-		imgObj, err = loadImageForGlamour(url)
-		if err != nil {
-			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "transmitKittyImage: failed to load %s: %v\n", url, err)
-				debugLog.Close()
-			}
-			return 0, 0, 0
-		}
+	// Load fresh
+	img, err := loadImageForGlamour(url)
+	if err != nil {
+		res.err = err
+		return res
+	}
+	imgObj = img
+	res.imgW = imgObj.Bounds().Dx()
+	res.imgH = imgObj.Bounds().Dy()
 
-		// Encode to PNG
-		var buf bytes.Buffer
-		if err := png.Encode(&buf, imgObj); err != nil {
-			return 0, 0, 0
-		}
-		data = buf.Bytes()
+	// Encode to PNG
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, imgObj); err != nil {
+		res.err = err
+		return res
+	}
+	res.data = buf.Bytes()
 
-		// Cache the data and dimensions for Google Drive images
-		if isGoogleDrive && globalImageCache != nil {
-			base64Data := base64.StdEncoding.EncodeToString(data)
-			imgW := imgObj.Bounds().Dx()
-			imgH := imgObj.Bounds().Dy()
-			cachedFingerprint = hashString(base64Data)
-			if err := globalImageCache.StoreCachedImageData(url, base64Data, imgW, imgH); err != nil {
-				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-					fmt.Fprintf(debugLog, "Warning: failed to cache %s: %v\n", url, err)
-					debugLog.Close()
-				}
-			}
-			cachedWidth = imgW
-			cachedHeight = imgH
-		}
+	// Cache Drive images
+	if res.isGoogleDrive && globalImageCache != nil {
+		base64Data := base64.StdEncoding.EncodeToString(res.data)
+		res.cachedFingerprint = hashString(base64Data)
+		_ = globalImageCache.StoreCachedImageData(url, base64Data, res.imgW, res.imgH)
 	}
 
-	// Get image dimensions - use cached values if available to avoid expensive decode
-	var imgW, imgH int
-	if cachedWidth > 0 && cachedHeight > 0 {
-		// Use cached pixel dimensions (no need to decode PNG)
-		imgW = cachedWidth
-		imgH = cachedHeight
-	} else if imgObj != nil {
-		// Already have decoded image object
-		imgW = imgObj.Bounds().Dx()
-		imgH = imgObj.Bounds().Dy()
-	} else {
-		// Need to decode to get dimensions (fallback for non-cached images)
-		var err error
-		imgObj, _, err = image.Decode(bytes.NewReader(data))
-		if err != nil {
-			return 0, 0, 0
-		}
-		imgW = imgObj.Bounds().Dx()
-		imgH = imgObj.Bounds().Dy()
+	if res.cachedFingerprint == "" {
+		res.cachedFingerprint = hashBytes(res.data)
 	}
 
-	if imgW == 0 || imgH == 0 {
+	return res
+}
+
+// transmitPreparedKittyImage transmits (or reuses) a prepared image and returns imageID, cols, rows.
+// Must be called in render order to keep Glamour's lookup ordering intact.
+func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, int) {
+	if prep == nil || prep.err != nil || prep.imgW == 0 || prep.imgH == 0 {
 		return 0, 0, 0
 	}
 
@@ -872,43 +880,54 @@ func transmitKittyImage(url string, maxCols int) (uint32, int, int) {
 	if targetCols <= 0 || targetCols > app.imageScale {
 		targetCols = app.imageScale
 	}
-	// Calculate rows based on aspect ratio and terminal cell dimensions
-	// Terminal cells are roughly 2:1 (height:width), but adjust factor for better fit
-	rows := int(float64(imgH) / float64(imgW) * float64(targetCols) * 0.42)
+	rows := int(float64(prep.imgH) / float64(prep.imgW) * float64(targetCols) * 0.42)
 	if rows < 1 {
 		rows = 1
 	}
 
 	isTmux := IsTmuxScreen()
 
-	// Reuse previously transmitted image when fingerprint matches
-	if cachedImageID != 0 && cachedFingerprint != "" {
-		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-			fmt.Fprintf(debugLog, "transmitKittyImage: reusing image ID=%d for %s (cols=%d, rows=%d)\n",
-				cachedImageID, url, targetCols, rows)
-			debugLog.Close()
+	// Reuse if fingerprint matches cache
+	if prep.cachedImageID != 0 && prep.cachedFingerprint != "" {
+		kittySessionImageMux.RLock()
+		entry, ok := kittySessionImages[prep.cachedImageID]
+		kittySessionImageMux.RUnlock()
+
+		if ok && (entry.fingerprint == prep.cachedFingerprint || entry.fingerprint == "") && (entry.confirmed || trustKittyCache) {
+			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+				fmt.Fprintf(debugLog, "transmitKittyImage: reusing image ID=%d for %s (cols=%d, rows=%d)\n",
+					prep.cachedImageID, prep.url, targetCols, rows)
+				debugLog.Close()
+			}
+			_ = kittyUpdateVirtualPlacement(prep.cachedImageID, targetCols, rows, isTmux)
+			if prep.isGoogleDrive && globalImageCache != nil {
+				_ = globalImageCache.UpdateKittyMeta(prep.url, prep.cachedImageID, targetCols, rows, prep.cachedFingerprint)
+			}
+			return prep.cachedImageID, targetCols, rows
 		}
-		_ = kittyUpdateVirtualPlacement(cachedImageID, targetCols, rows, isTmux)
-		return cachedImageID, targetCols, rows
 	}
 
-	// Get new image ID
+	// Need to transmit
 	imageID := nextKittyImageID()
-
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 		fmt.Fprintf(debugLog, "transmitKittyImage: %s -> ID=%d, cols=%d, rows=%d (scale=%d)\n",
-			url, imageID, targetCols, rows, app.imageScale)
+			prep.url, imageID, targetCols, rows, app.imageScale)
 		debugLog.Close()
 	}
 
-	// Transmit to kitty
-	if err := kittyTransmitActualImage(data, imageID, targetCols, rows, isTmux); err != nil {
+	if err := kittyTransmitActualImage(prep.data, imageID, targetCols, rows, isTmux); err != nil {
 		return 0, 0, 0
 	}
 
-	// Persist kitty metadata for reuse (Google Drive only for now)
-	if isGoogleDrive && globalImageCache != nil {
-		_ = globalImageCache.UpdateKittyMeta(url, imageID, targetCols, rows, cachedFingerprint)
+	kittySessionImageMux.Lock()
+	kittySessionImages[imageID] = kittySessionEntry{
+		fingerprint: prep.cachedFingerprint,
+		confirmed:   true,
+	}
+	kittySessionImageMux.Unlock()
+
+	if prep.isGoogleDrive && globalImageCache != nil {
+		_ = globalImageCache.UpdateKittyMeta(prep.url, imageID, targetCols, rows, prep.cachedFingerprint)
 	}
 
 	return imageID, targetCols, rows
@@ -1100,6 +1119,14 @@ func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmu
 
 	// Final chunk marker
 	_, err := os.Stdout.WriteString(oscOpen + "m=0;" + oscClose)
+	if err == nil {
+		kittySessionImageMux.Lock()
+		kittySessionImages[imageID] = kittySessionEntry{
+			fingerprint: "",
+			confirmed:   true,
+		}
+		kittySessionImageMux.Unlock()
+	}
 	return err
 }
 
@@ -1132,6 +1159,53 @@ func kittyUpdateVirtualPlacement(imageID uint32, cols, rows int, isTmux bool) er
 
 var renderingMarkdown bool // Guard against re-entrant calls
 
+// seedKittySessionFromCache populates kittySessionImages from disk cache so we can
+// reuse images already stored in the running kitty terminal (same tab).
+// Set VIMANGO_DISABLE_KITTY_CACHE_SEEDING to skip this behavior.
+func seedKittySessionFromCache() {
+	if seededKittyCache {
+		return
+	}
+	if os.Getenv("VIMANGO_TRUST_KITTY_CACHE") != "" {
+		trustKittyCache = true
+	}
+	if os.Getenv("VIMANGO_DISABLE_KITTY_CACHE_SEEDING") != "" {
+		seededKittyCache = true
+		return
+	}
+	if globalImageCache == nil {
+		initImageCache()
+	}
+	if globalImageCache == nil {
+		seededKittyCache = true
+		return
+	}
+
+	// Only seed if the cache was written by the same kitty window
+	globalImageCache.mutex.RLock()
+	cachedWindow := globalImageCache.index.KittyWindow
+	globalImageCache.mutex.RUnlock()
+	if cachedWindow == "" || cachedWindow != currentKittyWindowID() {
+		seededKittyCache = true
+		return
+	}
+
+	globalImageCache.mutex.RLock()
+	for _, entry := range globalImageCache.index.Entries {
+		if entry.ImageID == 0 || entry.Fingerprint == "" {
+			continue
+		}
+		kittySessionImageMux.Lock()
+		kittySessionImages[entry.ImageID] = kittySessionEntry{
+			fingerprint: entry.Fingerprint,
+			confirmed:   false, // assumed present from previous run in same kitty
+		}
+		kittySessionImageMux.Unlock()
+	}
+	globalImageCache.mutex.RUnlock()
+	seededKittyCache = true
+}
+
 // kittyImageCacheLookup returns image info for glamour during rendering
 // This is called by glamour to create markers: [KITTY_IMAGE:id=X,cols=Y,rows=Z]
 // We don't actually look up by URL - glamour passes the URL but we need to return
@@ -1140,18 +1214,16 @@ var renderingMarkdown bool // Guard against re-entrant calls
 var nextImageLookupID uint32 = 1
 
 func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
-	// Find this image's dimensions in our current render map
-	// Glamour calls this in the same order we transmitted, so we can iterate
-	currentRenderImageMux.RLock()
-	defer currentRenderImageMux.RUnlock()
+	currentRenderImageMux.Lock()
+	defer currentRenderImageMux.Unlock()
 
-	// Find the next imageID in our map (they're sequential)
-	for id := nextImageLookupID; id < nextImageLookupID+1000; id++ {
+	if currentRenderOrderIdx < len(currentRenderImageOrder) {
+		id := currentRenderImageOrder[currentRenderOrderIdx]
+		currentRenderOrderIdx++
 		if dims, exists := currentRenderImageDims[id]; exists {
-			nextImageLookupID = id + 1
 			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "kittyImageCacheLookup(%s): returning ID=%d, cols=%d, rows=%d\n",
-					url, id, dims.cols, dims.rows)
+				fmt.Fprintf(debugLog, "kittyImageCacheLookup(%s): returning ID=%d, cols=%d, rows=%d (ord=%d/%d)\n",
+					url, id, dims.cols, dims.rows, currentRenderOrderIdx, len(currentRenderImageOrder))
 				debugLog.Close()
 			}
 			return id, dims.cols, dims.rows, true
@@ -1160,7 +1232,7 @@ func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
 
 	// Not found - shouldn't happen if pre-transmission worked
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "kittyImageCacheLookup(%s): NOT FOUND (nextID=%d)\n", url, nextImageLookupID)
+		fmt.Fprintf(debugLog, "kittyImageCacheLookup(%s): NOT FOUND (ordIdx=%d len=%d)\n", url, currentRenderOrderIdx, len(currentRenderImageOrder))
 		debugLog.Close()
 	}
 	return 0, 0, 0, false
@@ -1224,10 +1296,15 @@ func (o *Organizer) renderMarkdown(s string) {
 
 	// Pre-transmit kitty images if kitty is available and images are enabled
 	if app.kitty && app.kittyPlace && app.showImages {
+		// Seed session map from disk cache (assumed present in current kitty) unless disabled
+		seedKittySessionFromCache()
+
 		// Clear the dimension map for this render
 		currentRenderImageMux.Lock()
 		currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
 		nextImageLookupID = 1 // Reset lookup counter
+		currentRenderImageOrder = currentRenderImageOrder[:0]
+		currentRenderOrderIdx = 0
 		currentRenderImageMux.Unlock()
 
 		imageURLs := extractImageURLs(s)
@@ -1237,12 +1314,64 @@ func (o *Organizer) renderMarkdown(s string) {
 				debugLog.Close()
 			}
 
+			// Parallel prepare (fetch/decode/encode) with bounded workers, then ordered transmit.
+			preparedMap := make(map[string]*preparedImage)
+			type job struct{ url string }
+			type result struct {
+				prep *preparedImage
+			}
+
+			jobCh := make(chan job)
+			resCh := make(chan result, len(imageURLs))
+			var wg sync.WaitGroup
+
+			workers := runtime.NumCPU()
+			if workers > 6 {
+				workers = 6
+			}
+			if workers < 2 {
+				workers = 2
+			}
+
+			for i := 0; i < workers; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for j := range jobCh {
+						resCh <- result{prep: prepareKittyImage(j.url)}
+					}
+				}()
+			}
+
+			// Deduplicate URLs but preserve mapping to original order
+			seen := make(map[string]bool)
 			for _, url := range imageURLs {
-				imageID, cols, rows := transmitKittyImage(url, o.Screen.totaleditorcols-20)
+				if !seen[url] {
+					seen[url] = true
+					jobCh <- job{url: url}
+				}
+			}
+			close(jobCh)
+
+			go func() {
+				wg.Wait()
+				close(resCh)
+			}()
+
+			for r := range resCh {
+				if r.prep != nil {
+					preparedMap[r.prep.url] = r.prep
+				}
+			}
+
+			// Ordered transmit to keep kitty IDs aligned with markdown order
+			for _, url := range imageURLs {
+				prep := preparedMap[url]
+				imageID, cols, rows := transmitPreparedKittyImage(prep, o.Screen.totaleditorcols-20)
 				if imageID != 0 {
-					// Store dimensions for this imageID
 					currentRenderImageMux.Lock()
 					currentRenderImageDims[imageID] = struct{ cols, rows int }{cols, rows}
+					currentRenderImageOrder = append(currentRenderImageOrder, imageID)
 					currentRenderImageMux.Unlock()
 				}
 			}

@@ -33,6 +33,7 @@ type CacheIndex struct {
 	Version     int                   `json:"version"`
 	Entries     map[string]CacheEntry `json:"entries"`
 	NextImageID uint32                `json:"next_image_id,omitempty"`
+	KittyWindow string                `json:"kitty_window,omitempty"`
 }
 
 // ImageCache manages the disk-based image cache
@@ -76,6 +77,11 @@ func NewImageCache() (*ImageCache, error) {
 
 func hashString(s string) string {
 	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+func hashBytes(b []byte) string {
+	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
 
@@ -153,6 +159,9 @@ func (c *ImageCache) loadIndex() error {
 // saveIndex saves the cache index to disk
 func (c *ImageCache) saveIndex() error {
 	// Note: Caller should hold write lock
+	if cw := os.Getenv("KITTY_WINDOW_ID"); cw != "" {
+		c.index.KittyWindow = cw
+	}
 	data, err := json.MarshalIndent(c.index, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal index: %v", err)
