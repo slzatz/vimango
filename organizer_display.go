@@ -28,15 +28,29 @@ var (
 	currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
 	currentRenderImageMux  sync.RWMutex
 	// Track which image IDs have been transmitted in this process (kitty session)
-	kittySessionImageMux sync.RWMutex
-	kittySessionImages   = make(map[uint32]kittySessionEntry) // imageID -> metadata
-	seededKittyCache     bool
-	trustKittyCache      bool
+	kittySessionImageMux   sync.RWMutex
+	kittySessionImages     = make(map[uint32]kittySessionEntry) // imageID -> metadata
+	seededKittyCache       bool
+	trustKittyCache        bool
+	kittyPurgeBeforeRender bool
+	kittyClearedOnStart    bool
+	kittyIDMap                    = make(map[string]uint32) // url -> small kitty ID
+	kittyIDReverse                = make(map[uint32]string)
+	kittyIDNext            uint32 = 1
+	kittyImagesSent        uint64
+	kittyBytesSent         uint64
 )
 
 type kittySessionEntry struct {
 	fingerprint string
 	confirmed   bool // true if this process sent the image data
+}
+
+func kittyQFlag() string {
+	if os.Getenv("VIMANGO_KITTY_VERBOSE") != "" {
+		return "1"
+	}
+	return "2"
 }
 
 func currentKittyWindowID() string {
@@ -908,7 +922,7 @@ func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, 
 	}
 
 	// Need to transmit
-	imageID := nextKittyImageID()
+	imageID := nextSmallKittyID(prep.url)
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 		fmt.Fprintf(debugLog, "transmitKittyImage: %s -> ID=%d, cols=%d, rows=%d (scale=%d)\n",
 			prep.url, imageID, targetCols, rows, app.imageScale)
@@ -944,7 +958,7 @@ func kittyTransmitImageToStdout(data []byte, imageID uint32, cols, rows int, isT
 	}
 
 	// Single-step: transmit with U=1 for Unicode placeholders (like Yazi)
-	header := []string{"a=T", "f=100", "q=2", "U=1"} // a=T (transmit), U=1 (Unicode placeholders)
+	header := []string{"a=T", "f=100", fmt.Sprintf("q=%s", kittyQFlag()), "U=1"} // a=T (transmit), U=1 (Unicode placeholders)
 	if imageID != 0 {
 		header = append(header, fmt.Sprintf("i=%d", imageID))
 	}
@@ -1082,10 +1096,10 @@ func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmu
 
 	// Transmit image data and create virtual placement (a=T,U=1)
 	header := []string{
-		"a=T",   // Transmit data AND create placement
-		"f=100", // PNG format
-		"q=2",   // Quiet mode (no terminal responses)
-		"U=1",   // Create Unicode placeholder virtual placement
+		"a=T",                             // Transmit data AND create placement
+		"f=100",                           // PNG format
+		fmt.Sprintf("q=%s", kittyQFlag()), // Quiet or verbose based on env
+		"U=1",                             // Create Unicode placeholder virtual placement
 		fmt.Sprintf("i=%d", imageID),
 		fmt.Sprintf("p=%d", imageID), // Placement ID (must match placeholder grids)
 		fmt.Sprintf("c=%d", cols),
@@ -1126,6 +1140,8 @@ func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmu
 			confirmed:   true,
 		}
 		kittySessionImageMux.Unlock()
+		kittyImagesSent++
+		kittyBytesSent += uint64(len(data))
 	}
 	return err
 }
@@ -1144,7 +1160,7 @@ func kittyUpdateVirtualPlacement(imageID uint32, cols, rows int, isTmux bool) er
 		"U=1",
 		fmt.Sprintf("i=%d", imageID),
 		fmt.Sprintf("p=%d", imageID),
-		"q=2",
+		fmt.Sprintf("q=%s", kittyQFlag()),
 	}
 	if cols > 0 {
 		args = append(args, fmt.Sprintf("c=%d", cols))
@@ -1654,4 +1670,18 @@ func (o *Organizer) drawNoticeText() {
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+7)
 	fmt.Print(strings.Join(o.notice[start:end], lf_ret))
 	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
+}
+func nextSmallKittyID(url string) uint32 {
+	if id, ok := kittyIDMap[url]; ok {
+		return id
+	}
+	id := kittyIDNext
+	kittyIDNext++
+	// Avoid zero
+	if kittyIDNext == 0 {
+		kittyIDNext = 1
+	}
+	kittyIDMap[url] = id
+	kittyIDReverse[id] = url
+	return id
 }

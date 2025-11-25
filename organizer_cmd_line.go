@@ -265,6 +265,15 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":imagescale +", ":imagescale -", ":imagescale 30", ":imagescale 60"},
 	})
 
+	registry.Register("kittyreset", (*Organizer).kittyReset, CommandInfo{
+		Name:        "kittyreset",
+		Aliases:     []string{"kitty-reset"},
+		Description: "Clear kitty image cache and rerender current note",
+		Usage:       "kittyreset",
+		Category:    "View Control",
+		Examples:    []string{":kittyreset"},
+	})
+
 	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
 		Name:        "vertical resize",
 		Aliases:     []string{"vert res"},
@@ -1803,5 +1812,23 @@ func (o *Organizer) scaleImages(pos int) {
 	deleteAllKittyImages()
 
 	o.ShowMessage(BL, fmt.Sprintf("Image scale: %d columns", app.imageScale))
+	o.drawPreview()
+}
+
+// kittyReset clears kitty images and local caches, then rerenders current note.
+func (o *Organizer) kittyReset(pos int) {
+	deleteAllKittyImages()
+	kittySessionImageMux.Lock()
+	kittySessionImages = make(map[uint32]kittySessionEntry)
+	kittySessionImageMux.Unlock()
+	kittyIDMap = make(map[string]uint32)
+	kittyIDReverse = make(map[uint32]string)
+	kittyIDNext = 1
+	sent := kittyImagesSent
+	bytes := kittyBytesSent
+	kittyImagesSent = 0
+	kittyBytesSent = 0
+	mb := float64(bytes) / (1024 * 1024)
+	o.ShowMessage(BL, "Kitty images cleared; since last reset: %d images, %.2f MB sent", sent, mb)
 	o.drawPreview()
 }

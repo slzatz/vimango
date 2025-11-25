@@ -51,7 +51,16 @@ func (a *App) DetectKittyCapabilities() {
 
 	// Initialize image display settings
 	a.showImages = (a.kitty && a.kittyPlace) // Enable images if kitty supports placeholders
-	a.imageScale = 45                         // Default image width in columns
+	a.imageScale = 45                        // Default image width in columns
+
+	// Clear kitty image cache at startup to avoid stale/evicted textures.
+	deleteAllKittyImages()
+	kittySessionImageMux.Lock()
+	kittySessionImages = make(map[uint32]kittySessionEntry)
+	kittySessionImageMux.Unlock()
+	kittyIDMap = make(map[string]uint32)
+	kittyIDReverse = make(map[uint32]string)
+	kittyIDNext = 1
 }
 
 func kittyBinaryVersion() (string, error) {

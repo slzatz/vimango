@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync/atomic"
 )
@@ -75,6 +76,11 @@ func kittyTransmitImage(out io.Writer, data []byte, opts kittyImageTxOptions) er
 	if opts.ZIndex != 0 {
 		header = append(header, fmt.Sprintf("z=%d", opts.ZIndex))
 	}
+	q := "2"
+	if os.Getenv("VIMANGO_KITTY_VERBOSE") != "" {
+		q = "1"
+	}
+	header = append(header, fmt.Sprintf("q=%s", q))
 	header = append(header, fmt.Sprintf("S=%d", len(data)))
 	bsHdr := []byte(strings.Join(header, ",") + ",")
 
@@ -176,10 +182,10 @@ func kittyCreateRelativePlacement(out io.Writer, imgID, placementID, parentImgID
 // buildPlaceholderAnchor returns a 1x1 placeholder cell at row/col zero for the given ids.
 // It intentionally restricts to a single cell so we don't rely on the full diacritic table yet.
 func buildPlaceholderAnchor(imgID, placementID uint32) string {
-	fg := fmt.Sprintf("\x1b[38;5;%dm", imgID&0xff)
+	fg := fmt.Sprintf("\x1b[38;2;%d;%d;%dm", (imgID>>16)&0xff, (imgID>>8)&0xff, imgID&0xff)
 	ul := ""
 	if placementID != 0 {
-		ul = fmt.Sprintf("\x1b[58;5;%dm", placementID&0xff)
+		ul = fmt.Sprintf("\x1b[58;2;%d;%d;%dm", (placementID>>16)&0xff, (placementID>>8)&0xff, placementID&0xff)
 	}
 	reset := "\x1b[0m"
 	return fg + ul + kittyPlaceholderRune + kittyZeroDiacritic + kittyZeroDiacritic + reset
