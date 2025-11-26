@@ -80,6 +80,7 @@ type preparedImage struct {
 	cachedImageID     uint32
 	cachedFingerprint string
 	err               error
+	source            string // "reuse-kitty" | "disk-cache" | "fresh-load"
 }
 
 var (
@@ -821,6 +822,7 @@ func prepareKittyImage(url string) *preparedImage {
 	res := &preparedImage{
 		url:           url,
 		isGoogleDrive: strings.Contains(url, "drive.google.com"),
+		source:        "fresh-load",
 	}
 
 	var imgObj image.Image
@@ -846,6 +848,7 @@ func prepareKittyImage(url string) *preparedImage {
 				if res.cachedFingerprint == "" {
 					res.cachedFingerprint = hashString(cachedBase64)
 				}
+				res.source = "disk-cache"
 				return res
 			}
 		}
@@ -909,8 +912,8 @@ func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, 
 
 		if ok && (entry.fingerprint == prep.cachedFingerprint || entry.fingerprint == "") && (entry.confirmed || trustKittyCache) {
 			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "transmitKittyImage: reusing image ID=%d for %s (cols=%d, rows=%d)\n",
-					prep.cachedImageID, prep.url, targetCols, rows)
+				fmt.Fprintf(debugLog, "transmitKittyImage[reuse-kitty]: %s -> ID=%d, cols=%d, rows=%d\n",
+					prep.url, prep.cachedImageID, targetCols, rows)
 				debugLog.Close()
 			}
 			_ = kittyUpdateVirtualPlacement(prep.cachedImageID, targetCols, rows, isTmux)
@@ -924,8 +927,8 @@ func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, 
 	// Need to transmit
 	imageID := nextSmallKittyID(prep.url)
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "transmitKittyImage: %s -> ID=%d, cols=%d, rows=%d (scale=%d)\n",
-			prep.url, imageID, targetCols, rows, app.imageScale)
+		fmt.Fprintf(debugLog, "transmitKittyImage[%s]: %s -> ID=%d, cols=%d, rows=%d (scale=%d)\n",
+			prep.source, prep.url, imageID, targetCols, rows, app.imageScale)
 		debugLog.Close()
 	}
 
