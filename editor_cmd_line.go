@@ -760,7 +760,7 @@ func (e *Editor) quitActions() {
 		}
 
 		//org.readTitleIntoBuffer() // shouldn't be necessary
-		app.Organizer.drawPreview()
+		app.Organizer.displayNote()
 		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 
@@ -835,7 +835,7 @@ func (e *Editor) quitAll() {
 		}
 
 		//org.readTitleIntoBuffer() // shouldn't be necessary
-		app.Organizer.drawPreview()
+		app.Organizer.displayNote()
 		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 	}
 }
@@ -882,7 +882,7 @@ func (e *Editor) quitAll2() {
 			app.moveDividerPct(80)
 		}
 
-		app.Organizer.drawPreview()
+		app.Organizer.displayNote()
 		app.returnCursor()
 	}
 }
@@ -928,7 +928,7 @@ func (e *Editor) quitAll3() {
 			app.moveDividerPct(80)
 		}
 
-		app.Organizer.drawPreview()
+		app.Organizer.displayNote()
 		app.returnCursor()
 	}
 }

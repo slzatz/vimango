@@ -624,7 +624,7 @@ func (o *Organizer) generateNoteList() {
 	vim.SetCursorPosition(1, 0)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.altRowoff = 0
-	o.drawPreview()
+	o.displayNote()
 }
 
 func (o *Organizer) open(pos int) {
@@ -935,7 +935,7 @@ func (o *Organizer) refresh(flag int) {
 			o.readRowsIntoBuffer()
 			vim.SetCursorPosition(1, 0)
 			o.bufferTick = o.vbuf.GetLastChangedTick()
-			o.drawPreview()
+			o.displayNote()
 		} else {
 			//o.mode = o.last_mode
 			o.mode = NORMAL
@@ -951,7 +951,7 @@ func (o *Organizer) refresh(flag int) {
 			vim.SetCursorPosition(1, 0)
 			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.ShowMessage(BL, "View refreshed")
-			o.drawPreview()
+			o.displayNote()
 		}
 	} else {
 		//o.mode = o.last_mode
@@ -1013,7 +1013,7 @@ func (o *Organizer) find(pos int) {
 	o.readRowsIntoBuffer()
 	vim.SetCursorPosition(1, 0)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
-	o.drawPreview()
+	o.displayNote()
 }
 
 func (o *Organizer) synchronize(_ int) {
@@ -1275,7 +1275,7 @@ func (o *Organizer) recent(_ int) {
 	o.readRowsIntoBuffer()
 	vim.SetCursorPosition(1, 0)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
-	o.drawPreview()
+	o.displayNote()
 }
 
 func (o *Organizer) deleteKeywords(_ int) {
@@ -1375,26 +1375,6 @@ func (o *Organizer) save(pos int) {
 	}
 	o.ShowMessage(BL, "Note written to file %s", filename)
 }
-
-/*
-func (o *Organizer) setImage(pos int) {
-	if pos == -1 {
-		o.ShowMessage(BL, "You need to provide an option ('on' or 'off')")
-		return
-	}
-	opt := o.command_line[pos+1:]
-	if opt == "on" {
-		o.Session.imagePreview = true
-	} else if opt == "off" {
-		o.Session.imagePreview = false
-	} else {
-		o.ShowMessage(BL, "Your choice of options is 'on' or 'off'")
-	}
-	o.mode = o.last_mode
-	o.drawPreview()
-	o.command_line = ""
-}
-*/
 
 func (o *Organizer) printDocument(_ int) {
 	id := o.rows[o.fr].id
@@ -1617,19 +1597,6 @@ func (o *Organizer) sortEntries(pos int) {
 		return
 	}
 	o.refresh(0)
-	/*
-		o.rows = filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, MAX)
-		if len(o.rows) == 0 {
-			o.insertRow(0, "", true, false, false, BASE_DATE)
-			o.rows[0].dirty = false
-			sess.showOrgMessage("No results were returned")
-		}
-		sess.imagePreview = false
-		o.readRowsIntoBuffer()
-		vim.SetCursorPosition(1, 0)
-		o.bufferTick = o.vbuf.GetLastChangedTick()
-		o.drawPreview()
-	*/
 }
 
 // startResearch initiates deep research using the current entry's note as the research prompt
@@ -1759,7 +1726,7 @@ func (o *Organizer) toggleImages(_ int) {
 	}
 
 	o.ShowMessage(BL, fmt.Sprintf("Images: %s", status))
-	o.drawPreview()
+	o.displayNote()
 }
 
 // scaleImages changes the image scale (width in columns)
@@ -1817,7 +1784,7 @@ func (o *Organizer) scaleImages(pos int) {
 	deleteAllKittyImages()
 
 	o.ShowMessage(BL, fmt.Sprintf("Image scale: %d columns", app.imageScale))
-	o.drawPreview()
+	o.displayNote()
 }
 
 // kittyReset clears kitty images and local caches, then rerenders current note.
@@ -1835,5 +1802,5 @@ func (o *Organizer) kittyReset(pos int) {
 	kittyBytesSent = 0
 	mb := float64(bytes) / (1024 * 1024)
 	o.ShowMessage(BL, "Kitty images cleared; since last reset: %d images, %.2f MB sent", sent, mb)
-	o.drawPreview()
+	o.displayNote()
 }

@@ -21,7 +21,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		o.tabCompletion.list = nil
 		o.Session.imagePreview = false
 		if o.view == TASK {
-			o.drawPreview()
+			o.displayNote()
 		} else {
 			o.Screen.eraseRightScreen()
 			o.displayContainerInfo()
@@ -182,7 +182,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		// need to erase > from previous row
 		o.erasePreviousRowMarker(prevRow)
 		if o.view == TASK {
-			o.drawPreview()
+			o.displayNote()
 		} else {
 			o.displayContainerInfo()
 		}

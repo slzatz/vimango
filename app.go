@@ -35,8 +35,8 @@ type App struct {
 	Config *dbConfig
 
 	// Application state
-	SyncInProcess bool
-	Run           bool
+	SyncInProcess   bool
+	Run             bool
 	kitty           bool   // true if running in kitty terminal
 	kittyVersion    string // kitty graphics protocol version
 	kittyPlace      bool   // true if kitty supports Unicode placeholders
@@ -217,7 +217,7 @@ func (a *App) moveDividerPct(pct int) {
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 		a.Screen.drawRightScreen()
 	} else if a.Organizer.view == TASK {
-		a.Organizer.drawPreview()
+		a.Organizer.displayNote()
 	}
 	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
 	a.returnCursor()
@@ -244,7 +244,7 @@ func (a *App) moveDividerAbs(num int) {
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 		a.Screen.drawRightScreen()
 	} else if a.Organizer.view == TASK {
-		a.Organizer.drawPreview()
+		a.Organizer.displayNote()
 	}
 
 	// Save preferences after divider move
@@ -368,7 +368,7 @@ func (a *App) LoadInitialData() {
 
 	a.Organizer.readRowsIntoBuffer()
 	a.Organizer.bufferTick = a.Organizer.vbuf.GetLastChangedTick()
-	a.Organizer.drawPreview()
+	a.Organizer.displayNote()
 	a.Organizer.refreshScreen()
 	a.Organizer.drawStatusBar()
 

@@ -770,8 +770,8 @@ func deleteAllKittyImages() {
 	os.Stdout.WriteString(deleteCmd)
 }
 
-// change function name to displayRenderedNote
-func (o *Organizer) drawPreview() {
+// render and display the markdown note
+func (o *Organizer) displayNote() {
 	if len(o.rows) == 0 {
 		o.Screen.eraseRightScreen()
 		return

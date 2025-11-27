@@ -320,7 +320,7 @@ func (e *Editor) moveLeft(_ int) {
 		}
 		e.Session.editorMode = false
 		vim.SetCurrentBuffer(app.Organizer.vbuf)
-		app.Organizer.drawPreview()
+		app.Organizer.displayNote()
 		app.Organizer.mode = NORMAL
 		app.returnCursor()
 		return
@@ -354,7 +354,7 @@ func (e *Editor) moveLeft(_ int) {
 		}
 		e.Session.editorMode = false
 		vim.SetCurrentBuffer(app.Organizer.vbuf)
-		app.Organizer.drawPreview()
+		app.Organizer.displayNote()
 		app.Organizer.mode = NORMAL
 		app.returnCursor()
 		return
