@@ -343,7 +343,11 @@ func (a *App) InitApp() {
 
 func (a *App) LoadInitialData() {
 	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
-	a.Screen.edPct = 60
+
+	// Only set default edPct if not already set (e.g., from preferences)
+	if a.Screen.edPct == 0 {
+		a.Screen.edPct = 60
+	}
 
 	// Set divider based on percentage
 	if a.Screen.edPct == 100 {

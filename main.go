@@ -104,12 +104,12 @@ func main() {
 	//os.Exit(0) //debugging
 
 	app.InitApp()
-	app.LoadInitialData()
 
-	// Override default edPct (60) with user preference
+	// Set edPct BEFORE LoadInitialData() so it uses the correct value
+	// LoadInitialData() will calculate divider and totaleditorcols based on this
 	app.Screen.edPct = prefs.EdPct
-	app.Screen.divider = app.Screen.screenCols - app.Screen.edPct*app.Screen.screenCols/100
-	app.Screen.totaleditorcols = app.Screen.screenCols - app.Screen.divider - 1
+
+	app.LoadInitialData()
 
 	app.Run = true
 	app.MainLoop()
