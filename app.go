@@ -37,13 +37,14 @@ type App struct {
 	// Application state
 	SyncInProcess bool
 	Run           bool
-	kitty         bool   // true if running in kitty terminal
-	kittyVersion  string // kitty graphics protocol version
-	kittyPlace    bool   // true if kitty supports Unicode placeholders
-	kittyRelative bool   // true if kitty supports relative placements
-	showImages    bool   // true if inline images should be displayed
-	imageScale    int    // image width in columns (default: 45)
-	origTermCfg   []byte // original terminal configuration
+	kitty           bool   // true if running in kitty terminal
+	kittyVersion    string // kitty graphics protocol version
+	kittyPlace      bool   // true if kitty supports Unicode placeholders
+	kittyRelative   bool   // true if kitty supports relative placements
+	showImages      bool   // true if inline images should be displayed
+	imageScale      int    // image width in columns (default: 45)
+	preferencesPath string // path to preferences.json file
+	origTermCfg     []byte // original terminal configuration
 }
 
 // CreateApp creates and initializes the application struct
@@ -117,6 +118,74 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 	return &cfg, nil
 }
 
+// LoadPreferences loads user preferences from preferences.json
+// Returns default preferences if file doesn't exist or is invalid
+func (a *App) LoadPreferences(path string) Preferences {
+	a.preferencesPath = path
+
+	// Default preferences
+	defaults := Preferences{
+		ImageScale: 45,
+		EdPct:      60,
+	}
+
+	// Try to read file
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		// File doesn't exist or can't be read - use defaults
+		return defaults
+	}
+
+	// Try to parse JSON
+	var prefs Preferences
+	if err := json.Unmarshal(b, &prefs); err != nil {
+		// Invalid JSON - use defaults
+		return defaults
+	}
+
+	// Validate ranges
+	if prefs.ImageScale < 10 || prefs.ImageScale > 100 {
+		prefs.ImageScale = defaults.ImageScale
+	}
+	if prefs.EdPct < 1 || prefs.EdPct > 99 {
+		prefs.EdPct = defaults.EdPct
+	}
+
+	return prefs
+}
+
+// SavePreferences writes current preferences to preferences.json
+// Uses atomic write pattern (write to temp, then rename)
+func (a *App) SavePreferences() error {
+	if a.preferencesPath == "" {
+		return fmt.Errorf("preferences path not set")
+	}
+
+	prefs := Preferences{
+		ImageScale: a.imageScale,
+		EdPct:      a.Screen.edPct,
+	}
+
+	// Marshal to JSON with indentation
+	data, err := json.MarshalIndent(prefs, "", "    ")
+	if err != nil {
+		return fmt.Errorf("marshal preferences: %w", err)
+	}
+
+	// Atomic write pattern
+	tmpPath := a.preferencesPath + ".tmp"
+	if err := ioutil.WriteFile(tmpPath, data, 0644); err != nil {
+		return fmt.Errorf("write temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, a.preferencesPath); err != nil {
+		os.Remove(tmpPath) // Clean up temp file on error
+		return fmt.Errorf("rename temp file: %w", err)
+	}
+
+	return nil
+}
+
 func (a *App) signalHandler() {
 	err := a.Screen.GetWindowSize()
 	if err != nil {
@@ -177,6 +246,12 @@ func (a *App) moveDividerAbs(num int) {
 	} else if a.Organizer.view == TASK {
 		a.Organizer.drawPreview()
 	}
+
+	// Save preferences after divider move
+	if err := a.SavePreferences(); err != nil {
+		// Silently ignore save errors (preferences not critical)
+	}
+
 	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d edPct: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider, a.Screen.edPct)
 	a.returnCursor()
 }

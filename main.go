@@ -21,8 +21,14 @@ func main() {
 
 	app = CreateApp()
 
-	// Detect kitty terminal capabilities
+	// Load user preferences (before DetectKittyCapabilities so we can override imageScale)
+	prefs := app.LoadPreferences("preferences.json")
+
+	// Detect kitty terminal capabilities (sets default imageScale=45)
 	app.DetectKittyCapabilities()
+
+	// Override default imageScale with user preference
+	app.imageScale = prefs.ImageScale
 
 	srv, err := auth.GetDriveService()
 	if err != nil {
@@ -99,6 +105,12 @@ func main() {
 
 	app.InitApp()
 	app.LoadInitialData()
+
+	// Override default edPct (60) with user preference
+	app.Screen.edPct = prefs.EdPct
+	app.Screen.divider = app.Screen.screenCols - app.Screen.edPct*app.Screen.screenCols/100
+	app.Screen.totaleditorcols = app.Screen.screenCols - app.Screen.divider - 1
+
 	app.Run = true
 	app.MainLoop()
 }

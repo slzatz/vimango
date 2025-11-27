@@ -1766,7 +1766,7 @@ func (o *Organizer) toggleImages(_ int) {
 func (o *Organizer) scaleImages(pos int) {
 	// Parse argument from command line
 	var argStr string
-	if pos+1 < len(o.command_line) {
+	if pos != -1 {
 		argStr = strings.TrimSpace(o.command_line[pos+1:])
 	}
 
@@ -1806,6 +1806,11 @@ func (o *Organizer) scaleImages(pos int) {
 
 	// Update scale
 	app.imageScale = newScale
+
+	// Save preferences
+	if err := app.SavePreferences(); err != nil {
+		// Silently ignore save errors (preferences not critical)
+	}
 
 	// Delete all existing kitty images (they're at the old scale)
 	// Next render will transmit at the new scale
