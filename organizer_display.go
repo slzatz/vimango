@@ -18,6 +18,12 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
+const (
+	// PREVIEW_RIGHT_PADDING is the number of columns to reserve as padding
+	// on the right side of the markdown preview pane (for text and images)
+	PREVIEW_RIGHT_PADDING = 5
+)
+
 var (
 	timeKeywordsRegex = regexp.MustCompile(`seconds|minutes|hours|days`)
 	emptyImageMarker  = strings.Repeat(" ", IMAGE_MARKER_WIDTH)
@@ -1386,7 +1392,7 @@ func (o *Organizer) renderMarkdown(s string) {
 			// Ordered transmit to keep kitty IDs aligned with markdown order
 			for _, url := range imageURLs {
 				prep := preparedMap[url]
-				imageID, cols, rows := transmitPreparedKittyImage(prep, o.Screen.totaleditorcols-20)
+				imageID, cols, rows := transmitPreparedKittyImage(prep, o.Screen.totaleditorcols-PREVIEW_RIGHT_PADDING)
 				if imageID != 0 {
 					currentRenderImageMux.Lock()
 					currentRenderImageDims[imageID] = struct{ cols, rows int }{cols, rows}
@@ -1478,7 +1484,7 @@ func (o *Organizer) renderMarkdown(s string) {
 		debugLog.Close()
 	}
 
-	note = WordWrap(note, o.Screen.totaleditorcols-20)
+	note = WordWrap(note, o.Screen.totaleditorcols-PREVIEW_RIGHT_PADDING)
 
 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 		fmt.Fprintf(debugLog, "renderMarkdown: WordWrap() returned\n")
@@ -1571,7 +1577,7 @@ func (o *Organizer) renderNotice(s string) {
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
 
-	note = WordWrap(note, o.Screen.totaleditorcols-20)
+	note = WordWrap(note, o.Screen.totaleditorcols-PREVIEW_RIGHT_PADDING)
 	o.notice = strings.Split(note, "\n")
 }
 
