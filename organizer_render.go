@@ -102,6 +102,7 @@ func (rm *RenderManager) Stop() {
 
 // StartRender initiates async rendering of a note
 // It immediately renders text-only, then starts background full render with images
+// If all images are already in kitty's session cache, it skips text-only and renders directly
 func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, lang string) {
 	// Cancel any previous render
 	rm.mutex.Lock()
@@ -127,6 +128,38 @@ func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, l
 	rm.currentRequest = req
 	rm.mutex.Unlock()
 
+	// Check if images are enabled
+	if !app.kitty || !app.showImages {
+		// No images mode - just render text
+		textLines := rm.renderTextOnly(markdown, maxCols, lang)
+		rm.organizer.note = textLines
+		rm.organizer.drawRenderedNote()
+		return
+	}
+
+	// Check if there are any images in the markdown
+	imageURLs := extractImageURLs(markdown)
+	if len(imageURLs) == 0 {
+		// No images in this note - just render text
+		textLines := rm.renderTextOnly(markdown, maxCols, lang)
+		rm.organizer.note = textLines
+		rm.organizer.drawRenderedNote()
+		return
+	}
+
+	// Check if ALL images are in kitty's session cache
+	// If so, full render will be fast and we can skip the text-only phase
+	if rm.allImagesInKittyCache(imageURLs) {
+		// Fast path: all images cached, render directly with images
+		lines := rm.renderFullWithImages(req)
+		if lines != nil {
+			rm.organizer.note = lines
+			rm.organizer.drawRenderedNote()
+		}
+		return
+	}
+
+	// Slow path: some images need loading
 	// Phase 1: Render text-only immediately (no images)
 	textLines := rm.renderTextOnly(markdown, maxCols, lang)
 
@@ -134,23 +167,43 @@ func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, l
 	rm.organizer.note = textLines
 	rm.organizer.drawRenderedNote()
 
-	// Check if images are enabled - if not, we're done
-	if !app.kitty || !app.showImages {
-		return
-	}
-
-	// Check if there are any images in the markdown
-	imageURLs := extractImageURLs(markdown)
-	if len(imageURLs) == 0 {
-		// No images, text-only render is complete
-		return
-	}
-
 	// Show status that images are loading
 	rm.organizer.ShowMessage(BR, "Loading %d image(s)...", len(imageURLs))
 
 	// Phase 2: Start background goroutine for full render with images
 	go rm.backgroundRender(req)
+}
+
+// allImagesInKittyCache checks if all image URLs are in kitty's session cache
+// This means they can be reused without network/disk loading
+func (rm *RenderManager) allImagesInKittyCache(imageURLs []string) bool {
+	if globalImageCache == nil {
+		return false
+	}
+
+	for _, url := range imageURLs {
+		// Check if we have cached metadata with a valid image ID
+		entry, ok := globalImageCache.GetKittyMeta(url)
+		if !ok || entry.ImageID == 0 {
+			return false
+		}
+
+		// Check if this image ID is in the kitty session cache
+		kittySessionImageMux.RLock()
+		sessionEntry, inSession := kittySessionImages[entry.ImageID]
+		kittySessionImageMux.RUnlock()
+
+		if !inSession {
+			return false
+		}
+
+		// Check if the session entry is confirmed or we trust the cache
+		if !sessionEntry.confirmed && !trustKittyCache {
+			return false
+		}
+	}
+
+	return true
 }
 
 // renderTextOnly renders markdown without images (fast path)
