@@ -800,12 +800,22 @@ func (o *Organizer) displayNote() {
 		lang = "markdown"
 	}
 
-	if lang == "markdown" {
-		o.renderMarkdown(note)
+	// Use async rendering if RenderManager is available and images are enabled
+	// This provides non-blocking image loading with cancellation support
+	if app.RenderManager != nil && app.kitty && app.showImages && lang == "markdown" {
+		// Async path: text displays immediately, images load in background
+		app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols, lang)
+		// Note: drawRenderedNote() is called immediately for text-only,
+		// then again via notification when full render with images is ready
 	} else {
-		o.renderCode(note, lang)
+		// Sync path: traditional blocking render
+		if lang == "markdown" {
+			o.renderMarkdown(note)
+		} else {
+			o.renderCode(note, lang)
+		}
+		o.drawRenderedNote()
 	}
-	o.drawRenderedNote()
 }
 
 // extractImageURLs extracts all image URLs from markdown

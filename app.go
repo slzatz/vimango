@@ -25,6 +25,7 @@ type App struct {
 
 	// Research system
 	ResearchManager *ResearchManager  // Manages background research tasks
+	RenderManager   *RenderManager    // Manages async note rendering
 	notifications   []string          // Queue of user notifications
 	notificationMux sync.RWMutex      // Mutex for notifications
 	notificationCh  chan struct{}     // Signals pending notifications
@@ -412,6 +413,11 @@ func (a *App) returnCursor() {
 }
 
 func (a *App) Cleanup() {
+	// Stop async render manager
+	if a.RenderManager != nil {
+		a.RenderManager.Stop()
+	}
+
 	if a.Database.MainDB != nil {
 		a.Database.MainDB.Close()
 	}
@@ -516,7 +522,7 @@ func (a *App) MainLoop() {
 				org.ShowMessage(BL, "Readkey problem %v", err)
 			}
 		case <-a.notificationCh:
-			a.processNotifications(org)
+			a.processNotificationsWithRedraw(org)
 		}
 		a.returnCursor()
 	}
@@ -561,6 +567,29 @@ func (a *App) processNotifications(org *Organizer) {
 	}
 }
 
+// processNotificationsWithRedraw handles notifications including special redraw requests
+func (a *App) processNotificationsWithRedraw(org *Organizer) {
+	for {
+		notification := a.GetNotification()
+		if notification == "" {
+			return
+		}
+
+		// Handle special preview redraw notification from async renderer
+		if notification == "_REDRAW_PREVIEW_" {
+			if !a.Session.editorMode && org.view == TASK {
+				org.drawRenderedNote()
+			}
+			continue
+		}
+
+		// Handle regular notifications (research results, etc.)
+		org.drawNotice(notification)
+		org.altRowoff = 0
+		org.mode = NAVIGATE_NOTICE
+	}
+}
+
 // HasNotifications returns true if there are pending notifications
 func (a *App) HasNotifications() bool {
 	a.notificationMux.RLock()
@@ -573,4 +602,9 @@ func (a *App) InitResearchManager(apiKey string) {
 	if apiKey != "" {
 		a.ResearchManager = NewResearchManager(a, apiKey)
 	}
+}
+
+// InitRenderManager initializes the async render manager
+func (a *App) InitRenderManager() {
+	a.RenderManager = NewRenderManager(a)
 }

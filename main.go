@@ -78,6 +78,9 @@ func main() {
 		app.InitResearchManager(app.Config.Claude.ApiKey)
 	}
 
+	// Initialize async render manager for non-blocking image loading
+	app.InitRenderManager()
+
 	// Set up platform-specific signal handling
 	setupSignalHandling(app)
 
