@@ -22,6 +22,7 @@ const (
 	// PREVIEW_RIGHT_PADDING is the number of columns to reserve as padding
 	// on the right side of the markdown preview pane (for text and images)
 	PREVIEW_RIGHT_PADDING = 5
+	NOTICE_RIGHT_PADDING  = 12
 )
 
 var (
@@ -149,10 +150,9 @@ func (o *Organizer) refreshScreen() {
 
 	ab.WriteString("\x1b[?25l") //hides the cursor
 
-	//Below erase screen from middle to left - `1K` below is cursor to left erasing
-	//Now erases time/sort column (+ 17 in line below)
+	//Erases the left side of the screen
 	for j := TOP_MARGIN; j < o.Screen.textLines+1; j++ {
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", j+TOP_MARGIN, LEFT_MARGIN+1)
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", j+TOP_MARGIN, LEFT_MARGIN) //+1 changed 11282025
 		ab.WriteString(leftBlank)
 	}
 	//	}
@@ -1587,7 +1587,7 @@ func (o *Organizer) renderNotice(s string) {
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
 
-	note = WordWrap(note, o.Screen.totaleditorcols-PREVIEW_RIGHT_PADDING)
+	note = WordWrap(note, o.Screen.totaleditorcols-NOTICE_RIGHT_PADDING)
 	o.notice = strings.Split(note, "\n")
 }
 
