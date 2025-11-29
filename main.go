@@ -27,8 +27,9 @@ func main() {
 	// Detect kitty terminal capabilities (sets default imageScale=45)
 	app.DetectKittyCapabilities()
 
-	// Override default imageScale with user preference
+	// Override defaults with user preferences
 	app.imageScale = prefs.ImageScale
+	app.imageCacheMaxWidth = prefs.ImageCacheMaxWidth
 
 	srv, err := auth.GetDriveService()
 	if err != nil {

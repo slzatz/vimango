@@ -42,9 +42,10 @@ type App struct {
 	kittyVersion    string // kitty graphics protocol version
 	kittyPlace      bool   // true if kitty supports Unicode placeholders
 	kittyRelative   bool   // true if kitty supports relative placements
-	showImages      bool   // true if inline images should be displayed
-	imageScale      int    // image width in columns (default: 45)
-	preferencesPath string // path to preferences.json file
+	showImages         bool   // true if inline images should be displayed
+	imageScale         int    // image width in columns (default: 45)
+	imageCacheMaxWidth int    // max pixel width for cached Google Drive images (default: 800)
+	preferencesPath    string // path to preferences.json file
 	origTermCfg     []byte // original terminal configuration
 }
 
@@ -126,8 +127,9 @@ func (a *App) LoadPreferences(path string) Preferences {
 
 	// Default preferences
 	defaults := Preferences{
-		ImageScale: 45,
-		EdPct:      60,
+		ImageScale:         45,
+		EdPct:              60,
+		ImageCacheMaxWidth: 800,
 	}
 
 	// Try to read file
@@ -151,6 +153,10 @@ func (a *App) LoadPreferences(path string) Preferences {
 	if prefs.EdPct < 1 || prefs.EdPct > 99 {
 		prefs.EdPct = defaults.EdPct
 	}
+	// Validate ImageCacheMaxWidth (reasonable range: 400-2000, 0 means use default)
+	if prefs.ImageCacheMaxWidth == 0 || prefs.ImageCacheMaxWidth < 400 || prefs.ImageCacheMaxWidth > 2000 {
+		prefs.ImageCacheMaxWidth = defaults.ImageCacheMaxWidth
+	}
 
 	return prefs
 }
@@ -163,8 +169,9 @@ func (a *App) SavePreferences() error {
 	}
 
 	prefs := Preferences{
-		ImageScale: a.imageScale,
-		EdPct:      a.Screen.edPct,
+		ImageScale:         a.imageScale,
+		EdPct:              a.Screen.edPct,
+		ImageCacheMaxWidth: a.imageCacheMaxWidth,
 	}
 
 	// Marshal to JSON with indentation

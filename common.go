@@ -65,8 +65,9 @@ type dbConfig struct {
 
 // Preferences holds user UI preferences that persist across sessions
 type Preferences struct {
-	ImageScale int `json:"image_scale"` // Image width in columns (10-100)
-	EdPct      int `json:"ed_pct"`      // Editor percentage (1-99)
+	ImageScale         int `json:"image_scale"`           // Image width in columns (10-100)
+	EdPct              int `json:"ed_pct"`                // Editor percentage (1-99)
+	ImageCacheMaxWidth int `json:"image_cache_max_width"` // Max pixel width for cached images (default 800)
 }
 
 // validateGlamourStyle checks if a glamour style file exists and returns an error if not.

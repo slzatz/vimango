@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -263,6 +264,24 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Usage:       "imagescale [+|-|N]",
 		Category:    "View Control",
 		Examples:    []string{":imagescale +", ":imagescale -", ":imagescale 30", ":imagescale 60"},
+	})
+
+	registry.Register("cachewidth", (*Organizer).cacheWidth, CommandInfo{
+		Name:        "cachewidth",
+		Aliases:     []string{"cw"},
+		Description: "Set max pixel width for cached Google Drive images (default 800)",
+		Usage:       "cachewidth [N]",
+		Category:    "View Control",
+		Examples:    []string{":cachewidth", ":cachewidth 800", ":cachewidth 1200", ":cw 600"},
+	})
+
+	registry.Register("clearcache", (*Organizer).clearImageCache, CommandInfo{
+		Name:        "clearcache",
+		Aliases:     []string{"clc"},
+		Description: "Clear the disk image cache (forces re-download of Google Drive images)",
+		Usage:       "clearcache",
+		Category:    "View Control",
+		Examples:    []string{":clearcache", ":clc"},
 	})
 
 	registry.Register("kittyreset", (*Organizer).kittyReset, CommandInfo{
@@ -1785,6 +1804,89 @@ func (o *Organizer) scaleImages(pos int) {
 
 	o.ShowMessage(BL, fmt.Sprintf("Image scale: %d columns", app.imageScale))
 	o.displayNote()
+}
+
+// cacheWidth sets or displays the max pixel width for cached Google Drive images
+func (o *Organizer) cacheWidth(pos int) {
+	var argStr string
+	if pos != -1 {
+		argStr = strings.TrimSpace(o.command_line[pos+1:])
+	}
+
+	o.mode = NORMAL
+	o.command_line = ""
+
+	if argStr == "" {
+		o.ShowMessage(BL, fmt.Sprintf("Cache max width: %d pixels", app.imageCacheMaxWidth))
+		return
+	}
+
+	newWidth, err := strconv.Atoi(argStr)
+	if err != nil {
+		o.ShowMessage(BL, fmt.Sprintf("Invalid width value: %s (use a number)", argStr))
+		return
+	}
+
+	// Validate range (same as in LoadPreferences)
+	if newWidth < 400 {
+		o.ShowMessage(BL, "Cache width too small (minimum: 400 pixels)")
+		return
+	}
+	if newWidth > 2000 {
+		o.ShowMessage(BL, "Cache width too large (maximum: 2000 pixels)")
+		return
+	}
+
+	// Update width
+	app.imageCacheMaxWidth = newWidth
+
+	// Save preferences
+	if err := app.SavePreferences(); err != nil {
+		// Silently ignore save errors (preferences not critical)
+	}
+
+	o.ShowMessage(BL, fmt.Sprintf("Cache max width: %d pixels (new images will use this size)", app.imageCacheMaxWidth))
+}
+
+// clearImageCache removes all files from the disk image cache
+func (o *Organizer) clearImageCache(pos int) {
+	o.mode = NORMAL
+	o.command_line = ""
+
+	if globalImageCache == nil {
+		o.ShowMessage(BL, "Image cache not initialized")
+		return
+	}
+
+	// Get stats before clearing
+	count, size := globalImageCache.GetCacheStats()
+
+	// Clear the cache directory
+	cacheDir := "./image_cache"
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		o.ShowMessage(BL, fmt.Sprintf("Error reading cache directory: %v", err))
+		return
+	}
+
+	var removed int
+	for _, entry := range entries {
+		if entry.Name() == "cache_index.json" || entry.Name() == ".write_test" {
+			continue // Keep the index file structure
+		}
+		path := filepath.Join(cacheDir, entry.Name())
+		if err := os.Remove(path); err == nil {
+			removed++
+		}
+	}
+
+	// Reset the cache index
+	globalImageCache.mutex.Lock()
+	globalImageCache.index.Entries = make(map[string]CacheEntry)
+	globalImageCache.saveIndex()
+	globalImageCache.mutex.Unlock()
+
+	o.ShowMessage(BL, fmt.Sprintf("Cleared image cache: %d files removed (%.1f MB freed)", count, float64(size)/(1024*1024)))
 }
 
 // kittyReset clears kitty images and local caches, then rerenders current note.
