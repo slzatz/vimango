@@ -156,6 +156,24 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
 	return buf.String(), nil
 }
 
+// detectImageFormat detects image format from base64 data magic bytes
+func detectImageFormat(base64Data string) string {
+	// PNG signature: iVBORw0KG (base64 of 89 50 4E 47)
+	if strings.HasPrefix(base64Data, "iVBORw0KG") {
+		return "png"
+	}
+	// JPEG signature: /9j/ (base64 of FF D8 FF)
+	if strings.HasPrefix(base64Data, "/9j/") {
+		return "jpeg"
+	}
+	// GIF signature: R0lGOD (base64 of 47 49 46 38)
+	if strings.HasPrefix(base64Data, "R0lGOD") {
+		return "gif"
+	}
+	// Default to png if can't detect (most common format)
+	return "png"
+}
+
 // preprocessMarkdownImages processes Google Drive images in markdown before HTML conversion
 func preprocessMarkdownImages(markdown string) (string, error) {
 	// Initialize cache if needed
@@ -182,7 +200,15 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 		// Try cache first
 		if globalImageCache != nil {
 			if cachedData, found := globalImageCache.GetCachedImage(googleURL); found {
-				dataURI = cachedData
+				// Check if cached data is already a data URI or raw base64
+				if strings.HasPrefix(cachedData, "data:") {
+					// Already a proper data URI, use as-is
+					dataURI = cachedData
+				} else {
+					// Raw base64 from cache - convert to data URI
+					format := detectImageFormat(cachedData)
+					dataURI = fmt.Sprintf("data:image/%s;base64,%s", format, cachedData)
+				}
 			} else {
 				// Cache miss - download and convert to data URI
 				dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
@@ -191,7 +217,7 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
 					continue
 				}
-				
+
 				// Store in cache for future use
 				if cacheErr := globalImageCache.StoreCachedImage(googleURL, dataURI); cacheErr != nil {
 					log.Printf("Warning: Could not cache image %s: %v", googleURL, cacheErr)
