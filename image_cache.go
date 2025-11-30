@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -68,8 +67,8 @@ func NewImageCache() (*ImageCache, error) {
 
 	// Load existing cache index
 	if err := cache.loadIndex(); err != nil {
-		log.Printf("Warning: Failed to load cache index, starting with empty cache: %v", err)
-		// Continue with empty cache rather than failing
+		// Silently continue with empty cache rather than failing
+		// (avoid printing to stdout which interferes with TUI)
 	}
 
 	return cache, nil
@@ -103,7 +102,17 @@ func (c *ImageCache) ensureCacheDirectory() error {
 }
 
 // generateCacheKey creates a hash-based key from a Google Drive URL
+// Normalizes URLs to gdrive:ID format to ensure consistent cache keys
 func (c *ImageCache) generateCacheKey(url string) string {
+	// Extract file ID and normalize to gdrive: format for Google Drive images
+	fileID, err := ExtractFileID(url)
+	if err == nil {
+		// Use normalized gdrive:ID format for cache key generation
+		// This ensures same image via different URL formats uses same cache key
+		url = "gdrive:" + fileID
+	}
+	// For non-Google Drive images or if extraction fails, use URL as-is
+
 	hash := sha256.Sum256([]byte(url))
 	// Use first 16 characters of hex for shorter filenames while avoiding collisions
 	return hex.EncodeToString(hash[:])[:16]
@@ -136,9 +145,8 @@ func (c *ImageCache) loadIndex() error {
 		cacheFile := filepath.Join(c.cacheDir, entry.Filename)
 		if _, err := os.Stat(cacheFile); err == nil {
 			validEntries[key] = entry
-		} else {
-			log.Printf("Removing stale cache entry for missing file: %s", entry.Filename)
 		}
+		// Silently skip stale entries (avoid printing to stdout which interferes with TUI)
 	}
 	c.index.Entries = validEntries
 
@@ -258,7 +266,7 @@ func (c *ImageCache) evictOldestEntry() error {
 	if entry, exists := c.index.Entries[oldestKey]; exists {
 		cacheFile := filepath.Join(c.cacheDir, entry.Filename)
 		if err := os.Remove(cacheFile); err != nil && !os.IsNotExist(err) {
-			log.Printf("Warning: Failed to remove cache file %s: %v", cacheFile, err)
+			// Silently ignore removal errors (avoid printing to stdout which interferes with TUI)
 		}
 	}
 
@@ -363,15 +371,21 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 	// Check if we need to evict entries before adding new one
 	if len(c.index.Entries) >= c.maxEntries {
 		if err := c.evictOldestEntry(); err != nil {
-			log.Printf("Warning: Failed to evict cache entry: %v", err)
 			// Continue anyway - better to have oversized cache than fail
+			// (avoid printing to stdout which interferes with TUI)
 		}
+	}
+
+	// Normalize URL to gdrive: format before storing
+	normalizedURL := url
+	if fileID, err := ExtractFileID(url); err == nil {
+		normalizedURL = "gdrive:" + fileID
 	}
 
 	// Add new entry
 	now := time.Now()
 	c.index.Entries[key] = CacheEntry{
-		URL:          url,
+		URL:          normalizedURL, // Store normalized format
 		Filename:     filename,
 		Created:      now,
 		LastAccessed: now,

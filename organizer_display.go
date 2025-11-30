@@ -837,7 +837,7 @@ func prepareKittyImage(url string) *preparedImage {
 
 	res := &preparedImage{
 		url:           url,
-		isGoogleDrive: strings.Contains(url, "drive.google.com"),
+		isGoogleDrive: strings.HasPrefix(url, "gdrive:") || strings.Contains(url, "drive.google.com"),
 		source:        "fresh-load",
 	}
 

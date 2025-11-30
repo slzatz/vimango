@@ -162,8 +162,9 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 	initImageCache()
 
 	// Regular expression to find Google Drive URLs in markdown image syntax
-	// Matches ![alt text](google drive url) or ![alt text](google drive url "title")
-	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
+	// Matches both full URLs and gdrive: format
+	// ![alt text](https://drive.google.com/...) or ![alt text](gdrive:ID)
+	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\(((?:https://drive\.google\.com/file/d/[^)]+)|(?:gdrive:[a-zA-Z0-9_-]+))\)`)
 
 	// Find all Google Drive image references
 	matches := googleDriveRegex.FindAllStringSubmatch(markdown, -1)

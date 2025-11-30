@@ -251,6 +251,7 @@ func tc(s string, l int, b bool) string {
 }
 
 var googleDriveRegex = regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
+var googleDriveShortRegex = regexp.MustCompile(`!\[([^\]]*)\]\((gdrive:[a-zA-Z0-9_-]+)\)`)
 
 type Row struct {
 	id       int
@@ -270,7 +271,27 @@ type Row struct {
 }
 
 func containsGoogleDriveImage(note string) bool {
-	return googleDriveRegex.MatchString(note)
+	return googleDriveRegex.MatchString(note) || googleDriveShortRegex.MatchString(note)
+}
+
+// ConvertGoogleDriveURLsToShort converts all Google Drive URLs in markdown to gdrive:ID format
+// Returns the converted markdown and the count of URLs converted
+func ConvertGoogleDriveURLsToShort(markdown string) (string, int) {
+	re := regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/([a-zA-Z0-9_-]+)[^)]*)\)`)
+
+	count := 0
+	result := re.ReplaceAllStringFunc(markdown, func(match string) string {
+		submatches := re.FindStringSubmatch(match)
+		if len(submatches) >= 4 {
+			altText := submatches[1]
+			fileID := submatches[3]
+			count++
+			return fmt.Sprintf("![%s](gdrive:%s)", altText, fileID)
+		}
+		return match
+	})
+
+	return result, count
 }
 
 type AltRow struct {

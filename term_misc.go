@@ -22,6 +22,16 @@ var (
 )
 
 func ExtractFileID(url string) (string, error) {
+	// Handle gdrive: format (new standardized format)
+	if strings.HasPrefix(url, "gdrive:") {
+		id := strings.TrimPrefix(url, "gdrive:")
+		if isValidGoogleDriveID(id) {
+			return id, nil
+		}
+		return "", errors.New("invalid gdrive: format")
+	}
+
+	// Handle full URL format (existing - backward compatible)
 	// A regular expression to find the file ID.
 	// It looks for a string of letters, numbers, hyphens, and underscores
 	// that is between "/d/" and the next "/".
@@ -38,6 +48,13 @@ func ExtractFileID(url string) (string, error) {
 	}
 
 	return "", errors.New("google drive file ID not found in URL")
+}
+
+// isValidGoogleDriveID validates that a string looks like a valid Google Drive file ID
+// Google Drive IDs are typically 28-33 characters, alphanumeric with - and _
+func isValidGoogleDriveID(id string) bool {
+	match, _ := regexp.MatchString(`^[a-zA-Z0-9_-]{20,50}$`, id)
+	return match
 }
 func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
 	fileID, err := ExtractFileID(path)

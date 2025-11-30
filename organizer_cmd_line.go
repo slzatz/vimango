@@ -112,6 +112,15 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":refresh", ":r"},
 	})
 
+	registry.Register("convertgdrive", (*Organizer).convertGoogleDriveURLs, CommandInfo{
+		Name:        "convertgdrive",
+		Aliases:     []string{},
+		Description: "Convert Google Drive URLs to gdrive:ID format in current note",
+		Usage:       "convertgdrive",
+		Category:    "Data Management",
+		Examples:    []string{":convertgdrive"},
+	})
+
 	registry.Register("research", (*Organizer).startResearch, CommandInfo{
 		Name:        "research",
 		Aliases:     []string{},
@@ -1905,4 +1914,46 @@ func (o *Organizer) kittyReset(pos int) {
 	mb := float64(bytes) / (1024 * 1024)
 	o.ShowMessage(BL, "Kitty images cleared; since last reset: %d images, %.2f MB sent", sent, mb)
 	o.displayNote()
+}
+
+// convertGoogleDriveURLs converts Google Drive URLs to gdrive:ID format in the current note
+func (o *Organizer) convertGoogleDriveURLs(pos int) {
+	if o.view != TASK || len(o.rows) == 0 {
+		o.ShowMessage(BL, "No entry selected")
+		return
+	}
+
+	currentRow := o.rows[o.fr]
+	if currentRow.id == -1 {
+		o.ShowMessage(BL, "Cannot convert unsaved entries")
+		return
+	}
+
+	// Read the current entry's note content
+	currentNote := o.Database.readNoteIntoString(currentRow.id)
+
+	// Convert URLs
+	convertedNote, count := ConvertGoogleDriveURLsToShort(currentNote)
+
+	if count == 0 {
+		o.ShowMessage(BL, "No Google Drive URLs found to convert")
+		return
+	}
+
+	// Update the note in database
+	err := o.Database.updateNote(currentRow.id, convertedNote)
+	if err != nil {
+		o.ShowMessage(BL, "Error updating note: %v", err)
+		return
+	}
+
+	// Update hasImage flag if needed
+	hasImage := containsGoogleDriveImage(convertedNote)
+	if hasImage != currentRow.hasImage {
+		o.rows[o.fr].hasImage = hasImage
+	}
+
+	// Refresh display to show updated note
+	o.displayNote()
+	o.ShowMessage(BL, "Converted %d Google Drive URL(s) to gdrive: format", count)
 }
