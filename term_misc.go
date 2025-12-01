@@ -7,6 +7,7 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	_ "image/png"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -56,6 +57,32 @@ func isValidGoogleDriveID(id string) bool {
 	match, _ := regexp.MatchString(`^[a-zA-Z0-9_-]{20,50}$`, id)
 	return match
 }
+
+// decodeImageWithOrientation decodes an image and applies EXIF orientation correction.
+// Uses the imaging library's AutoOrientation feature to handle phone camera images
+// that store orientation in EXIF metadata. Falls back gracefully if no EXIF present.
+func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
+	// Buffer the input so we can read it twice (once for format, once for decode)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Detect format using standard library
+	_, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Decode with EXIF orientation using imaging library
+	img, err := imaging.Decode(bytes.NewReader(data), imaging.AutoOrientation(true))
+	if err != nil {
+		return nil, "", err
+	}
+
+	return img, format, nil
+}
+
 func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
 	fileID, err := ExtractFileID(path)
 	resp, err := app.Session.googleDrive.Files.Get(fileID).Download()
@@ -70,7 +97,7 @@ func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, img
 		return
 	}
 
-	img, imgFmt, err = image.Decode(resp.Body)
+	img, imgFmt, err = decodeImageWithOrientation(resp.Body)
 	// Downsize large images for cache efficiency - configurable via preferences.json
 	// Use Resize with height=0 to preserve aspect ratio while constraining width
 	if err == nil && img != nil && img.Bounds().Dx() > app.imageCacheMaxWidth {
@@ -87,7 +114,7 @@ func loadImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt st
 	}
 	defer f.Close()
 
-	img, imgFmt, err = image.Decode(f)
+	img, imgFmt, err = decodeImageWithOrientation(f)
 	if img.Bounds().Max.X > maxWidth || img.Bounds().Max.Y > maxHeight {
 		//img = imaging.Resize(img, maxWidth, 0, imaging.Lanczos)
 		img = imaging.Fit(img, maxWidth, maxHeight, imaging.Lanczos)
@@ -108,7 +135,7 @@ func loadWebImage(URL string) (img image.Image, imgFmt string, err error) {
 		err = errors.New("Received non 200 response code")
 		return
 	}
-	img, imgFmt, err = image.Decode(response.Body)
+	img, imgFmt, err = decodeImageWithOrientation(response.Body)
 	if img.Bounds().Max.Y > app.Session.imgSizeY {
 		img = imaging.Resize(img, 0, app.Session.imgSizeY, imaging.Lanczos)
 	}
