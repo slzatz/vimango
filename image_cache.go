@@ -25,6 +25,9 @@ type CacheEntry struct {
 	Fingerprint string `json:"fingerprint,omitempty"` // Content hash or mtime+size signature
 	LastCols    int    `json:"last_cols,omitempty"`   // Last terminal cols used with this ID
 	LastRows    int    `json:"last_rows,omitempty"`   // Last terminal rows used with this ID
+	// Google Drive metadata (fetched on initial cache, refreshable via :refreshimageinfo)
+	GDriveName   string `json:"gdrive_name,omitempty"`   // Filename on Google Drive
+	GDriveFolder string `json:"gdrive_folder,omitempty"` // Parent folder name on Google Drive
 }
 
 // CacheIndex represents the cache metadata structure
@@ -242,6 +245,26 @@ func (c *ImageCache) UpdateKittyMeta(url string, imageID uint32, cols, rows int,
 	return c.saveIndex()
 }
 
+// UpdateGDriveMeta updates Google Drive metadata (filename and folder) for a cached image.
+func (c *ImageCache) UpdateGDriveMeta(url, gdriveName, gdriveFolder string) error {
+	key := c.generateCacheKey(url)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	entry, exists := c.index.Entries[key]
+	if !exists {
+		return fmt.Errorf("cache entry not found for url: %s", url)
+	}
+
+	entry.GDriveName = gdriveName
+	entry.GDriveFolder = gdriveFolder
+	entry.LastAccessed = time.Now()
+	c.index.Entries[key] = entry
+
+	return c.saveIndex()
+}
+
 // evictOldestEntry removes the oldest cache entry (FIFO)
 // Note: Caller must hold write lock
 func (c *ImageCache) evictOldestEntry() error {
@@ -274,6 +297,31 @@ func (c *ImageCache) evictOldestEntry() error {
 	delete(c.index.Entries, oldestKey)
 
 	return nil
+}
+
+// InvalidateCacheEntry removes a specific cache entry by URL, forcing re-download on next access.
+// This removes both the cache file and the index entry.
+func (c *ImageCache) InvalidateCacheEntry(url string) error {
+	key := c.generateCacheKey(url)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	entry, exists := c.index.Entries[key]
+	if !exists {
+		return nil // Already not in cache
+	}
+
+	// Remove cache file
+	cacheFile := filepath.Join(c.cacheDir, entry.Filename)
+	if err := os.Remove(cacheFile); err != nil && !os.IsNotExist(err) {
+		// Continue anyway - we still want to remove from index
+	}
+
+	// Remove from index
+	delete(c.index.Entries, key)
+
+	return c.saveIndex()
 }
 
 // GetCacheStats returns basic cache statistics

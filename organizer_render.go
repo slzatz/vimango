@@ -302,6 +302,7 @@ func (rm *RenderManager) renderFullWithImages(req *RenderRequest) []string {
 		// Clear the dimension map for this render
 		currentRenderImageMux.Lock()
 		currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
+		currentRenderImageURLs = make(map[uint32]string)
 		nextImageLookupID = 1
 		currentRenderImageOrder = currentRenderImageOrder[:0]
 		currentRenderOrderIdx = 0
@@ -380,6 +381,7 @@ func (rm *RenderManager) renderFullWithImages(req *RenderRequest) []string {
 					currentRenderImageMux.Lock()
 					currentRenderImageDims[imageID] = struct{ cols, rows int }{cols, rows}
 					currentRenderImageOrder = append(currentRenderImageOrder, imageID)
+					currentRenderImageURLs[imageID] = url
 					currentRenderImageMux.Unlock()
 				}
 			}

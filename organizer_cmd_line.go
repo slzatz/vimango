@@ -13,6 +13,7 @@ import (
 
 	"github.com/jung-kurt/gofpdf"
 	"github.com/mandolyte/mdtopdf/v2"
+	"github.com/slzatz/vimango/auth"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -264,6 +265,24 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Usage:       "toggleimages",
 		Category:    "View Control",
 		Examples:    []string{":toggleimages", ":ti"},
+	})
+
+	registry.Register("showimageinfo", (*Organizer).showImageInfo, CommandInfo{
+		Name:        "showimageinfo",
+		Aliases:     []string{"sii"},
+		Description: "Toggle display of Google Drive folder/filename above images",
+		Usage:       "showimageinfo",
+		Category:    "View Control",
+		Examples:    []string{":showimageinfo", ":sii"},
+	})
+
+	registry.Register("refreshimageinfo", (*Organizer).refreshImageInfo, CommandInfo{
+		Name:        "refreshimageinfo",
+		Aliases:     []string{"rii"},
+		Description: "Refresh Google Drive metadata for images in current note. Use ! to also re-download images.",
+		Usage:       "refreshimageinfo[!]",
+		Category:    "View Control",
+		Examples:    []string{":refreshimageinfo", ":refreshimageinfo!", ":rii", ":rii!"},
 	})
 
 	registry.Register("imagescale", (*Organizer).scaleImages, CommandInfo{
@@ -1754,6 +1773,97 @@ func (o *Organizer) toggleImages(_ int) {
 	}
 
 	o.ShowMessage(BL, fmt.Sprintf("Images: %s", status))
+	o.displayNote()
+}
+
+// showImageInfo toggles display of Google Drive folder/filename above images
+func (o *Organizer) showImageInfo(_ int) {
+	o.mode = NORMAL
+	o.command_line = ""
+
+	app.showImageInfo = !app.showImageInfo
+
+	status := "OFF"
+	if app.showImageInfo {
+		status = "ON"
+	}
+
+	o.ShowMessage(BL, fmt.Sprintf("Image info: %s", status))
+	o.displayNote()
+}
+
+// refreshImageInfo refreshes Google Drive metadata for images in the current note
+// With ! suffix, also re-downloads the image bytes
+func (o *Organizer) refreshImageInfo(pos int) {
+	// Check for ! suffix (force re-download)
+	redownload := strings.HasSuffix(o.command_line, "!")
+
+	o.mode = NORMAL
+	o.command_line = ""
+
+	// Get the current entry's note
+	if len(o.rows) == 0 {
+		o.ShowMessage(BL, "No entry selected")
+		return
+	}
+	entry := o.rows[o.fr]
+	note := o.Database.readNoteIntoString(entry.id)
+
+	// Extract image URLs from the note
+	urls := extractImageURLs(note)
+	if len(urls) == 0 {
+		o.ShowMessage(BL, "No images in current note")
+		return
+	}
+
+	// Count Google Drive images
+	gdriveCount := 0
+	for _, url := range urls {
+		if strings.HasPrefix(url, "gdrive:") || strings.Contains(url, "drive.google.com") {
+			gdriveCount++
+		}
+	}
+
+	if gdriveCount == 0 {
+		o.ShowMessage(BL, "No Google Drive images in current note")
+		return
+	}
+
+	o.ShowMessage(BL, fmt.Sprintf("Refreshing metadata for %d image(s)...", gdriveCount))
+
+	// Process each Google Drive image
+	refreshed := 0
+	for _, url := range urls {
+		if !strings.HasPrefix(url, "gdrive:") && !strings.Contains(url, "drive.google.com") {
+			continue
+		}
+
+		fileID, err := ExtractFileID(url)
+		if err != nil {
+			continue
+		}
+
+		// Fetch fresh metadata from Google Drive
+		if app.Session.googleDrive != nil {
+			fileName, folderName, err := auth.GetGDriveFileInfo(app.Session.googleDrive, fileID)
+			if err == nil && globalImageCache != nil {
+				_ = globalImageCache.UpdateGDriveMeta(url, fileName, folderName)
+				refreshed++
+			}
+		}
+
+		// If ! suffix, also invalidate the cached image to force re-download
+		if redownload && globalImageCache != nil {
+			// Remove from cache - it will be re-downloaded on next render
+			globalImageCache.InvalidateCacheEntry(url)
+		}
+	}
+
+	action := "metadata"
+	if redownload {
+		action = "metadata + images"
+	}
+	o.ShowMessage(BL, fmt.Sprintf("Refreshed %s for %d image(s)", action, refreshed))
 	o.displayNote()
 }
 

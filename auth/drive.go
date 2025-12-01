@@ -99,3 +99,29 @@ func saveToken(path string, token *oauth2.Token) {
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
 }
+
+// GetGDriveFileInfo retrieves the filename and parent folder name for a Google Drive file.
+// Returns (filename, folderName, error). If the file is in the root, folderName will be "My Drive".
+func GetGDriveFileInfo(srv *drive.Service, fileID string) (string, string, error) {
+	// Get the file's name and parent IDs
+	file, err := srv.Files.Get(fileID).Fields("name, parents").Do()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get file metadata: %w", err)
+	}
+
+	fileName := file.Name
+	folderName := "My Drive" // Default if no parent
+
+	if len(file.Parents) > 0 {
+		// Get the parent folder's name
+		parentID := file.Parents[0]
+		parent, err := srv.Files.Get(parentID).Fields("name").Do()
+		if err != nil {
+			// Return filename even if we can't get parent
+			return fileName, "", fmt.Errorf("failed to get parent folder: %w", err)
+		}
+		folderName = parent.Name
+	}
+
+	return fileName, folderName, nil
+}

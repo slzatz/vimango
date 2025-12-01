@@ -43,6 +43,7 @@ type App struct {
 	kittyPlace      bool   // true if kitty supports Unicode placeholders
 	kittyRelative   bool   // true if kitty supports relative placements
 	showImages         bool   // true if inline images should be displayed
+	showImageInfo      bool   // true if Google Drive folder/filename should be displayed above images
 	imageScale         int    // image width in columns (default: 45)
 	imageCacheMaxWidth int    // max pixel width for cached Google Drive images (default: 800)
 	preferencesPath    string // path to preferences.json file

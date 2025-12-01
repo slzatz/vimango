@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/slzatz/vimango/auth"
 )
 
 const (
@@ -104,6 +105,9 @@ var (
 	// Ordered list of image IDs for this render (to give deterministic lookups)
 	currentRenderImageOrder []uint32
 	currentRenderOrderIdx   int
+
+	// Map from imageID to URL for metadata lookup during marker replacement
+	currentRenderImageURLs = make(map[uint32]string)
 
 	// Regex to extract markdown images
 	markdownImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
@@ -893,6 +897,13 @@ func prepareKittyImage(url string) *preparedImage {
 		base64Data := base64.StdEncoding.EncodeToString(res.data)
 		res.cachedFingerprint = hashString(base64Data)
 		_ = globalImageCache.StoreCachedImageData(url, base64Data, res.imgW, res.imgH)
+
+		// Also fetch and cache Google Drive metadata (filename, folder)
+		if fileID, err := ExtractFileID(url); err == nil && app.Session.googleDrive != nil {
+			if fileName, folderName, err := auth.GetGDriveFileInfo(app.Session.googleDrive, fileID); err == nil {
+				_ = globalImageCache.UpdateGDriveMeta(url, fileName, folderName)
+			}
+		}
 	}
 
 	if res.cachedFingerprint == "" {
@@ -1275,6 +1286,7 @@ func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
 
 // replaceKittyImageMarkers converts glamour's text markers into actual Unicode placeholder grids
 // Markers have format: [KITTY_IMAGE:id=42,cols=30,rows=15]
+// If app.showImageInfo is true, prepends Google Drive folder/filename above each image
 func replaceKittyImageMarkers(text string) string {
 	markerRegex := regexp.MustCompile(`\[KITTY_IMAGE:id=(\d+),cols=(\d+),rows=(\d+)\]`)
 
@@ -1303,8 +1315,18 @@ func replaceKittyImageMarkers(text string) string {
 			debugLog.Close()
 		}
 
+		// Build the result: optionally prepend image info, then the placeholder grid
+		var result strings.Builder
+
+		// If showImageInfo is enabled, prepend Google Drive folder/filename
+		if app.showImageInfo {
+			infoLine := getImageInfoLine(uint32(imageID))
+			result.WriteString(infoLine)
+		}
+
 		// Generate the Unicode placeholder grid
 		grid := buildPlaceholderGrid(uint32(imageID), placementID, cols, rows)
+		result.WriteString(grid)
 
 		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 			fmt.Fprintf(debugLog, "PLACEHOLDER GRID: Building grid for id=%d, cols=%d, rows=%d\n", imageID, cols, rows)
@@ -1313,8 +1335,47 @@ func replaceKittyImageMarkers(text string) string {
 			fmt.Fprintf(debugLog, "GRID STATS: grid length=%d, newline count=%d, expected rows=%d\n", len(grid), newlineCount, rows)
 			debugLog.Close()
 		}
-		return grid
+		return result.String()
 	})
+}
+
+// getImageInfoLine returns the folder/filename info line for an image, or empty string if not available
+func getImageInfoLine(imageID uint32) string {
+	// Look up the URL for this imageID
+	currentRenderImageMux.RLock()
+	url, exists := currentRenderImageURLs[imageID]
+	currentRenderImageMux.RUnlock()
+
+	if !exists || url == "" {
+		return "[metadata not cached]\n"
+	}
+
+	// Check if this is a Google Drive image
+	if !strings.HasPrefix(url, "gdrive:") && !strings.Contains(url, "drive.google.com") {
+		// Not a Google Drive image, no metadata to show
+		return ""
+	}
+
+	// Look up the cache entry for metadata
+	if globalImageCache == nil {
+		return "[metadata not cached]\n"
+	}
+
+	entry, found := globalImageCache.GetKittyMeta(url)
+	if !found || (entry.GDriveName == "" && entry.GDriveFolder == "") {
+		return "[metadata not cached]\n"
+	}
+
+	// Format: "FolderName / filename.jpg\n"
+	if entry.GDriveFolder != "" && entry.GDriveName != "" {
+		return fmt.Sprintf("%s / %s\n", entry.GDriveFolder, entry.GDriveName)
+	} else if entry.GDriveName != "" {
+		return fmt.Sprintf("%s\n", entry.GDriveName)
+	} else if entry.GDriveFolder != "" {
+		return fmt.Sprintf("%s / [unknown]\n", entry.GDriveFolder)
+	}
+
+	return "[metadata not cached]\n"
 }
 
 func (o *Organizer) renderMarkdown(s string) {
@@ -1337,6 +1398,7 @@ func (o *Organizer) renderMarkdown(s string) {
 		// Clear the dimension map for this render
 		currentRenderImageMux.Lock()
 		currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
+		currentRenderImageURLs = make(map[uint32]string)
 		nextImageLookupID = 1 // Reset lookup counter
 		currentRenderImageOrder = currentRenderImageOrder[:0]
 		currentRenderOrderIdx = 0
@@ -1407,6 +1469,7 @@ func (o *Organizer) renderMarkdown(s string) {
 					currentRenderImageMux.Lock()
 					currentRenderImageDims[imageID] = struct{ cols, rows int }{cols, rows}
 					currentRenderImageOrder = append(currentRenderImageOrder, imageID)
+					currentRenderImageURLs[imageID] = url
 					currentRenderImageMux.Unlock()
 				}
 			}
