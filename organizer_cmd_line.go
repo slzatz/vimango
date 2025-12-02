@@ -63,7 +63,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"n"},
 		Description: "Create new entry",
 		Usage:       "new",
-		Category:    "Data Management",
+		Category:    "Entry Management",
 		Examples:    []string{":new", ":n"},
 	})
 
@@ -72,7 +72,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"w"},
 		Description: "Save all modified entries to database",
 		Usage:       "write",
-		Category:    "Data Management",
+		Category:    "Entry Management",
 		Examples:    []string{":write", ":w"},
 	})
 
@@ -109,16 +109,16 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"r"},
 		Description: "Refresh current view",
 		Usage:       "refresh",
-		Category:    "Data Management",
+		Category:    "Entry Management",
 		Examples:    []string{":refresh", ":r"},
 	})
 
 	registry.Register("convertgdrive", (*Organizer).convertGoogleDriveURLs, CommandInfo{
 		Name:        "convertgdrive",
-		Aliases:     []string{},
+		Aliases:     []string{"cgd"},
 		Description: "Convert Google Drive URLs to gdrive:ID format in current note",
 		Usage:       "convertgdrive",
-		Category:    "Data Management",
+		Category:    "Images",
 		Examples:    []string{":convertgdrive"},
 	})
 
@@ -127,7 +127,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{},
 		Description: "Start deep research using current note as prompt",
 		Usage:       "research",
-		Category:    "Data Management",
+		Category:    "Research",
 		Examples:    []string{":research"},
 	})
 
@@ -136,7 +136,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"rd"},
 		Description: "Start deep research with full debug information",
 		Usage:       "researchdebug",
-		Category:    "Data Management",
+		Category:    "Research",
 		Examples:    []string{":researchdebug", ":rd"},
 	})
 
@@ -145,7 +145,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"rtest"},
 		Description: "Generate sample research status notifications for testing",
 		Usage:       "researchtest",
-		Category:    "Data Management",
+		Category:    "Research",
 		Examples:    []string{":researchtest", ":rtest"},
 	})
 
@@ -190,7 +190,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"keyword", "k"},
 		Description: "Show all keywords or add keyword to entries",
 		Usage:       "keywords [keyword]",
-		Category:    "Search & Filter",
+		Category:    "Container Management",
 		Examples:    []string{":keywords", ":k urgent", ":keyword meeting"},
 	})
 
@@ -211,12 +211,12 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 			Examples:    []string{":log"},
 		})
 	*/
-	// View Control commands
+	// View Management commands
 	registry.Register("sort", (*Organizer).sortEntries, CommandInfo{
 		Name:        "sort",
 		Description: "Sort entries by column",
 		Usage:       "sort <column>",
-		Category:    "View Control",
+		Category:    "View Management",
 		Examples:    []string{":sort modified", ":sort created", ":sort priority"},
 	})
 
@@ -225,7 +225,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		//Aliases:     []string{"show"},
 		Description: "Toggle showing completed/deleted entries",
 		Usage:       "showall",
-		Category:    "View Control",
+		Category:    "View Management",
 		Examples:    []string{":showall", ":show"},
 	})
 
@@ -245,7 +245,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"wv"},
 		Description: "Show current note in web browser",
 		Usage:       "webview",
-		Category:    "View Control",
+		Category:    "HTML View",
 		Examples:    []string{":webview", ":wv"},
 	})
 
@@ -254,7 +254,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"cwv"},
 		Description: "Close webkit webview window",
 		Usage:       "closewebview",
-		Category:    "View Control",
+		Category:    "HTML View",
 		Examples:    []string{":closewebview", ":cwv"},
 	})
 
@@ -263,7 +263,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"ti"},
 		Description: "Toggle inline image display on/off",
 		Usage:       "toggleimages",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":toggleimages", ":ti"},
 	})
 
@@ -272,16 +272,16 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"sii"},
 		Description: "Toggle display of Google Drive folder/filename above images",
 		Usage:       "showimageinfo",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":showimageinfo", ":sii"},
 	})
 
 	registry.Register("refreshimageinfo", (*Organizer).refreshImageInfo, CommandInfo{
 		Name:        "refreshimageinfo",
 		Aliases:     []string{"rii"},
-		Description: "Refresh Google Drive metadata for images in current note. Use ! to also re-download images.",
+		Description: "Refresh Google Drive image metadata (currently file path) for images in current note. ! also re-download images.",
 		Usage:       "refreshimageinfo[!]",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":refreshimageinfo", ":refreshimageinfo!", ":rii", ":rii!"},
 	})
 
@@ -290,7 +290,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"is"},
 		Description: "Scale inline images up (+), down (-), or to specific size (N columns)",
 		Usage:       "imagescale [+|-|N]",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":imagescale +", ":imagescale -", ":imagescale 30", ":imagescale 60"},
 	})
 
@@ -299,7 +299,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"cw"},
 		Description: "Set max pixel width for cached Google Drive images (default 800)",
 		Usage:       "cachewidth [N]",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":cachewidth", ":cachewidth 800", ":cachewidth 1200", ":cw 600"},
 	})
 
@@ -308,7 +308,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"clc"},
 		Description: "Clear the disk image cache (forces re-download of Google Drive images)",
 		Usage:       "clearcache",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":clearcache", ":clc"},
 	})
 
@@ -317,26 +317,26 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Aliases:     []string{"kitty-reset"},
 		Description: "Clear kitty image cache and rerender current note",
 		Usage:       "kittyreset",
-		Category:    "View Control",
+		Category:    "Images",
 		Examples:    []string{":kittyreset"},
 	})
 
 	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
 		Name:        "vertical resize",
-		Aliases:     []string{"vert res"},
+		Aliases:     []string{"vert res, divider"},
 		Description: "Resize vertical divider",
 		Usage:       "vertical resize <width>",
-		Category:    "View Control",
-		Examples:    []string{":vertical resize 80", ":vert res +10", ":vert res -5"},
+		Category:    "View Management",
+		Examples:    []string{":vertical resize 80", ":vert res +10", ":divider -5"},
 	})
 
 	// Entry Management commands
 	registry.Register("e", (*Organizer).editNote, CommandInfo{
 		Name:        "e",
-		Description: "Edit note for current or specified entry",
-		Usage:       "e [entry_id]",
+		Description: "Edit the current note",
+		Usage:       "e",
 		Category:    "Entry Management",
-		Examples:    []string{":e", ":e 123"},
+		Examples:    []string{":e"},
 	})
 
 	registry.Register("copy", (*Organizer).copyEntry, CommandInfo{
@@ -844,7 +844,7 @@ func (o *Organizer) editNote(id int) {
 		id = o.getId()
 	}
 	if id == -1 {
-		o.ShowMessage(BL, "You need to save item before you can create a note")
+		o.ShowMessage(BL, "You need to save a note's title before you can edit it!")
 		o.command = ""
 		//o.mode = o.last_mode
 		o.mode = NORMAL

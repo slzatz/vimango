@@ -254,7 +254,9 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		var s string
 		pos := strings.LastIndexByte(o.command_line, ' ')
 		if pos == -1 {
-			s = o.command_line
+			//s = o.command_line
+			// allow for commands with no arguments to have a variant ending with !
+			s = strings.TrimSuffix(o.command_line, "!")
 		} else {
 			s = o.command_line[:pos]
 		}
