@@ -193,8 +193,113 @@ func breakWord(word string, limit int) []string {
 	return segments
 }
 
+// detectListItemIndent analyzes a line to detect if it's a list item and returns
+// the hanging indent width (visible width up to and including the space after bullet/number).
+// Returns 0 if not a list item.
+func detectListItemIndent(line string) int {
+	// Strip ANSI escape codes to analyze visible content
+	visibleLine := stripANSI(line)
+	if len(visibleLine) == 0 {
+		return 0
+	}
+
+	// Count leading spaces
+	leadingSpaces := 0
+	for _, r := range visibleLine {
+		if r == ' ' {
+			leadingSpaces++
+		} else if r == '\t' {
+			leadingSpaces += 4 // Assume tab = 4 spaces
+		} else {
+			break
+		}
+	}
+
+	// Get content after leading spaces
+	content := visibleLine[leadingSpaces:]
+	if len(content) == 0 {
+		return 0
+	}
+
+	// Check for unordered list bullets: •, -, *, ◦, ▪, ▸, ►
+	// These are typically followed by a space
+	bullets := []rune{'•', '-', '*', '◦', '▪', '▸', '►', '○', '●'}
+	contentRunes := []rune(content)
+	firstRune := contentRunes[0]
+	for _, bullet := range bullets {
+		if firstRune == bullet {
+			// Check if followed by space (use runes, not bytes)
+			if len(contentRunes) > 1 && contentRunes[1] == ' ' {
+				// Hanging indent = leading spaces + bullet width + space
+				return leadingSpaces + runewidth.RuneWidth(bullet) + 1
+			}
+		}
+	}
+
+	// Check for ordered list: digits followed by . or ) and space
+	// e.g., "1. ", "10. ", "1) "
+	digitCount := 0
+	for _, r := range content {
+		if r >= '0' && r <= '9' {
+			digitCount++
+		} else {
+			break
+		}
+	}
+
+	if digitCount > 0 && digitCount < len(content) {
+		afterDigits := content[digitCount:]
+		// Check for ". " or ") " pattern
+		if len(afterDigits) >= 2 && (afterDigits[0] == '.' || afterDigits[0] == ')') && afterDigits[1] == ' ' {
+			// Hanging indent = leading spaces + digits + delimiter + space
+			return leadingSpaces + digitCount + 2
+		}
+	}
+
+	// Check for task list items: [ ] or [x] or [✓]
+	if len(content) >= 4 && content[0] == '[' {
+		// Look for closing bracket
+		closeBracket := strings.Index(content, "] ")
+		if closeBracket > 0 && closeBracket <= 3 {
+			// Hanging indent = leading spaces + [x] + space
+			return leadingSpaces + closeBracket + 2
+		}
+	}
+
+	return 0
+}
+
+// stripANSI removes ANSI escape sequences from a string
+func stripANSI(s string) string {
+	var result strings.Builder
+	state := 0 // 0: Normal, 1: Saw ESC, 2: Inside CSI
+
+	for _, r := range s {
+		switch state {
+		case 0:
+			if r == '\x1b' {
+				state = 1
+			} else {
+				result.WriteRune(r)
+			}
+		case 1:
+			if r == '[' {
+				state = 2
+			} else {
+				state = 0
+			}
+		case 2:
+			if r >= '@' && r <= '~' {
+				state = 0
+			}
+		}
+	}
+	return result.String()
+}
+
 // WordWrap wraps the given text to the specified limit, respecting ANSI escape codes,
-// preserving existing newline characters, and breaking long words.
+// preserving existing newline characters, breaking long words, and applying hanging
+// indents for list items.
 func WordWrap(text string, limit int) string {
 	if limit <= 0 { // Cannot wrap to zero or negative width
 		return text // Or handle as an error
@@ -214,8 +319,16 @@ func WordWrap(text string, limit int) string {
 			continue
 		}
 
+		// Detect if this is a list item and get hanging indent width
+		hangingIndent := detectListItemIndent(line)
+		hangingIndentStr := ""
+		if hangingIndent > 0 {
+			hangingIndentStr = strings.Repeat(" ", hangingIndent)
+		}
+
 		var currentLineBuilder strings.Builder
 		currentLineWidth := 0
+		isFirstLineOfParagraph := true
 
 		segments := parseWordsWithSpaces(line)
 
@@ -238,23 +351,35 @@ func WordWrap(text string, limit int) string {
 			word := segment.Content
 			wordWidth := segmentWidth
 
+			// Calculate effective limit for continuation lines (accounting for hanging indent)
+			effectiveLimit := limit
+			if !isFirstLineOfParagraph && hangingIndent > 0 {
+				effectiveLimit = limit - hangingIndent
+			}
+
 			// --- Check if word needs breaking ---
-			if wordWidth > limit {
+			if wordWidth > effectiveLimit {
 				// Flush existing line content before breaking the word
 				if currentLineBuilder.Len() > 0 {
 					finalResult.WriteString(currentLineBuilder.String())
 					finalResult.WriteByte('\n')
 					currentLineBuilder.Reset()
-					// currentLineWidth reset below after breakWord
+					isFirstLineOfParagraph = false
 				}
 
 				// Break the long word
-				brokenSegments := breakWord(word, limit)
+				brokenSegments := breakWord(word, effectiveLimit)
 
 				// Add segments to result
 				for segIdx, segment := range brokenSegments {
 					if segIdx > 0 {
-						finalResult.WriteByte('\n') // Add newline before subsequent segments
+						finalResult.WriteByte('\n')
+						if hangingIndent > 0 {
+							finalResult.WriteString(hangingIndentStr)
+						}
+					} else if !isFirstLineOfParagraph && hangingIndent > 0 {
+						// First segment of broken word on continuation line
+						finalResult.WriteString(hangingIndentStr)
 					}
 					finalResult.WriteString(segment)
 				}
@@ -262,10 +387,13 @@ func WordWrap(text string, limit int) string {
 				// Update current line width based on the *last* segment
 				if len(brokenSegments) > 0 {
 					currentLineWidth = visibleWidth(brokenSegments[len(brokenSegments)-1])
+					if hangingIndent > 0 {
+						currentLineWidth += hangingIndent
+					}
 				} else {
 					currentLineWidth = 0
 				}
-				// Reset builder as its content is conceptually transferred to finalResult
+				isFirstLineOfParagraph = false
 				currentLineBuilder.Reset()
 
 				continue // Skip normal fitting logic
@@ -281,8 +409,16 @@ func WordWrap(text string, limit int) string {
 				finalResult.WriteString(currentLineBuilder.String())
 				finalResult.WriteByte('\n') // Wrap break
 				currentLineBuilder.Reset()
+				isFirstLineOfParagraph = false
+
+				// Apply hanging indent to continuation line
+				if hangingIndent > 0 {
+					currentLineBuilder.WriteString(hangingIndentStr)
+					currentLineWidth = hangingIndent + wordWidth
+				} else {
+					currentLineWidth = wordWidth
+				}
 				currentLineBuilder.WriteString(word)
-				currentLineWidth = wordWidth
 			}
 		} // End of loop over words in the line
 
