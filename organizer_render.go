@@ -15,7 +15,6 @@ type RenderRequest struct {
 	NoteID    int    // Database ID of note
 	Markdown  string // Note content
 	MaxCols   int    // Maximum columns for rendering
-	Lang      string // Language for rendering (markdown or code language)
 	CancelCh  chan struct{}
 	CreatedAt time.Time
 }
@@ -103,7 +102,7 @@ func (rm *RenderManager) Stop() {
 // StartRender initiates async rendering of a note
 // It immediately renders text-only, then starts background full render with images
 // If all images are already in kitty's session cache, it skips text-only and renders directly
-func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, lang string) {
+func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int) {
 	// Cancel any previous render
 	rm.mutex.Lock()
 	if rm.currentRequest != nil {
@@ -121,7 +120,6 @@ func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, l
 		NoteID:    noteID,
 		Markdown:  markdown,
 		MaxCols:   maxCols,
-		Lang:      lang,
 		CancelCh:  make(chan struct{}),
 		CreatedAt: time.Now(),
 	}
@@ -131,7 +129,7 @@ func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, l
 	// Check if images are enabled
 	if !app.kitty || !app.showImages {
 		// No images mode - just render text
-		textLines := rm.renderTextOnly(markdown, maxCols, lang)
+		textLines := rm.renderTextOnly(markdown, maxCols)
 		rm.organizer.note = textLines
 		rm.organizer.drawRenderedNote()
 		return
@@ -141,7 +139,7 @@ func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, l
 	imageURLs := extractImageURLs(markdown)
 	if len(imageURLs) == 0 {
 		// No images in this note - just render text
-		textLines := rm.renderTextOnly(markdown, maxCols, lang)
+		textLines := rm.renderTextOnly(markdown, maxCols)
 		rm.organizer.note = textLines
 		rm.organizer.drawRenderedNote()
 		return
@@ -161,7 +159,7 @@ func (rm *RenderManager) StartRender(noteID int, markdown string, maxCols int, l
 
 	// Slow path: some images need loading
 	// Phase 1: Render text-only immediately (no images)
-	textLines := rm.renderTextOnly(markdown, maxCols, lang)
+	textLines := rm.renderTextOnly(markdown, maxCols)
 
 	// Display text-only version immediately
 	rm.organizer.note = textLines
@@ -207,13 +205,7 @@ func (rm *RenderManager) allImagesInKittyCache(imageURLs []string) bool {
 }
 
 // renderTextOnly renders markdown without images (fast path)
-func (rm *RenderManager) renderTextOnly(markdown string, maxCols int, lang string) []string {
-	if lang != "markdown" {
-		// For code, use the existing code renderer
-		// We'll just return empty and let the sync path handle it
-		return rm.organizer.renderCodeToLines(markdown, lang, maxCols)
-	}
-
+func (rm *RenderManager) renderTextOnly(markdown string, maxCols int) []string {
 	// Render markdown without kitty images
 	options := []glamour.TermRendererOption{
 		glamour.WithStylePath(getGlamourStylePath()),
@@ -470,10 +462,3 @@ func (rm *RenderManager) resultHandler() {
 	}
 }
 
-// renderCodeToLines renders code and returns lines (helper for non-markdown)
-func (o *Organizer) renderCodeToLines(code string, lang string, maxCols int) []string {
-	// Use existing renderCode logic but return lines
-	// For now, delegate to the existing method by temporarily capturing output
-	o.renderCode(code, lang)
-	return o.note
-}

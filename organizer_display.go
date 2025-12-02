@@ -10,7 +10,6 @@ import (
 	net_url "net/url"
 	"os"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -781,9 +780,6 @@ func (o *Organizer) displayNote() {
 		return
 	}
 
-	// Don't delete images - let them persist in kitty for reuse
-	// deleteAllKittyImages()
-
 	id := o.rows[o.fr].id
 	var note string
 	if o.taskview != BY_FIND {
@@ -793,33 +789,9 @@ func (o *Organizer) displayNote() {
 	}
 	o.Screen.eraseRightScreen()
 
-	var lang string
-	if o.Database.taskFolder(id) == "code" {
-		c := o.Database.taskContext(id)
-		var ok bool
-		if lang, ok = Languages[c]; !ok {
-			lang = "markdown"
-		}
-	} else {
-		lang = "markdown"
-	}
-
-	// Use async rendering if RenderManager is available and images are enabled
-	// This provides non-blocking image loading with cancellation support
-	if app.RenderManager != nil && app.kitty && app.showImages && lang == "markdown" {
-		// Async path: text displays immediately, images load in background
-		app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols, lang)
-		// Note: drawRenderedNote() is called immediately for text-only,
-		// then again via notification when full render with images is ready
-	} else {
-		// Sync path: traditional blocking render
-		if lang == "markdown" {
-			o.renderMarkdown(note)
-		} else {
-			o.renderCode(note, lang)
-		}
-		o.drawRenderedNote()
-	}
+	// Always use RenderManager - it handles all cases internally
+	// (kitty/no-kitty, images/no-images, cached/uncached)
+	app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
 }
 
 // extractImageURLs extracts all image URLs from markdown
@@ -1203,8 +1175,6 @@ func kittyUpdateVirtualPlacement(imageID uint32, cols, rows int, isTmux bool) er
 	return err
 }
 
-var renderingMarkdown bool // Guard against re-entrant calls
-
 // seedKittySessionFromCache populates kittySessionImages from disk cache so we can
 // reuse images already stored in the running kitty terminal (same tab).
 // Set VIMANGO_DISABLE_KITTY_CACHE_SEEDING to skip this behavior.
@@ -1378,200 +1348,6 @@ func getImageInfoLine(imageID uint32) string {
 	return "[metadata not cached]\n"
 }
 
-func (o *Organizer) renderMarkdown(s string) {
-	// Prevent infinite loop from re-entrant calls
-	if renderingMarkdown {
-		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-			fmt.Fprintf(debugLog, "WARNING: Prevented re-entrant renderMarkdown call!\n")
-			debugLog.Close()
-		}
-		return
-	}
-	renderingMarkdown = true
-	defer func() { renderingMarkdown = false }()
-
-	// Pre-transmit kitty images if kitty is available and images are enabled
-	if app.kitty && app.kittyPlace && app.showImages {
-		// Seed session map from disk cache (assumed present in current kitty) unless disabled
-		seedKittySessionFromCache()
-
-		// Clear the dimension map for this render
-		currentRenderImageMux.Lock()
-		currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
-		currentRenderImageURLs = make(map[uint32]string)
-		nextImageLookupID = 1 // Reset lookup counter
-		currentRenderImageOrder = currentRenderImageOrder[:0]
-		currentRenderOrderIdx = 0
-		currentRenderImageMux.Unlock()
-
-		imageURLs := extractImageURLs(s)
-		if len(imageURLs) > 0 {
-			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "renderMarkdown: pre-transmitting %d images\n", len(imageURLs))
-				debugLog.Close()
-			}
-
-			// Parallel prepare (fetch/decode/encode) with bounded workers, then ordered transmit.
-			preparedMap := make(map[string]*preparedImage)
-			type job struct{ url string }
-			type result struct {
-				prep *preparedImage
-			}
-
-			jobCh := make(chan job)
-			resCh := make(chan result, len(imageURLs))
-			var wg sync.WaitGroup
-
-			workers := runtime.NumCPU()
-			if workers > 6 {
-				workers = 6
-			}
-			if workers < 2 {
-				workers = 2
-			}
-
-			for i := 0; i < workers; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for j := range jobCh {
-						resCh <- result{prep: prepareKittyImage(j.url)}
-					}
-				}()
-			}
-
-			// Deduplicate URLs but preserve mapping to original order
-			seen := make(map[string]bool)
-			for _, url := range imageURLs {
-				if !seen[url] {
-					seen[url] = true
-					jobCh <- job{url: url}
-				}
-			}
-			close(jobCh)
-
-			go func() {
-				wg.Wait()
-				close(resCh)
-			}()
-
-			for r := range resCh {
-				if r.prep != nil {
-					preparedMap[r.prep.url] = r.prep
-				}
-			}
-
-			// Ordered transmit to keep kitty IDs aligned with markdown order
-			for _, url := range imageURLs {
-				prep := preparedMap[url]
-				imageID, cols, rows := transmitPreparedKittyImage(prep, o.Screen.totaleditorcols-PREVIEW_RIGHT_PADDING)
-				if imageID != 0 {
-					currentRenderImageMux.Lock()
-					currentRenderImageDims[imageID] = struct{ cols, rows int }{cols, rows}
-					currentRenderImageOrder = append(currentRenderImageOrder, imageID)
-					currentRenderImageURLs[imageID] = url
-					currentRenderImageMux.Unlock()
-				}
-			}
-		}
-	}
-
-	// Configure renderer options WITH kitty support
-	options := []glamour.TermRendererOption{
-		glamour.WithStylePath(getGlamourStylePath()),
-		glamour.WithWordWrap(0),
-	}
-
-	// Enable kitty image rendering if available and enabled
-	if app.kitty && app.kittyPlace && app.showImages {
-		options = append(options, glamour.WithKittyImages(true, kittyImageCacheLookup))
-	}
-
-	r, _ := glamour.NewTermRenderer(options...)
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "renderMarkdown: calling r.Render()\n")
-		debugLog.Close()
-	}
-
-	note, _ := r.Render(s)
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "renderMarkdown: r.Render() returned, note length=%d\n", len(note))
-		// Show where markers appear in rendered text
-		markerIdx := strings.Index(note, "[KITTY_IMAGE:")
-		previewLen := 200
-		if len(note) < previewLen {
-			previewLen = len(note)
-		}
-		if markerIdx >= 0 {
-			fmt.Fprintf(debugLog, "MARKER POSITION: Found at index %d (first 200 chars: %q)\n", markerIdx, note[:previewLen])
-			// Show context around second marker if it exists
-			secondMarkerIdx := strings.Index(note[markerIdx+1:], "[KITTY_IMAGE:")
-			if secondMarkerIdx >= 0 {
-				secondMarkerIdx += markerIdx + 1
-				// Show 100 chars before and after second marker
-				contextStart := secondMarkerIdx - 100
-				if contextStart < 0 {
-					contextStart = 0
-				}
-				contextEnd := secondMarkerIdx + 100
-				if contextEnd > len(note) {
-					contextEnd = len(note)
-				}
-				fmt.Fprintf(debugLog, "SECOND MARKER CONTEXT (index %d): %q\n", secondMarkerIdx, note[contextStart:contextEnd])
-			}
-		} else {
-			fmt.Fprintf(debugLog, "MARKER POSITION: NOT FOUND in rendered output (first 200 chars: %q)\n", note[:previewLen])
-		}
-		debugLog.Close()
-	}
-
-	// Replace glamour's text markers with actual Unicode placeholder grids
-	if app.kitty && app.kittyPlace && app.showImages {
-		note = replaceKittyImageMarkers(note)
-
-		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-			fmt.Fprintf(debugLog, "renderMarkdown: after replaceKittyImageMarkers, note length=%d\n", len(note))
-			// Show first part of text to see if placeholder is at top
-			previewLen := 200
-			if len(note) < previewLen {
-				previewLen = len(note)
-			}
-			fmt.Fprintf(debugLog, "AFTER REPLACEMENT: First 200 chars: %q\n", note[:previewLen])
-			debugLog.Close()
-		}
-	}
-
-	// glamour seems to add a '\n' at the start
-	note = strings.TrimSpace(note)
-
-	if o.taskview == BY_FIND {
-		// could use strings.Count to make sure they are balanced
-		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
-		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
-	}
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "renderMarkdown: calling WordWrap()\n")
-		debugLog.Close()
-	}
-
-	note = WordWrap(note, o.Screen.totaleditorcols-PREVIEW_RIGHT_PADDING)
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "renderMarkdown: WordWrap() returned\n")
-		debugLog.Close()
-	}
-
-	o.note = strings.Split(note, "\n")
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "renderMarkdown: FINISHED (note has %d lines)\n", len(o.note))
-		debugLog.Close()
-	}
-}
-
 // loadImageForGlamour loads images for glamour's kitty renderer
 // It handles local files, Google Drive, and web URLs
 func loadImageForGlamour(url string) (image.Image, error) {
@@ -1616,20 +1392,6 @@ func loadImageForGlamour(url string) (image.Image, error) {
 	// Try as local filesystem path (supports mounted Drive paths)
 	img, _, err := loadImage(url, maxW, maxH)
 	return img, err
-}
-
-func (o *Organizer) renderCode(s string, lang string) {
-	var buf bytes.Buffer
-	_ = Highlight(&buf, s, lang, "terminal16m", o.Session.style[o.Session.styleIndex])
-	note := buf.String()
-
-	if o.taskview == BY_FIND {
-		// could use strings.Count to make sure they are balanced
-		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
-		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
-	}
-	note = WordWrap(note, o.Screen.totaleditorcols)
-	o.note = strings.Split(note, "\n")
 }
 
 func (o *Organizer) drawNotice(s string) {

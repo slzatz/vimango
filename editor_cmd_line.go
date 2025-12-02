@@ -295,10 +295,8 @@ func (e *Editor) help() {
 		e.ShowMessage(BR, "Help displayed - press ESC to close")
 	*/
 	// Display help in the preview area
-	app.Organizer.Screen.eraseRightScreen()
-	app.Organizer.renderMarkdown(helpText)
+	app.Organizer.drawNotice(helpText)
 	app.Organizer.altRowoff = 0
-	app.Organizer.drawRenderedNote()
 	e.mode = PREVIEW
 	e.command_line = ""
 }
