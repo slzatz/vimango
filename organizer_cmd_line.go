@@ -548,9 +548,9 @@ func (o *Organizer) help(pos int) {
 		}
 	}
 
+	o.mode = NAVIGATE_HELP_NOTICE
 	o.drawNotice(helpText)
 	o.altRowoff = 0
-	o.mode = NAVIGATE_NOTICE
 	o.command_line = ""
 }
 

@@ -210,7 +210,7 @@ func (r *CommandRegistry[T]) FormatAllHelp() string {
 			if len(cmd.Examples) > 0 {
 				examples = fmt.Sprintf(" *%s*", strings.Join(cmd.Examples, ", "))
 			}
-			help.WriteString(fmt.Sprintf("`%-15s`%s - %s %s\n", cmd.Name, aliases, cmd.Description, examples))
+			help.WriteString(fmt.Sprintf("- `%-15s`%s - %s %s\n", cmd.Name, aliases, cmd.Description, examples))
 		}
 		help.WriteString("\n")
 	}

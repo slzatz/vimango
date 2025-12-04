@@ -179,11 +179,12 @@ const (
 	VISUAL_BLOCK // only editor mode
 	SEARCH       // only editor mode
 	//FIND            // only organizer mode
-	PREVIEW         // only editor mode - for previewing markdown
-	VIEW_LOG        // only in editor mode - for debug viewing of vim message hx
-	SPELLING        // this mode recognizes 'z='
-	NAVIGATE_NOTICE // only in organizer mode
-	LINKS           // only in organizer mode
+	PREVIEW              // only editor mode - for previewing markdown
+	VIEW_LOG             // only in editor mode - for debug viewing of vim message hx
+	SPELLING             // this mode recognizes 'z='
+	NAVIGATE_NOTICE      // only in organizer mode
+	NAVIGATE_HELP_NOTICE // only in organizer mode
+	LINKS                // only in organizer mode
 	PENDING
 	OTHER // Just in case
 )
@@ -383,6 +384,7 @@ func (m Mode) String() string {
 		"VIEW LOG",
 		"SPELLING",
 		"NAVIGATE_NOTICE",
+		"NAVIGATE_HELP_NOTICE",
 		"LINKS",
 		"PENDING",
 		"OTHER",

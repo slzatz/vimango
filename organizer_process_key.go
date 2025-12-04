@@ -39,7 +39,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		redraw = RedrawPartial
 	case COMMAND_LINE:
 		redraw = o.ExModeKeyHandler(c)
-	case NAVIGATE_NOTICE:
+	case NAVIGATE_NOTICE, NAVIGATE_HELP_NOTICE:
 		redraw = o.NavigateNoticeModeKeyHandler(c)
 	default:
 		return
