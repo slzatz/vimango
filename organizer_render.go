@@ -231,7 +231,7 @@ func (rm *RenderManager) renderTextOnly(markdown string, maxCols int) []string {
 		note = strings.ReplaceAll(note, "qy", "\x1b[0m")
 	}
 
-	note = WordWrap(note, maxCols-PREVIEW_RIGHT_PADDING)
+	note = WordWrap(note, maxCols-PREVIEW_RIGHT_PADDING, 0)
 
 	return strings.Split(note, "\n")
 }
@@ -413,7 +413,7 @@ func (rm *RenderManager) renderFullWithImages(req *RenderRequest) []string {
 		note = strings.ReplaceAll(note, "qy", "\x1b[0m")
 	}
 
-	note = WordWrap(note, maxCols-PREVIEW_RIGHT_PADDING)
+	note = WordWrap(note, maxCols-PREVIEW_RIGHT_PADDING, 0)
 
 	return strings.Split(note, "\n")
 }
@@ -461,4 +461,3 @@ func (rm *RenderManager) resultHandler() {
 		}
 	}
 }
-

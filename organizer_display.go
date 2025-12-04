@@ -1395,11 +1395,7 @@ func loadImageForGlamour(url string) (image.Image, error) {
 }
 
 func (o *Organizer) drawNotice(s string) {
-	if o.mode == NAVIGATE_HELP_NOTICE {
-		o.renderHelpNotice(s)
-	} else {
-		o.renderNotice(s)
-	}
+	o.renderNotice(s)
 	if len(o.notice) == 0 {
 		return
 	}
@@ -1408,6 +1404,7 @@ func (o *Organizer) drawNotice(s string) {
 }
 
 func (o *Organizer) renderNotice(s string) {
+	var offset int
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath(getGlamourStylePath()),
 		glamour.WithWordWrap(0),
@@ -1415,23 +1412,10 @@ func (o *Organizer) renderNotice(s string) {
 	note, _ := r.Render(s)
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
-	// if there was a single word wrap that took a third parameter for hanging indent
-	// then could check for o.mode == NAVIGATE_HELP_NOTICE here
-	// and would not need a separate renderHelpNotice function
-	note = WordWrap(note, o.Screen.totaleditorcols-NOTICE_RIGHT_PADDING)
-	o.notice = strings.Split(note, "\n")
-}
-
-func (o *Organizer) renderHelpNotice(s string) {
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath(getGlamourStylePath()),
-		glamour.WithWordWrap(0),
-	)
-	note, _ := r.Render(s)
-	// glamour seems to add a '\n' at the start
-	note = strings.TrimSpace(note)
-
-	note = WordWrapHelp(note, o.Screen.totaleditorcols-NOTICE_RIGHT_PADDING, 16)
+	if o.mode == NAVIGATE_HELP_NOTICE {
+		offset = 16
+	}
+	note = WordWrap(note, o.Screen.totaleditorcols-NOTICE_RIGHT_PADDING, offset)
 	o.notice = strings.Split(note, "\n")
 }
 

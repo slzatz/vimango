@@ -517,7 +517,7 @@ func (e *Editor) showMarkdownPreview(_ int) {
 	)
 	note, _ = r.Render(note)
 	//note = WordWrap(note, e.Screen.totaleditorcols)
-	note = WordWrap(note, e.screencols)
+	note = WordWrap(note, e.screencols, 0)
 	note = strings.TrimSpace(note)
 	e.renderedNote = note
 	e.mode = PREVIEW

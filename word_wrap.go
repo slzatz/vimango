@@ -300,7 +300,7 @@ func stripANSI(s string) string {
 // WordWrap wraps the given text to the specified limit, respecting ANSI escape codes,
 // preserving existing newline characters, breaking long words, and applying hanging
 // indents for list items.
-func WordWrap(text string, limit int) string {
+func WordWrap_old(text string, limit int) string {
 	if limit <= 0 { // Cannot wrap to zero or negative width
 		return text // Or handle as an error
 	}
@@ -437,7 +437,7 @@ func WordWrap(text string, limit int) string {
 	return finalResult.String()
 }
 
-func WordWrapHelp(text string, limit int, hangingIndentOffset int) string {
+func WordWrap(text string, limit int, hangingIndentOffset int) string {
 	if limit <= 0 { // Cannot wrap to zero or negative width
 		return text // Or handle as an error
 	}
