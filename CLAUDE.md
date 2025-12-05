@@ -3,10 +3,14 @@
 This file provides guidance to GEMINI.md when working with code in this repository.
 
 ## Build Commands
-- **Linux/Unix Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
 - **Linux/Unix with CGO**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (includes libvim, hunspell, sqlite3)
+NOTE: When updating, fixing or adding to the code, the CGO build is the most comprehensive to ensure all features work as expected.
+- **Linux/Unix Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
 - **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
 - Run: `go run main.go`
+
+### Tests
+NOTE: Generally we have not been running tests but have tested key functionality manually.
 - Test: `go test ./...`
 - Test single package: `go test ./path/to/package`
 - Test single function: `go test -run TestFunctionName`
@@ -34,6 +38,9 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 ## Key Points
 - The application is written in Go.
 - The vimango application is a note taking application that stores notes and their titles in a local SQLite database.
+- The application operates in two main modes: an editor mode for editing notes and an organizer mode for managing and viewing notes. On the terminal screen the Organizer with the titles of notes is on the left and the Editor for editing notes is on the right.
+- The application supports markdown rendering of notes to enhance the readability of the content.
+- The ability to manage and display images is an important feature of the application.
 - The application supports dual SQLite driver selection:
   - `modernc.org/sqlite` (Pure Go, default) - Works on all platforms
   - `mattn/go-sqlite3` (CGO-based) - Only available on Linux/Unix with CGO enabled
@@ -66,7 +73,7 @@ The application now supports full Windows cross-compilation from Linux/Unix syst
 - Automatic screen redraw and layout adjustment on terminal resize
 
 ## Command System
-The application features a comprehensive command registry system with full discoverability for both ex commands and normal mode commands:
+The command system is loosely based on the vim command system and the existence of modes. The "super" modes of Organizer and Editor each have normal commands and Ex Commands.  For editing both of Organizer note titles and Editor notes, the use of libvim provides a wide range of vim commands including essentially all vim normal mode commands. The application features a comprehensive command registry system with full discoverability for both ex commands and non-vim normal mode commands:
 
 ### Help System
 - `:help` - Show all available ex commands organized by category
@@ -198,15 +205,6 @@ Error: glamour style files not found:
 Please ensure at least one of these files exists
 ```
 
-### Implementation Details
-- **Files Modified**: `common.go`, `editor_normal.go`, `organizer_display.go`, `main.go`, `config.json`
-- **Validation Function**: `validateGlamourStyle()` in `common.go` (called at startup)
-- **Path Resolution**: `getGlamourStylePath()` in `common.go` (used during rendering)
-- **Used In**:
-  - Editor markdown preview (`<leader>m`)
-  - Organizer note preview (rendered in right panel)
-  - Notice display system
-
 #### Web Fetch Requirements
 For enhanced deep research with web fetch capabilities:
 - **API Key Permissions**: Ensure your Claude API key has web search and web fetch permissions enabled
@@ -215,26 +213,8 @@ For enhanced deep research with web fetch capabilities:
 - **Content Limits**: Configured with 100,000 token limit for large document processing
 - **Citations**: Automatically enabled for fetched content to provide accurate source attribution
 
-### Implementation
-- **File**: `research.go` - Core research system with ResearchManager and Claude API integration
-- **Modified Files**: `app.go`, `main.go`, `common.go`, `organizer_cmd_line.go` - Integration and command registration
-- **Enhanced Features**:
-  - **Aggregated Notification System**: Single comprehensive notification displayed when research completes
-    - Buffers all status messages during research processing
-    - Displays consolidated summary with duration, metrics, quality rating, and chronological process log
-    - Presented via `processNotifications()` in `app.go` after note creation completes
-  - Queue management for asynchronous background processing
-  - Structured markdown generation with enhanced statistics
-  - Dual-tool counting from result blocks for accurate metrics
-  - Web fetch specific error detection and troubleshooting
-- **API Integration**: Uses Claude Messages API with combined web search and web fetch tools
-  - **Web Search Tool**: `web_search_20250305` with location-aware queries
-  - **Web Fetch Tool**: `web_fetch_20250910` with citations and content limits
-  - **Smart Tool Selection**: Claude automatically decides when to search vs fetch based on research needs
-  - **Enhanced Error Handling**: Specific detection for web fetch permission issues, beta access problems, and model compatibility
-
-### Research Workflow Examples
-- **Search-Heavy Research**: Simple factual queries (5+ searches, 0 fetches) → "Standard" quality
-- **Balanced Research**: Topic overviews (8+ searches, 2+ fetches) → "Comprehensive" quality
-- **Deep Research**: Complex analysis (10+ searches, 4+ fetches) → "Premium Deep Research" quality
-- **Document-Focused**: Specialized research targeting authoritative sources (fewer searches, more fetches)
+## Image Management
+- The markdown notes my contain image placeholders of the form ![text](imagepath) where typically that image path is the id of an image file in google drive.  
+- Google drive image files are represented, for example, as ![2072 in lily_2025](gdrive:19_FwuxjvgIwxn-b4Ia75DrXRGLZeB2fe) where the string after gdrive: is the file id in google drive.
+- An important feature of the application is the caching of images since downloading from google drive introduces some delays.
+- There are two levels of image caching.  There is a local hard drive cache that represents the images as base64 encoded png files. The application relies of the kitty graphics protocol, which caches images in memory in the terminal emulator, for fast display of images.  This requires the terminal emulator to support the kitty graphics protocol.  The in-memory cache is reset with every launch of the application.
