@@ -1379,11 +1379,35 @@ func (o *Organizer) deleteMarks(_ int) {
 }
 
 func (o *Organizer) copyEntry(_ int) {
-	//copyEntry()
+	// Validate we're in task view with entries
+	if o.view != TASK || len(o.rows) == 0 {
+		o.ShowMessage(BL, "No entry to copy")
+		o.mode = NORMAL
+		o.command_line = ""
+		return
+	}
+
+	currentRow := o.rows[o.fr]
+	if currentRow.id == -1 {
+		o.ShowMessage(BL, "Cannot copy unsaved entry")
+		o.mode = NORMAL
+		o.command_line = ""
+		return
+	}
+
+	// Copy the entry in the database
+	newID, err := o.Database.copyEntry(currentRow.id)
+	if err != nil {
+		o.ShowMessage(BL, "Error copying entry: %v", err)
+		o.mode = NORMAL
+		o.command_line = ""
+		return
+	}
+
 	o.mode = NORMAL
 	o.command_line = ""
-	o.refresh(0)
-	o.ShowMessage(BL, "Entry copied")
+	o.refresh(0) // Refresh to show the new entry
+	o.ShowMessage(BL, "Entry copied (new id: %d)", newID)
 }
 
 /*

@@ -936,6 +936,30 @@ func generateWWString_(text string, width int, length int, ret string) string {
 	return ab.String()
 }
 
+func (db *Database) copyEntry(sourceID int) (int, error) {
+	// Get source entry info
+	entry := db.getEntryInfo(sourceID)
+	if entry.id == 0 {
+		return -1, fmt.Errorf("source entry not found")
+	}
+
+	// Get the note content
+	note := db.readNoteIntoString(sourceID)
+
+	// Insert new entry with copied data
+	newTitle := "Copy of " + entry.title
+	var newID int
+	err := db.MainDB.QueryRow(
+		`INSERT INTO task (title, folder_tid, context_tid, star, note, added)
+		 VALUES (?, ?, ?, ?, ?, datetime('now')) RETURNING id;`,
+		newTitle, entry.folder_tid, entry.context_tid, entry.star, note).Scan(&newID)
+	if err != nil {
+		return -1, err
+	}
+
+	return newID, nil
+}
+
 func (db *Database) updateCodeFile(id int, text string) {
 	var filePath string
 	lang := Languages[db.taskContext(id)]
