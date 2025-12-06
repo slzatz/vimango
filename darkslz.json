@@ -15,24 +15,27 @@
   "h1": {
     "prefix": " ",
     "suffix": " ",
-    "color": "0",
+    "color": "16",
     "background_color": "9",
     "bold": true
   },
   "h2": {
     "prefix": " ",
     "suffix": " ",
-    "color": "0",
+    "color": "16",
     "background_color": "4"
   },
   "h3": {
     "prefix": " ",
     "suffix": " ",
-    "color": "30",
+    "color": "4",
     "background_color": "11"
   },
   "h4": {
-    "prefix": "#### "
+    "color": "16",
+    "background_color": "14",
+    "prefix": "",
+    "suffix": ""
   },
   "h5": {
     "prefix": "##### "
@@ -54,7 +57,7 @@
     "bold": true
   },
   "hr": {
-    "color": "240",
+    "color": "8",
     "format": "\n----------------------------------\n"
   },
   "link": {
@@ -80,6 +83,14 @@
  "task": {
    "ticked": "[✓] ",
    "unticked": "[ ] "
+  },
+  "image": {
+    "color": "12",
+    "format": "({{.text}})"
+  },
+  "image_text": {
+    "color": "12",
+    "format": "Image: {{.text}} "
   },
   "code": {
     "color": "6"
