@@ -13,11 +13,12 @@
     "bold": true
   },
   "h1": {
-    "prefix": " ",
+    "prefix": "------->",
     "suffix": " ",
     "color": "16",
     "background_color": "9",
-    "bold": true
+    "bold": true,
+    "kitty_scale": 4
   },
   "h2": {
     "prefix": " ",

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 )
 
 // RenderRequest represents an async rendering request for a note
@@ -225,6 +226,9 @@ func (rm *RenderManager) renderTextOnly(markdown string, maxCols int) []string {
 
 	note = strings.TrimSpace(note)
 
+	// Decode any Kitty text sizing markers (OSC 66) that were protected during glamour processing
+	note = ansi.DecodeKittyTextSizeMarkers(note)
+
 	// Handle search highlighting
 	if rm.organizer.taskview == BY_FIND {
 		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m")
@@ -406,6 +410,9 @@ func (rm *RenderManager) renderFullWithImages(req *RenderRequest) []string {
 	}
 
 	note = strings.TrimSpace(note)
+
+	// Decode any Kitty text sizing markers (OSC 66) that were protected during glamour processing
+	note = ansi.DecodeKittyTextSizeMarkers(note)
 
 	// Handle search highlighting
 	if o.taskview == BY_FIND {

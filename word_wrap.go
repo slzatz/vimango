@@ -1,11 +1,124 @@
 package main
 
 import (
+	"fmt"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	// "unicode/utf8" // Not strictly needed
 
 	"github.com/mattn/go-runewidth" // Import the key library
 )
+
+// osc66Regex matches OSC 66 sequences and captures the metadata and text content
+// Format: \x1b]66;metadata;text\x07
+var osc66Regex = regexp.MustCompile(`\x1b\]66;([^;]*);([^\x07]*)\x07`)
+
+// parseOSC66Line parses a line containing an OSC 66 sequence and returns its components.
+// Returns: ansiPrefix, osc66Meta, text, ansiSuffix, scale, ok
+func parseOSC66Line(line string) (ansiPrefix, osc66Meta, text, ansiSuffix string, scale int, ok bool) {
+	// Find the OSC 66 sequence
+	match := osc66Regex.FindStringSubmatchIndex(line)
+	if match == nil {
+		return "", "", "", "", 0, false
+	}
+
+	// Extract components
+	osc66Start := match[0]
+	osc66End := match[1]
+	osc66Meta = line[match[2]:match[3]]
+	text = line[match[4]:match[5]]
+
+	ansiPrefix = line[:osc66Start]
+	ansiSuffix = line[osc66End:]
+
+	// Parse scale from metadata (e.g., "s=2" or "s=2:w=0")
+	scale = 1 // default
+	for _, part := range strings.Split(osc66Meta, ":") {
+		if strings.HasPrefix(part, "s=") {
+			if s, err := strconv.Atoi(part[2:]); err == nil && s > 0 {
+				scale = s
+			}
+		}
+	}
+
+	return ansiPrefix, osc66Meta, text, ansiSuffix, scale, true
+}
+
+// wrapOSC66Line wraps a line containing an OSC 66 sequence at the effective width.
+// Each wrapped segment becomes its own OSC 66 sequence with the same styling.
+// Extra newlines are added between segments to account for the vertical space
+// consumed by scaled text (scale=2 means each line takes 2 rows).
+func wrapOSC66Line(line string, limit int) []string {
+	ansiPrefix, osc66Meta, text, ansiSuffix, scale, ok := parseOSC66Line(line)
+	if !ok {
+		// Not a valid OSC 66 line, return as-is
+		return []string{line}
+	}
+
+	// Calculate effective width accounting for scale
+	effectiveLimit := limit / scale
+	if effectiveLimit < 1 {
+		effectiveLimit = 1
+	}
+
+	// Calculate visible width of text
+	textWidth := 0
+	for _, r := range text {
+		textWidth += runewidth.RuneWidth(r)
+	}
+
+	// If it fits, return as-is
+	// Note: HeadingElement.Finish() already adds trailing newlines for scale height
+	// so we don't need to add them here for the no-wrap case
+	if textWidth <= effectiveLimit {
+		return []string{line}
+	}
+
+	// Wrap the text at effective limit
+	var wrappedSegments []string
+	var currentLine strings.Builder
+	currentWidth := 0
+
+	for _, r := range text {
+		rw := runewidth.RuneWidth(r)
+
+		// Check if adding this rune would exceed the limit
+		if currentWidth+rw > effectiveLimit && currentLine.Len() > 0 {
+			// Finish current segment
+			wrappedSegments = append(wrappedSegments, currentLine.String())
+			currentLine.Reset()
+			currentWidth = 0
+		}
+
+		currentLine.WriteRune(r)
+		currentWidth += rw
+	}
+
+	// Don't forget the last segment
+	if currentLine.Len() > 0 {
+		wrappedSegments = append(wrappedSegments, currentLine.String())
+	}
+
+	// Build final lines with proper spacing for scale
+	var wrappedLines []string
+	for i, segment := range wrappedSegments {
+		wrappedLine := fmt.Sprintf("%s\x1b]66;%s;%s\x07%s", ansiPrefix, osc66Meta, segment, ansiSuffix)
+
+		// Add extra newlines after each line to account for scale height
+		// (scale-1 extra newlines because one newline comes from the line break itself)
+		// But don't add extra newlines after the very last segment
+		if i < len(wrappedSegments)-1 {
+			for j := 1; j < scale; j++ {
+				wrappedLine += "\n"
+			}
+		}
+		wrappedLines = append(wrappedLines, wrappedLine)
+	}
+
+	return wrappedLines
+}
 
 // SegmentType indicates whether a text segment contains words or spaces
 type SegmentType int
@@ -86,7 +199,9 @@ func parseWordsWithSpaces(line string) []TextSegment {
 
 func visibleWidth(s string) int {
 	width := 0
-	state := 0 // 0: Normal, 1: Saw ESC, 2: Inside CSI
+	// States: 0=Normal, 1=Saw ESC, 2=Inside CSI, 3=Inside OSC, 4=Inside APC
+	state := 0
+	var prevRune rune
 
 	for _, r := range s {
 		switch state {
@@ -98,16 +213,30 @@ func visibleWidth(s string) int {
 			}
 		case 1: // Saw ESC
 			if r == '[' {
-				state = 2
+				state = 2 // CSI sequence
+			} else if r == ']' {
+				state = 3 // OSC sequence (e.g., OSC 66 text sizing)
+			} else if r == '_' {
+				state = 4 // APC sequence (e.g., Kitty graphics)
 			} else {
-				state = 0 // Assume short escape, reset
+				state = 0 // Unknown/short escape, reset
 			}
-		case 2: // Inside CSI sequence
+		case 2: // Inside CSI sequence - ends with letter @ through ~
 			if r >= '@' && r <= '~' {
-				state = 0 // End of sequence
+				state = 0
 			}
-			// Characters inside escape sequence have no width
+		case 3: // Inside OSC sequence - ends with BEL (\x07) or ST (\x1b\)
+			if r == '\x07' {
+				state = 0
+			} else if prevRune == '\x1b' && r == '\\' {
+				state = 0
+			}
+		case 4: // Inside APC sequence - ends with ST (\x1b\)
+			if prevRune == '\x1b' && r == '\\' {
+				state = 0
+			}
 		}
+		prevRune = r
 	}
 	return width
 }
@@ -123,7 +252,9 @@ func breakWord(word string, limit int) []string {
 	var segments []string
 	var currentSegment strings.Builder
 	currentSegmentWidth := 0
-	state := 0 // 0: Normal, 1: Saw ESC, 2: Inside CSI
+	// States: 0=Normal, 1=Saw ESC, 2=Inside CSI, 3=Inside OSC, 4=Inside APC
+	state := 0
+	var prevRune rune
 
 	for _, r := range word {
 		runeWidth := 0 // Width of this specific rune (0 if escape)
@@ -141,14 +272,30 @@ func breakWord(word string, limit int) []string {
 		case 1: // Saw ESC
 			isEscapeChar = true
 			if r == '[' {
-				state = 2
+				state = 2 // CSI sequence
+			} else if r == ']' {
+				state = 3 // OSC sequence
+			} else if r == '_' {
+				state = 4 // APC sequence
 			} else {
-				state = 0 // Assume short escape, reset
+				state = 0 // Unknown/short escape, reset
 			}
 		case 2: // Inside CSI sequence
 			isEscapeChar = true
 			if r >= '@' && r <= '~' {
 				state = 0 // End of sequence
+			}
+		case 3: // Inside OSC sequence - ends with BEL or ST
+			isEscapeChar = true
+			if r == '\x07' {
+				state = 0
+			} else if prevRune == '\x1b' && r == '\\' {
+				state = 0
+			}
+		case 4: // Inside APC sequence - ends with ST
+			isEscapeChar = true
+			if prevRune == '\x1b' && r == '\\' {
+				state = 0
 			}
 		}
 
@@ -176,6 +323,8 @@ func breakWord(word string, limit int) []string {
 		if !isEscapeChar {
 			currentSegmentWidth += runeWidth
 		}
+
+		prevRune = r
 	}
 
 	// Add the final segment
@@ -270,29 +419,47 @@ func detectListItemIndent(line string) int {
 }
 
 // stripANSI removes ANSI escape sequences from a string
+// Handles CSI (\x1b[), OSC (\x1b]), and APC (\x1b_) sequences
 func stripANSI(s string) string {
 	var result strings.Builder
-	state := 0 // 0: Normal, 1: Saw ESC, 2: Inside CSI
+	// States: 0=Normal, 1=Saw ESC, 2=Inside CSI, 3=Inside OSC, 4=Inside APC
+	state := 0
+	var prevRune rune
 
 	for _, r := range s {
 		switch state {
-		case 0:
+		case 0: // Normal text
 			if r == '\x1b' {
 				state = 1
 			} else {
 				result.WriteRune(r)
 			}
-		case 1:
+		case 1: // Saw ESC
 			if r == '[' {
-				state = 2
+				state = 2 // CSI sequence
+			} else if r == ']' {
+				state = 3 // OSC sequence
+			} else if r == '_' {
+				state = 4 // APC sequence
 			} else {
-				state = 0
+				state = 0 // Unknown escape, reset
 			}
-		case 2:
+		case 2: // Inside CSI sequence - ends with letter @ through ~
 			if r >= '@' && r <= '~' {
 				state = 0
 			}
+		case 3: // Inside OSC sequence - ends with BEL (\x07) or ST (\x1b\)
+			if r == '\x07' {
+				state = 0
+			} else if prevRune == '\x1b' && r == '\\' {
+				state = 0
+			}
+		case 4: // Inside APC sequence - ends with ST (\x1b\)
+			if prevRune == '\x1b' && r == '\\' {
+				state = 0
+			}
 		}
+		prevRune = r
 	}
 	return result.String()
 }
@@ -305,6 +472,19 @@ func WordWrap(text string, limit int, hangingIndentOffset int) string {
 		return text // Or handle as an error
 	}
 
+	// DEBUG: Log input to WordWrap
+	if strings.Contains(text, "\x1b]66;") {
+		if f, err := os.OpenFile("/tmp/osc66_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			fmt.Fprintf(f, "DEBUG WordWrap: found OSC66 in input, limit=%d\n", limit)
+			logLen := 500
+			if len(text) < logLen {
+				logLen = len(text)
+			}
+			fmt.Fprintf(f, "DEBUG WordWrap input: %q\n", text[:logLen])
+			f.Close()
+		}
+	}
+
 	var finalResult strings.Builder
 	originalLines := strings.Split(text, "\n")
 
@@ -313,6 +493,21 @@ func WordWrap(text string, limit int, hangingIndentOffset int) string {
 		// These are image placeholder grids that must not be broken
 		if strings.Contains(line, string(rune(0x10EEEE))) {
 			finalResult.WriteString(line)
+			if i < len(originalLines)-1 {
+				finalResult.WriteByte('\n')
+			}
+			continue
+		}
+
+		// Handle OSC 66 text sizing sequences specially - wrap at effective width
+		if strings.Contains(line, "\x1b]66;") {
+			wrappedOSC66 := wrapOSC66Line(line, limit)
+			for j, wrappedLine := range wrappedOSC66 {
+				finalResult.WriteString(wrappedLine)
+				if j < len(wrappedOSC66)-1 {
+					finalResult.WriteByte('\n')
+				}
+			}
 			if i < len(originalLines)-1 {
 				finalResult.WriteByte('\n')
 			}

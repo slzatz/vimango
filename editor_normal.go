@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -516,6 +517,8 @@ func (e *Editor) showMarkdownPreview(_ int) {
 		glamour.WithWordWrap(0),
 	)
 	note, _ = r.Render(note)
+	// Decode any Kitty text sizing markers (OSC 66)
+	note = ansi.DecodeKittyTextSizeMarkers(note)
 	//note = WordWrap(note, e.Screen.totaleditorcols)
 	note = WordWrap(note, e.screencols, 0)
 	note = strings.TrimSpace(note)

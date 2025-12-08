@@ -15,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	"github.com/slzatz/vimango/auth"
 )
 
@@ -1412,6 +1413,8 @@ func (o *Organizer) renderNotice(s string) {
 	note, _ := r.Render(s)
 	// glamour seems to add a '\n' at the start
 	note = strings.TrimSpace(note)
+	// Decode any Kitty text sizing markers (OSC 66)
+	note = ansi.DecodeKittyTextSizeMarkers(note)
 	if o.mode == NAVIGATE_HELP_NOTICE {
 		offset = 16
 	}

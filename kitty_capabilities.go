@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/charmbracelet/glamour/ansi"
 )
 
 var semverRe = regexp.MustCompile(`\d+\.\d+\.\d+`)
@@ -32,12 +34,16 @@ func (a *App) DetectKittyCapabilities() {
 	if version == "" {
 		a.kittyPlace = true
 		a.kittyRelative = true
+		a.kittyTextSizing = true // Assume modern kitty has text sizing
 	} else {
 		if semverAtLeast(version, "0.28.0") {
 			a.kittyPlace = true
 		}
 		if semverAtLeast(version, "0.31.0") {
 			a.kittyRelative = true
+		}
+		if semverAtLeast(version, "0.40.0") {
+			a.kittyTextSizing = true
 		}
 	}
 
@@ -48,10 +54,21 @@ func (a *App) DetectKittyCapabilities() {
 	if os.Getenv("VIMANGO_ENABLE_KITTY_RELATIVE") != "" {
 		a.kittyRelative = true
 	}
+	if os.Getenv("VIMANGO_ENABLE_KITTY_TEXT_SIZING") != "" {
+		a.kittyTextSizing = true
+	}
+	if os.Getenv("VIMANGO_DISABLE_KITTY_TEXT_SIZING") != "" {
+		a.kittyTextSizing = false
+	}
 
 	// Initialize image display settings
 	a.showImages = (a.kitty && a.kittyPlace) // Enable images if kitty supports placeholders
 	a.imageScale = 45                        // Default image width in columns
+
+	// Enable Kitty text sizing in glamour if supported
+	if a.kittyTextSizing {
+		ansi.SetKittyTextSizingEnabled(true)
+	}
 
 	// Clear kitty image cache at startup to avoid stale/evicted textures.
 	deleteAllKittyImages()

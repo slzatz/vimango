@@ -42,6 +42,7 @@ type App struct {
 	kittyVersion    string // kitty graphics protocol version
 	kittyPlace      bool   // true if kitty supports Unicode placeholders
 	kittyRelative   bool   // true if kitty supports relative placements
+	kittyTextSizing bool   // true if kitty supports OSC 66 text sizing (0.40.0+)
 	showImages         bool   // true if inline images should be displayed
 	showImageInfo      bool   // true if Google Drive folder/filename should be displayed above images
 	imageScale         int    // image width in columns (default: 45)
