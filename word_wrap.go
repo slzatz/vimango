@@ -76,24 +76,42 @@ func wrapOSC66Line(line string, limit int) []string {
 		return []string{line}
 	}
 
-	// Wrap the text at effective limit
+	// Wrap the text at word boundaries using the same approach as normal text
+	segments := parseWordsWithSpaces(text)
+
 	var wrappedSegments []string
 	var currentLine strings.Builder
 	currentWidth := 0
 
-	for _, r := range text {
-		rw := runewidth.RuneWidth(r)
+	for _, segment := range segments {
+		segmentWidth := visibleWidth(segment.Content)
 
-		// Check if adding this rune would exceed the limit
-		if currentWidth+rw > effectiveLimit && currentLine.Len() > 0 {
-			// Finish current segment
-			wrappedSegments = append(wrappedSegments, currentLine.String())
-			currentLine.Reset()
-			currentWidth = 0
+		if segment.Type == SegmentSpace {
+			// Include space if it fits
+			if currentWidth+segmentWidth <= effectiveLimit {
+				currentLine.WriteString(segment.Content)
+				currentWidth += segmentWidth
+			}
+			// Skip trailing spaces when starting new line
+			continue
 		}
 
-		currentLine.WriteRune(r)
-		currentWidth += rw
+		// Word segment
+		if currentWidth+segmentWidth <= effectiveLimit {
+			// Word fits on current line
+			currentLine.WriteString(segment.Content)
+			currentWidth += segmentWidth
+		} else if currentLine.Len() > 0 {
+			// Word doesn't fit, start new line
+			wrappedSegments = append(wrappedSegments, currentLine.String())
+			currentLine.Reset()
+			currentLine.WriteString(segment.Content)
+			currentWidth = segmentWidth
+		} else {
+			// Word is longer than limit, must include it anyway
+			currentLine.WriteString(segment.Content)
+			currentWidth = segmentWidth
+		}
 	}
 
 	// Don't forget the last segment
