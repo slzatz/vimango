@@ -13,24 +13,33 @@
     "bold": true
   },
   "h1": {
-    "prefix": " ",
-    "suffix": " ",
+    "prefix": "",
+    "suffix": "",
     "color": "16",
     "background_color": "9",
-    "bold": true,
-    "kitty_scale": 4
+    "bold": false,
+    "kitty_scale": 2
   },
   "h2": {
-    "prefix": " ",
-    "suffix": " ",
+    "prefix": "",
+    "suffix": "",
     "color": "16",
-    "background_color": "4"
+    "background_color": "4",
+    "bold": false,
+    "kitty_scale": 2,
+    "kitty_numerator": 7,
+    "kitty_denominator": 8,
+    "kitty_valign": 2
   },
   "h3": {
-    "prefix": " ",
-    "suffix": " ",
+    "prefix": "",
+    "suffix": "",
     "color": "4",
-    "background_color": "11"
+    "background_color": "11",
+    "kitty_scale": 2,
+    "kitty_numerator": 3,
+    "kitty_denominator": 4,
+    "kitty_valign": 2
   },
   "h4": {
     "color": "16",
