@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	"image/png"
@@ -61,14 +62,30 @@ func isValidGoogleDriveID(id string) bool {
 // decodeImageWithOrientation decodes an image and applies EXIF orientation correction.
 // Uses the imaging library's AutoOrientation feature to handle phone camera images
 // that store orientation in EXIF metadata. Falls back gracefully if no EXIF present.
+// Now supports HEIC format when CGO is available.
 func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
-	// Buffer the input so we can read it twice (once for format, once for decode)
+	// Buffer the input so we can read it multiple times
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Detect format using standard library
+	// Check for HEIC format first (before standard library detection)
+	if IsHEICData(data) {
+		if IsHEICAvailable() {
+			img, err := GetHEICDecoder().Decode(bytes.NewReader(data))
+			if err != nil {
+				return nil, "", fmt.Errorf("HEIC decode failed: %v", err)
+			}
+			// HEIC images decoded by go-libheif should already have orientation applied
+			// Return as "heic" format - will be converted to PNG for caching
+			return img, "heic", nil
+		}
+		// HEIC not available - return meaningful error
+		return nil, "", fmt.Errorf("HEIC format detected but not supported in this build (requires CGO)")
+	}
+
+	// Detect format using standard library for non-HEIC formats
 	_, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", err

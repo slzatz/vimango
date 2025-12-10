@@ -214,7 +214,77 @@ For enhanced deep research with web fetch capabilities:
 - **Citations**: Automatically enabled for fetched content to provide accurate source attribution
 
 ## Image Management
-- The markdown notes my contain image placeholders of the form ![text](imagepath) where typically that image path is the id of an image file in google drive.  
+- The markdown notes my contain image placeholders of the form ![text](imagepath) where typically that image path is the id of an image file in google drive.
 - Google drive image files are represented, for example, as ![2072 in lily_2025](gdrive:19_FwuxjvgIwxn-b4Ia75DrXRGLZeB2fe) where the string after gdrive: is the file id in google drive.
 - An important feature of the application is the caching of images since downloading from google drive introduces some delays.
 - There are two levels of image caching.  There is a local hard drive cache that represents the images as base64 encoded png files. The application relies of the kitty graphics protocol, which caches images in memory in the terminal emulator, for fast display of images.  This requires the terminal emulator to support the kitty graphics protocol.  The in-memory cache is reset with every launch of the application.
+
+## HEIC Image Support
+The application supports HEIC/HEIF image format (commonly used by Apple devices for high-efficiency image storage) when built with CGO.
+
+### System Dependencies
+HEIC support requires the following system libraries to be installed at runtime:
+- **libheif** >= v1.16.2 - Core HEIF/HEIC container format library
+- **libde265** - HEVC/H.265 decoder (required by libheif for HEIC decoding)
+- **aom** - AV1 codec support (note: package name is `aom` on Arch Linux, `libaom-dev` on Debian/Ubuntu)
+
+**Arch Linux:**
+```bash
+sudo pacman -S libheif libde265 aom
+```
+
+**Debian/Ubuntu:**
+```bash
+# May need strukturag PPA for recent libheif versions
+sudo add-apt-repository ppa:strukturag/libheif
+sudo apt update
+sudo apt install libheif-dev libde265-dev libaom-dev
+```
+
+### Build Requirements
+HEIC support uses the `go-libheif` package which requires a separate worker binary for safe image decoding. The worker binary architecture isolates potential libheif crashes from the main application.
+
+**Build steps:**
+
+1. Build the HEIC worker binary first:
+   ```bash
+   cd cmd/heic_worker && go build -o ../../heic_worker
+   ```
+
+2. Build main application with CGO:
+   ```bash
+   CGO_ENABLED=1 go build --tags="fts5,cgo"
+   ```
+
+**Important:** The `heic_worker` binary must be placed alongside the main `vimango` executable (same directory).
+
+### Graceful Degradation
+HEIC support degrades gracefully in all failure scenarios - the main application will never crash due to missing HEIC dependencies:
+
+- **Missing system libraries** (libheif, libde265, aom): Worker binary fails to start, HEIC reported as unavailable
+- **Missing worker binary**: HEIC reported as unavailable with descriptive error
+- **Pure Go builds** (CGO_ENABLED=0): HEIC images skipped with informative message
+- **Corrupted HEIC file**: Worker process handles the crash, main app receives error message
+
+When HEIC is unavailable, attempting to display a HEIC image will show an error message rather than crashing.
+
+### Behavior
+- **CGO builds with dependencies**: HEIC images are automatically detected by magic bytes and converted to PNG for display/caching
+- **First access**: HEIC is decoded and converted to PNG, then cached as base64 in `./image_cache/`
+- **Subsequent access**: Cached PNG is used directly - no HEIC decoding needed
+- **Pure Go builds**: HEIC images are gracefully skipped with an informative message
+
+### HEIC Detection
+HEIC files are detected by magic bytes (ftyp box with heic/heix/hevc/hevx/mif1/msf1 brand identifiers), not by file extension, ensuring reliable detection for Google Drive images where extension may not be preserved.
+
+### Why a Worker Binary?
+The `go-libheif` package uses a subprocess architecture for safety. The libheif C library can crash (segfault) when processing malformed images. By running decoding in a separate worker process:
+- Crashes in libheif only terminate the worker, not the main application
+- The main app receives an error and can continue operating
+- This is especially important for a TUI application where crashes would corrupt the terminal state
+
+### Implementation Files
+- `heic.go` - Shared interface and HEIC magic bytes detection
+- `heic_cgo.go` - CGO-based HEIC decoding using go-libheif, with stdout/stderr suppression for TUI compatibility
+- `heic_nocgo.go` - Stub implementation for non-CGO builds
+- `cmd/heic_worker/main.go` - Worker binary for safe subprocess decoding
