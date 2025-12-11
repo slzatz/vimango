@@ -100,8 +100,22 @@ func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
 	return img, format, nil
 }
 
+// ErrGoogleDriveNotConfigured is returned when trying to load a Google Drive image
+// but Google Drive credentials haven't been set up
+var ErrGoogleDriveNotConfigured = errors.New("Google Drive not configured - see README.md for setup instructions")
+
 func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
+	// Check if Google Drive service is available
+	if app.Session.googleDrive == nil {
+		err = ErrGoogleDriveNotConfigured
+		return
+	}
+
 	fileID, err := ExtractFileID(path)
+	if err != nil {
+		return
+	}
+
 	resp, err := app.Session.googleDrive.Files.Get(fileID).Download()
 	if err != nil {
 		return

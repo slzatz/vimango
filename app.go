@@ -266,6 +266,9 @@ func (a *App) moveDividerAbs(num int) {
 	a.returnCursor()
 }
 
+// ErrDatabaseNotFound is returned when SQLite database files don't exist
+var ErrDatabaseNotFound = fmt.Errorf("database files not found")
+
 // InitDatabases initializes database connections
 func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error {
 	// Read config file
@@ -273,6 +276,16 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 	if err != nil {
 		return err
 	}
+
+	// Check that database files exist before opening
+	// (sql.Open for SQLite creates empty files, which we want to avoid)
+	if _, err := os.Stat(config.Sqlite3.DB); os.IsNotExist(err) {
+		return fmt.Errorf("%w: %s not found - run './vimango --init' to create databases", ErrDatabaseNotFound, config.Sqlite3.DB)
+	}
+	if _, err := os.Stat(config.Sqlite3.FTS_DB); os.IsNotExist(err) {
+		return fmt.Errorf("%w: %s not found - run './vimango --init' to create databases", ErrDatabaseNotFound, config.Sqlite3.FTS_DB)
+	}
+
 	// Initialize main database
 	a.Database.MainDB, err = sqliteConfig.OpenSQLiteDB(config.Sqlite3.DB)
 	if err != nil {
@@ -288,24 +301,58 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 	if err != nil {
 		return err
 	}
-	connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.Postgres.Host,
-		config.Postgres.Port,
-		config.Postgres.User,
-		config.Postgres.Password,
-		config.Postgres.DB,
-	)
-	a.Database.PG, err = sql.Open("postgres", connect)
-	if err != nil {
-		return err
+	// Postgres is optional - only connect if host is configured
+	if config.Postgres.Host != "" {
+		connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			config.Postgres.Host,
+			config.Postgres.Port,
+			config.Postgres.User,
+			config.Postgres.Password,
+			config.Postgres.DB,
+		)
+		a.Database.PG, err = sql.Open("postgres", connect)
+		if err != nil {
+			return err
+		}
+
+		// Ping to verify connection
+		err = a.Database.PG.Ping()
+		if err != nil {
+			return err
+		}
+	} else {
+		// No Postgres configured - sync functionality will be disabled
+		a.Database.PG = nil
 	}
 
-	// Ping to connection
-	err = a.Database.PG.Ping()
-	if err != nil {
-		return err
-	}
 	a.Config = config
+	return nil
+}
+
+// ValidateDatabaseSchema checks that the required tables exist in the databases.
+// Returns an error if the schema is missing or incomplete.
+func (a *App) ValidateDatabaseSchema() error {
+	// Check main database tables
+	requiredTables := []string{"task", "context", "folder", "keyword", "sync", "task_keyword"}
+	for _, table := range requiredTables {
+		var name string
+		err := a.Database.MainDB.QueryRow(
+			"SELECT name FROM sqlite_master WHERE type='table' AND name=?", table,
+		).Scan(&name)
+		if err != nil {
+			return fmt.Errorf("required table '%s' not found in main database", table)
+		}
+	}
+
+	// Check FTS database
+	var ftsName string
+	err := a.Database.FtsDB.QueryRow(
+		"SELECT name FROM sqlite_master WHERE type='table' AND name='fts'",
+	).Scan(&ftsName)
+	if err != nil {
+		return fmt.Errorf("FTS table not found in FTS database")
+	}
+
 	return nil
 }
 

@@ -1,0 +1,26 @@
+{
+  "options": {
+    "type": "folder",
+    "title": ""
+  },
+  "postgres": {
+    "host": "",
+    "port": "",
+    "user": "",
+    "password": "",
+    "db": "vimango"
+  },
+  "sqlite3": {
+    "db": "vimango.db",
+    "fts_db": "fts5_vimango.db"
+  },
+  "chroma": {
+    "style": "gruvbox_mod.xml"
+  },
+  "claude": {
+    "api_key": ""
+  },
+  "glamour": {
+    "style": "darkslz.json"
+  }
+}

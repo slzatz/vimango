@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -19,6 +20,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Check for --init flag for first-time setup
+	if CheckForInit(os.Args) {
+		os.Exit(0)
+	}
+
 	app = CreateApp()
 
 	// Load user preferences (before DetectKittyCapabilities so we can override imageScale)
@@ -31,11 +37,15 @@ func main() {
 	app.imageScale = prefs.ImageScale
 	app.imageCacheMaxWidth = prefs.ImageCacheMaxWidth
 
+	// Google Drive is optional - initialize if credentials are available
 	srv, err := auth.GetDriveService()
 	if err != nil {
-		log.Fatalf("Failed to get Google Drive service: %v", err)
+		// Google Drive not configured - this is OK, the app will work without it
+		// Users with gdrive: images will see a message explaining how to set it up
+		app.Session.googleDrive = nil
+	} else {
+		app.Session.googleDrive = srv
 	}
-	app.Session.googleDrive = srv
 
 	// Initialize image cache
 	initImageCache()
@@ -66,7 +76,32 @@ func main() {
 	// Initialize database connections
 	err = app.InitDatabases("config.json", sqliteConfig)
 	if err != nil {
+		// Check if this is a missing config.json error
+		if os.IsNotExist(err) {
+			fmt.Println("Error: config.json not found.")
+			fmt.Println()
+			fmt.Println("If this is a new installation, run:")
+			fmt.Println("  ./vimango --init")
+			fmt.Println()
+			fmt.Println("This will create config.json and initialize the SQLite databases.")
+			os.Exit(1)
+		}
+		// Check if database files are missing
+		if errors.Is(err, ErrDatabaseNotFound) {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
 		log.Fatal(err)
+	}
+
+	// Validate database schema exists
+	if err := app.ValidateDatabaseSchema(); err != nil {
+		fmt.Printf("Error: Database schema is missing or incomplete.\n")
+		fmt.Printf("Details: %v\n", err)
+		fmt.Println()
+		fmt.Println("Run './vimango --init' to initialize the databases.")
+		fmt.Println("(You may need to remove existing .db files first if they are corrupted)")
+		os.Exit(1)
 	}
 
 	// Validate glamour style file exists

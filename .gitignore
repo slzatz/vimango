@@ -1,9 +1,23 @@
-*.json
-*.config
-*.ini
+# Configuration files with sensitive data
+config.json
+go_credentials.json
+token.json
+preferences.json
+
+# Database files
 *.db
+
+# Backup and test files
 *.bak
 *.test
 *.txt
+
+# Config files
+*.config
+*.ini
+
+# Build artifacts
 vimango
+
+# Image cache
 image_cache/

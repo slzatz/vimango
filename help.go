@@ -24,6 +24,11 @@ OPTIONS:
     --help, -h
         Display this help message and exit
 
+    --init
+        Run first-time setup. Creates config.json with default settings and
+        initializes the SQLite databases (vimango.db and fts5_vimango.db).
+        Use this when running vimango for the first time after cloning.
+
     --go-vim
         Use the pure Go vim implementation (govim) instead of the CGO-based libvim.
         Default: Uses libvim on Linux/Unix when available, govim on Windows or when
@@ -40,6 +45,9 @@ OPTIONS:
         Note: Silently ignored on Windows or in pure Go builds.
 
 EXAMPLES:
+    # First-time setup (creates config.json and databases)
+    ./vimango --init
+
     # Run with default settings (pure Go SQLite, libvim on Linux/CGO builds)
     ./vimango
 

@@ -914,6 +914,11 @@ func (a *App) deleteKeywordFromBoth(c Container, isServerDeleted bool, lg io.Wri
 // Synchronize synchronizes data between local and remote databases
 // reportOnly: if true, only reports changes without applying them
 func (a *App) Synchronize(reportOnly bool) (log string) {
+	// Check if Postgres is configured
+	if a.Database.PG == nil {
+		return "### Remote sync not available\n\nPostgreSQL is not configured. To enable sync, edit config.json and add your PostgreSQL connection details in the \"postgres\" section."
+	}
+
 	if a.SyncInProcess {
 		return "Synchronization already in process"
 	}
