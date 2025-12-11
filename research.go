@@ -30,17 +30,17 @@ type ResearchManager struct {
 }
 
 type ResearchTask struct {
-	ID            string    `json:"id"`
-	Title         string    `json:"title"`
-	Prompt        string    `json:"prompt"`
-	Status        string    `json:"status"` // pending, running, completed, failed
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time,omitempty"`
-	Result        string    `json:"result,omitempty"`
-	Error         string    `json:"error,omitempty"`
-	SourceEntry   int       `json:"source_entry"` // ID of the entry containing the research prompt
-	DebugMode     bool      `json:"debug_mode"`   // Whether to include full debug info
-	notifications []string  // Buffer for collecting notifications during research
+	ID            string     `json:"id"`
+	Title         string     `json:"title"`
+	Prompt        string     `json:"prompt"`
+	Status        string     `json:"status"` // pending, running, completed, failed
+	StartTime     time.Time  `json:"start_time"`
+	EndTime       time.Time  `json:"end_time,omitempty"`
+	Result        string     `json:"result,omitempty"`
+	Error         string     `json:"error,omitempty"`
+	SourceEntry   int        `json:"source_entry"` // ID of the entry containing the research prompt
+	DebugMode     bool       `json:"debug_mode"`   // Whether to include full debug info
+	notifications []string   // Buffer for collecting notifications during research
 	notifyMux     sync.Mutex // Protect notifications slice
 }
 
@@ -247,7 +247,7 @@ func (rm *ResearchManager) performResearch(prompt string, debugMode bool) (strin
 	}
 
 	request := ClaudeRequest{
-		Model:     "claude-sonnet-4-5-20250929", // Using Sonnet 4.5 with web fetch support
+		Model:     "claude-opus-4-5-20251101", //claude-sonnet-4-5-20250929
 		MaxTokens: 4000,
 		Messages: []Message{
 			{

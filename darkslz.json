@@ -35,11 +35,7 @@
     "prefix": "",
     "suffix": "",
     "color": "4",
-    "background_color": "11",
-    "kitty_scale": 2,
-    "kitty_numerator": 3,
-    "kitty_denominator": 4,
-    "kitty_valign": 2
+    "background_color": "11"
   },
   "h4": {
     "color": "16",
