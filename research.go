@@ -691,7 +691,7 @@ Debug files saved in vimango_research_debug/ directory:
 
 	// Safely insert the new entry with error checking
 	rm.logDebug("Attempting to insert research note title...")
-	err := rm.app.Database.insertTitle(row, 1, 1)
+	err := rm.app.Database.insertTitle(row, DefaultContextUUID, DefaultFolderUUID)
 	if err != nil {
 		rm.logDebug("ERROR inserting research note title: %v", err)
 		task.addNotification(fmt.Sprintf("⚠️ Failed to create research note: %v", err))

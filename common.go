@@ -345,6 +345,7 @@ type serverEntry struct {
 type Container struct {
 	id       int
 	tid      int
+	uuid     string // Primary identifier for containers
 	title    string
 	star     bool
 	deleted  bool

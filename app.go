@@ -356,6 +356,171 @@ func (a *App) ValidateDatabaseSchema() error {
 	return nil
 }
 
+// MigrateToUUID migrates existing databases to use UUID for containers.
+// This is a one-time migration for databases created before UUID support.
+func (a *App) MigrateToUUID() error {
+	// Check if uuid column exists in context table
+	var colName string
+	err := a.Database.MainDB.QueryRow(
+		"SELECT name FROM pragma_table_info('context') WHERE name='uuid'",
+	).Scan(&colName)
+
+	if err == nil {
+		// uuid column already exists, check if migration is complete
+		var nullCount int
+		err = a.Database.MainDB.QueryRow(
+			"SELECT COUNT(*) FROM context WHERE uuid IS NULL OR uuid = ''",
+		).Scan(&nullCount)
+		if err == nil && nullCount == 0 {
+			// Migration already complete
+			return nil
+		}
+	}
+
+	// Need to run migration
+	fmt.Println("Migrating database to UUID-based containers...")
+
+	// Add uuid columns to container tables if they don't exist
+	containerTables := []string{"context", "folder", "keyword"}
+	for _, table := range containerTables {
+		// Check if column exists
+		var exists string
+		err := a.Database.MainDB.QueryRow(
+			fmt.Sprintf("SELECT name FROM pragma_table_info('%s') WHERE name='uuid'", table),
+		).Scan(&exists)
+		if err != nil {
+			// Column doesn't exist, add it
+			_, err = a.Database.MainDB.Exec(
+				fmt.Sprintf("ALTER TABLE %s ADD COLUMN uuid TEXT", table),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to add uuid column to %s: %v", table, err)
+			}
+			fmt.Printf("  Added uuid column to %s\n", table)
+		}
+
+		// Generate UUIDs for existing rows that don't have one
+		// Use tid to create predictable UUIDs for the default "none" entries
+		rows, err := a.Database.MainDB.Query(
+			fmt.Sprintf("SELECT id, tid, title FROM %s WHERE uuid IS NULL OR uuid = ''", table),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to query %s for migration: %v", table, err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var id int
+			var tid sql.NullInt64
+			var title string
+			if err := rows.Scan(&id, &tid, &title); err != nil {
+				return fmt.Errorf("failed to scan %s row: %v", table, err)
+			}
+
+			var newUUID string
+			// Use predefined UUIDs for the default containers
+			if title == "none" && tid.Valid && tid.Int64 == 1 {
+				if table == "context" {
+					newUUID = DefaultContextUUID
+				} else if table == "folder" {
+					newUUID = DefaultFolderUUID
+				} else {
+					newUUID = generateUUID()
+				}
+			} else {
+				newUUID = generateUUID()
+			}
+
+			_, err = a.Database.MainDB.Exec(
+				fmt.Sprintf("UPDATE %s SET uuid = ? WHERE id = ?", table),
+				newUUID, id,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to set uuid for %s id %d: %v", table, id, err)
+			}
+		}
+		fmt.Printf("  Generated UUIDs for %s entries\n", table)
+	}
+
+	// Add uuid columns to task table if they don't exist
+	taskUUIDCols := []struct {
+		column       string
+		defaultValue string
+	}{
+		{"context_uuid", DefaultContextUUID},
+		{"folder_uuid", DefaultFolderUUID},
+	}
+
+	for _, col := range taskUUIDCols {
+		var exists string
+		err := a.Database.MainDB.QueryRow(
+			fmt.Sprintf("SELECT name FROM pragma_table_info('task') WHERE name='%s'", col.column),
+		).Scan(&exists)
+		if err != nil {
+			// Column doesn't exist, add it with default value
+			_, err = a.Database.MainDB.Exec(
+				fmt.Sprintf("ALTER TABLE task ADD COLUMN %s TEXT DEFAULT '%s'", col.column, col.defaultValue),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to add %s column to task: %v", col.column, err)
+			}
+			fmt.Printf("  Added %s column to task\n", col.column)
+		}
+	}
+
+	// Migrate task references from tid to uuid
+	// Update context_uuid based on context_tid
+	_, err = a.Database.MainDB.Exec(`
+		UPDATE task SET context_uuid = (
+			SELECT uuid FROM context WHERE context.tid = task.context_tid
+		) WHERE context_uuid IS NULL OR context_uuid = '' OR context_uuid = ?
+	`, DefaultContextUUID)
+	if err != nil {
+		return fmt.Errorf("failed to migrate task context_uuid: %v", err)
+	}
+	fmt.Println("  Migrated task context references")
+
+	// Update folder_uuid based on folder_tid
+	_, err = a.Database.MainDB.Exec(`
+		UPDATE task SET folder_uuid = (
+			SELECT uuid FROM folder WHERE folder.tid = task.folder_tid
+		) WHERE folder_uuid IS NULL OR folder_uuid = '' OR folder_uuid = ?
+	`, DefaultFolderUUID)
+	if err != nil {
+		return fmt.Errorf("failed to migrate task folder_uuid: %v", err)
+	}
+	fmt.Println("  Migrated task folder references")
+
+	// Add keyword_uuid column to task_keyword if it doesn't exist
+	var kwUUIDExists string
+	err = a.Database.MainDB.QueryRow(
+		"SELECT name FROM pragma_table_info('task_keyword') WHERE name='keyword_uuid'",
+	).Scan(&kwUUIDExists)
+	if err != nil {
+		_, err = a.Database.MainDB.Exec(
+			"ALTER TABLE task_keyword ADD COLUMN keyword_uuid TEXT",
+		)
+		if err != nil {
+			return fmt.Errorf("failed to add keyword_uuid column to task_keyword: %v", err)
+		}
+		fmt.Println("  Added keyword_uuid column to task_keyword")
+	}
+
+	// Migrate task_keyword references from keyword_tid to keyword_uuid
+	_, err = a.Database.MainDB.Exec(`
+		UPDATE task_keyword SET keyword_uuid = (
+			SELECT uuid FROM keyword WHERE keyword.tid = task_keyword.keyword_tid
+		) WHERE keyword_uuid IS NULL OR keyword_uuid = ''
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate task_keyword keyword_uuid: %v", err)
+	}
+	fmt.Println("  Migrated task_keyword references")
+
+	fmt.Println("Database migration complete!")
+	return nil
+}
+
 // InitApp initializes the application components
 func (a *App) InitApp() {
 

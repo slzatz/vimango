@@ -288,3 +288,55 @@ The `go-libheif` package uses a subprocess architecture for safety. The libheif 
 - `heic_cgo.go` - CGO-based HEIC decoding using go-libheif, with stdout/stderr suppression for TUI compatibility
 - `heic_nocgo.go` - Stub implementation for non-CGO builds
 - `cmd/heic_worker/main.go` - Worker binary for safe subprocess decoding
+
+## Local-Only Operation (UUID-Based Containers)
+
+The application supports full local-only operation without requiring PostgreSQL synchronization. This is achieved through UUID-based container identification.
+
+### How It Works
+- **Containers** (contexts, folders, keywords) are identified by UUID rather than PostgreSQL-assigned `tid` values
+- **Tasks** reference containers via `context_uuid`, `folder_uuid`, and `keyword_uuid` foreign keys
+- **Local creation**: Containers created locally generate their own UUIDs immediately
+- **Sync compatibility**: The `tid` column is preserved for backward compatibility with PostgreSQL sync
+
+### Database Schema
+Containers include both `tid` (for sync) and `uuid` (for local operations):
+```sql
+CREATE TABLE context (
+    id INTEGER PRIMARY KEY,
+    tid INTEGER,           -- PostgreSQL sync ID (may be NULL locally)
+    uuid TEXT NOT NULL UNIQUE,  -- Primary identifier for local operations
+    title TEXT NOT NULL,
+    ...
+);
+```
+
+Tasks reference containers by UUID:
+```sql
+CREATE TABLE task (
+    ...
+    context_uuid TEXT DEFAULT '00000000-0000-0000-0000-000000000001',
+    folder_uuid TEXT DEFAULT '00000000-0000-0000-0000-000000000002',
+    FOREIGN KEY(context_uuid) REFERENCES context (uuid),
+    FOREIGN KEY(folder_uuid) REFERENCES folder (uuid)
+);
+```
+
+### Default Containers
+- Default context UUID: `00000000-0000-0000-0000-000000000001` (title: "none")
+- Default folder UUID: `00000000-0000-0000-0000-000000000002` (title: "none")
+
+### Migration
+Existing databases are automatically migrated on startup:
+1. UUID columns are added if missing
+2. Existing containers receive generated UUIDs
+3. Task references are updated from tid to uuid
+4. The migration is idempotent and safe to run multiple times
+
+### Implementation Files
+- `init.go` - Schema definitions with UUID columns, UUID generation helper
+- `dbfunc.go` - Container/task CRUD operations using UUID
+- `app.go` - `MigrateToUUID()` migration function
+- `common.go` - Container struct with uuid field
+- `organizer_cmd_line.go` - Container assignment commands
+- `synchronize.go` - Sync logic (uses tid for PostgreSQL compatibility)

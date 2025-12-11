@@ -4,33 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/google/uuid"
+)
+
+// Default UUIDs for the "none" containers
+const (
+	DefaultContextUUID = "00000000-0000-0000-0000-000000000001"
+	DefaultFolderUUID  = "00000000-0000-0000-0000-000000000002"
 )
 
 // Schema for SQLite main database
 const sqliteSchema = `
-CREATE TABLE task (
-	id INTEGER NOT NULL,
-	tid INTEGER,
-	star BOOLEAN DEFAULT FALSE,
-	title TEXT NOT NULL,
-	folder_tid INTEGER DEFAULT 1,
-	context_tid INTEGER DEFAULT 1,
-	note TEXT,
-	archived BOOLEAN DEFAULT FALSE,
-	deleted BOOLEAN DEFAULT FALSE,
-	added TEXT NOT NULL,
-	modified TEXT DEFAULT CURRENT_TIMESTAMP,
-	PRIMARY KEY (id),
-	FOREIGN KEY(folder_tid) REFERENCES folder (tid),
-	FOREIGN KEY(context_tid) REFERENCES context (tid),
-	UNIQUE (tid),
-	CHECK (star IN (0, 1)),
-	CHECK (archived IN (0, 1)),
-	CHECK (deleted IN (0, 1))
-);
 CREATE TABLE context (
 	id INTEGER NOT NULL,
 	tid INTEGER,
+	uuid TEXT NOT NULL UNIQUE,
 	title TEXT NOT NULL,
 	star BOOLEAN DEFAULT FALSE,
 	deleted BOOLEAN DEFAULT FALSE,
@@ -44,6 +33,7 @@ CREATE TABLE context (
 CREATE TABLE folder (
 	id INTEGER NOT NULL,
 	tid INTEGER,
+	uuid TEXT NOT NULL UNIQUE,
 	title TEXT NOT NULL,
 	star BOOLEAN DEFAULT FALSE,
 	deleted BOOLEAN DEFAULT FALSE,
@@ -57,6 +47,7 @@ CREATE TABLE folder (
 CREATE TABLE keyword (
 	id INTEGER NOT NULL,
 	tid INTEGER,
+	uuid TEXT NOT NULL UNIQUE,
 	title TEXT NOT NULL,
 	star BOOLEAN DEFAULT FALSE,
 	deleted BOOLEAN DEFAULT FALSE,
@@ -65,6 +56,28 @@ CREATE TABLE keyword (
 	UNIQUE (tid),
 	UNIQUE (title),
 	CHECK (star IN (0, 1)),
+	CHECK (deleted IN (0, 1))
+);
+CREATE TABLE task (
+	id INTEGER NOT NULL,
+	tid INTEGER,
+	star BOOLEAN DEFAULT FALSE,
+	title TEXT NOT NULL,
+	folder_tid INTEGER,
+	context_tid INTEGER,
+	folder_uuid TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000002',
+	context_uuid TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
+	note TEXT,
+	archived BOOLEAN DEFAULT FALSE,
+	deleted BOOLEAN DEFAULT FALSE,
+	added TEXT NOT NULL,
+	modified TEXT DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (id),
+	FOREIGN KEY(folder_uuid) REFERENCES folder (uuid),
+	FOREIGN KEY(context_uuid) REFERENCES context (uuid),
+	UNIQUE (tid),
+	CHECK (star IN (0, 1)),
+	CHECK (archived IN (0, 1)),
 	CHECK (deleted IN (0, 1))
 );
 CREATE TABLE sync (
@@ -76,10 +89,11 @@ CREATE TABLE sync (
 );
 CREATE TABLE task_keyword (
 	task_tid INTEGER NOT NULL,
-	keyword_tid INTEGER NOT NULL,
-	PRIMARY KEY (task_tid, keyword_tid),
+	keyword_tid INTEGER,
+	keyword_uuid TEXT NOT NULL,
+	PRIMARY KEY (task_tid, keyword_uuid),
 	FOREIGN KEY(task_tid) REFERENCES task (tid),
-	FOREIGN KEY(keyword_tid) REFERENCES keyword (tid)
+	FOREIGN KEY(keyword_uuid) REFERENCES keyword (uuid)
 );
 CREATE TABLE sync_log (
 	id INTEGER NOT NULL,
@@ -89,6 +103,11 @@ CREATE TABLE sync_log (
 	PRIMARY KEY (id)
 );
 `
+
+// generateUUID generates a new UUID string
+func generateUUID() string {
+	return uuid.New().String()
+}
 
 // CheckForInit checks if --init flag is present and runs initialization if so.
 // Returns true if --init was handled (caller should exit), false otherwise.
@@ -195,15 +214,15 @@ func runInit() {
 		os.Exit(1)
 	}
 
-	// Insert default context and folder (tid=1 for "none" entries)
-	stmt := "INSERT INTO context (title, tid) VALUES (?, 1);"
-	if _, err := mainDB.Exec(stmt, "none"); err != nil {
+	// Insert default context and folder with known UUIDs
+	stmt := "INSERT INTO context (title, tid, uuid) VALUES (?, 1, ?);"
+	if _, err := mainDB.Exec(stmt, "none", DefaultContextUUID); err != nil {
 		fmt.Printf("Error inserting default context: %v\n", err)
 		os.Exit(1)
 	}
 
-	stmt = "INSERT INTO folder (title, tid) VALUES (?, 1);"
-	if _, err := mainDB.Exec(stmt, "none"); err != nil {
+	stmt = "INSERT INTO folder (title, tid, uuid) VALUES (?, 1, ?);"
+	if _, err := mainDB.Exec(stmt, "none", DefaultFolderUUID); err != nil {
 		fmt.Printf("Error inserting default folder: %v\n", err)
 		os.Exit(1)
 	}

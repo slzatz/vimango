@@ -104,6 +104,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Migrate existing databases to UUID-based containers if needed
+	if err := app.MigrateToUUID(); err != nil {
+		fmt.Printf("Error: Database migration failed.\n")
+		fmt.Printf("Details: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Validate glamour style file exists
 	if err := validateGlamourStyle(); err != nil {
 		log.Fatalf("Error: %v", err)

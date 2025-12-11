@@ -259,10 +259,11 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) string {
 	}
 	fmt.Fprintf(&ab, "%s%s", title, "\n")
 
-	context := o.Database.filterTitle("context", e.context_tid)
+	// Use taskContext/taskFolder which join on uuid
+	context := o.Database.taskContext(e.id)
 	fmt.Fprintf(&ab, "**context**: %s%s", context, "\n")
 
-	folder := o.Database.filterTitle("folder", e.folder_tid)
+	folder := o.Database.taskFolder(e.id)
 	fmt.Fprintf(&ab, "folder: %s%s", folder, "\n")
 
 	fmt.Fprintf(&ab, "star: %t%s", e.star, "\n")

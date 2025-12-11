@@ -777,19 +777,19 @@ func (o *Organizer) write(pos int) {
 					continue
 				}
 			} else {
-				var context_tid, folder_tid int
+				var context_uuid, folder_uuid string
 				switch o.taskview {
 				case BY_CONTEXT:
-					context_tid, _ = o.Database.contextExists(o.filter)
-					folder_tid = 1
+					context_uuid, _ = o.Database.contextExists(o.filter)
+					folder_uuid = DefaultFolderUUID
 				case BY_FOLDER:
-					folder_tid, _ = o.Database.folderExists(o.filter)
-					context_tid = 1
+					folder_uuid, _ = o.Database.folderExists(o.filter)
+					context_uuid = DefaultContextUUID
 				default:
-					context_tid = 1
-					folder_tid = 1
+					context_uuid = DefaultContextUUID
+					folder_uuid = DefaultFolderUUID
 				}
-				err := o.Database.insertTitle(&r, context_tid, folder_tid)
+				err := o.Database.insertTitle(&r, context_uuid, folder_uuid)
 				if err != nil {
 					o.ShowMessage(BL, "Error inserting title id %d: %v", r.id, err)
 					continue
@@ -1159,28 +1159,18 @@ func (o *Organizer) list(pos int) {
 }
 func (o *Organizer) setContext(pos int) {
 	input := o.command_line[pos+1:]
-	var tid int
+	var contextUUID string
 	var ok bool
-	if tid, ok = o.Database.contextExists(input); !ok {
+	if contextUUID, ok = o.Database.contextExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid context!", input)
-		return
-	}
-	/*
-		for context, folder, and I think keyword - you need to sync a new context etc first
-		before you can add a task to it or you'll get a FOREIGN KEY constraint error because
-		the task will have a context_tid of [0, -1 ...] and the context tid will be changed
-		from that number to the server id and now there is not context tid that matches the task's context_tid
-	*/
-	if tid < 1 {
-		o.ShowMessage(BL, "Context is unsynced")
 		return
 	}
 
 	if len(o.marked_entries) > 0 {
 		for id := range o.marked_entries {
-			err := o.Database.updateTaskContextByTid(tid, id)
+			err := o.Database.updateTaskContextByUUID(contextUUID, id)
 			if err != nil {
-				o.ShowMessage(BL, "Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
 				return
 			}
 		}
@@ -1188,9 +1178,9 @@ func (o *Organizer) setContext(pos int) {
 		return
 	}
 	id := o.rows[o.fr].id
-	err := o.Database.updateTaskContextByTid(tid, id)
+	err := o.Database.updateTaskContextByUUID(contextUUID, id)
 	if err != nil {
-		o.showMessage("Error updating context (updateTaskContextByTid) for entry %d to tid %d: %v", id, tid, err)
+		o.showMessage("Error updating context for entry %d: %v", id, err)
 		return
 	}
 	o.showMessage("Moved current entry (since none were marked) into context %s", input)
@@ -1199,37 +1189,30 @@ func (o *Organizer) setContext(pos int) {
 func (o *Organizer) setFolder(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
-	var tid int
-	if tid, ok = o.Database.folderExists(input); !ok {
+	var folderUUID string
+	if folderUUID, ok = o.Database.folderExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		return
 	}
 
-	if tid < 1 {
-		o.ShowMessage(BL, "Folder is unsynced")
-		return
-	}
-
 	if len(o.marked_entries) > 0 {
-		for id, _ := range o.marked_entries {
-			err := o.Database.updateTaskFolderByTid(tid, id)
+		for id := range o.marked_entries {
+			err := o.Database.updateTaskFolderByUUID(folderUUID, id)
 			if err != nil {
-				o.ShowMessage(BL, "Error updating folder (updateTaskFolderByTid) for entry %d to tid %d: %v", id, tid, err)
+				o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
 				return
 			}
 		}
 		o.ShowMessage(BL, "Marked entries moved into folder %s", input)
 		return
 	}
-	//o.Database.updateTaskFolderByTid(tid, o.rows[o.fr].id)
 	id := o.rows[o.fr].id
-	err := o.Database.updateTaskFolderByTid(tid, id)
+	err := o.Database.updateTaskFolderByUUID(folderUUID, id)
 	if err != nil {
-		o.ShowMessage(BL, "Error updating folder (updateTaskFolderByTid) for entry %d to tid %d: %v", id, tid, err)
+		o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
 		return
 	}
 	o.ShowMessage(BL, "Moved current entry (since none were marked) into folder %s", input)
-	///o.drawStatusBar() /////// won't do anything given the current code
 }
 
 func (o *Organizer) keywords(pos int) {
@@ -1256,50 +1239,25 @@ func (o *Organizer) keywords(pos int) {
 		return
 	}
 
-	// not necessary if handled in sync (but not currently handled there)
-	if len(o.marked_entries) == 0 && o.Database.entryTidFromId(o.rows[o.fr].id) < 1 {
-		o.ShowMessage(BL, "The entry has not been synced yet!")
-		//o.mode = o.last_mode
-		o.mode = NORMAL
-		return
-	}
-
 	input := o.command_line[pos+1:]
 	var ok bool
-	var tid int
-	if tid, ok = o.Database.keywordExists(input); !ok {
+	var keywordUUID string
+	if keywordUUID, ok = o.Database.keywordExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
-		//o.mode = o.last_mode
 		o.mode = NORMAL
 		return
 	}
 
-	if tid < 1 {
-		o.ShowMessage(BL, "%q is an unsynced keyword!", input)
-		//o.mode = o.last_mode
-		o.mode = NORMAL
-		return
-	}
-	var unsynced []string
 	if len(o.marked_entries) > 0 {
-		for entry_id, _ := range o.marked_entries {
-			// not necessary if handled in sync (but not currently handled there)
-			if o.Database.entryTidFromId(entry_id) < 1 {
-				unsynced = append(unsynced, strconv.Itoa(entry_id))
-				continue
-			}
-			o.Database.addTaskKeywordByTid(tid, entry_id, true) //true = update fts_dn
+		for entry_id := range o.marked_entries {
+			o.Database.addTaskKeywordByUUID(keywordUUID, entry_id, true) //true = update fts_db
 		}
-		if len(unsynced) > 0 {
-			o.ShowMessage(BL, "Added keyword %s to marked entries except for previously unsynced entries: %s", input, strings.Join(unsynced, ", "))
-		} else {
-			o.ShowMessage(BL, "Added keyword %s to marked entries", input)
-		}
+		o.ShowMessage(BL, "Added keyword %s to marked entries", input)
 		return
 	}
 
 	// get here if no marked entries
-	o.Database.addTaskKeywordByTid(tid, o.rows[o.fr].id, true)
+	o.Database.addTaskKeywordByUUID(keywordUUID, o.rows[o.fr].id, true)
 	o.ShowMessage(BL, "Added keyword %s to current entry (since none were marked)", input)
 }
 

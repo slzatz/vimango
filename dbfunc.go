@@ -24,13 +24,13 @@ func (db *Database) entryTidFromId(id int) int {
 	return tid
 }
 
-func (db *Database) keywordExists(title string) (int, bool) {
-	var tid sql.NullInt64
-	err := db.MainDB.QueryRow("SELECT tid FROM keyword WHERE title=?;", title).Scan(&tid)
+func (db *Database) keywordExists(title string) (string, bool) {
+	var uuid string
+	err := db.MainDB.QueryRow("SELECT uuid FROM keyword WHERE title=?;", title).Scan(&uuid)
 	if err != nil {
-		return 0, false
+		return "", false
 	}
-	return int(tid.Int64), true
+	return uuid, true
 }
 
 func (db *Database) filterTitle(filter string, tid int) string {
@@ -43,22 +43,22 @@ func (db *Database) filterTitle(filter string, tid int) string {
 	return title
 }
 
-func (db *Database) contextExists(title string) (int, bool) {
-	var tid sql.NullInt64
-	err := db.MainDB.QueryRow("SELECT tid FROM context WHERE title=?;", title).Scan(&tid)
+func (db *Database) contextExists(title string) (string, bool) {
+	var uuid string
+	err := db.MainDB.QueryRow("SELECT uuid FROM context WHERE title=?;", title).Scan(&uuid)
 	if err != nil {
-		return 0, false
+		return "", false
 	}
-	return int(tid.Int64), true
+	return uuid, true
 }
 
-func (db *Database) folderExists(title string) (int, bool) {
-	var tid sql.NullInt64
-	err := db.MainDB.QueryRow("SELECT tid FROM folder WHERE title=?;", title).Scan(&tid)
+func (db *Database) folderExists(title string) (string, bool) {
+	var uuid string
+	err := db.MainDB.QueryRow("SELECT uuid FROM folder WHERE title=?;", title).Scan(&uuid)
 	if err != nil {
-		return 0, false
+		return "", false
 	}
-	return int(tid.Int64), true
+	return uuid, true
 }
 
 func (db *Database) contextList() map[string]struct{} {
@@ -118,15 +118,15 @@ func (db *Database) toggleArchived(id int, state bool, table string) error {
 	return err
 }
 
-func (db *Database) updateTaskContextByTid(tid, id int) error {
-	_, err := db.MainDB.Exec("UPDATE task SET context_tid=?, modified=datetime('now') WHERE id=?;",
-		tid, id)
+func (db *Database) updateTaskContextByUUID(uuid string, id int) error {
+	_, err := db.MainDB.Exec("UPDATE task SET context_uuid=?, modified=datetime('now') WHERE id=?;",
+		uuid, id)
 	return err
 }
 
-func (db *Database) updateTaskFolderByTid(tid, id int) error {
-	_, err := db.MainDB.Exec("UPDATE task SET folder_tid=?, modified=datetime('now') WHERE id=?;",
-		tid, id)
+func (db *Database) updateTaskFolderByUUID(uuid string, id int) error {
+	_, err := db.MainDB.Exec("UPDATE task SET folder_uuid=?, modified=datetime('now') WHERE id=?;",
+		uuid, id)
 	return err
 }
 
@@ -195,14 +195,14 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 
 	switch taskView {
 	case BY_CONTEXT:
-		s += "JOIN context ON context.tid=task.context_tid WHERE context.title=?"
+		s += "JOIN context ON context.uuid=task.context_uuid WHERE context.title=?"
 	case BY_FOLDER:
-		s += "JOIN folder ON folder.tid = task.folder_tid WHERE folder.title=?"
+		s += "JOIN folder ON folder.uuid = task.folder_uuid WHERE folder.title=?"
 	case BY_KEYWORD:
 		s += "JOIN task_keyword ON task.tid=task_keyword.task_tid " +
-			"JOIN keyword ON keyword.tid=task_keyword.keyword_tid " +
+			"JOIN keyword ON keyword.uuid=task_keyword.keyword_uuid " +
 			"WHERE task.tid = task_keyword.task_tid AND " +
-			"task_keyword.keyword_tid = keyword.tid AND keyword.title=?"
+			"task_keyword.keyword_uuid = keyword.uuid AND keyword.title=?"
 	case BY_RECENT:
 		//s += "WHERE 1=1"
 		s += "WHERE 1=?"
@@ -281,12 +281,12 @@ func (db *Database) updateTitle(row *Row) error {
 	return nil
 }
 
-func (db *Database) insertTitle(row *Row, context_tid, folder_tid int) error { // should return err
+func (db *Database) insertTitle(row *Row, context_uuid, folder_uuid string) error { // should return err
 
 	var id int
-	err := db.MainDB.QueryRow("INSERT INTO task (title, folder_tid, context_tid, star, added) "+
+	err := db.MainDB.QueryRow("INSERT INTO task (title, folder_uuid, context_uuid, star, added) "+
 		"VALUES (?, ?, ?, ?, datetime('now')) RETURNING id;",
-		row.title, folder_tid, context_tid, row.star).Scan(&id)
+		row.title, folder_uuid, context_uuid, row.star).Scan(&id)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error inserting into DB: %v", err)
 		//return -1
@@ -344,7 +344,9 @@ func (db *Database) getEntryInfo(id int) NewEntry {
 	if id == -1 {
 		return NewEntry{}
 	}
-	row := db.MainDB.QueryRow("SELECT id, tid, title, folder_tid, context_tid, star, added, archived, deleted, modified FROM task WHERE id=?;", id)
+	// Note: folder_tid and context_tid are deprecated in favor of uuid-based lookups
+	// We no longer query them here - use taskFolder() and taskContext() instead
+	row := db.MainDB.QueryRow("SELECT id, tid, title, star, added, archived, deleted, modified FROM task WHERE id=?;", id)
 
 	var e NewEntry
 	var tid sql.NullInt64
@@ -352,8 +354,6 @@ func (db *Database) getEntryInfo(id int) NewEntry {
 		&e.id,
 		&tid,
 		&e.title,
-		&e.folder_tid,
-		&e.context_tid,
 		&e.star,
 		&e.added,
 		&e.archived,
@@ -369,9 +369,8 @@ func (db *Database) getEntryInfo(id int) NewEntry {
 }
 
 func (db *Database) taskFolder(id int) string {
-	//row := db.QueryRow("SELECT folder.title FROM folder JOIN task on task.folder_tid = folder.tid WHERE task.id=?;", id)
-	// below seems better because where clause is on task
-	row := db.MainDB.QueryRow("SELECT folder.title FROM task JOIN folder on task.folder_tid = folder.tid WHERE task.id=?;", id)
+	// Query folder title by joining on uuid
+	row := db.MainDB.QueryRow("SELECT folder.title FROM task JOIN folder on task.folder_uuid = folder.uuid WHERE task.id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -381,7 +380,7 @@ func (db *Database) taskFolder(id int) string {
 }
 
 func (db *Database) taskContext(id int) string {
-	row := db.MainDB.QueryRow("SELECT context.title FROM task JOIN context on task.context_tid = context.tid WHERE task.id=?;", id)
+	row := db.MainDB.QueryRow("SELECT context.title FROM task JOIN context on task.context_uuid = context.uuid WHERE task.id=?;", id)
 	var title string
 	err := row.Scan(&title)
 	if err != nil {
@@ -639,19 +638,14 @@ func (db *Database) getContainerInfo(id int, view View) Container {
 	var countQuery string
 	switch view {
 	case CONTEXT:
-		//table = "context"
-		// Note: the join for context and folder is on the context/folder *tid*
-		countQuery = "SELECT COUNT(*) FROM task JOIN context ON context.tid = task.context_tid WHERE context.id=?;"
-		//columns = "id, tid, title, star, created, deleted, modified"
+		// Join on uuid for context
+		countQuery = "SELECT COUNT(*) FROM task JOIN context ON context.uuid = task.context_uuid WHERE context.id=?;"
 	case FOLDER:
-		//table = "folder"
-		countQuery = "SELECT COUNT(*) FROM task JOIN folder ON folder.tid = task.folder_tid WHERE folder.id=?;"
-		//columns = "id, tid, title, star, created, deleted, modified"
+		// Join on uuid for folder
+		countQuery = "SELECT COUNT(*) FROM task JOIN folder ON folder.uuid = task.folder_uuid WHERE folder.id=?;"
 	case KEYWORD:
-		//table = "keyword"
-		//countQuery = "SELECT COUNT(*) FROM task_keyword WHERE keyword_tid=?;"
-		countQuery = "SELECT COUNT(*) FROM task_keyword WHERE keyword_tid=(SELECT tid FROM keyword WHERE id=?);"
-		//columns = "id, tid, name, star, deleted, modified"
+		// Join on uuid for keyword
+		countQuery = "SELECT COUNT(*) FROM task_keyword WHERE keyword_uuid=(SELECT uuid FROM keyword WHERE id=?);"
 	default:
 		app.Organizer.ShowMessage(BL, "Somehow you are in a view I can't handle")
 		return Container{}
@@ -687,20 +681,20 @@ func (db *Database) getContainerInfo(id int, view View) Container {
 	return c
 }
 
-func (db *Database) addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bool) {
-	entry_tid := db.entryTidFromId(entry_id) /////////////////////////////////////////////////////
+func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, update_fts bool) {
+	entry_tid := db.entryTidFromId(entry_id)
 
-	_, err := db.MainDB.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid) VALUES (?, ?);",
-		entry_tid, keyword_tid)
+	_, err := db.MainDB.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_uuid) VALUES (?, ?);",
+		entry_tid, keyword_uuid)
 
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByTid = INSERT or IGNORE INTO task_keyword: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - INSERT or IGNORE INTO task_keyword: %v", err)
 		return
 	}
 
 	_, err = db.MainDB.Exec("UPDATE task SET modified = datetime('now') WHERE id=?;", entry_id)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByTid - Update task modified: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - Update task modified: %v", err)
 		return
 	}
 
@@ -712,7 +706,7 @@ func (db *Database) addTaskKeywordByTid(keyword_tid, entry_id int, update_fts bo
 	//_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE lm_id=?;", s, entry_id)
 	_, err = db.FtsDB.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByTid - fts Update: %v", err)
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - fts Update: %v", err)
 	}
 }
 
@@ -760,10 +754,11 @@ func (db *Database) updateContainerTitle(row *Row, view View) error {
 }
 
 func (db *Database) insertContainer(row *Row, view View) error {
-	stmt := fmt.Sprintf("INSERT INTO %s (title, star, deleted, modified) ", view)
-	stmt += "VALUES (?, ?, False, datetime('now')) RETURNING id;"
+	newUUID := generateUUID()
+	stmt := fmt.Sprintf("INSERT INTO %s (title, uuid, star, deleted, modified) ", view)
+	stmt += "VALUES (?, ?, ?, False, datetime('now')) RETURNING id;"
 	var id int
-	err := db.MainDB.QueryRow(stmt, row.title, row.star).Scan(&id)
+	err := db.MainDB.QueryRow(stmt, row.title, newUUID, row.star).Scan(&id)
 	if err != nil {
 		//sess.showOrgMessage("Error in insertContainer: %v", err)
 		return err

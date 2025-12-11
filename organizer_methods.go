@@ -205,19 +205,19 @@ func (o *Organizer) writeTitle() {
 				}
 			}
 		} else {
-			var context_tid, folder_tid int
+			var context_uuid, folder_uuid string
 			switch o.taskview {
 			case BY_CONTEXT:
-				context_tid, _ = o.Database.contextExists(o.filter)
-				folder_tid = 1
+				context_uuid, _ = o.Database.contextExists(o.filter)
+				folder_uuid = DefaultFolderUUID
 			case BY_FOLDER:
-				folder_tid, _ = o.Database.folderExists(o.filter)
-				context_tid = 1
+				folder_uuid, _ = o.Database.folderExists(o.filter)
+				context_uuid = DefaultContextUUID
 			default:
-				context_tid = 1
-				folder_tid = 1
+				context_uuid = DefaultContextUUID
+				folder_uuid = DefaultFolderUUID
 			}
-			err := o.Database.insertTitle(row, context_tid, folder_tid)
+			err := o.Database.insertTitle(row, context_uuid, folder_uuid)
 			if err != nil {
 				o.ShowMessage(BL, "Error inserting new title id %d: %v", row.id, err)
 			} else {
