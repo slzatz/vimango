@@ -28,6 +28,7 @@ type EntryPlusTag struct {
 type TaskKeywordPairs struct {
 	taskTid    int
 	keywordTid int
+	keywordUUID string
 }
 
 // TaskTag represents a task with its associated tags
@@ -103,15 +104,16 @@ func createBulkInsertQueryFTS3(n int, entries []EntryPlusTag) (query string, arg
 
 func createBulkInsertQueryTaskKeywordPairs(n int, tk []TaskKeywordPairs) (query string, args []interface{}) {
 	values := make([]string, n)
-	args = make([]interface{}, n*2)
+	args = make([]interface{}, n*3)
 	pos := 0
 	for i, e := range tk {
-		values[i] = "(?, ?)"
+		values[i] = "(?, ?, ?)"
 		args[pos] = e.taskTid
 		args[pos+1] = e.keywordTid
-		pos += 2
+		args[pos+2] = e.keywordUUID
+		pos += 3
 	}
-	query = fmt.Sprintf("INSERT INTO task_keyword (task_tid, keyword_tid) VALUES %s", strings.Join(values, ", "))
+	query = fmt.Sprintf("INSERT INTO task_keyword (task_tid, keyword_tid, keyword_uuid) VALUES %s", strings.Join(values, ", "))
 	return
 }
 
@@ -135,7 +137,7 @@ func getTaskKeywordPairs(dbase *sql.DB, in string, plg io.Writer) []TaskKeywordP
 }
 
 func getTaskKeywordPairsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskKeywordPairs {
-	rows, err := dbase.Query("SELECT task_tid, keyword_tid FROM task_keyword WHERE task_tid = ANY($1);", pq.Array(tids))
+	rows, err := dbase.Query("SELECT task_tid, keyword_tid, keyword_uuid FROM task_keyword WHERE task_tid = ANY($1);", pq.Array(tids))
 	if err != nil {
 		println(err)
 		return []TaskKeywordPairs{}
@@ -143,13 +145,22 @@ func getTaskKeywordPairsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskKeywo
 	tkPairs := make([]TaskKeywordPairs, 0)
 	for rows.Next() {
 		var tk TaskKeywordPairs
+		var keywordUUID sql.NullString
 		rows.Scan(
 			&tk.taskTid,
 			&tk.keywordTid,
+			&keywordUUID,
 		)
+		tk.keywordUUID = keywordUUID.String
 		tkPairs = append(tkPairs, tk)
 	}
 	return tkPairs
+}
+
+// KeywordTidUUID holds both tid and uuid for a keyword
+type KeywordTidUUID struct {
+	tid  int
+	uuid string
 }
 
 func TaskKeywordTids(dbase *sql.DB, plg io.Writer, tid int) []int {
@@ -170,14 +181,39 @@ func TaskKeywordTids(dbase *sql.DB, plg io.Writer, tid int) []int {
 	return keywordTids
 }
 
-func insertTaskKeywordTids(dbase *sql.DB, plg io.Writer, keywordTid, entryTid int) {
-	_, err := dbase.Exec("INSERT INTO task_keyword (task_tid, keyword_tid) VALUES ($1, $2);",
-		entryTid, keywordTid)
+// TaskKeywordTidsAndUUIDs returns both tid and uuid for keywords associated with a task
+func TaskKeywordTidsAndUUIDs(dbase *sql.DB, plg io.Writer, taskTid int) []KeywordTidUUID {
+	rows, err := dbase.Query("SELECT keyword.tid, keyword.uuid FROM task_keyword LEFT OUTER JOIN keyword ON "+
+		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", taskTid)
+	if err != nil {
+		fmt.Fprintf(plg, "Error in TaskKeywordTidsAndUUIDs: %v\n", err)
+		return []KeywordTidUUID{}
+	}
+	defer rows.Close()
+
+	result := []KeywordTidUUID{}
+	for rows.Next() {
+		var kw KeywordTidUUID
+		var tid sql.NullInt64
+		var uuid sql.NullString
+		err = rows.Scan(&tid, &uuid)
+		if err == nil {
+			kw.tid = int(tid.Int64)
+			kw.uuid = uuid.String
+			result = append(result, kw)
+		}
+	}
+	return result
+}
+
+func insertTaskKeywordTids(dbase *sql.DB, plg io.Writer, keywordTid, entryTid int, keywordUUID string) {
+	_, err := dbase.Exec("INSERT INTO task_keyword (task_tid, keyword_tid, keyword_uuid) VALUES ($1, $2, $3);",
+		entryTid, keywordTid, keywordUUID)
 	if err != nil {
 		fmt.Fprintf(plg, "Error in insertTaskKeywordTids: %v\n", err)
 		return
 	} else {
-		fmt.Fprintf(plg, "Inserted into task_keyword entry tid **%d** and keyword_tid **%d**\n", entryTid, keywordTid)
+		fmt.Fprintf(plg, "Inserted into task_keyword entry tid **%d**, keyword_tid **%d**, keyword_uuid %s\n", entryTid, keywordTid, keywordUUID)
 	}
 }
 
@@ -244,9 +280,9 @@ func getTagSQ(dbase *sql.DB, tid int, plg io.Writer) string {
 
 // fetchServerContainers fetches updated or deleted containers from server
 func (a *App) fetchServerContainers(containerType containerType, serverTime string, deleted bool, lg io.Writer) ([]Container, error) {
-	query := fmt.Sprintf("SELECT tid, title, star, modified FROM %s WHERE modified > $1 AND deleted = $2;", containerType)
+	query := fmt.Sprintf("SELECT tid, uuid, title, star, modified FROM %s WHERE modified > $1 AND deleted = $2;", containerType)
 	if deleted {
-		query = fmt.Sprintf("SELECT tid, title FROM %s WHERE modified > $1 AND deleted = $2;", containerType)
+		query = fmt.Sprintf("SELECT tid, uuid, title FROM %s WHERE modified > $1 AND deleted = $2;", containerType)
 	}
 
 	rows, err := a.Database.PG.Query(query, serverTime, deleted)
@@ -258,11 +294,13 @@ func (a *App) fetchServerContainers(containerType containerType, serverTime stri
 	var containers []Container
 	for rows.Next() {
 		var c Container
+		var uuid sql.NullString
 		if deleted {
-			rows.Scan(&c.tid, &c.title)
+			rows.Scan(&c.tid, &uuid, &c.title)
 		} else {
-			rows.Scan(&c.tid, &c.title, &c.star, &c.modified)
+			rows.Scan(&c.tid, &uuid, &c.title, &c.star, &c.modified)
 		}
+		c.uuid = uuid.String
 		containers = append(containers, c)
 	}
 	return containers, nil
@@ -270,9 +308,9 @@ func (a *App) fetchServerContainers(containerType containerType, serverTime stri
 
 // fetchClientContainers fetches updated or deleted containers from client
 func (a *App) fetchClientContainers(containerType containerType, clientTime string, deleted bool, lg io.Writer) ([]Container, error) {
-	query := fmt.Sprintf("SELECT id, tid, title, star, modified FROM %s WHERE substr(modified, 1, 19) > $1 AND deleted = $2;", containerType)
+	query := fmt.Sprintf("SELECT id, tid, uuid, title, star, modified FROM %s WHERE substr(modified, 1, 19) > $1 AND deleted = $2;", containerType)
 	if deleted {
-		query = fmt.Sprintf("SELECT id, tid, title FROM %s WHERE substr(modified, 1, 19) > $1 AND deleted = $2;", containerType)
+		query = fmt.Sprintf("SELECT id, tid, uuid, title FROM %s WHERE substr(modified, 1, 19) > $1 AND deleted = $2;", containerType)
 	}
 
 	rows, err := a.Database.MainDB.Query(query, clientTime, deleted)
@@ -286,9 +324,9 @@ func (a *App) fetchClientContainers(containerType containerType, clientTime stri
 		var c Container
 		var tid sql.NullInt64
 		if deleted {
-			rows.Scan(&c.id, &tid, &c.title)
+			rows.Scan(&c.id, &tid, &c.uuid, &c.title)
 		} else {
-			rows.Scan(&c.id, &tid, &c.title, &c.star, &c.modified)
+			rows.Scan(&c.id, &tid, &c.uuid, &c.title, &c.star, &c.modified)
 		}
 		c.tid = int(tid.Int64)
 		containers = append(containers, c)
@@ -330,13 +368,16 @@ func (a *App) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*syn
 	}
 
 	// Fetch server entries
-	rows, err := a.Database.PG.Query("SELECT tid, title, star, note, modified, added, archived, context_tid, folder_tid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", serverTime, false)
+	rows, err := a.Database.PG.Query("SELECT tid, title, star, note, modified, added, archived, context_tid, folder_tid, context_uuid, folder_uuid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", serverTime, false)
 	if err != nil {
 		return nil, fmt.Errorf("Error in SELECT for server_updated_entries: %v", err)
 	}
 	for rows.Next() {
 		var e EntryPlusTag
-		rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid)
+		var contextUUID, folderUUID sql.NullString
+		rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &contextUUID, &folderUUID)
+		e.context_uuid = contextUUID.String
+		e.folder_uuid = folderUUID.String
 		changes.serverUpdatedEntries = append(changes.serverUpdatedEntries, e)
 	}
 	rows.Close()
@@ -381,14 +422,14 @@ func (a *App) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*syn
 	}
 
 	// Fetch client entries
-	rows, err = a.Database.MainDB.Query("SELECT id, tid, title, star, note, modified, added, archived, context_tid, folder_tid FROM task WHERE substr(modified, 1, 19)  > ? AND deleted = ?;", clientTime, false)
+	rows, err = a.Database.MainDB.Query("SELECT id, tid, title, star, note, modified, added, archived, context_tid, folder_tid, context_uuid, folder_uuid FROM task WHERE substr(modified, 1, 19)  > ? AND deleted = ?;", clientTime, false)
 	if err != nil {
 		return nil, fmt.Errorf("Error in SELECT for client_updated_entries: %v", err)
 	}
 	for rows.Next() {
 		var e NewEntry
 		var tid sql.NullInt64
-		rows.Scan(&e.id, &tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid)
+		rows.Scan(&e.id, &tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &e.context_uuid, &e.folder_uuid)
 		e.tid = int(tid.Int64)
 		changes.clientUpdatedEntries = append(changes.clientUpdatedEntries, e)
 	}
@@ -574,18 +615,20 @@ func (a *App) syncContainersToClient(containerType containerType, containers []C
 		}
 
 		if exists {
-			query = fmt.Sprintf("UPDATE %s SET title=?, star=?, modified=datetime('now') WHERE tid=?;", containerType)
-			_, err := a.Database.MainDB.Exec(query, c.title, c.star, c.tid)
+			query = fmt.Sprintf("UPDATE %s SET title=?, star=?, uuid=?, modified=datetime('now') WHERE tid=?;", containerType)
+			_, err := a.Database.MainDB.Exec(query, c.title, c.star, c.uuid, c.tid)
 			if err != nil {
 				fmt.Fprintf(lg, "Error updating sqlite for %s with tid: %v: %v\n", containerType, c.tid, err)
 			} else {
-				fmt.Fprintf(lg, "Updated local %s: %q with tid: %v\n", containerType, c.title, c.tid)
+				fmt.Fprintf(lg, "Updated local %s: %q with tid: %v uuid: %s\n", containerType, c.title, c.tid, c.uuid)
 			}
 		} else {
-			query = fmt.Sprintf("INSERT INTO %s (tid, title, star, modified, deleted) VALUES (?,?,?, datetime('now'), false);", containerType)
-			_, err := a.Database.MainDB.Exec(query, c.tid, c.title, c.star)
+			query = fmt.Sprintf("INSERT INTO %s (tid, uuid, title, star, modified, deleted) VALUES (?,?,?,?, datetime('now'), false);", containerType)
+			_, err := a.Database.MainDB.Exec(query, c.tid, c.uuid, c.title, c.star)
 			if err != nil {
 				fmt.Fprintf(lg, "Error inserting new %s into sqlite: %v\n", containerType, err)
+			} else {
+				fmt.Fprintf(lg, "Inserted local %s: %q with tid: %v uuid: %s\n", containerType, c.title, c.tid, c.uuid)
 			}
 		}
 	}
@@ -603,27 +646,30 @@ func (a *App) syncContainersToServer(containerType containerType, containers []C
 		}
 
 		if exists {
-			query = fmt.Sprintf("UPDATE %s SET title=$1, star=$2, modified=now() WHERE tid=$3;", containerType)
-			_, err := a.Database.PG.Exec(query, c.title, c.star, c.tid)
+			// Update existing container, also sync uuid
+			query = fmt.Sprintf("UPDATE %s SET title=$1, star=$2, uuid=$3, modified=now() WHERE tid=$4;", containerType)
+			_, err := a.Database.PG.Exec(query, c.title, c.star, c.uuid, c.tid)
 			if err != nil {
 				fmt.Fprintf(lg, "Error updating postgres for %s with tid: %d: %v\n", containerType, c.tid, err)
 			} else {
-				fmt.Fprintf(lg, "Updated server %s: %q with tid: %v\n", containerType, c.title, c.tid)
+				fmt.Fprintf(lg, "Updated server %s: %q with tid: %v uuid: %s\n", containerType, c.title, c.tid, c.uuid)
 			}
 		} else {
+			// Insert new container with uuid from client
 			var tid int
-			query = fmt.Sprintf("INSERT INTO %s (title, star, modified, deleted) VALUES ($1, $2, now(), false) RETURNING tid;", containerType)
-			err := a.Database.PG.QueryRow(query, c.title, c.star).Scan(&tid)
+			query = fmt.Sprintf("INSERT INTO %s (title, star, uuid, modified, deleted) VALUES ($1, $2, $3, now(), false) RETURNING tid;", containerType)
+			err := a.Database.PG.QueryRow(query, c.title, c.star, c.uuid).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(lg, "Error inserting new %s into postgres and returning tid: %v\n", containerType, err)
 				continue
 			}
+			// Update local SQLite with the server-assigned tid
 			query = fmt.Sprintf("UPDATE %s SET tid=? WHERE id=?;", containerType)
 			_, err = a.Database.MainDB.Exec(query, tid, c.id)
 			if err != nil {
 				fmt.Fprintf(lg, "Error on UPDATE %s SET tid ...: %v\n", containerType, err)
 			} else {
-				fmt.Fprintf(lg, "Inserted server %s %q and updated local tid to %d\n", containerType, c.title, tid)
+				fmt.Fprintf(lg, "Inserted server %s %q with uuid: %s and updated local tid to %d\n", containerType, c.title, c.uuid, tid)
 			}
 		}
 	}
@@ -635,16 +681,17 @@ func (a *App) syncEntriesToClient(entries []EntryPlusTag, lg io.Writer) map[int]
 	var tids []int
 
 	for _, e := range entries {
-		_, err := a.Database.MainDB.Exec("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, note, modified, deleted) VALUES"+
-			"(?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
+		_, err := a.Database.MainDB.Exec("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, note, modified, deleted) VALUES"+
+			"(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), false) ON CONFLICT(tid) DO UPDATE SET "+
 			"title=excluded.title, star=excluded.star, archived=excluded.archived, context_tid=excluded.context_tid, "+
-			"folder_tid=excluded.folder_tid, note=excluded.note, modified=datetime('now');",
-			e.tid, e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.note)
+			"folder_tid=excluded.folder_tid, context_uuid=excluded.context_uuid, folder_uuid=excluded.folder_uuid, "+
+			"note=excluded.note, modified=datetime('now');",
+			e.tid, e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.context_uuid, e.folder_uuid, e.note)
 		if err != nil {
 			fmt.Fprintf(lg, "**Error** in INSERT ... ON CONFLICT for tid %d %q: %v\n", e.tid, e.title, err)
 			continue
 		} else {
-			fmt.Fprintf(lg, "Inserted or updated client entry %q with tid **%d**\n", e.title, e.tid)
+			fmt.Fprintf(lg, "Inserted or updated client entry %q with tid **%d** context_uuid: %s folder_uuid: %s\n", e.title, e.tid, e.context_uuid, e.folder_uuid)
 		}
 		tids = append(tids, e.tid)
 		updatedTids[e.tid] = struct{}{}
@@ -715,11 +762,40 @@ func (a *App) syncEntriesToServer(entries []NewEntry, serverUpdatedTids map[int]
 			continue
 		}
 
+		// Resolve context_tid and folder_tid from uuid if needed
+		// (In local-only mode, tid might be 0 but uuid is set)
+		contextTid := e.context_tid
+		folderTid := e.folder_tid
+
+		if contextTid < 1 && e.context_uuid != "" {
+			// Look up context tid from uuid
+			var tid sql.NullInt64
+			err := a.Database.MainDB.QueryRow("SELECT tid FROM context WHERE uuid = ?", e.context_uuid).Scan(&tid)
+			if err == nil && tid.Valid {
+				contextTid = int(tid.Int64)
+			} else {
+				// Fallback to default context
+				contextTid = DefaultContainerID
+			}
+		}
+
+		if folderTid < 1 && e.folder_uuid != "" {
+			// Look up folder tid from uuid
+			var tid sql.NullInt64
+			err := a.Database.MainDB.QueryRow("SELECT tid FROM folder WHERE uuid = ?", e.folder_uuid).Scan(&tid)
+			if err == nil && tid.Valid {
+				folderTid = int(tid.Int64)
+			} else {
+				// Fallback to default folder
+				folderTid = DefaultContainerID
+			}
+		}
+
 		var tid int
 		if e.tid < 1 {
-			err := a.Database.PG.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, note, modified, deleted) "+
-				"VALUES ($1, $2, $3, $4, $5, $6, $7, now(), false)  RETURNING tid",
-				e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.note).Scan(&tid)
+			err := a.Database.PG.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, note, modified, deleted) "+
+				"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), false) RETURNING tid",
+				e.title, e.star, e.added, e.archived, contextTid, folderTid, e.context_uuid, e.folder_uuid, e.note).Scan(&tid)
 			if err != nil {
 				fmt.Fprintf(lg, "Error inserting server entry: %v", err)
 				continue
@@ -741,17 +817,17 @@ func (a *App) syncEntriesToServer(entries []NewEntry, serverUpdatedTids map[int]
 			if err != nil {
 				fmt.Fprintf(lg, "Error in INSERT INTO fts: %v\n", err)
 			}
-			fmt.Fprintf(lg, "Created new server entry *%q* with tid **%d**\n", truncate(e.title, 15), tid)
+			fmt.Fprintf(lg, "Created new server entry *%q* with tid **%d** context_uuid: %s folder_uuid: %s\n", truncate(e.title, 15), tid, e.context_uuid, e.folder_uuid)
 			fmt.Fprintf(lg, "and set tid for client entry with id **%d** and created fts entry\n", e.id)
 		} else {
-			_, err := a.Database.PG.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, note=$5, archived=$6, modified=now() WHERE tid=$7;",
-				e.title, e.star, e.context_tid, e.folder_tid, e.note, e.archived, e.tid)
+			_, err := a.Database.PG.Exec("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, context_uuid=$5, folder_uuid=$6, note=$7, archived=$8, modified=now() WHERE tid=$9;",
+				e.title, e.star, contextTid, folderTid, e.context_uuid, e.folder_uuid, e.note, e.archived, e.tid)
 			if err != nil {
 				fmt.Fprintf(lg, "Error updating server entry: %v", err)
 				continue
 			}
 			tid = e.tid
-			fmt.Fprintf(lg, "Updated server entry *%q* with tid **%d**\n", truncate(e.title, 15), tid)
+			fmt.Fprintf(lg, "Updated server entry *%q* with tid **%d** context_uuid: %s folder_uuid: %s\n", truncate(e.title, 15), tid, e.context_uuid, e.folder_uuid)
 		}
 
 		// Update the server entry's keywords
@@ -760,9 +836,9 @@ func (a *App) syncEntriesToServer(entries []NewEntry, serverUpdatedTids map[int]
 			fmt.Fprintf(lg, "Error deleting from task_keyword from server tid %d: %v\n", tid, err)
 			continue
 		}
-		kwTids := TaskKeywordTids(a.Database.MainDB, lg, tid)
-		for _, kwTid := range kwTids {
-			insertTaskKeywordTids(a.Database.PG, lg, kwTid, tid)
+		kwPairs := TaskKeywordTidsAndUUIDs(a.Database.MainDB, lg, tid)
+		for _, kw := range kwPairs {
+			insertTaskKeywordTids(a.Database.PG, lg, kw.tid, tid, kw.uuid)
 		}
 	}
 }

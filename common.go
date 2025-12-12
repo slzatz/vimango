@@ -303,31 +303,35 @@ type AltRow struct {
 
 // used in synchronize and getEntryInfo
 type NewEntry struct {
-	id          int
-	tid         int
-	title       string
-	folder_tid  int
-	context_tid int
-	star        bool
-	note        sql.NullString //string
-	added       string
-	archived    bool
-	deleted     bool
-	modified    string
+	id           int
+	tid          int
+	title        string
+	folder_tid   int
+	context_tid  int
+	folder_uuid  string
+	context_uuid string
+	star         bool
+	note         sql.NullString //string
+	added        string
+	archived     bool
+	deleted      bool
+	modified     string
 }
 
 type Entry struct {
-	id          int
-	tid         int
-	title       string
-	folder_tid  int
-	context_tid int
-	star        bool
-	note        sql.NullString //string
-	added       sql.NullString
-	completed   sql.NullString
-	deleted     bool
-	modified    string
+	id           int
+	tid          int
+	title        string
+	folder_tid   int
+	context_tid  int
+	folder_uuid  string
+	context_uuid string
+	star         bool
+	note         sql.NullString //string
+	added        sql.NullString
+	completed    sql.NullString
+	deleted      bool
+	modified     string
 }
 type serverEntry struct {
 	id         int

@@ -327,16 +327,51 @@ CREATE TABLE task (
 - Default folder UUID: `00000000-0000-0000-0000-000000000002` (title: "none")
 
 ### Migration
-Existing databases are automatically migrated on startup:
-1. UUID columns are added if missing
-2. Existing containers receive generated UUIDs
-3. Task references are updated from tid to uuid
-4. The migration is idempotent and safe to run multiple times
+
+**New Installations**: Databases created with `--init` include UUID columns from the start.
+
+**Existing Local Databases**: Use the standalone migration utility:
+```bash
+cd cmd/migrate_local && go build
+./migrate_local /path/to/listmanager.db
+```
+
+**Existing PostgreSQL Databases**: Run the migration script:
+```bash
+# Backup first!
+pg_dump -h host -U user -d db > backup.sql
+
+# Then migrate
+psql -h host -U user -d db -f cmd/create_dbs/postgres_migrate_uuid.sql
+```
+
+**Automatic Migration** (app.go): The application also runs `MigrateToUUID()` on startup, which is idempotent and safe to run multiple times.
+
+### PostgreSQL Synchronization with UUIDs
+
+The sync system now supports full UUID synchronization between SQLite and PostgreSQL:
+
+**Container Sync**:
+- Client-generated UUIDs are sent to PostgreSQL when creating new containers
+- PostgreSQL assigns `tid` values which are synced back to the client
+- Both `tid` and `uuid` are maintained for bidirectional sync
+
+**Task Sync**:
+- Tasks sync both `context_tid`/`folder_tid` and `context_uuid`/`folder_uuid`
+- When syncing tasks created in local-only mode, `tid` is resolved from `uuid`
+- Fallback to default containers if resolution fails
+
+**Keyword Sync**:
+- `task_keyword` table includes `keyword_uuid` column
+- Keywords sync with both `tid` and `uuid` references
 
 ### Implementation Files
 - `init.go` - Schema definitions with UUID columns, UUID generation helper
 - `dbfunc.go` - Container/task CRUD operations using UUID
 - `app.go` - `MigrateToUUID()` migration function
-- `common.go` - Container struct with uuid field
+- `common.go` - Container and Entry structs with uuid fields
 - `organizer_cmd_line.go` - Container assignment commands
-- `synchronize.go` - Sync logic (uses tid for PostgreSQL compatibility)
+- `synchronize.go` - Full UUID sync support for containers, tasks, and keywords
+- `cmd/migrate_local/main.go` - Standalone local database migration utility
+- `cmd/create_dbs/postgres_migrate_uuid.sql` - PostgreSQL migration script
+- `cmd/create_dbs/postgres_init4.sql` - New PostgreSQL schema with UUID support
