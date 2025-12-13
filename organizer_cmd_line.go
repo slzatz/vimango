@@ -676,7 +676,6 @@ func (o *Organizer) generateNoteList() {
 	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 	o.clearMarkedEntries()
 	o.view = TASK
-	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
@@ -690,6 +689,8 @@ func (o *Organizer) generateNoteList() {
 	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.altRowoff = 0
 	o.displayNote()
+	//o.mode = NORMAL
+	//o.command = ""
 }
 
 func (o *Organizer) open(pos int) {
@@ -722,6 +723,8 @@ func (o *Organizer) open(pos int) {
 	}
 	o.filter = input
 	o.generateNoteList()
+	o.mode = NORMAL
+	o.command = ""
 }
 
 func (o *Organizer) openContext(pos int) {
