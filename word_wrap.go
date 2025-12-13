@@ -370,20 +370,23 @@ func detectListItemIndent(line string) int {
 		return 0
 	}
 
-	// Count leading spaces
-	leadingSpaces := 0
+	// Count leading spaces - track both visual width and character count
+	leadingWidth := 0 // Visual width (tabs count as 4)
+	leadingChars := 0 // Actual character count (for slicing)
 	for _, r := range visibleLine {
 		if r == ' ' {
-			leadingSpaces++
+			leadingWidth++
+			leadingChars++
 		} else if r == '\t' {
-			leadingSpaces += 4 // Assume tab = 4 spaces
+			leadingWidth += 4 // Assume tab = 4 spaces for visual width
+			leadingChars++    // But only 1 character for slicing
 		} else {
 			break
 		}
 	}
 
-	// Get content after leading spaces
-	content := visibleLine[leadingSpaces:]
+	// Get content after leading spaces (use character count, not visual width)
+	content := visibleLine[leadingChars:]
 	if len(content) == 0 {
 		return 0
 	}
@@ -397,8 +400,8 @@ func detectListItemIndent(line string) int {
 		if firstRune == bullet {
 			// Check if followed by space (use runes, not bytes)
 			if len(contentRunes) > 1 && contentRunes[1] == ' ' {
-				// Hanging indent = leading spaces + bullet width + space
-				return leadingSpaces + runewidth.RuneWidth(bullet) + 1
+				// Hanging indent = leading width + bullet width + space
+				return leadingWidth + runewidth.RuneWidth(bullet) + 1
 			}
 		}
 	}
@@ -418,8 +421,8 @@ func detectListItemIndent(line string) int {
 		afterDigits := content[digitCount:]
 		// Check for ". " or ") " pattern
 		if len(afterDigits) >= 2 && (afterDigits[0] == '.' || afterDigits[0] == ')') && afterDigits[1] == ' ' {
-			// Hanging indent = leading spaces + digits + delimiter + space
-			return leadingSpaces + digitCount + 2
+			// Hanging indent = leading width + digits + delimiter + space
+			return leadingWidth + digitCount + 2
 		}
 	}
 
@@ -428,8 +431,8 @@ func detectListItemIndent(line string) int {
 		// Look for closing bracket
 		closeBracket := strings.Index(content, "] ")
 		if closeBracket > 0 && closeBracket <= 3 {
-			// Hanging indent = leading spaces + [x] + space
-			return leadingSpaces + closeBracket + 2
+			// Hanging indent = leading width + [x] + space
+			return leadingWidth + closeBracket + 2
 		}
 	}
 
