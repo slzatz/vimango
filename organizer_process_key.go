@@ -39,7 +39,7 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		redraw = RedrawPartial
 	case COMMAND_LINE:
 		redraw = o.ExModeKeyHandler(c)
-	case NAVIGATE_NOTICE, NAVIGATE_HELP_NOTICE:
+	case NAVIGATE_NOTICE, HELP:
 		redraw = o.NavigateNoticeModeKeyHandler(c)
 	default:
 		return
@@ -265,7 +265,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		if cmd, found = o.exCmds[s]; found {
 			cmd(o, pos)
 			redraw = RedrawFull
-			//o.mode = o.last_mode - could be NAVIGATE_RENDER
+			//o.mode = NORMAl - could be NAVIGATE_RENDER
 			return
 		}
 		// to catch find with more than one find term
@@ -275,7 +275,6 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 				// pass the position of the first space
 				cmd(o, pos)
 				redraw = RedrawFull
-				//o.mode = o.last_mode
 				o.mode = NORMAL
 				return
 			}

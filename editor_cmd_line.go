@@ -24,7 +24,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// File Operations commands
 	registry.Register("write", (*Editor).writeNote, CommandInfo{
-		Name:        "write",
 		Aliases:     []string{"w"},
 		Description: "Save current note to database",
 		Usage:       "write",
@@ -33,7 +32,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("writeall", (*Editor).writeAll, CommandInfo{
-		Name:        "writeall",
 		Aliases:     []string{"wa"},
 		Description: "Save all open notes",
 		Usage:       "writeall",
@@ -42,7 +40,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("read", (*Editor).readFile, CommandInfo{
-		Name:        "read",
 		Aliases:     []string{"r"},
 		Description: "Read contents from file into current note",
 		Usage:       "read <filename>",
@@ -51,7 +48,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("save", (*Editor).saveNoteToFile, CommandInfo{
-		Name:        "save",
 		Aliases:     []string{"savefile"},
 		Description: "Save current note to external file",
 		Usage:       "save <filename>",
@@ -61,7 +57,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// Editing commands
 	registry.Register("syntax", (*Editor).syntax, CommandInfo{
-		Name:        "syntax",
 		Description: "Set syntax highlighting for current note",
 		Usage:       "syntax <language>",
 		Category:    "Editing",
@@ -69,7 +64,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("number", (*Editor).number, CommandInfo{
-		Name:        "number",
 		Aliases:     []string{"num"},
 		Description: "Toggle line numbers on/off",
 		Usage:       "number",
@@ -78,7 +72,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("paste", (*Editor).paste, CommandInfo{
-		Name: "paste",
 		//Aliases:     []string{"num"},
 		Description: "Autoindent off - good for pasting content",
 		Usage:       "paste",
@@ -87,7 +80,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("nopaste", (*Editor).nopaste, CommandInfo{
-		Name: "nopaste",
 		//Aliases:     []string{"num"},
 		Description: "Autoindent on - not good for pasting content",
 		Usage:       "nopaste",
@@ -115,7 +107,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// Layout commands
 	registry.Register("vertical resize", (*Editor).verticalResize, CommandInfo{
-		Name:        "vertical resize",
 		Aliases:     []string{"vert res"},
 		Description: "Resize vertical divider",
 		Usage:       "vertical resize <width>",
@@ -124,7 +115,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("resize", (*Editor).resize, CommandInfo{
-		Name:        "resize",
 		Aliases:     []string{"res"},
 		Description: "Resize editor window",
 		Usage:       "resize <height>",
@@ -134,7 +124,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// Output commands
 	registry.Register("ha", (*Editor).printNote, CommandInfo{
-		Name:        "ha",
 		Description: "Print current note using vim hardcopy",
 		Usage:       "ha",
 		Category:    "Output",
@@ -142,7 +131,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("print", (*Editor).printDocument, CommandInfo{
-		Name:        "print",
 		Description: "Print current note as formatted document",
 		Usage:       "print",
 		Category:    "Output",
@@ -150,7 +138,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("pdf", (*Editor).createPDF, CommandInfo{
-		Name:        "pdf",
 		Description: "Create PDF from current note",
 		Usage:       "pdf",
 		Category:    "Output",
@@ -158,7 +145,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("pdf-goldmark", (*Editor).createPDFGoldmark, CommandInfo{
-		Name:        "pdf-goldmark",
 		Description: "Create PDF from current note using goldmark-pdf (consistent with webview rendering)",
 		Usage:       "pdf-goldmark <filename>",
 		Category:    "Output",
@@ -167,7 +153,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// System commands
 	registry.Register("quit", (*Editor).quitActions, CommandInfo{
-		Name:        "quit",
 		Aliases:     []string{"q", "quit!", "q!"},
 		Description: "Close current editor (q!/quit! forces without saving)",
 		Usage:       "quit",
@@ -176,7 +161,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("exit", (*Editor).exit, CommandInfo{
-		Name:        "exit",
 		Aliases:     []string{"x"},
 		Description: "Save and exit the current file",
 		Usage:       "x",
@@ -185,7 +169,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("quitall", (*Editor).quitAll3, CommandInfo{
-		Name:        "quitall",
 		Aliases:     []string{"qa"},
 		Description: "Close all editors",
 		Usage:       "quitall",
@@ -195,7 +178,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 
 	// Help command
 	registry.Register("help", (*Editor).help, CommandInfo{
-		Name:        "help",
 		Aliases:     []string{"h"},
 		Description: "Show help for editor commands",
 		Usage:       "help [command|category]",
@@ -286,18 +268,9 @@ func (e *Editor) help() {
 			}
 		}
 	}
-
-	// Create a temporary editor overlay for help display
-	/*
-		e.overlay = strings.Split(helpText, "\n")
-		e.drawOverlay()
-		e.redraw = true
-		e.ShowMessage(BR, "Help displayed - press ESC to close")
-	*/
-	// Display help in the preview area
+	e.mode = HELP
 	app.Organizer.drawNotice(helpText)
 	app.Organizer.altRowoff = 0
-	e.mode = PREVIEW
 	e.command_line = ""
 }
 

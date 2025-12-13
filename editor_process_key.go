@@ -28,6 +28,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.fr = pos[0] - 1
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
 		e.ShowMessage(BR, "")
+		e.ShowMessage(BR, "%s", prevMode)
 		//return false
 		if prevMode == VISUAL || prevMode == PREVIEW { //need to redraw to remove highlight or if leaving preview
 			return true
@@ -52,7 +53,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		redraw, exit = e.ExModeKeyHandler(c)
 	case SEARCH:
 		redraw, exit = e.SearchModeKeyHandler(c)
-	case PREVIEW:
+	case PREVIEW, HELP:
 		redraw, exit = e.PreviewModeKeyHandler(c)
 	case VIEW_LOG:
 		redraw, exit = e.ViewLogModeKeyHandler(c)
@@ -307,7 +308,9 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		if cmd0, found := e.exCmds[cmd]; found {
 			cmd0(e)
 			e.command_line = ""
-			e.mode = NORMAL
+			if e.mode != HELP {
+				e.mode = NORMAL
+			}
 			e.tabCompletion.index = 0
 			e.tabCompletion.list = nil
 			if cmd == "read" || cmd == "r" {
