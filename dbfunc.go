@@ -419,7 +419,7 @@ func (db *Database) getTaskKeywords(id int) string {
 	//	"keyword.id=task_keyword.keyword_id WHERE task_keyword.task_id=?;", id)
 
 	rows, err := db.MainDB.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON "+
-		"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
+		"keyword.uuid=task_keyword.keyword_uuid WHERE task_keyword.task_tid=?;", entry_tid)
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error in getTaskKeywords for entry id %d: %v", id, err)
 		return ""
@@ -684,8 +684,16 @@ func (db *Database) getContainerInfo(id int, view View) Container {
 func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, update_fts bool) {
 	entry_tid := db.entryTidFromId(entry_id)
 
-	_, err := db.MainDB.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_uuid) VALUES (?, ?);",
-		entry_tid, keyword_uuid)
+	// Look up keyword_tid from uuid (needed because task_keyword.keyword_tid is NOT NULL)
+	var keyword_tid int
+	err := db.MainDB.QueryRow("SELECT tid FROM keyword WHERE uuid=?;", keyword_uuid).Scan(&keyword_tid)
+	if err != nil {
+		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - looking up keyword tid: %v", err)
+		return
+	}
+
+	_, err = db.MainDB.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid, keyword_uuid) VALUES (?, ?, ?);",
+		entry_tid, keyword_tid, keyword_uuid)
 
 	if err != nil {
 		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - INSERT or IGNORE INTO task_keyword: %v", err)

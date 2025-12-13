@@ -158,40 +158,58 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":find meeting notes", ":find urgent todo"},
 	})
 
-	registry.Register("list", (*Organizer).list, CommandInfo{
-		Name:        "list",
-		Aliases:     []string{"l"},
-		Description: "list contexts, folders, or keywords",
-		Usage:       "list <context|folder|keyword>",
+	registry.Register("contexts", (*Organizer).containers, CommandInfo{
+		Name:        "contexts",
+		Aliases:     []string{"c"},
+		Description: "show contexts",
+		Usage:       "contexts",
 		Category:    "Container Management",
-		Examples:    []string{":list contexts", ":l f"},
+		Examples:    []string{":contexts", "c"},
+	})
+
+	registry.Register("folders", (*Organizer).containers, CommandInfo{
+		Name:        "folders",
+		Aliases:     []string{"f"},
+		Description: "show folders",
+		Usage:       "folders",
+		Category:    "Container Management",
+		Examples:    []string{":folders", "f"},
+	})
+
+	registry.Register("keywords", (*Organizer).containers, CommandInfo{
+		Name:        "keywords",
+		Aliases:     []string{"k"},
+		Description: "show keywords",
+		Usage:       "keywords",
+		Category:    "Container Management",
+		Examples:    []string{":keywords", "k"},
 	})
 
 	registry.Register("set context", (*Organizer).setContext, CommandInfo{
 		Name:        "set context",
-		Aliases:     []string{"set c", "mv"},
+		Aliases:     []string{"set c"},
 		Description: "Set context for entrie(s)",
-		Usage:       "set context <context_name>",
+		Usage:       "set context <context>",
 		Category:    "Entry Management",
 		Examples:    []string{":set context work", ":set c work"},
 	})
 
-	registry.Register("folders", (*Organizer).setFolder, CommandInfo{
+	registry.Register("set folder", (*Organizer).setFolder, CommandInfo{
 		Name:        "set folder",
-		Aliases:     []string{"set f", "mvf"},
+		Aliases:     []string{"set f"},
 		Description: "Set folder for entrie(s)",
-		Usage:       "set folder <folder_name>",
+		Usage:       "set folder <folder>",
 		Category:    "Entry Management",
 		Examples:    []string{":set folder todo", ":set f todo"},
 	})
 
-	registry.Register("keywords", (*Organizer).keywords, CommandInfo{
-		Name:        "keywords",
-		Aliases:     []string{"keyword", "k"},
-		Description: "Show all keywords or add keyword to entries",
-		Usage:       "keywords [keyword]",
-		Category:    "Container Management",
-		Examples:    []string{":keywords", ":k urgent", ":keyword meeting"},
+	registry.Register("add keyword", (*Organizer).addKeyword, CommandInfo{
+		Name:        "add keyword",
+		Aliases:     []string{"add k"},
+		Description: "Add keyword to entry",
+		Usage:       "add k <keyword>",
+		Category:    "Entry Management",
+		Examples:    []string{":add keyword urgent", ":add k urgent"},
 	})
 
 	registry.Register("recent", (*Organizer).recent, CommandInfo{
@@ -1119,27 +1137,44 @@ func (o *Organizer) reverse(_ int) {
 }
 */
 
-func (o *Organizer) list(pos int) {
+func (o *Organizer) containers(_ int) {
+	cmd := o.command_line
+	var containerType string
+	if cmd == "contexts" || cmd == "c" {
+		o.view = CONTEXT
+		containerType = "contexts"
+	} else if cmd == "folders" || cmd == "f" {
+		o.view = FOLDER
+		containerType = "folders"
+	} else { //if cmd == "keywords" || cmd == "k" {
+		o.view = KEYWORD
+		containerType = "keywords"
+	}
 	o.mode = NORMAL
 
-	if pos == -1 {
-		o.view = CONTEXT
-	} else {
-		input := o.command_line[pos+1:]
-		if input[0] == 'c' {
-			o.view = CONTEXT
-		} else if input[0] == 'f' {
-			o.view = FOLDER
-		} else if input[0] == 'k' {
-			o.view = KEYWORD
-		} else {
-			o.ShowMessage(BL, "You need to provide a valid view: c for context, f for folder, k for keyword")
-			//o.mode = o.last_mode
-			o.mode = NORMAL
-			return
-		}
-		o.command_line = ""
+	o.command_line = ""
+
+	o.Screen.eraseRightScreen()
+	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+	o.rows = o.Database.getContainers(o.view)
+	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
+		o.ShowMessage(BL, "No results were returned")
 	}
+	o.fc, o.fr, o.rowoff = 0, 0, 0
+	o.filter = ""
+	o.readRowsIntoBuffer()
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
+	o.displayContainerInfo()
+	o.ShowMessage(BL, "Retrieved %s", containerType)
+}
+
+func (o *Organizer) contexts(_ int) {
+	o.mode = NORMAL
+	o.view = CONTEXT
+	o.command_line = ""
 
 	o.Screen.eraseRightScreen()
 	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
@@ -1157,6 +1192,29 @@ func (o *Organizer) list(pos int) {
 	o.displayContainerInfo()
 	o.ShowMessage(BL, "Retrieved contexts")
 }
+
+func (o *Organizer) folders(_ int) {
+	o.mode = NORMAL
+	o.view = FOLDER
+	o.command_line = ""
+
+	o.Screen.eraseRightScreen()
+	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
+	o.rows = o.Database.getContainers(o.view)
+	if len(o.rows) == 0 {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
+		o.ShowMessage(BL, "No results were returned")
+	}
+	o.fc, o.fr, o.rowoff = 0, 0, 0
+	o.filter = ""
+	o.readRowsIntoBuffer()
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
+	o.displayContainerInfo()
+	o.ShowMessage(BL, "Retrieved folders")
+}
+
 func (o *Organizer) setContext(pos int) {
 	input := o.command_line[pos+1:]
 	var contextUUID string
@@ -1183,7 +1241,7 @@ func (o *Organizer) setContext(pos int) {
 		o.showMessage("Error updating context for entry %d: %v", id, err)
 		return
 	}
-	o.showMessage("Moved current entry (since none were marked) into context %s", input)
+	o.showMessage("Moved current entry into context %s", input)
 }
 
 func (o *Organizer) setFolder(pos int) {
@@ -1212,33 +1270,11 @@ func (o *Organizer) setFolder(pos int) {
 		o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
 		return
 	}
-	o.ShowMessage(BL, "Moved current entry (since none were marked) into folder %s", input)
+	o.ShowMessage(BL, "Moved current entry into folder %s", input)
 }
 
-func (o *Organizer) keywords(pos int) {
+func (o *Organizer) addKeyword(pos int) {
 	o.mode = NORMAL
-
-	if pos == -1 {
-		o.Screen.eraseRightScreen()
-		o.view = KEYWORD
-		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-		o.rows = o.Database.getContainers(o.view)
-
-		if len(o.rows) == 0 {
-			o.insertRow(0, "", true, false, false, BASE_DATE)
-			o.rows[0].dirty = false
-			o.ShowMessage(BL, "No results were returned")
-		}
-		o.fc, o.fr, o.rowoff = 0, 0, 0
-		o.filter = ""
-		o.readRowsIntoBuffer()
-		vim.SetCursorPosition(1, 0)
-		o.bufferTick = o.vbuf.GetLastChangedTick()
-		o.displayContainerInfo()
-		o.ShowMessage(BL, "Retrieved keywords")
-		return
-	}
-
 	input := o.command_line[pos+1:]
 	var ok bool
 	var keywordUUID string
@@ -1258,7 +1294,7 @@ func (o *Organizer) keywords(pos int) {
 
 	// get here if no marked entries
 	o.Database.addTaskKeywordByUUID(keywordUUID, o.rows[o.fr].id, true)
-	o.ShowMessage(BL, "Added keyword %s to current entry (since none were marked)", input)
+	o.ShowMessage(BL, "Added keyword %s to current entry", input)
 }
 
 func (o *Organizer) recent(_ int) {

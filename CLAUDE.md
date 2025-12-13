@@ -86,10 +86,10 @@ The command system is loosely based on the vim command system and the existence 
 ### Ex Command Organization
 **Organizer Ex Commands (69+ commands in 9 categories):**
 - **Navigation**: open, opencontext, openfolder, openkeyword
-- **Data Management**: new, write, sync, bulkload, refresh
+- **Data Management**: sync
 - **Search & Filter**: find, contexts, folders, keywords, recent, log
 - **View Control**: sort, showall, image, webview, closewebview, vertical resize
-- **Entry Management**: e (edit), copy, deletekeywords, deletemarks
+- **Entry Management**: new, e (edit), copy, set context, set folder, deletekeywords, deletemarks
 - **Container Management**: cc (context), ff (folder), kk (keyword)
 - **Research**: research, researchdebug (rd)
 - **Output & Export**: print, ha, printlist, save, savelog
