@@ -36,12 +36,9 @@ func NewCommandRegistry[T any]() *CommandRegistry[T] {
 // Register adds a command with its metadata to the registry
 func (r *CommandRegistry[T]) Register(name string, fn T, info CommandInfo) {
 	// Set the primary name if not already set
-	/*
-		if info.Name == "" {
-			info.Name = name
-		}
-	*/
-	info.Name = name
+	if info.Name == "" {
+		info.Name = name
+	}
 
 	// Store the command function and info
 	r.commands[name] = fn

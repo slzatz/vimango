@@ -14,94 +14,74 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	// Entry Actions commands
 	registry.Register(string(0x4), (*Organizer).del, CommandInfo{
 		Name:        keyToDisplayName(string(0x4)),
-		Description: "Toggle delete status of current entry",
-		Usage:       "Ctrl-D",
+		Description: "Toggle delete status of current note",
 		Category:    "Entry Actions",
-		Examples:    []string{"Ctrl-D - Mark/unmark entry as deleted"},
 	})
 
 	registry.Register(string(0x1), (*Organizer).star, CommandInfo{
 		Name:        keyToDisplayName(string(0x1)),
-		Description: "Toggle star status of current entry",
-		Usage:       "Ctrl-A",
+		Description: "Toggle star status of current note",
 		Category:    "Entry Actions",
-		Examples:    []string{"Ctrl-A - Mark/unmark entry as starred"},
 	})
 
 	registry.Register(string(0x18), (*Organizer).archive, CommandInfo{
 		Name:        keyToDisplayName(string(0x18)),
-		Description: "Toggle archive status of current entry",
-		Usage:       "Ctrl-X",
+		Description: "Toggle archive status of current note",
 		Category:    "Entry Actions",
-		Examples:    []string{"Ctrl-X - Mark/unmark entry as archived"},
 	})
 
 	registry.Register("m", (*Organizer).mark, CommandInfo{
 		Name:        keyToDisplayName("m"),
-		Description: "Toggle mark on current entry for batch operations",
-		Usage:       "m",
+		Description: "Toggle mark on current note for batch operations",
 		Category:    "Entry Actions",
-		Examples:    []string{"m - Mark/unmark entry for batch operations"},
 	})
 
 	// Navigation commands
 	registry.Register(string(ctrlKey('j')), (*Organizer).scrollPreviewDown, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('j'))),
-		Description: "Scroll rendered page down",
-		Usage:       "Ctrl-J",
+		Name:        keyToDisplayName(string(ctrlKey('j'))) + " or ↓",
+		Aliases:     []string{string(ARROW_DOWN)},
+		Description: "Scroll rendered note down",
 		Category:    "Navigation",
-		Examples:    []string{"Ctrl-J - Scroll down in rendered page"},
 	})
 
 	registry.Register(string(ctrlKey('k')), (*Organizer).scrollPreviewUp, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('k'))),
-		Description: "Scroll rendered page up",
-		Usage:       "Ctrl-K",
+		Name:        keyToDisplayName(string(ctrlKey('k'))) + " or ↑",
+		Aliases:     []string{string(ARROW_UP)},
+		Description: "Scroll rendered note up",
 		Category:    "Navigation",
-		Examples:    []string{"Ctrl-K - Scroll up in rendered page"},
 	})
 
 	// Information commands
 	registry.Register(string(ctrlKey('i')), (*Organizer).info, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('i'))),
-		Description: "Show detailed information about current entry",
-		Usage:       "Ctrl-I",
+		Description: "Show detailed information about current note",
 		Category:    "Information",
-		Examples:    []string{"Ctrl-I - Display entry details (ID, context, folder, etc.)"},
 	})
 
 	// Mode Switching commands
 	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('l'))),
-		Description: "Move to editor to the left (if one is active)",
-		Usage:       "Ctrl-L",
+		Description: "Switch to editor (if one is active)",
 		Category:    "Mode Switching",
-		Examples:    []string{"Ctrl-L - Switch to active editor if available"},
 	})
 
 	// Preview commands
 	registry.Register(string(ctrlKey('w')), (*Organizer).showWebView_n, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('w'))),
 		Description: "Show current note in web browser",
-		Usage:       "Ctrl-W",
 		Category:    "Preview",
-		Examples:    []string{"Ctrl-W - Open current note in web browser"},
 	})
 
 	registry.Register(string(ctrlKey('q')), (*Organizer).closeWebView_n, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('q'))),
 		Description: "Close webkit webview window",
-		Usage:       "Ctrl-Q",
 		Category:    "Preview",
-		Examples:    []string{"Ctrl-Q - Close webview window"},
 	})
 
 	registry.Register(string(ctrlKey('y')), (*Organizer).showEditorWindows, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('y'))),
 		Description: "Show open editor windows",
-		Usage:       "Ctrl-Y",
 		Category:    "Preview",
-		Examples:    []string{"Ctrl-Y - Show active editor windows"},
 	})
 
 	// Store registry in organizer for help command access
@@ -309,7 +289,7 @@ func (o *Organizer) displayContainerInfo() {
 	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, "\n")
 
 	fmt.Fprintf(&ab, "modified: %s%s", c.modified, "\n")
-	fmt.Fprintf(&ab, "entry count: %d%s", c.count, "\n")
+	fmt.Fprintf(&ab, "note count: %d%s", c.count, "\n")
 
 	o.drawNotice(ab.String())
 }

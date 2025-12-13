@@ -550,10 +550,10 @@ func (o *Organizer) formatNormalModeHelp() string {
 
 	for _, category := range categoryNames {
 		commands := categories[category]
-		help.WriteString(fmt.Sprintf("## %s:\n", category))
+		help.WriteString(fmt.Sprintf("### %s:\n", category))
 
 		for _, cmd := range commands {
-			help.WriteString(fmt.Sprintf("`  %-15s` - %s\n", cmd.Name, cmd.Description))
+			help.WriteString(fmt.Sprintf("- `%-14s`%s\n", cmd.Name, cmd.Description))
 		}
 		help.WriteString("\n")
 	}
@@ -580,31 +580,6 @@ func (o *Organizer) findNormalCommandByDisplayName(displayName string) (CommandI
 	}
 	return CommandInfo{}, false
 }
-
-/* would bring back previous syncs, which I never use
-func (o *Organizer) log(_ int) {
-
-	//db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", org.sort, org.sort, max))
-	o.rows = o.Database.getSyncItems(o.sort, MAX) //getSyncItems should have an err returned too
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.altRowoff = 0
-	o.mode = SYNC_LOG //kluge INSERT, NORMAL, ...
-	//o.view = SYNC_LOG_VIEW //TASK, FOLDER, KEYWORD ...
-	o.view = -1 //TASK, FOLDER, KEYWORD ...
-
-	// show first row's note
-	o.Screen.eraseRightScreen()
-	if len(o.rows) == 0 {
-		o.ShowMessage(BL, "%sThere are no saved sync logs%s", BOLD, RESET)
-		return
-	}
-	note := o.Database.readSyncLog(o.rows[o.fr].id)
-	o.note = strings.Split(note, "\n")
-	o.drawRenderedNote()
-	o.clearMarkedEntries()
-	o.ShowMessage(BL, "")
-}
-*/
 
 func (o *Organizer) openContainerSelection() {
 	row := o.rows[o.fr]
