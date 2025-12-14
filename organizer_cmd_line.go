@@ -246,7 +246,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	registry.Register("closewebview", (*Organizer).closeWebView, CommandInfo{
-		Aliases:     []string{"cwv"},
+		Aliases:     []string{"close"},
 		Description: "Close webkit webview window",
 		Usage:       "closewebview",
 		Category:    "HTML View",
