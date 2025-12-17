@@ -109,6 +109,9 @@ func (a *App) NewEditor() *Editor {
 }
 
 // FromFile returns a dbConfig struct parsed from a file.
+// Sensitive credentials can be overridden via environment variables:
+//   - VIMANGO_PG_PASSWORD: PostgreSQL password
+//   - VIMANGO_CLAUDE_API_KEY: Claude API key
 func (a *App) FromFile(path string) (*dbConfig, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -119,6 +122,21 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
+
+	// Override sensitive values from environment variables if set
+	if pgPassword := os.Getenv("VIMANGO_PG_PASSWORD"); pgPassword != "" {
+		cfg.Postgres.Password = pgPassword
+	}
+	if sslMode := os.Getenv("VIMANGO_PG_SSL_MODE"); sslMode != "" {
+		cfg.Postgres.SSLMode = sslMode
+	}
+	if sslCACert := os.Getenv("VIMANGO_PG_SSL_CA_CERT"); sslCACert != "" {
+		cfg.Postgres.SSLCACert = sslCACert
+	}
+	if claudeKey := os.Getenv("VIMANGO_CLAUDE_API_KEY"); claudeKey != "" {
+		cfg.Claude.ApiKey = claudeKey
+	}
+
 	return &cfg, nil
 }
 
@@ -303,13 +321,27 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 	}
 	// Postgres is optional - only connect if host is configured
 	if config.Postgres.Host != "" {
-		connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		// Default SSL mode to "disable" for backward compatibility
+		sslMode := config.Postgres.SSLMode
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+
+		// Build connection string
+		connect := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 			config.Postgres.Host,
 			config.Postgres.Port,
 			config.Postgres.User,
 			config.Postgres.Password,
 			config.Postgres.DB,
+			sslMode,
 		)
+
+		// Add CA certificate path if provided (required for verify-ca and verify-full modes)
+		if config.Postgres.SSLCACert != "" {
+			connect += fmt.Sprintf(" sslrootcert=%s", config.Postgres.SSLCACert)
+		}
+
 		a.Database.PG, err = sql.Open("postgres", connect)
 		if err != nil {
 			return err

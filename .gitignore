@@ -19,5 +19,8 @@ preferences.json
 # Build artifacts
 vimango
 
+# exclude certificate files
+*.crt
+
 # Image cache
 image_cache/
