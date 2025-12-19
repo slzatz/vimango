@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"image/color"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -31,6 +33,13 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":write", ":w"},
 	})
 
+	registry.Register("write", (*Editor).compile, CommandInfo{
+		Aliases:     []string{"compile"},
+		Description: "Compile current code file",
+		Usage:       "compile",
+		Category:    "File Operations",
+		Examples:    []string{":compile"},
+	})
 	registry.Register("writeall", (*Editor).writeAll, CommandInfo{
 		Aliases:     []string{"wa"},
 		Description: "Save all open notes",
@@ -471,19 +480,38 @@ func (e *Editor) resize() {
 	}
 }
 
-/*
 func (e *Editor) compile() {
 
-	var dir string
+	var dir, filePath string
 	var cmd *exec.Cmd
 	lang := Languages[e.Database.taskContext(e.id)]
+	dir = "/home/slzatz/vimango_" + lang + "_code/"
+	filePath = dir + "main.go"
+	// Recursively create directories
+	err := os.MkdirAll(dir, os.ModePerm) // os.ModePerm is 0777
+	if err != nil {
+		e.ShowMessage(BR, "Error creating directory %s: %v", dir, err)
+		return
+	}
+	f, err := os.Create(filePath)
+	if err != nil {
+		e.ShowMessage(BR, "Error creating file %s: %v", filePath, err)
+		return
+	}
+	defer f.Close()
+	_, err = f.WriteString(strings.Join(e.ss, "\n"))
+	if err != nil {
+		e.ShowMessage(BR, "Error writing file %s: %v", filePath, err)
+		return
+	}
+	e.ShowMessage(BR, "Note written to file %s", filePath)
 	if lang == "cpp" {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
 	} else if lang == "go" {
-		dir = "/home/slzatz/vmgo_go_code/"
+		//dir = "/home/slzatz/vmgo_go_code/"
 		//cmd = exec.Command("go", "build", "main.go")
-		cmd = exec.Command("go", "run")
+		cmd = exec.Command("go", "run", "main.go")
 	} else if lang == "python" {
 		e.ShowMessage(BR, "You don't have to compile python")
 		return
@@ -515,7 +543,7 @@ func (e *Editor) compile() {
 	buffer_err := bufio.NewReader(stderr)
 
 	var rows []string
-	rows = append(rows, "------------------------")
+	rows = append(rows, "## output")
 
 	for {
 		bytes, _, err := buffer_out.ReadLine()
@@ -536,12 +564,19 @@ func (e *Editor) compile() {
 		rows = append(rows, "The code compiled successfully")
 	}
 
-	rows = append(rows, "------------------------")
+	//rows = append(rows, "------------------------")
 
-	op := e.output
-	op.rowOffset = 0
-	op.rows = rows
-	op.drawText()
+	e.mode = HELP
+	result := strings.Join(rows, "\n")
+	app.Organizer.drawNotice(result)
+	app.Organizer.altRowoff = 0
+	e.command_line = ""
+	/*
+		op := e.output
+		op.rowOffset = 0
+		op.rows = rows
+		op.drawText()
+	*/
 	// no need to call drawFrame or drawStatusBar
 }
 
@@ -622,7 +657,6 @@ func (e *Editor) run() {
 	op.drawText()
 	// no need to call drawFrame or drawStatusBar
 }
-*/
 
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax

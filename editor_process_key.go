@@ -30,7 +30,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.ShowMessage(BR, "")
 		e.ShowMessage(BR, "%s", prevMode)
 		//return false
-		if prevMode == VISUAL || prevMode == PREVIEW { //need to redraw to remove highlight or if leaving preview
+		if prevMode == VISUAL || prevMode == PREVIEW || prevMode == HELP { //need to redraw to remove highlight or if leaving preview
 			return true
 		} else {
 			return false
