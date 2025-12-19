@@ -679,8 +679,19 @@ func (e *Editor) quitActions() {
 
 	vim.ExecuteCommand("bw") // wipout the buffer
 
+	if e.Session.numberOfEditors() == 1 {
+		e.Session.Windows = e.Session.Windows[:0]
+		e.Session.editorMode = false
+		e.Session.activeEditor = nil
+		vim.SetCurrentBuffer(app.Organizer.vbuf)
+		e.Screen.eraseRightScreen()
+		app.Organizer.displayNote()
+		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
+		return
+	}
+
+	// below is for more than one editor open
 	index := -1
-	//for i, w := range app.Windows {
 	for i, w := range e.Session.Windows {
 		if w == e {
 			index = i
@@ -690,51 +701,32 @@ func (e *Editor) quitActions() {
 	copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
 	e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
 
-	if e.output != nil {
-		index = -1
-		for i, w := range e.Session.Windows {
-			if w == e.output {
-				index = i
-				break
+	/*
+		if e.output != nil {
+			index = -1
+			for i, w := range e.Session.Windows {
+				if w == e.output {
+					index = i
+					break
+				}
 			}
+			copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
+			e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
 		}
-		copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
-		e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
+	*/
+
+	// easier to just go to first window which has to be an editor (at least right now)
+	for _, w := range e.Session.Windows {
+		if ed, ok := w.(*Editor); ok { //need the type assertion
+			e.Session.activeEditor = ed
+			break
+		}
 	}
 
-	//if len(app.Windows) > 0 {
-	if e.Session.numberOfEditors() > 0 {
-		// easier to just go to first window which has to be an editor (at least right now)
-		for _, w := range e.Session.Windows {
-			if ed, ok := w.(*Editor); ok { //need the type assertion
-				e.Session.activeEditor = ed
-				break
-			}
-		}
-
-		//p = app.Windows[0].(*Editor)
-		vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
-		e.Screen.positionWindows()
-		e.Screen.eraseRightScreen()
-		e.Screen.drawRightScreen()
-
-	} else { // we've quit the last remaining editor(s)
-		// unless commented out earlier sess.p.quit <- causes panic
-		//sess.p = nil
-		e.Session.editorMode = false
-		vim.SetCurrentBuffer(app.Organizer.vbuf) ///////////////////////////////////////////////////////////
-		e.Screen.eraseRightScreen()
-
-		if e.Screen.divider < 10 {
-			e.Screen.edPct = 80
-			app.moveDividerPct(80)
-		}
-
-		//org.readTitleIntoBuffer() // shouldn't be necessary
-		app.Organizer.displayNote()
-		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
-	}
-
+	vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
+	e.Screen.positionWindows()
+	e.Screen.eraseRightScreen()
+	e.Screen.drawRightScreen()
 }
 
 func (e *Editor) writeAll() {
