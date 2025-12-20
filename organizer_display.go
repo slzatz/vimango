@@ -790,9 +790,51 @@ func (o *Organizer) displayNote() {
 	}
 	o.Screen.eraseRightScreen()
 
-	// Always use RenderManager - it handles all cases internally
-	// (kitty/no-kitty, images/no-images, cached/uncached)
-	app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
+	if o.Database.taskFolder(id) == "code" {
+		c := o.Database.taskContext(id)
+		if lang, ok := Languages[c]; ok {
+			o.renderCode(note, lang)
+			o.drawRenderedNote()
+		} else {
+			app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
+		}
+	} else {
+		// Always use RenderManager for markdown- it handles all cases internally
+		// (kitty/no-kitty, images/no-images, cached/uncached)
+		app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
+	}
+}
+
+func (o *Organizer) renderCode(s string, lang string) {
+	var buf bytes.Buffer
+	_ = Highlight(&buf, s, lang, "terminal16m", o.Session.style[o.Session.styleIndex])
+	note := buf.String()
+
+	if o.taskview == BY_FIND {
+		// could use strings.Count to make sure they are balanced
+		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
+		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
+	}
+	note = WordWrap(note, o.Screen.totaleditorcols, 0)
+	o.note = strings.Split(note, "\n")
+}
+func (o *Organizer) drawRenderedNote_() {
+	if len(o.note) == 0 {
+		return
+	}
+	start := o.altRowoff
+	var end int
+	// check if there are more lines than can fit on the screen
+	if len(o.note)-start > o.Screen.textLines-1 {
+		end = o.Screen.textLines + start
+	} else {
+		//end = len(o.note) - 1
+		end = len(o.note)
+	}
+	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
+	fmt.Print(strings.Join(o.note[start:end], lf_ret))
+	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
 }
 
 // extractImageURLs extracts all image URLs from markdown

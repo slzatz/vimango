@@ -486,6 +486,7 @@ func (e *Editor) compile() {
 
 	var dir, filePath string
 	var cmd *exec.Cmd
+	var cmd0 *exec.Cmd
 	lang := Languages[e.Database.taskContext(e.id)]
 	dir = "/home/slzatz/vimango_" + lang + "_code/"
 	filePath = dir + "main.go"
@@ -511,8 +512,18 @@ func (e *Editor) compile() {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")
 	} else if lang == "go" {
-		//dir = "/home/slzatz/vmgo_go_code/"
-		//cmd = exec.Command("go", "build", "main.go")
+		cmd0 = exec.Command("go", "mod", "tidy")
+
+		// 2. Set the working directory to where your main.go and go.mod live
+		cmd0.Dir = dir
+
+		// 3. Execute and capture both Standard Output and Standard Error
+		// This is helpful because 'go mod tidy' prints its progress to Stderr
+		output, err := cmd0.CombinedOutput()
+		if err != nil {
+			e.ShowMessage(BR, "go mod tidy failed: %w\nOutput: %s", err, string(output))
+			return
+		}
 		cmd = exec.Command("go", "run", "main.go")
 	} else if lang == "python" {
 		e.ShowMessage(BR, "You don't have to compile python")
@@ -734,39 +745,8 @@ func (e *Editor) quitActions() {
 			break
 		}
 	}
-
-	/*
-		copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
-		e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
-	*/
-
 	e.Session.Windows = slices.Delete(e.Session.Windows, index, index+1)
-
-	/*
-		if e.output != nil {
-			index = -1
-			for i, w := range e.Session.Windows {
-				if w == e.output {
-					index = i
-					break
-				}
-			}
-			copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
-			e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
-		}
-	*/
-
-	// easier to just go to first window which has to be an editor (at least right now)
-	/*
-		for _, w := range e.Session.Windows {
-			if ed, ok := w.(*Editor); ok { //need the type assertion
-				e.Session.activeEditor = ed
-				break
-			}
-		}
-	*/
 	e.Session.activeEditor = e.Session.Windows[0]
-
 	vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
 	e.Screen.positionWindows()
 	e.Screen.eraseRightScreen()

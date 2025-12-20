@@ -208,7 +208,6 @@ func (e *Editor) drawText() {
 		e.drawVisual(&ab)
 	}
 	fmt.Print(ab.String())
-	//go e.drawHighlightedBraces() // this will produce data race
 	e.drawHighlightedBraces() //has to come after drawing rows
 }
 
