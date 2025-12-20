@@ -139,22 +139,24 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<C-w>< - Decrease editor width by 1 column"},
 	})
 
-	// Output Control commands
-	registry.Register("\x0a", (*Editor).scrollOutputDown, CommandInfo{
-		Name:        keyToDisplayName("\x0a"),
-		Description: "Scroll output window down",
-		Usage:       "Ctrl-J",
-		Category:    "Output Control",
-		Examples:    []string{"Ctrl-J - Scroll down in output window"},
-	})
+	/*
+		// Output Control commands
+		registry.Register("\x0a", (*Editor).scrollOutputDown, CommandInfo{
+			Name:        keyToDisplayName("\x0a"),
+			Description: "Scroll output window down",
+			Usage:       "Ctrl-J",
+			Category:    "Output Control",
+			Examples:    []string{"Ctrl-J - Scroll down in output window"},
+		})
 
-	registry.Register("\x0b", (*Editor).scrollOutputUp, CommandInfo{
-		Name:        keyToDisplayName("\x0b"),
-		Description: "Scroll output window up",
-		Usage:       "Ctrl-K",
-		Category:    "Output Control",
-		Examples:    []string{"Ctrl-K - Scroll up in output window"},
-	})
+		registry.Register("\x0b", (*Editor).scrollOutputUp, CommandInfo{
+			Name:        keyToDisplayName("\x0b"),
+			Description: "Scroll output window up",
+			Usage:       "Ctrl-K",
+			Category:    "Output Control",
+			Examples:    []string{"Ctrl-K - Scroll up in output window"},
+		})
+	*/
 
 	// Utility commands
 	registry.Register(leader+"y", (*Editor).nextStyle, CommandInfo{
@@ -281,6 +283,7 @@ func (e *Editor) moveOutputWindowBelow(_ int) {
 }
 
 // should scroll output down
+/*
 func (e *Editor) scrollOutputDown(_ int) {
 	op := e.output
 	if op == nil {
@@ -293,8 +296,9 @@ func (e *Editor) scrollOutputDown(_ int) {
 	}
 	e.command = ""
 }
-
+*/
 // scroll output window up
+/*
 func (e *Editor) scrollOutputUp(_ int) {
 	if e.output == nil {
 		e.command = ""
@@ -306,14 +310,14 @@ func (e *Editor) scrollOutputUp(_ int) {
 	e.output.drawText()
 	e.command = ""
 }
-
+*/
 func (e *Editor) moveLeft(_ int) {
 	// below "if" really for testing
 	if e.isModified() {
 		e.ShowMessage(BR, "Note you left has been modified")
 	}
 
-	if e.Session.numberOfEditors() == 1 {
+	if len(e.Session.Windows) == 1 {
 
 		if e.Screen.divider < 10 {
 			e.Screen.edPct = 80
@@ -327,19 +331,18 @@ func (e *Editor) moveLeft(_ int) {
 		return
 	}
 
-	eds := e.Session.editors()
 	index := 0
-	for i, ed := range eds {
+	for i, ed := range e.Session.Windows {
 		if ed == e {
 			index = i
 			break
 		}
 	}
 
-	e.ShowMessage(BL, "index: %d; length: %d", index, len(eds))
+	e.ShowMessage(BL, "index: %d; length: %d", index, len(e.Session.Windows))
 
 	if index > 0 {
-		ae := eds[index-1]
+		ae := e.Session.Windows[index-1]
 		app.Session.activeEditor = ae
 		vim.SetCurrentBuffer(ae.vbuf)
 		// There is a bug in libvim C implementation where the cursor column position is set to zero when switching buffers
@@ -368,19 +371,18 @@ func (e *Editor) moveRight(_ int) {
 		e.ShowMessage(BR, "Note you left has been modified")
 	}
 
-	eds := e.Session.editors()
 	index := 0
-	for i, z := range eds {
+	for i, z := range e.Session.Windows {
 		if z == e {
 			index = i
 			break
 		}
 	}
 	pos := vim.GetCursorPosition()
-	e.ShowMessage(BR, "Before move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(eds), pos[0]-1, pos[1])
+	e.ShowMessage(BR, "Before move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(e.Session.Windows), pos[0]-1, pos[1])
 
-	if index < len(eds)-1 {
-		ae := eds[index+1]
+	if index < len(e.Session.Windows)-1 {
+		ae := e.Session.Windows[index+1]
 		vim.SetCurrentBuffer(ae.vbuf)
 		app.Session.activeEditor = ae
 		// There is a bug in libvim C implementation where the cursor column position is set to zero when switching buffers

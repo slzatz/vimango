@@ -102,36 +102,15 @@ func (s *Screen) drawRightScreen() {
 }
 
 func (s *Screen) positionWindows() {
-	windowSlots := 0
-	for _, w := range s.Session.Windows {
-		switch v := w.(type) {
-		case *Output:
-			if !v.is_below {
-				windowSlots++
-			}
-			// or default
-		case *Editor:
-			windowSlots++
-		}
-	}
+	windowSlots := len(s.Session.Windows)
 
 	cols := -1 + (s.screenCols-s.divider)/windowSlots
 	i := -1 //i = number of columns of windows -1
 	for _, w := range s.Session.Windows {
-		switch v := w.(type) {
-		case *Output:
-			if !v.is_below {
-				i++
-			}
-			v.left_margin = s.divider + i*cols + i
-			v.screencols = cols
-			v.setLinesMargins()
-		case *Editor:
-			i++
-			v.left_margin = s.divider + i*cols + i
-			v.screencols = cols
-			v.setLinesMargins()
-		}
+		i++
+		w.left_margin = s.divider + i*cols + i
+		w.screencols = cols
+		w.setLinesMargins()
 	}
 }
 

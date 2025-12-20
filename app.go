@@ -36,19 +36,19 @@ type App struct {
 	Config *dbConfig
 
 	// Application state
-	SyncInProcess   bool
-	Run             bool
-	kitty           bool   // true if running in kitty terminal
-	kittyVersion    string // kitty graphics protocol version
-	kittyPlace      bool   // true if kitty supports Unicode placeholders
-	kittyRelative   bool   // true if kitty supports relative placements
-	kittyTextSizing bool   // true if kitty supports OSC 66 text sizing (0.40.0+)
+	SyncInProcess      bool
+	Run                bool
+	kitty              bool   // true if running in kitty terminal
+	kittyVersion       string // kitty graphics protocol version
+	kittyPlace         bool   // true if kitty supports Unicode placeholders
+	kittyRelative      bool   // true if kitty supports relative placements
+	kittyTextSizing    bool   // true if kitty supports OSC 66 text sizing (0.40.0+)
 	showImages         bool   // true if inline images should be displayed
 	showImageInfo      bool   // true if Google Drive folder/filename should be displayed above images
 	imageScale         int    // image width in columns (default: 45)
 	imageCacheMaxWidth int    // max pixel width for cached Google Drive images (default: 800)
 	preferencesPath    string // path to preferences.json file
-	origTermCfg     []byte // original terminal configuration
+	origTermCfg        []byte // original terminal configuration
 }
 
 // CreateApp creates and initializes the application struct
@@ -56,7 +56,7 @@ func CreateApp() *App {
 	db := &Database{}
 	sess := &Session{}
 	screen := &Screen{Session: sess}
-	sess.Windows = make([]Window, 0)
+	sess.Windows = make([]*Editor, 0)
 	kitty := IsTermKitty()
 	return &App{
 		Session:  sess,

@@ -14,10 +14,12 @@ type Session struct {
 	style            [8]string
 	markdown_style   *chroma.Style
 	styleIndex       int
-	Windows          []Window       //slice of Window interfaces (Output, Editor)
-	googleDrive      *drive.Service // Google Drive service for file operations
+	//Windows          []Window       //slice of Window interfaces (Output, Editor)
+	Windows     []*Editor      //slice of Window interfaces (Output, Editor)
+	googleDrive *drive.Service // Google Drive service for file operations
 }
 
+/*
 func (s *Session) numberOfEditors() int {
 	i := 0
 	for _, w := range s.Windows {
@@ -37,3 +39,4 @@ func (s *Session) editors() []*Editor {
 	}
 	return eds
 }
+*/

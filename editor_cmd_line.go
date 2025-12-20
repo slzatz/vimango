@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -471,10 +472,11 @@ func (e *Editor) resize() {
 		}
 
 		e.screenlines = num
-		op := e.output
-		op.screenlines = e.Screen.textLines - num - 1
-		op.top_margin = num + 3
-
+		/*
+			op := e.output
+			op.screenlines = e.Screen.textLines - num - 1
+			op.top_margin = num + 3
+		*/
 		e.Screen.eraseRightScreen()
 		e.Screen.drawRightScreen()
 	}
@@ -713,7 +715,7 @@ func (e *Editor) quitActions() {
 
 	vim.ExecuteCommand("bw") // wipout the buffer
 
-	if e.Session.numberOfEditors() == 1 {
+	if len(e.Session.Windows) == 1 {
 		e.Session.Windows = e.Session.Windows[:0]
 		e.Session.editorMode = false
 		e.Session.activeEditor = nil
@@ -732,8 +734,13 @@ func (e *Editor) quitActions() {
 			break
 		}
 	}
-	copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
-	e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
+
+	/*
+		copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
+		e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
+	*/
+
+	e.Session.Windows = slices.Delete(e.Session.Windows, index, index+1)
 
 	/*
 		if e.output != nil {
@@ -750,12 +757,15 @@ func (e *Editor) quitActions() {
 	*/
 
 	// easier to just go to first window which has to be an editor (at least right now)
-	for _, w := range e.Session.Windows {
-		if ed, ok := w.(*Editor); ok { //need the type assertion
-			e.Session.activeEditor = ed
-			break
+	/*
+		for _, w := range e.Session.Windows {
+			if ed, ok := w.(*Editor); ok { //need the type assertion
+				e.Session.activeEditor = ed
+				break
+			}
 		}
-	}
+	*/
+	e.Session.activeEditor = e.Session.Windows[0]
 
 	vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
 	e.Screen.positionWindows()
@@ -765,10 +775,10 @@ func (e *Editor) quitActions() {
 
 func (e *Editor) writeAll() {
 	for _, w := range e.Session.Windows {
-		if ed, ok := w.(*Editor); ok {
-			vim.SetCurrentBuffer(ed.vbuf)
-			ed.writeNote()
-		}
+		//if ed, ok := w.(*Editor); ok {
+		vim.SetCurrentBuffer(w.vbuf)
+		w.writeNote()
+		//}
 	}
 	vim.SetCurrentBuffer(e.vbuf)
 	e.command_line = ""
@@ -777,44 +787,15 @@ func (e *Editor) writeAll() {
 
 func (e *Editor) quitAll() {
 
-	for _, w := range e.Session.Windows {
-		if ed, ok := w.(*Editor); ok {
-			if ed.isModified() {
-				continue
-			} else {
-				index := -1
-				for i, w := range e.Session.Windows {
-					if w == ed {
-						index = i
-						break
-					}
-				}
-				copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
-				e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
-
-				if ed.output != nil {
-					index = -1
-					for i, w := range e.Session.Windows {
-						if w == ed.output {
-							index = i
-							break
-						}
-					}
-					copy(e.Session.Windows[index:], e.Session.Windows[index+1:])
-					e.Session.Windows = e.Session.Windows[:len(e.Session.Windows)-1]
-				}
-			}
+	for index, w := range e.Session.Windows {
+		if w.isModified() {
+			continue
 		}
+		e.Session.Windows = slices.Delete(e.Session.Windows, index, index+1)
 	}
 
-	if e.Session.numberOfEditors() > 0 { // we could not quit some editors because they were in modified state
-		for _, w := range e.Session.Windows {
-			if ed, ok := w.(*Editor); ok { //need this type assertion to have statement below
-				e.Session.activeEditor = ed //p is the global representing the current editor
-				break
-			}
-		}
-
+	if len(e.Session.Windows) > 0 { // we could not quit some editors because they were in modified state
+		e.Session.activeEditor = e.Session.Windows[0]
 		vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
 		e.Screen.positionWindows()
 		e.Screen.eraseRightScreen()
@@ -837,58 +818,59 @@ func (e *Editor) quitAll() {
 	}
 }
 
-func (e *Editor) quitAll2() {
-	var editorsToKeep []*Editor
+/*
+	func (e *Editor) quitAll2() {
+		var editorsToKeep []*Editor
 
-	// First pass: identify which editors to keep and clean up those we're closing
-	for _, w := range e.Session.Windows {
-		ed := w.(*Editor) // Safe since all Session Windows are editors
-		if ed.isModified() {
-			editorsToKeep = append(editorsToKeep, ed)
+		// First pass: identify which editors to keep and clean up those we're closing
+		for _, w := range e.Session.Windows {
+			ed := w.(*Editor) // Safe since all Session Windows are editors
+			if ed.isModified() {
+				editorsToKeep = append(editorsToKeep, ed)
+			} else {
+				// Clean up the vim buffer for editors we're closing
+				vim.SetCurrentBuffer(ed.vbuf)
+				vim.ExecuteCommand("bw") // wipeout buffer
+			}
+		}
+
+		// Replace the windows slice with only the editors we're keeping
+		var newWindows []Window
+		for _, ed := range editorsToKeep {
+			newWindows = append(newWindows, ed)
+		}
+		e.Session.Windows = newWindows
+
+		// Handle the result
+		if len(editorsToKeep) > 0 {
+			// Some editors had unsaved changes - set the first one as active
+			e.Session.activeEditor = editorsToKeep[0]
+			vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
+			e.Screen.positionWindows()
+			e.Screen.eraseRightScreen()
+			e.Screen.drawRightScreen()
+			e.ShowMessage(BR, "Some editors had no write since the last change")
 		} else {
-			// Clean up the vim buffer for editors we're closing
-			vim.SetCurrentBuffer(ed.vbuf)
-			vim.ExecuteCommand("bw") // wipeout buffer
+			// All editors were closed successfully
+			e.Session.editorMode = false
+			vim.SetCurrentBuffer(app.Organizer.vbuf)
+			e.Screen.eraseRightScreen()
+
+			if e.Screen.divider < 10 {
+				e.Screen.edPct = 80
+				app.moveDividerPct(80)
+			}
+
+			app.Organizer.displayNote()
+			app.returnCursor()
 		}
 	}
-
-	// Replace the windows slice with only the editors we're keeping
-	var newWindows []Window
-	for _, ed := range editorsToKeep {
-		newWindows = append(newWindows, ed)
-	}
-	e.Session.Windows = newWindows
-
-	// Handle the result
-	if len(editorsToKeep) > 0 {
-		// Some editors had unsaved changes - set the first one as active
-		e.Session.activeEditor = editorsToKeep[0]
-		vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
-		e.Screen.positionWindows()
-		e.Screen.eraseRightScreen()
-		e.Screen.drawRightScreen()
-		e.ShowMessage(BR, "Some editors had no write since the last change")
-	} else {
-		// All editors were closed successfully
-		e.Session.editorMode = false
-		vim.SetCurrentBuffer(app.Organizer.vbuf)
-		e.Screen.eraseRightScreen()
-
-		if e.Screen.divider < 10 {
-			e.Screen.edPct = 80
-			app.moveDividerPct(80)
-		}
-
-		app.Organizer.displayNote()
-		app.returnCursor()
-	}
-}
-
+*/
 func (e *Editor) quitAll3() {
 	var editorsToKeep []*Editor
 
 	// First pass: identify which editors to keep and clean up those we're closing
-	for _, ed := range e.Session.editors() {
+	for _, ed := range e.Session.Windows {
 		if ed.isModified() {
 			editorsToKeep = append(editorsToKeep, ed)
 		} else {
@@ -899,7 +881,7 @@ func (e *Editor) quitAll3() {
 	}
 
 	// Replace the windows slice with only the editors we're keeping
-	var newWindows []Window
+	var newWindows []*Editor
 	for _, ed := range editorsToKeep {
 		newWindows = append(newWindows, ed)
 	}

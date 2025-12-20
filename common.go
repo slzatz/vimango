@@ -24,12 +24,13 @@ type Position struct {
 	end    int
 }
 
+/*
 type Window interface {
 	drawText()
 	drawFrame()
 	drawStatusBar()
 }
-
+*/
 // dbConfig holds application configuration loaded from config.json.
 // Sensitive credentials can be overridden via environment variables:
 //   - VIMANGO_PG_PASSWORD: overrides postgres.password
@@ -41,10 +42,10 @@ type dbConfig struct {
 		Host      string `json:"host"`
 		Port      string `json:"port"`
 		User      string `json:"user"`
-		Password  string `json:"password"`   // Can be overridden by VIMANGO_PG_PASSWORD env var
+		Password  string `json:"password"` // Can be overridden by VIMANGO_PG_PASSWORD env var
 		DB        string `json:"db"`
 		Test      string `json:"test"`
-		SSLMode   string `json:"ssl_mode"`   // disable, require, verify-ca, verify-full (overridden by VIMANGO_PG_SSL_MODE)
+		SSLMode   string `json:"ssl_mode"`    // disable, require, verify-ca, verify-full (overridden by VIMANGO_PG_SSL_MODE)
 		SSLCACert string `json:"ssl_ca_cert"` // Path to CA certificate (overridden by VIMANGO_PG_SSL_CA_CERT)
 	} `json:"postgres"`
 
