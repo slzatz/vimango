@@ -74,54 +74,55 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<leader>w - Open note in web browser"},
 	})
 
-	// Window Management commands
-	registry.Register("\x17L", (*Editor).moveOutputWindowRight, CommandInfo{
-		Name:        keyToDisplayName("\x17L"),
-		Description: "Move output window to the right",
-		Usage:       "<C-w>L",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>L - Position output window to the right"},
-	})
+	/*
+		// Window Management commands
+		registry.Register("\x17L", (*Editor).moveOutputWindowRight, CommandInfo{
+			Name:        keyToDisplayName("\x17L"),
+			Description: "Move output window to the right",
+			Usage:       "<C-w>L",
+			Category:    "Window Management",
+			Examples:    []string{"<C-w>L - Position output window to the right"},
+		})
 
-	registry.Register("\x17J", (*Editor).moveOutputWindowBelow, CommandInfo{
-		Name:        keyToDisplayName("\x17J"),
-		Description: "Move output window below editor",
-		Usage:       "<C-w>J",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>J - Position output window below editor"},
-	})
+		registry.Register("\x17J", (*Editor).moveOutputWindowBelow, CommandInfo{
+			Name:        keyToDisplayName("\x17J"),
+			Description: "Move output window below editor",
+			Usage:       "<C-w>J",
+			Category:    "Window Management",
+			Examples:    []string{"<C-w>J - Position output window below editor"},
+		})
 
-	registry.Register("\x17=", (*Editor).changeSplit, CommandInfo{
-		Name:        keyToDisplayName("\x17="),
-		Description: "Equalize split sizes",
-		Usage:       "<C-w>=",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>= - Make editor and output windows equal size"},
-	})
+				registry.Register("\x17=", (*Editor).changeSplit, CommandInfo{
+					Name:        keyToDisplayName("\x17="),
+					Description: "Equalize split sizes",
+					Usage:       "<C-w>=",
+					Category:    "Window Management",
+					Examples:    []string{"<C-w>= - Make editor and output windows equal size"},
+				})
+			registry.Register("\x17_", (*Editor).changeSplit, CommandInfo{
+				Name:        keyToDisplayName("\x17_"),
+				Description: "Minimize output window",
+				Usage:       "<C-w>_",
+				Category:    "Window Management",
+				Examples:    []string{"<C-w>_ - Minimize output window to 2 lines"},
+			})
 
-	registry.Register("\x17_", (*Editor).changeSplit, CommandInfo{
-		Name:        keyToDisplayName("\x17_"),
-		Description: "Minimize output window",
-		Usage:       "<C-w>_",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>_ - Minimize output window to 2 lines"},
-	})
+			registry.Register("\x17-", (*Editor).changeSplit, CommandInfo{
+				Name:        keyToDisplayName("\x17-"),
+				Description: "Decrease output window height",
+				Usage:       "<C-w>-",
+				Category:    "Window Management",
+				Examples:    []string{"<C-w>- - Decrease output window height by 1 line"},
+			})
 
-	registry.Register("\x17-", (*Editor).changeSplit, CommandInfo{
-		Name:        keyToDisplayName("\x17-"),
-		Description: "Decrease output window height",
-		Usage:       "<C-w>-",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>- - Decrease output window height by 1 line"},
-	})
-
-	registry.Register("\x17+", (*Editor).changeSplit, CommandInfo{
-		Name:        keyToDisplayName("\x17+"),
-		Description: "Increase output window height",
-		Usage:       "<C-w>+",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>+ - Increase output window height by 1 line"},
-	})
+			registry.Register("\x17+", (*Editor).changeSplit, CommandInfo{
+				Name:        keyToDisplayName("\x17+"),
+				Description: "Increase output window height",
+				Usage:       "<C-w>+",
+				Category:    "Window Management",
+				Examples:    []string{"<C-w>+ - Increase output window height by 1 line"},
+			})
+	*/
 
 	registry.Register("\x17>", (*Editor).changeHSplit, CommandInfo{
 		Name:        keyToDisplayName("\x17>"),
@@ -206,39 +207,6 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 	return registry.GetFunctionMap()
 }
 
-func (e *Editor) changeSplit(flag int) {
-	if e.output == nil {
-		return
-	}
-
-	op := e.output
-	var outputHeight int
-	if flag == '=' {
-		outputHeight = e.Screen.textLines / 2
-	} else if flag == '_' {
-		outputHeight = 2
-	} else if flag == '+' {
-		outputHeight = op.screenlines - 1
-	} else if flag == '-' {
-		outputHeight = op.screenlines + 1
-	} else {
-		e.ShowMessage(BR, "flag = %v", flag)
-		return
-	}
-	e.ShowMessage(BR, "flag = %v", flag)
-
-	if outputHeight < 2 || outputHeight > e.Screen.textLines-3 {
-		return
-	}
-
-	e.screenlines = e.Screen.textLines - outputHeight - 1
-	op.screenlines = outputHeight
-	op.top_margin = e.Screen.textLines - outputHeight + 2
-
-	e.Screen.eraseRightScreen()
-	e.Screen.drawRightScreen()
-}
-
 func (e *Editor) changeHSplit(flag int) {
 	var width int
 	if flag == '>' {
@@ -253,64 +221,6 @@ func (e *Editor) changeHSplit(flag int) {
 	}
 }
 
-func (e *Editor) moveOutputWindowRight(_ int) {
-	if e.output == nil { // && e.is_subeditor && e.is_below) {
-		return
-	}
-	//top_margin = TOP_MARGIN + 1;
-	//screenlines = total_screenlines - 1;
-	e.output.is_below = false
-
-	e.Screen.positionWindows()
-	e.Screen.eraseRightScreen()
-	e.Screen.drawRightScreen()
-	//editorSetMessage("top_margin = %d", top_margin);
-
-}
-
-func (e *Editor) moveOutputWindowBelow(_ int) {
-	if e.output == nil { // && e.is_subeditor && e.is_below) {
-		return
-	}
-	//top_margin = TOP_MARGIN + 1;
-	//screenlines = total_screenlines - 1;
-	e.output.is_below = true
-
-	e.Screen.positionWindows()
-	e.Screen.eraseRightScreen()
-	e.Screen.drawRightScreen()
-	//editorSetMessage("top_margin = %d", top_margin);
-}
-
-// should scroll output down
-/*
-func (e *Editor) scrollOutputDown(_ int) {
-	op := e.output
-	if op == nil {
-		e.command = ""
-		return
-	}
-	if op.rowOffset < len(op.rows)-1 {
-		op.rowOffset++
-		op.drawText()
-	}
-	e.command = ""
-}
-*/
-// scroll output window up
-/*
-func (e *Editor) scrollOutputUp(_ int) {
-	if e.output == nil {
-		e.command = ""
-		return
-	}
-	if e.output.rowOffset > 0 {
-		e.output.rowOffset--
-	}
-	e.output.drawText()
-	e.command = ""
-}
-*/
 func (e *Editor) moveLeft(_ int) {
 	// below "if" really for testing
 	if e.isModified() {

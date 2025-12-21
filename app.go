@@ -89,7 +89,6 @@ func (a *App) NewEditor() *Editor {
 		highlightSyntax:    true, // applies to golang, c++ etc. and markdown
 		numberLines:        true,
 		redraw:             false,
-		output:             nil,
 		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
 		modified:           false,
 		tabCompletion: struct {

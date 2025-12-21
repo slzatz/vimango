@@ -6,8 +6,6 @@ import (
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
-//import "github.com/neovim/go-client/nvim"
-
 // note that there isn't a columnOffset because currently only word wrap supported
 
 type Editor struct {
@@ -30,7 +28,7 @@ type Editor struct {
 	numberLines        bool
 	redraw             bool
 	id                 int //db id of entry
-	output             *Output
+	//output             *Output
 	vbuf               interfaces.VimBuffer
 	ss                 []string
 	searchPrefix       string
@@ -57,7 +55,7 @@ type Editor struct {
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
-	max_length := e.Screen.PositionMessage(loc) //this needs to change to e.Screen.PositionMessage(loc)
+	max_length := e.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {
 		str = str[:max_length]

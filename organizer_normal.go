@@ -196,7 +196,7 @@ func (o *Organizer) scrollNoticeDown() {
 	if len(o.notice) == 0 {
 		return
 	}
-	if o.altRowoff == len(o.note)-2 {
+	if o.altRowoff == len(o.notice)-2 {
 		o.ShowMessage(BL, "Reached end of rendered note")
 		return
 	}

@@ -53,7 +53,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		redraw, exit = e.ExModeKeyHandler(c)
 	case SEARCH:
 		redraw, exit = e.SearchModeKeyHandler(c)
-	case PREVIEW, HELP:
+	case PREVIEW, HELP: // RUN:
 		redraw, exit = e.PreviewModeKeyHandler(c)
 	case VIEW_LOG:
 		redraw, exit = e.ViewLogModeKeyHandler(c)

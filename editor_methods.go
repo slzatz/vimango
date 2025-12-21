@@ -63,18 +63,19 @@ func (e *Editor) drawHighlightedBraces() {
 
 func (e *Editor) setLinesMargins() { //also sets top margin
 
-	if e.output != nil {
-		if e.output.is_below {
-			e.screenlines = e.Screen.textLines - LINKED_NOTE_HEIGHT - 1
-			e.top_margin = TOP_MARGIN + 1
+	/*
+		if e.output != nil {
+			if e.output.is_below {
+				e.screenlines = e.Screen.textLines - LINKED_NOTE_HEIGHT - 1
+				e.top_margin = TOP_MARGIN + 1
+			} else {
+				e.screenlines = e.Screen.textLines
+				e.top_margin = TOP_MARGIN + 1
+			}
 		} else {
-			e.screenlines = e.Screen.textLines
-			e.top_margin = TOP_MARGIN + 1
-		}
-	} else {
-		e.screenlines = e.Screen.textLines
-		e.top_margin = TOP_MARGIN + 1
-	}
+	*/
+	e.screenlines = e.Screen.textLines
+	e.top_margin = TOP_MARGIN + 1
 }
 
 // used by updateNote

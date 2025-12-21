@@ -310,7 +310,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
-		Aliases:     []string{"vert res, divider"},
+		Aliases:     []string{"vert res", "divider"},
 		Description: "Resize vertical divider",
 		Usage:       "vertical resize <width>",
 		Category:    "View Management",

@@ -124,13 +124,15 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":vertical resize 80", ":vert res +10", ":vert res -5"},
 	})
 
-	registry.Register("resize", (*Editor).resize, CommandInfo{
-		Aliases:     []string{"res"},
-		Description: "Resize editor window",
-		Usage:       "resize <height>",
-		Category:    "Layout",
-		Examples:    []string{":resize 20", ":res +5", ":res -3"},
-	})
+	/*
+		registry.Register("resize", (*Editor).resize, CommandInfo{
+			Aliases:     []string{"res"},
+			Description: "Resize editor window",
+			Usage:       "resize <height>",
+			Category:    "Layout",
+			Examples:    []string{":resize 20", ":res +5", ":res -3"},
+		})
+	*/
 
 	// Output commands
 	registry.Register("ha", (*Editor).printNote, CommandInfo{
@@ -448,6 +450,7 @@ func (e *Editor) verticalResize() {
 	app.moveDividerAbs(width)
 }
 
+/*
 func (e *Editor) resize() {
 	pos := strings.Index(e.command_line, " ")
 	opt := e.command_line[pos+1:]
@@ -472,15 +475,14 @@ func (e *Editor) resize() {
 		}
 
 		e.screenlines = num
-		/*
 			op := e.output
 			op.screenlines = e.Screen.textLines - num - 1
 			op.top_margin = num + 3
-		*/
 		e.Screen.eraseRightScreen()
 		e.Screen.drawRightScreen()
 	}
 }
+*/
 
 func (e *Editor) compile() {
 
@@ -579,20 +581,14 @@ func (e *Editor) compile() {
 
 	//rows = append(rows, "------------------------")
 
-	e.mode = HELP
+	e.mode = HELP //RUN //// revist this
 	result := strings.Join(rows, "\n")
-	app.Organizer.drawNotice(result)
-	app.Organizer.altRowoff = 0
+	app.Screen.altRowoff = 0
+	app.Screen.drawNotice(result, false) // isMarkdown = false
 	e.command_line = ""
-	/*
-		op := e.output
-		op.rowOffset = 0
-		op.rows = rows
-		op.drawText()
-	*/
-	// no need to call drawFrame or drawStatusBar
 }
 
+/*
 func (e *Editor) run() {
 
 	var args []string
@@ -670,6 +666,7 @@ func (e *Editor) run() {
 	op.drawText()
 	// no need to call drawFrame or drawStatusBar
 }
+*/
 
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax
