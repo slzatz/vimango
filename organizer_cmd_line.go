@@ -866,20 +866,23 @@ func (o *Organizer) editNote(id int) {
 }
 
 func (o *Organizer) verticalResize(pos int) {
-	//pos := strings.LastIndex(o.command_line, " ")
+	var newWidth int
 	opt := o.command_line[pos+1:]
 	width, err := strconv.Atoi(opt)
-
-	if opt[0] == '+' || opt[0] == '-' {
-		width = o.Screen.screenCols - o.Screen.divider - width
-	}
-
 	if err != nil {
-		o.ShowMessage(BL, "The format is :vert[ical] res[ize] N")
+		o.ShowMessage(BL, "You need to provide a number")
 		return
 	}
-	app.moveDividerAbs(width)
-	//o.mode = o.last_mode
+	if opt[0] == '+' || opt[0] == '-' {
+		newWidth = o.Screen.screenCols - o.Screen.divider - width
+	} else {
+		newWidth = o.Screen.screenCols - width
+		if newWidth < 20 || newWidth > o.Screen.screenCols-20 {
+			o.ShowMessage(BL, "Width must be between 20 and %d", o.Screen.screenCols-20)
+			return
+		}
+	}
+	app.moveDividerAbs(newWidth)
 	o.mode = NORMAL
 }
 

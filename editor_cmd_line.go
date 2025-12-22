@@ -584,7 +584,7 @@ func (e *Editor) compile() {
 	e.mode = HELP //RUN //// revist this
 	result := strings.Join(rows, "\n")
 	app.Screen.altRowoff = 0
-	app.Screen.drawNotice(result, false) // isMarkdown = false
+	app.Screen.drawNotice(result, false, TL) // isMarkdown = false
 	e.command_line = ""
 }
 

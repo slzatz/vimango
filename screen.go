@@ -146,22 +146,27 @@ func (s *Screen) PositionMessage(loc Location) int { // positions message and re
 	return max_length
 }
 
-func (s *Screen) drawNotice(str string, isMarkdown bool) {
+func (s *Screen) drawNotice(str string, isMarkdown bool, loc Location) {
 	if len(str) == 0 {
 		return
 	}
 	if isMarkdown {
-		s.renderNotice(str)
+		s.renderNotice(str, loc)
 	} else {
 		note := WordWrap(str, s.totaleditorcols-NOTICE_RIGHT_PADDING, 16)
 		s.notice = strings.Split(note, "\n")
 	}
-	s.drawNoticeLayer()
-	s.drawNoticeText()
+	if loc == TR {
+		s.drawNoticeLayer()
+		s.drawNoticeText()
+	} else {
+		s.drawNoticeLayerLeft()
+		s.drawNoticeTextLeft()
+	}
 }
 
-func (s *Screen) renderNotice(str string) {
-	var offset int
+func (s *Screen) renderNotice(str string, loc Location) {
+	var offset, width int
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath(getGlamourStylePath()),
 		glamour.WithWordWrap(0),
@@ -174,7 +179,13 @@ func (s *Screen) renderNotice(str string) {
 	if app.Organizer.mode == HELP || (app.Session.activeEditor != nil && app.Session.activeEditor.mode == HELP) {
 		offset = 16
 	}
-	note = WordWrap(note, s.totaleditorcols-NOTICE_RIGHT_PADDING, offset)
+	// width = s.screenCols - s.divider - width
+	if loc == TR {
+		width = s.totaleditorcols - NOTICE_RIGHT_PADDING
+	} else {
+		width = s.divider - NOTICE_RIGHT_PADDING
+	}
+	note = WordWrap(note, width, offset)
 	s.notice = strings.Split(note, "\n")
 }
 
@@ -213,6 +224,41 @@ func (s *Screen) drawNoticeLayer() {
 	s.drawNoticeBox()
 }
 
+func (s *Screen) drawNoticeLayerLeft() {
+	var ab strings.Builder
+	//width := s.totaleditorcols - 10
+	width := s.divider - 10 /////////////
+	length := len(s.notice)
+	if length > s.textLines-10 {
+		length = s.textLines - 10
+	}
+
+	// \x1b[NC moves cursor forward by N columns
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", 2) //////////
+
+	//hide the cursor
+	ab.WriteString("\x1b[?25l")
+	// move the cursor
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, 3) //////
+
+	//erase set number of chars on each line
+	erase_chars := fmt.Sprintf("\x1b[%dX", s.divider-4) ///////
+	for i := 0; i < length; i++ {
+		ab.WriteString(erase_chars)
+		ab.WriteString(lf_ret)
+	}
+
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+6, 3) /////
+
+	// \x1b[ 2*x is DECSACE to operate in rectable mode
+	// \x1b[%d;%d;%d;%d;48;5;235$r is DECCARA to apply specified attributes (background color 235) to rectangle area
+	// \x1b[ *x is DECSACE to exit rectangle mode
+	fmt.Fprintf(&ab, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
+		TOP_MARGIN+6, 7, TOP_MARGIN+4+length, 7+width)
+	ab.WriteString("\x1b[48;5;235m") //draws the box lines with same background as above rectangle
+	fmt.Print(ab.String())
+	s.drawNoticeBoxLeft()
+}
 func (s *Screen) drawNoticeBox() {
 	width := s.totaleditorcols - 10
 	length := len(s.notice) + 1
@@ -258,6 +304,52 @@ func (s *Screen) drawNoticeBox() {
 	fmt.Print(ab.String())
 }
 
+func (s *Screen) drawNoticeBoxLeft() {
+	//width := s.totaleditorcols - 10
+	width := s.divider - 5 /////////////
+	length := len(s.notice) + 1
+	if length > s.textLines-9 {
+		length = s.textLines - 9
+	}
+	var ab strings.Builder
+	move_cursor := fmt.Sprintf("\x1b[%dC", width)
+
+	ab.WriteString("\x1b(0") // Enter line drawing mode
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 3)
+	ab.WriteString("\x1b[37;1ml") //upper left corner
+
+	for i := 1; i < length; i++ {
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5+i, 3)
+		// x=0x78 vertical line (q=0x71 is horizontal) 37=white; 1m=bold (only need 1 m)
+		ab.WriteString("\x1b[37;1mx")
+		ab.WriteString(move_cursor)
+		ab.WriteString("\x1b[37;1mx")
+	}
+
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+4+length, 3)
+	ab.WriteString("\x1b[1B")
+	ab.WriteString("\x1b[37;1mm") //lower left corner
+
+	move_cursor = fmt.Sprintf("\x1b[1D\x1b[%dB", length)
+
+	for i := 1; i < width+1; i++ {
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 3+i) //3
+		ab.WriteString("\x1b[37;1mq")
+		ab.WriteString(move_cursor)
+		ab.WriteString("\x1b[37;1mq")
+	}
+
+	ab.WriteString("\x1b[37;1mj")                          //lower right corner
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 4+width) //3
+	ab.WriteString("\x1b[37;1mk")                          //upper right corner
+
+	//exit line drawing mode
+	ab.WriteString("\x1b(B")
+	ab.WriteString("\x1b[0m")
+	ab.WriteString("\x1b[?25h")
+	fmt.Print(ab.String())
+}
+
 func (s *Screen) drawNoticeText() {
 	length := len(s.notice)
 	if length > s.textLines-10 {
@@ -274,6 +366,26 @@ func (s *Screen) drawNoticeText() {
 	}
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+6, s.divider+8)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", s.divider+7)
+	fmt.Print(strings.Join(s.notice[start:end], lf_ret))
+	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
+}
+
+func (s *Screen) drawNoticeTextLeft() {
+	length := len(s.notice)
+	if length > s.textLines-10 {
+		length = s.textLines - 10
+	}
+	start := s.altRowoff
+	var end int
+	// check if there are more lines than can fit on the screen
+	if len(s.notice)-start > length {
+		end = length + start - 2
+	} else {
+		//end = len(o.note) - 1
+		end = len(s.notice)
+	}
+	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+6, 4)
+	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", 3)
 	fmt.Print(strings.Join(s.notice[start:end], lf_ret))
 	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
 }
