@@ -153,7 +153,13 @@ func (s *Screen) drawNotice(str string, isMarkdown bool, loc Location) {
 	if isMarkdown {
 		s.renderNotice(str, loc)
 	} else {
-		note := WordWrap(str, s.totaleditorcols-NOTICE_RIGHT_PADDING, 16)
+		var width int
+		if loc == TR {
+			width = s.totaleditorcols - NOTICE_RIGHT_PADDING
+		} else {
+			width = s.divider - 2
+		}
+		note := WordWrap(str, width, 0)
 		s.notice = strings.Split(note, "\n")
 	}
 	if loc == TR {
@@ -306,7 +312,7 @@ func (s *Screen) drawNoticeBox() {
 
 func (s *Screen) drawNoticeBoxLeft() {
 	//width := s.totaleditorcols - 10
-	width := s.divider - 5 /////////////
+	width := s.divider - 4 /////////////
 	length := len(s.notice) + 1
 	if length > s.textLines-9 {
 		length = s.textLines - 9
@@ -315,32 +321,32 @@ func (s *Screen) drawNoticeBoxLeft() {
 	move_cursor := fmt.Sprintf("\x1b[%dC", width)
 
 	ab.WriteString("\x1b(0") // Enter line drawing mode
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 3)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 2)
 	ab.WriteString("\x1b[37;1ml") //upper left corner
 
 	for i := 1; i < length; i++ {
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5+i, 3)
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5+i, 2)
 		// x=0x78 vertical line (q=0x71 is horizontal) 37=white; 1m=bold (only need 1 m)
 		ab.WriteString("\x1b[37;1mx")
 		ab.WriteString(move_cursor)
 		ab.WriteString("\x1b[37;1mx")
 	}
 
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+4+length, 3)
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+4+length, 2)
 	ab.WriteString("\x1b[1B")
 	ab.WriteString("\x1b[37;1mm") //lower left corner
 
 	move_cursor = fmt.Sprintf("\x1b[1D\x1b[%dB", length)
 
 	for i := 1; i < width+1; i++ {
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 3+i) //3
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 2+i) //3
 		ab.WriteString("\x1b[37;1mq")
 		ab.WriteString(move_cursor)
 		ab.WriteString("\x1b[37;1mq")
 	}
 
 	ab.WriteString("\x1b[37;1mj")                          //lower right corner
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 4+width) //3
+	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+5, 3+width) //3
 	ab.WriteString("\x1b[37;1mk")                          //upper right corner
 
 	//exit line drawing mode

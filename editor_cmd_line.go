@@ -487,6 +487,7 @@ func (e *Editor) resize() {
 func (e *Editor) compile() {
 
 	var dir, filePath string
+	var args []string
 	var cmd *exec.Cmd
 	var cmd0 *exec.Cmd
 	lang := Languages[e.Database.taskContext(e.id)]
@@ -526,7 +527,13 @@ func (e *Editor) compile() {
 			e.ShowMessage(BR, "go mod tidy failed: %w\nOutput: %s", err, string(output))
 			return
 		}
-		cmd = exec.Command("go", "run", "main.go")
+		//cmd = exec.Command("go", "run", "main.go")
+		pos := strings.Index(e.command_line, " ")
+		if pos != -1 {
+			args = strings.Split(e.command_line[pos+1:], " ")
+		}
+		args = append([]string{"run", "main.go"}, args...)
+		cmd = exec.Command("go", args...)
 	} else if lang == "python" {
 		e.ShowMessage(BR, "You don't have to compile python")
 		return
@@ -581,7 +588,7 @@ func (e *Editor) compile() {
 
 	//rows = append(rows, "------------------------")
 
-	e.mode = HELP //RUN //// revist this
+	e.mode = NORMAL //HELP //RUN //// revist this
 	result := strings.Join(rows, "\n")
 	app.Screen.altRowoff = 0
 	app.Screen.drawNotice(result, false, TL) // isMarkdown = false
