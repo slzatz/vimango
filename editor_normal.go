@@ -227,7 +227,7 @@ func (e *Editor) moveLeft(_ int) {
 		e.ShowMessage(BR, "Note you left has been modified")
 	}
 
-	if len(e.Session.Windows) == 1 {
+	if len(e.Session.Editors) == 1 {
 
 		if e.Screen.divider < 10 {
 			e.Screen.edPct = 80
@@ -242,17 +242,17 @@ func (e *Editor) moveLeft(_ int) {
 	}
 
 	index := 0
-	for i, ed := range e.Session.Windows {
+	for i, ed := range e.Session.Editors {
 		if ed == e {
 			index = i
 			break
 		}
 	}
 
-	e.ShowMessage(BL, "index: %d; length: %d", index, len(e.Session.Windows))
+	e.ShowMessage(BL, "index: %d; length: %d", index, len(e.Session.Editors))
 
 	if index > 0 {
-		ae := e.Session.Windows[index-1]
+		ae := e.Session.Editors[index-1]
 		app.Session.activeEditor = ae
 		vim.SetCurrentBuffer(ae.vbuf)
 		// There is a bug in libvim C implementation where the cursor column position is set to zero when switching buffers
@@ -282,17 +282,17 @@ func (e *Editor) moveRight(_ int) {
 	}
 
 	index := 0
-	for i, z := range e.Session.Windows {
+	for i, z := range e.Session.Editors {
 		if z == e {
 			index = i
 			break
 		}
 	}
 	pos := vim.GetCursorPosition()
-	e.ShowMessage(BR, "Before move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(e.Session.Windows), pos[0]-1, pos[1])
+	e.ShowMessage(BR, "Before move: index: %d; length: %d e.fr: %d; e.fc %d", index, len(e.Session.Editors), pos[0]-1, pos[1])
 
-	if index < len(e.Session.Windows)-1 {
-		ae := e.Session.Windows[index+1]
+	if index < len(e.Session.Editors)-1 {
+		ae := e.Session.Editors[index+1]
 		vim.SetCurrentBuffer(ae.vbuf)
 		app.Session.activeEditor = ae
 		// There is a bug in libvim C implementation where the cursor column position is set to zero when switching buffers

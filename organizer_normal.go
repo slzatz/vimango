@@ -157,7 +157,7 @@ func (o *Organizer) showEditorWindows() {
 }
 
 func (o *Organizer) switchToEditorMode() {
-	if len(o.Session.Windows) == 0 {
+	if len(o.Session.Editors) == 0 {
 		o.ShowMessage(BL, "%sThere are no active editors%s", RED_BG, RESET)
 		return
 	}

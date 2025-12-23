@@ -818,7 +818,7 @@ func (o *Organizer) editNote(id int) {
 	o.Session.editorMode = true
 
 	active := false
-	for _, w := range o.Session.Windows {
+	for _, w := range o.Session.Editors {
 		if w.id == id {
 			active = true
 			ae = w
@@ -828,19 +828,10 @@ func (o *Organizer) editNote(id int) {
 
 	if !active {
 		ae = app.NewEditor()
-		o.Session.Windows = append(o.Session.Windows, ae)
+		o.Session.Editors = append(o.Session.Editors, ae)
 		ae.id = id
 		ae.title = o.rows[o.fr].title
 		ae.top_margin = TOP_MARGIN + 1
-
-		/*
-			if o.Database.taskFolder(o.rows[o.fr].id) == "code" {
-				ae.output = &Output{}
-				ae.output.is_below = true
-				ae.output.id = id
-				o.Session.Windows = append(o.Session.Windows, ae.output)
-			}
-		*/
 		note := o.Database.readNoteIntoString(id)
 		ae.ss = strings.Split(note, "\n")
 		// Make sure we have at least one line, even if the note was empty

@@ -98,7 +98,7 @@ func (s *Screen) eraseRightScreen() {
 }
 
 func (s *Screen) drawRightScreen() {
-	for _, w := range s.Session.Windows {
+	for _, w := range s.Session.Editors {
 		w.drawText()
 		w.drawFrame()
 		w.drawStatusBar()
@@ -106,11 +106,11 @@ func (s *Screen) drawRightScreen() {
 }
 
 func (s *Screen) positionWindows() {
-	windowSlots := len(s.Session.Windows)
+	windowSlots := len(s.Session.Editors)
 
 	cols := -1 + (s.screenCols-s.divider)/windowSlots
 	i := -1 //i = number of columns of windows -1
-	for _, w := range s.Session.Windows {
+	for _, w := range s.Session.Editors {
 		i++
 		w.left_margin = s.divider + i*cols + i
 		w.screencols = cols

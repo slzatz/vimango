@@ -14,6 +14,6 @@ type Session struct {
 	style            [8]string
 	markdown_style   *chroma.Style
 	styleIndex       int
-	Windows          []*Editor      //slice of all active Editor
+	Editors          []*Editor      //slice of all active Editor
 	googleDrive      *drive.Service // Google Drive service for file operations
 }

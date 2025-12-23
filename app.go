@@ -56,7 +56,7 @@ func CreateApp() *App {
 	db := &Database{}
 	sess := &Session{}
 	screen := &Screen{Session: sess}
-	sess.Windows = make([]*Editor, 0)
+	sess.Editors = make([]*Editor, 0)
 	kitty := IsTermKitty()
 	return &App{
 		Session:  sess,
