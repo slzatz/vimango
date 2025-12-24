@@ -301,12 +301,12 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":clearcache", ":clc"},
 	})
 
-	registry.Register("kittyreset", (*Organizer).kittyReset, CommandInfo{
-		Aliases:     []string{"kitty-reset"},
-		Description: "Clear kitty image cache and rerender current note",
-		Usage:       "kittyreset",
+	registry.Register("imagereset", (*Organizer).imageReset, CommandInfo{
+		Aliases:     []string{"ir"},
+		Description: "Clear terminal image cache and rerender current note",
+		Usage:       "imagereset",
 		Category:    "Images",
-		Examples:    []string{":kittyreset"},
+		Examples:    []string{":imagereset", ":ir"},
 	})
 
 	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
@@ -1966,8 +1966,9 @@ func (o *Organizer) clearImageCache(pos int) {
 	o.ShowMessage(BL, fmt.Sprintf("Cleared image cache: %d files removed (%.1f MB freed)", count, float64(size)/(1024*1024)))
 }
 
-// kittyReset clears kitty images and local caches, then rerenders current note.
-func (o *Organizer) kittyReset(pos int) {
+// imageReset clears terminal graphics cache and local caches, then rerenders current note.
+// Works with any terminal supporting the kitty graphics protocol (kitty, ghostty, etc.)
+func (o *Organizer) imageReset(pos int) {
 	deleteAllKittyImages()
 	kittySessionImageMux.Lock()
 	kittySessionImages = make(map[uint32]kittySessionEntry)
@@ -1980,7 +1981,7 @@ func (o *Organizer) kittyReset(pos int) {
 	kittyImagesSent = 0
 	kittyBytesSent = 0
 	mb := float64(bytes) / (1024 * 1024)
-	o.ShowMessage(BL, "Kitty images cleared; since last reset: %d images, %.2f MB sent", sent, mb)
+	o.ShowMessage(BL, "Terminal images cleared; since last reset: %d images, %.2f MB sent", sent, mb)
 	o.displayNote()
 }
 

@@ -144,40 +144,41 @@ func kittyCreateVirtualPlacement(out io.Writer, imgID, placementID uint32, cols,
 	return err
 }
 
+// Reserved for future side-by-side image support (relative placements):
 // kittyCreateRelativePlacement creates a placement tied to a parent placement (P/Q) with optional offsets.
-func kittyCreateRelativePlacement(out io.Writer, imgID, placementID, parentImgID, parentPlacementID uint32, cols, rows int, dx, dy int) error {
-	if app == nil || !app.kitty {
-		return errors.New("kitty terminal not detected")
-	}
-	oscOpen, oscClose := KITTY_IMG_HDR, KITTY_IMG_FTR
-	if IsTmuxScreen() {
-		oscOpen, oscClose = TmuxOscOpenClose(oscOpen, oscClose)
-	}
-
-	args := []string{
-		"a=p",
-		"q=1", // show errors
-		fmt.Sprintf("i=%d", imgID),
-		fmt.Sprintf("p=%d", placementID),
-		fmt.Sprintf("P=%d", parentImgID),
-		fmt.Sprintf("Q=%d", parentPlacementID),
-	}
-	if cols > 0 {
-		args = append(args, fmt.Sprintf("c=%d", cols))
-	}
-	if rows > 0 {
-		args = append(args, fmt.Sprintf("r=%d", rows))
-	}
-	if dx != 0 {
-		args = append(args, fmt.Sprintf("H=%d", dx))
-	}
-	if dy != 0 {
-		args = append(args, fmt.Sprintf("V=%d", dy))
-	}
-
-	_, err := fmt.Fprintf(out, "%s%s%s", oscOpen, strings.Join(args, ","), oscClose)
-	return err
-}
+// func kittyCreateRelativePlacement(out io.Writer, imgID, placementID, parentImgID, parentPlacementID uint32, cols, rows int, dx, dy int) error {
+// 	if app == nil || !app.kitty {
+// 		return errors.New("kitty terminal not detected")
+// 	}
+// 	oscOpen, oscClose := KITTY_IMG_HDR, KITTY_IMG_FTR
+// 	if IsTmuxScreen() {
+// 		oscOpen, oscClose = TmuxOscOpenClose(oscOpen, oscClose)
+// 	}
+//
+// 	args := []string{
+// 		"a=p",
+// 		"q=1", // show errors
+// 		fmt.Sprintf("i=%d", imgID),
+// 		fmt.Sprintf("p=%d", placementID),
+// 		fmt.Sprintf("P=%d", parentImgID),
+// 		fmt.Sprintf("Q=%d", parentPlacementID),
+// 	}
+// 	if cols > 0 {
+// 		args = append(args, fmt.Sprintf("c=%d", cols))
+// 	}
+// 	if rows > 0 {
+// 		args = append(args, fmt.Sprintf("r=%d", rows))
+// 	}
+// 	if dx != 0 {
+// 		args = append(args, fmt.Sprintf("H=%d", dx))
+// 	}
+// 	if dy != 0 {
+// 		args = append(args, fmt.Sprintf("V=%d", dy))
+// 	}
+//
+// 	_, err := fmt.Fprintf(out, "%s%s%s", oscOpen, strings.Join(args, ","), oscClose)
+// 	return err
+// }
 
 // buildPlaceholderAnchor returns a 1x1 placeholder cell at row/col zero for the given ids.
 // It intentionally restricts to a single cell so we don't rely on the full diacritic table yet.

@@ -38,11 +38,11 @@ type App struct {
 	// Application state
 	SyncInProcess      bool
 	Run                bool
-	kitty              bool   // true if running in kitty terminal
-	kittyVersion       string // kitty graphics protocol version
-	kittyPlace         bool   // true if kitty supports Unicode placeholders
-	kittyRelative      bool   // true if kitty supports relative placements
-	kittyTextSizing    bool   // true if kitty supports OSC 66 text sizing (0.40.0+)
+	kitty           bool   // true if running in kitty-graphics-compatible terminal (kitty, ghostty, etc.)
+	kittyVersion    string // kitty version (only set for actual kitty terminal)
+	kittyPlace      bool   // true if terminal supports Unicode placeholders
+	kittyTextSizing bool   // true if terminal supports OSC 66 text sizing (kitty 0.40.0+ only)
+	// kittyRelative bool // Reserved for future side-by-side image support (relative placements)
 	showImages         bool   // true if inline images should be displayed
 	showImageInfo      bool   // true if Google Drive folder/filename should be displayed above images
 	imageScale         int    // image width in columns (default: 45)

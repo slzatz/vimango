@@ -371,11 +371,29 @@ func GetEnvIdentifiers() map[string]string {
 	return V
 }
 
-// NOTE: uses $TERM, which is overwritten by tmux
+// IsTermKitty checks if the terminal supports the kitty graphics protocol.
+// This includes Kitty terminal, Ghostty, and other compatible terminals.
+// NOTE: $TERM may be overwritten by tmux
 func IsTermKitty() bool {
-
 	V := GetEnvIdentifiers()
-	return V["TERM"] == "xterm-kitty"
+
+	// Kitty terminal
+	if V["TERM"] == "xterm-kitty" {
+		return true
+	}
+
+	// Ghostty terminal - check TERM, TERM_PROGRAM, or ghostty-specific env var
+	if strings.Contains(V["TERM"], "ghostty") {
+		return true
+	}
+	if strings.Contains(V["TERM_PROGRAM"], "ghostty") {
+		return true
+	}
+	if os.Getenv("GHOSTTY_RESOURCES_DIR") != "" {
+		return true
+	}
+
+	return false
 }
 
 /*

@@ -1,6 +1,6 @@
-# GEMINI.md
+# CLAUDE.md
 
-This file provides guidance to GEMINI.md when working with code in this repository.
+This file provides guidance to Claude when working with code in this repository.
 
 ## Build Commands
 - **Linux/Unix with CGO**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (includes libvim, hunspell, sqlite3)
@@ -213,11 +213,50 @@ For enhanced deep research with web fetch capabilities:
 - **Content Limits**: Configured with 100,000 token limit for large document processing
 - **Citations**: Automatically enabled for fetched content to provide accurate source attribution
 
+## Terminal Graphics Protocol Support
+
+The application uses the kitty graphics protocol for inline image display. This protocol is supported by multiple terminal emulators:
+
+### Supported Terminals
+- **Kitty**: Full support including images, Unicode placeholders, and text sizing (OSC 66)
+- **Ghostty**: Supports images and Unicode placeholders; text sizing not yet supported (falls back gracefully)
+- **Other terminals**: Any terminal implementing the kitty graphics protocol should work for images
+
+### Feature Detection
+The application automatically detects terminal capabilities:
+- `IsTermKitty()` in `term_misc.go` - Detects kitty graphics protocol support (kitty, ghostty, etc.)
+- `isActualKittyTerminal()` in `kitty_capabilities.go` - Distinguishes actual kitty from other compatible terminals
+- Text sizing (OSC 66) is only enabled for actual kitty terminal; other terminals get standard ANSI heading styles
+
+### Text Sizing Protocol
+The kitty text sizing protocol (OSC 66, added in kitty 0.40.0) allows scaled headings in markdown rendering:
+- Configured via glamour style files (e.g., `darkslz.json`) using `kitty_scale`, `kitty_numerator`, `kitty_denominator`, `kitty_valign` properties
+- Automatically disabled for terminals that don't support it (like ghostty)
+- Headings fall back to standard ANSI styling (bold, colors) when text sizing is unavailable
+
+### Environment Variable Override
+- `VIMANGO_DISABLE_KITTY_TEXT_SIZING` - Escape hatch to disable text sizing if it causes issues
+
+### Image Commands
+- `:toggleimages` (`:ti`) - Toggle inline image display on/off
+- `:imagereset` (`:ir`) - Clear terminal image cache and rerender current note
+- `:imagescale [+|-|N]` - Scale images up, down, or to specific column width
+- `:clearcache` (`:clc`) - Clear disk image cache
+
+### Implementation Files
+- `kitty_capabilities.go` - Terminal detection and capability flags
+- `term_misc.go` - `IsTermKitty()` function for protocol support detection
+- `kitty_placeholders.go` - Kitty graphics protocol commands
+- `organizer_display.go` - Image rendering and placeholder handling
+
 ## Image Management
-- The markdown notes my contain image placeholders of the form ![text](imagepath) where typically that image path is the id of an image file in google drive.
+- The markdown notes may contain image placeholders of the form ![text](imagepath) where typically that image path is the id of an image file in google drive.
 - Google drive image files are represented, for example, as ![2072 in lily_2025](gdrive:19_FwuxjvgIwxn-b4Ia75DrXRGLZeB2fe) where the string after gdrive: is the file id in google drive.
 - An important feature of the application is the caching of images since downloading from google drive introduces some delays.
-- There are two levels of image caching.  There is a local hard drive cache that represents the images as base64 encoded png files. The application relies of the kitty graphics protocol, which caches images in memory in the terminal emulator, for fast display of images.  This requires the terminal emulator to support the kitty graphics protocol.  The in-memory cache is reset with every launch of the application.
+- There are two levels of image caching:
+  - **Disk cache** (`./image_cache/`): Stores images as base64 encoded PNG files. Persistent across sessions and terminal-agnostic.
+  - **Terminal memory cache**: The kitty graphics protocol caches images in the terminal emulator for fast display. Reset on each application launch.
+- The disk cache works with any kitty-graphics-compatible terminal (kitty, ghostty, etc.)
 
 ## HEIC Image Support
 The application supports HEIC/HEIF image format (commonly used by Apple devices for high-efficiency image storage) when built with CGO.

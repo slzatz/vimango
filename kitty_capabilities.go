@@ -12,8 +12,19 @@ import (
 
 var semverRe = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
+// isActualKittyTerminal returns true only if we're running in the actual
+// kitty terminal (not ghostty or other kitty-graphics-compatible terminals).
+// This is used to distinguish features only kitty supports (like OSC 66 text sizing)
+// from features that other terminals also support (like the graphics protocol).
+func isActualKittyTerminal() bool {
+	// TERM=xterm-kitty is only set by actual kitty terminal
+	return strings.ToLower(os.Getenv("TERM")) == "xterm-kitty"
+}
+
 // DetectKittyCapabilities populates kitty-related feature flags on the global app.
 // Best-effort: falls back quietly when kitty is unavailable or version is unknown.
+// Distinguishes between actual kitty and other terminals (like ghostty) that support
+// the kitty graphics protocol but not all kitty-specific features like text sizing.
 func (a *App) DetectKittyCapabilities() {
 	if !IsTermKitty() {
 		a.kitty = false
@@ -22,41 +33,40 @@ func (a *App) DetectKittyCapabilities() {
 
 	a.kitty = true
 
+	// Check if we're in actual kitty vs another kitty-graphics-compatible terminal
+	isActualKitty := isActualKittyTerminal()
+
 	version := os.Getenv("VIMANGO_ASSUME_KITTY_VERSION")
-	if version == "" {
+	if version == "" && isActualKitty {
+		// Only try to get kitty version if we're actually in kitty
 		if v, err := kittyBinaryVersion(); err == nil {
 			version = v
 		}
 	}
 	a.kittyVersion = version
 
-	// If we can't determine version but know we're in kitty, assume modern enough.
+	// If we can't determine version, enable graphics protocol features
+	// (these work in ghostty too) but only enable text sizing for actual kitty
 	if version == "" {
 		a.kittyPlace = true
-		a.kittyRelative = true
-		a.kittyTextSizing = true // Assume modern kitty has text sizing
+		// a.kittyRelative = true // Reserved for future side-by-side image support
+		// Only enable text sizing for actual kitty - ghostty doesn't support OSC 66
+		a.kittyTextSizing = isActualKitty
 	} else {
 		if semverAtLeast(version, "0.28.0") {
 			a.kittyPlace = true
 		}
-		if semverAtLeast(version, "0.31.0") {
-			a.kittyRelative = true
-		}
+		// Reserved for future side-by-side image support:
+		// if semverAtLeast(version, "0.31.0") {
+		// 	a.kittyRelative = true
+		// }
 		if semverAtLeast(version, "0.40.0") {
 			a.kittyTextSizing = true
 		}
 	}
 
-	// Manual overrides
-	if os.Getenv("VIMANGO_ENABLE_KITTY_PLACEHOLDERS") != "" {
-		a.kittyPlace = true
-	}
-	if os.Getenv("VIMANGO_ENABLE_KITTY_RELATIVE") != "" {
-		a.kittyRelative = true
-	}
-	if os.Getenv("VIMANGO_ENABLE_KITTY_TEXT_SIZING") != "" {
-		a.kittyTextSizing = true
-	}
+	// Manual override - escape hatch if text sizing causes issues in a specific terminal
+	// (No runtime toggle exists for text sizing; use :toggleimages for image control)
 	if os.Getenv("VIMANGO_DISABLE_KITTY_TEXT_SIZING") != "" {
 		a.kittyTextSizing = false
 	}

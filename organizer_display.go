@@ -71,12 +71,13 @@ const (
 	KITTY_PLACEHOLDER_PLACEMENT_ID = 1
 )
 
-type pendingRelativePlacement struct {
-	imageID     uint32
-	placementID uint32
-	cols        int
-	rows        int
-}
+// Reserved for future side-by-side image support (relative placements):
+// type pendingRelativePlacement struct {
+// 	imageID     uint32
+// 	placementID uint32
+// 	cols        int
+// 	rows        int
+// }
 
 // preparedImage holds the heavy work (load/decode/encode) for a markdown image.
 type preparedImage struct {
@@ -95,12 +96,10 @@ var (
 	// Track if transparent placeholder has been transmitted
 	transparentPlaceholderTransmitted = false
 
-	// Counter for relative placement IDs
-	nextRelativePlacementID uint32 = 2 // Start at 2 (1 is reserved for transparent placeholder)
-
-	// Pending relative placements to create after rendering
-	pendingRelativePlacements []pendingRelativePlacement
-	pendingPlacementsMux      sync.Mutex
+	// Reserved for future side-by-side image support (relative placements):
+	// nextRelativePlacementID uint32 = 2 // Start at 2 (1 is reserved for transparent placeholder)
+	// pendingRelativePlacements []pendingRelativePlacement
+	// pendingPlacementsMux      sync.Mutex
 
 	// Ordered list of image IDs for this render (to give deterministic lookups)
 	currentRenderImageOrder []uint32
@@ -570,43 +569,44 @@ func (o *Organizer) createImagePlacementsAtPositions(startLine, endLine int) {
 	os.Stdout.Sync()
 }
 
+// Reserved for future side-by-side image support (relative placements):
 // createPendingRelativePlacements creates all pending relative placements after Unicode placeholders are drawn
-func createPendingRelativePlacements() {
-	pendingPlacementsMux.Lock()
-	defer pendingPlacementsMux.Unlock()
-
-	if len(pendingRelativePlacements) == 0 {
-		return
-	}
-
-	for _, p := range pendingRelativePlacements {
-		if err := kittyCreateRelativePlacement(os.Stdout, p.imageID, p.placementID,
-			KITTY_PLACEHOLDER_IMAGE_ID, KITTY_PLACEHOLDER_PLACEMENT_ID,
-			p.cols, p.rows, 0, 0); err != nil {
-			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "ERROR creating relative placement: %v\n", err)
-				debugLog.Close()
-			}
-		} else {
-			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "CREATED RELATIVE PLACEMENT: i=%d, p=%d, P=%d, Q=%d, c=%d, r=%d\n",
-					p.imageID, p.placementID, KITTY_PLACEHOLDER_IMAGE_ID, KITTY_PLACEHOLDER_PLACEMENT_ID, p.cols, p.rows)
-				debugLog.Close()
-			}
-		}
-	}
-
-	// Clear pending list
-	pendingRelativePlacements = nil
-
-	// Ensure all commands are sent to kitty immediately
-	os.Stdout.Sync()
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "FLUSHED: all relative placement commands sent to kitty\n")
-		debugLog.Close()
-	}
-}
+// func createPendingRelativePlacements() {
+// 	pendingPlacementsMux.Lock()
+// 	defer pendingPlacementsMux.Unlock()
+//
+// 	if len(pendingRelativePlacements) == 0 {
+// 		return
+// 	}
+//
+// 	for _, p := range pendingRelativePlacements {
+// 		if err := kittyCreateRelativePlacement(os.Stdout, p.imageID, p.placementID,
+// 			KITTY_PLACEHOLDER_IMAGE_ID, KITTY_PLACEHOLDER_PLACEMENT_ID,
+// 			p.cols, p.rows, 0, 0); err != nil {
+// 			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+// 				fmt.Fprintf(debugLog, "ERROR creating relative placement: %v\n", err)
+// 				debugLog.Close()
+// 			}
+// 		} else {
+// 			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+// 				fmt.Fprintf(debugLog, "CREATED RELATIVE PLACEMENT: i=%d, p=%d, P=%d, Q=%d, c=%d, r=%d\n",
+// 					p.imageID, p.placementID, KITTY_PLACEHOLDER_IMAGE_ID, KITTY_PLACEHOLDER_PLACEMENT_ID, p.cols, p.rows)
+// 				debugLog.Close()
+// 			}
+// 		}
+// 	}
+//
+// 	// Clear pending list
+// 	pendingRelativePlacements = nil
+//
+// 	// Ensure all commands are sent to kitty immediately
+// 	os.Stdout.Sync()
+//
+// 	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+// 		fmt.Fprintf(debugLog, "FLUSHED: all relative placement commands sent to kitty\n")
+// 		debugLog.Close()
+// 	}
+// }
 
 func (o *Organizer) drawStatusBar() {
 
