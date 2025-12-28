@@ -17,19 +17,14 @@
     "suffix": "",
     "color": "16",
     "background_color": "9",
-    "bold": false,
-    "kitty_scale": 2
+    "bold": true
   },
   "h2": {
     "prefix": "",
     "suffix": "",
     "color": "16",
     "background_color": "4",
-    "bold": false,
-    "kitty_scale": 2,
-    "kitty_numerator": 7,
-    "kitty_denominator": 8,
-    "kitty_valign": 2
+    "bold": true
   },
   "h3": {
     "prefix": "",
@@ -44,12 +39,23 @@
     "suffix": ""
   },
   "h5": {
-    "prefix": "##### "
+    "prefix": "",
+    "suffix": "",
+    "color": "16",
+    "background_color": "9",
+    "bold": false,
+    "kitty_scale": 2
   },
   "h6": {
-    "prefix": "###### ",
-    "color": "35",
-    "bold": false
+    "prefix": "",
+    "suffix": "",
+    "color": "16",
+    "background_color": "4",
+    "bold": false,
+    "kitty_scale": 2,
+    "kitty_numerator": 7,
+    "kitty_denominator": 8,
+    "kitty_valign": 2
   },
   "text": {},
   "strikethrough": {
