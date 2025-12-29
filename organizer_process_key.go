@@ -359,6 +359,8 @@ func (o *Organizer) NavigateNoticeModeKeyHandler(c int) RedrawScope {
 		o.scrollNoticeDown()
 	case ctrlKey('k'), PAGE_UP:
 		o.scrollNoticeUp()
+	case HOME_KEY:
+		o.scrollNoticeHome()
 	case ':': // COMMAND or SEARCH
 		o.ShowMessage(BL, ":")
 		vim.SendKey("<esc>") // park in NORMAL mode

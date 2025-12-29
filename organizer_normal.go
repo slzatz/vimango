@@ -217,6 +217,15 @@ func (o *Organizer) scrollNoticeDown() {
 	o.drawNoticeLayer()
 	o.drawNoticeText()
 }
+func (o *Organizer) scrollNoticeHome() {
+	if len(o.notice) == 0 {
+		return
+	}
+	o.altRowoff = 0
+	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
+	o.drawNoticeLayer()
+	o.drawNoticeText()
+}
 
 // for scrolling reports (notices) like help
 func (o *Organizer) scrollNoticeUp() {
