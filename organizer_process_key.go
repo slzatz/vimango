@@ -103,7 +103,7 @@ func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
 }
 
 func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
-	o.ShowMessage(BR, "key pressed: %d", c) ///debug
+	//o.ShowMessage(BR, "key pressed: %d", c) ///debug
 	redraw = RedrawNone
 	if c == '\r' {
 
@@ -124,7 +124,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		o.command += string(c) //note currently all are single characters although future could use leader+chars
 
 		if cmd, found := o.normalCmds[o.command]; found {
-			o.ShowMessage(BL, "key pressed: %T", cmd) ///debug
+			//o.ShowMessage(BL, "key pressed: %T", cmd) ///debug
 			cmd(o)
 			switch o.command {
 			case string(ctrlKey('a')), string(ctrlKey('d')), string(ctrlKey('x')), "m":

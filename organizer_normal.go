@@ -38,16 +38,22 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 
 	// Navigation commands
 	registry.Register(string(ctrlKey('j')), (*Organizer).scrollPreviewDown, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('j'))) + " or ↓",
-		Aliases:     []string{string(ARROW_DOWN)},
+		Name:        keyToDisplayName(string(ctrlKey('j'))) + "/PgDn",
+		Aliases:     []string{string(PAGE_DOWN)},
 		Description: "Scroll rendered note down",
 		Category:    "Navigation",
 	})
 
 	registry.Register(string(ctrlKey('k')), (*Organizer).scrollPreviewUp, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('k'))) + " or ↑",
-		Aliases:     []string{string(ARROW_UP)},
+		Name:        keyToDisplayName(string(ctrlKey('k'))) + "/PgUp",
+		Aliases:     []string{string(PAGE_UP)},
 		Description: "Scroll rendered note up",
+		Category:    "Navigation",
+	})
+
+	registry.Register(string(HOME_KEY), (*Organizer).scrollPreviewHome, CommandInfo{
+		Name:        "Home",
+		Description: "Scroll rendered note to top",
 		Category:    "Navigation",
 	})
 
@@ -189,6 +195,12 @@ func (o *Organizer) scrollPreviewUp() {
 		o.Screen.eraseRightScreen()
 		o.drawRenderedNote()
 	}
+}
+
+func (o *Organizer) scrollPreviewHome() {
+	o.altRowoff = 0
+	o.Screen.eraseRightScreen()
+	o.drawRenderedNote()
 }
 
 // for scrolling reports (notices) like help
