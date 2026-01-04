@@ -527,7 +527,7 @@ func (o *Organizer) help(pos int) {
 	o.mode = HELP
 	o.drawNotice(helpText)
 	o.altRowoff = 0
-	o.command_line = ""
+	o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }
 
 // formatNormalModeHelp returns formatted help for all normal mode commands
@@ -1037,7 +1037,7 @@ func (o *Organizer) synchronize(_ int) {
 		o.ShowMessage(BL, "Synchronization error: %v", err)
 		return
 	}
-	o.command_line = ""
+	o.command_line = "" // needed because not going to normal mode right away where it is cleared on typing ":"
 	o.drawNotice(log)
 	o.altRowoff = 0
 	o.mode = NAVIGATE_NOTICE
@@ -1181,7 +1181,7 @@ func (o *Organizer) setContext(pos int) {
 		o.showMessage("Error updating context for entry %d: %v", id, err)
 		return
 	}
-	o.showMessage("Moved current entry into context %s", input)
+	o.ShowMessage(BL, "Moved current entry into context %s", input)
 }
 
 func (o *Organizer) setFolder(pos int) {
@@ -1245,7 +1245,6 @@ func (o *Organizer) recent(_ int) {
 	o.view = TASK
 	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
-	//o.rows = DB.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	o.FilterEntries(MAX)
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
