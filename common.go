@@ -140,23 +140,8 @@ var sortColumns = map[string]struct{}{
 	"priority": z0,
 }
 
-/*
-var navKeys = map[int]struct{}{
-	ARROW_UP:    z0,
-	ARROW_DOWN:  z0,
-	ARROW_LEFT:  z0,
-	ARROW_RIGHT: z0,
-	'j':         z0,
-	'k':         z0,
-	'h':         z0,
-	'l':         z0,
-	'g':         z0,
-	'G':         z0,
-}
-*/
-
 var termcodes = map[int]string{
-	ARROW_UP:    "<up>", // could also do with vimKey as <Right>, <Left>, <Up>, <Down>
+	ARROW_UP:    "<up>",
 	ARROW_DOWN:  "<down>",
 	ARROW_RIGHT: "<right>",
 	ARROW_LEFT:  "<left>",
@@ -165,8 +150,6 @@ var termcodes = map[int]string{
 	DEL_KEY:     "<del>",
 	PAGE_UP:     "<pageup>",
 	PAGE_DOWN:   "<pagedown>",
-	//0x6:         "<c-f>",
-	//<end> <tab> <insert> <cr> or <enter> <f1> ... <f12>
 }
 
 var Lsps = map[string]string{

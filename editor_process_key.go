@@ -30,7 +30,8 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.ShowMessage(BR, "")
 		e.ShowMessage(BR, "%s", prevMode)
 		//return false
-		if prevMode == VISUAL || prevMode == PREVIEW || prevMode == HELP { //need to redraw to remove highlight or if leaving preview
+		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
+		if prevMode == VISUAL || prevMode == PREVIEW || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving preview
 			//app.Organizer.refreshScreen()
 			return true
 		} else {
