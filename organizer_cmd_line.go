@@ -1159,6 +1159,7 @@ func (o *Organizer) setContext(pos int) {
 	input := o.command_line[pos+1:]
 	var contextUUID string
 	var ok bool
+	o.mode = NORMAL
 	if contextUUID, ok = o.Database.contextExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid context!", input)
 		return
@@ -1188,6 +1189,7 @@ func (o *Organizer) setFolder(pos int) {
 	input := o.command_line[pos+1:]
 	var ok bool
 	var folderUUID string
+	o.mode = NORMAL
 	if folderUUID, ok = o.Database.folderExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		return
