@@ -164,14 +164,20 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 // case PREVIEW:
 func (e *Editor) PreviewModeKeyHandler(c int) (redraw, exit bool) {
 	switch c {
-	case ARROW_DOWN, ctrlKey('j'):
-		e.previewLineOffset++
-	case ARROW_UP, ctrlKey('k'):
-		if e.previewLineOffset > 0 {
-			e.previewLineOffset--
-		}
+	case PAGE_DOWN, ctrlKey('j'):
+		app.Organizer.scrollNoticeDown()
+	case PAGE_UP, ctrlKey('k'):
+		app.Organizer.scrollNoticeUp()
+	case HOME_KEY:
+		app.Organizer.scrollNoticeHome()
+	case ':': // COMMAND or SEARCH
+		e.ShowMessage(BR, ":")
+		vim.SendKey("<esc>") // park in NORMAL mode
+		e.command_line = ""
+		e.mode = EX_COMMAND
+		e.tabCompletion.index = 0
+		e.tabCompletion.list = nil
 	}
-	e.drawPreview()
 	return false, true
 }
 

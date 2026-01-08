@@ -171,7 +171,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	registry.Register("set context", (*Organizer).setContext, CommandInfo{
-		Aliases:     []string{"set c"},
+		Aliases:     []string{"set c", "setc", "sc"},
 		Description: "Set context for entrie(s)",
 		Usage:       "set context <context>",
 		Category:    "Entry Management",
@@ -179,7 +179,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	registry.Register("set folder", (*Organizer).setFolder, CommandInfo{
-		Aliases:     []string{"set f"},
+		Aliases:     []string{"set f", "setf", "sf"},
 		Description: "Set folder for entrie(s)",
 		Usage:       "set folder <folder>",
 		Category:    "Entry Management",
