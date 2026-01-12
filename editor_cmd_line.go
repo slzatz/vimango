@@ -34,8 +34,8 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":write", ":w"},
 	})
 
-	registry.Register("write", (*Editor).compile, CommandInfo{
-		Aliases:     []string{"compile"},
+	registry.Register("compile", (*Editor).compile, CommandInfo{
+		Aliases:     []string{"compile", "run"},
 		Description: "Compile current code file",
 		Usage:       "compile",
 		Category:    "File Operations",
@@ -510,7 +510,7 @@ func (e *Editor) compile() {
 		e.ShowMessage(BR, "Error writing file %s: %v", filePath, err)
 		return
 	}
-	e.ShowMessage(BR, "Note written to file %s", filePath)
+	e.ShowMessage(BR, "Code file written to %s", filePath)
 	if lang == "cpp" {
 		dir = "/home/slzatz/clangd_examples/"
 		cmd = exec.Command("make")

@@ -51,7 +51,7 @@
     "suffix": "",
     "color": "16",
     "background_color": "4",
-    "bold": false,
+    "bold": true,
     "kitty_scale": 2,
     "kitty_numerator": 7,
     "kitty_denominator": 8,
