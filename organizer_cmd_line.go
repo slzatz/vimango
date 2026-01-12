@@ -1156,7 +1156,12 @@ func (o *Organizer) folders(_ int) {
 }
 
 func (o *Organizer) setContext(pos int) {
-	input := o.command_line[pos+1:]
+	var input string
+	if pos == -1 {
+		input = "none"
+	} else {
+		input = o.command_line[pos+1:]
+	}
 	var contextUUID string
 	var ok bool
 	o.mode = NORMAL
@@ -1173,7 +1178,7 @@ func (o *Organizer) setContext(pos int) {
 				return
 			}
 		}
-		o.ShowMessage(BL, "Marked entries moved into context %s", input)
+		o.ShowMessage(BL, "Marked entries moved into context %q", input)
 		return
 	}
 	id := o.rows[o.fr].id
@@ -1182,16 +1187,21 @@ func (o *Organizer) setContext(pos int) {
 		o.showMessage("Error updating context for entry %d: %v", id, err)
 		return
 	}
-	o.ShowMessage(BL, "Moved current entry into context %s", input)
+	o.ShowMessage(BL, "Moved current entry into context %q", input)
 }
 
 func (o *Organizer) setFolder(pos int) {
-	input := o.command_line[pos+1:]
-	var ok bool
+	var input string
+	if pos == -1 {
+		input = "none"
+	} else {
+		input = o.command_line[pos+1:]
+	}
 	var folderUUID string
+	var ok bool
 	o.mode = NORMAL
 	if folderUUID, ok = o.Database.folderExists(input); !ok {
-		o.ShowMessage(BL, "%s is not a valid folder!", input)
+		o.ShowMessage(BL, "%q is not a valid folder!", input)
 		return
 	}
 
@@ -1203,7 +1213,7 @@ func (o *Organizer) setFolder(pos int) {
 				return
 			}
 		}
-		o.ShowMessage(BL, "Marked entries moved into folder %s", input)
+		o.ShowMessage(BL, "Marked entries moved into folder %q", input)
 		return
 	}
 	id := o.rows[o.fr].id
@@ -1212,7 +1222,7 @@ func (o *Organizer) setFolder(pos int) {
 		o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
 		return
 	}
-	o.ShowMessage(BL, "Moved current entry into folder %s", input)
+	o.ShowMessage(BL, "Moved current entry into folder %q", input)
 }
 
 func (o *Organizer) addKeyword(pos int) {

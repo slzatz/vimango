@@ -8,6 +8,7 @@ import (
 )
 
 func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
+	//o.ShowMessage(BR, "organizerProcessKey: %d -- mode %s", c, o.mode) //debug
 	redraw = RedrawFull
 	// Handle global escape key
 	if c == '\x1b' {
@@ -124,7 +125,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		o.command += string(c) //note currently all are single characters although future could use leader+chars
 
 		if cmd, found := o.normalCmds[o.command]; found {
-			//o.ShowMessage(BL, "key pressed: %T", cmd) ///debug
+			//o.ShowMessage(BR, "key pressed: %T", cmd) ///debug
 			cmd(o)
 			switch o.command {
 			case string(ctrlKey('a')), string(ctrlKey('d')), string(ctrlKey('x')), "m":
@@ -254,6 +255,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		var cmd func(*Organizer, int)
 		var found bool
 		var s string
+		o.command = "" ////////there must be a better place!
 		pos := strings.LastIndexByte(o.command_line, ' ')
 		if pos == -1 {
 			//s = o.command_line
