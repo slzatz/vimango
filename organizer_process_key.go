@@ -333,7 +333,8 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 
 		o.command_line = o.command_line[:pos+1] + o.tabCompletion.list[o.tabCompletion.index].Text
-		o.showMessage(":%s (%c)", o.command_line, o.tabCompletion.list[o.tabCompletion.index].Char)
+		//o.showMessage(":%s (%c)", o.command_line, o.tabCompletion.list[o.tabCompletion.index].Char)
+		o.showMessage(":%s", o.command_line)
 		return
 
 	case DEL_KEY, BACKSPACE:
