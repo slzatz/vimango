@@ -42,6 +42,8 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		redraw = o.ExModeKeyHandler(c)
 	case NAVIGATE_NOTICE, HELP:
 		redraw = o.NavigateNoticeModeKeyHandler(c)
+	case CONTAINER:
+		redraw = o.NavigateContainerModeKeyHandler(c)
 	default:
 		return
 	}
@@ -357,6 +359,75 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 // Used for viewing sync log and help
 func (o *Organizer) NavigateNoticeModeKeyHandler(c int) RedrawScope {
 	o.ShowMessage(BL, "NavigateRender mode")
+	switch c {
+	case ctrlKey('j'), PAGE_DOWN:
+		o.scrollNoticeDown()
+	case ctrlKey('k'), PAGE_UP:
+		o.scrollNoticeUp()
+	case HOME_KEY:
+		o.scrollNoticeHome()
+	case ':': // COMMAND or SEARCH
+		o.ShowMessage(BL, ":")
+		vim.SendKey("<esc>") // park in NORMAL mode
+		o.command_line = ""
+		//o.last_mode = o.mode //Should probably be NORMAL
+		o.mode = COMMAND_LINE
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
+	}
+	return RedrawNone
+}
+
+func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
+	if _, err := strconv.Atoi(string(c)); err == nil {
+		o.command += string(c)
+	}
+	o.ShowMessage(BR, "%s", o.command) //debug
+	if c == '\r' {
+		index, _ := strconv.Atoi(o.command)
+		index-- // to convert to 0 based
+		if o.altView == CONTEXT {
+			o.setContextNew(o.containerList[index])
+		}
+		if o.altView == FOLDER {
+			o.setFolderNew(o.containerList[index])
+		}
+		o.command = ""
+		vim.SendKey("<esc>")
+		o.mode = NORMAL
+		o.altRowoff = 0
+		o.displayNote()
+		return RedrawFull // needed to redraw status line
+	}
+	switch c {
+	case ctrlKey('j'), PAGE_DOWN:
+		o.scrollNoticeDown()
+	case ctrlKey('k'), PAGE_UP:
+		o.scrollNoticeUp()
+	case HOME_KEY:
+		o.scrollNoticeHome()
+	case ':': // COMMAND or SEARCH
+		o.ShowMessage(BL, ":")
+		vim.SendKey("<esc>") // park in NORMAL mode
+		o.command_line = ""
+		//o.last_mode = o.mode //Should probably be NORMAL
+		o.mode = COMMAND_LINE
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
+	}
+	return RedrawNone
+}
+func (o *Organizer) NavigateContainerModeKeyHandler_(c int) RedrawScope {
+	if c >= '0' && c <= '9' {
+		index := int(c-'0') - 1
+		if o.altView == CONTEXT {
+			o.setContextNew(o.containerList[index])
+		}
+		o.mode = NORMAL
+		o.view = TASK
+		o.ShowMessage(BL, "NavigateContainer mode: %s %s", string(c), o.containerList[index])
+		return RedrawNone
+	}
 	switch c {
 	case ctrlKey('j'), PAGE_DOWN:
 		o.scrollNoticeDown()

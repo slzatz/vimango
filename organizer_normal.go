@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"maps"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/slzatz/vimango/vim"
@@ -49,6 +52,18 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 		Aliases:     []string{string(PAGE_UP)},
 		Description: "Scroll rendered note up",
 		Category:    "Navigation",
+	})
+
+	registry.Register(string(ctrlKey('f')), (*Organizer).newFolderNormal, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('f'))),
+		Description: "Assign a folder to the current note",
+		Category:    "Entry Actions",
+	})
+
+	registry.Register(string(ctrlKey('c')), (*Organizer).newContextNormal, CommandInfo{
+		Name:        keyToDisplayName(string(ctrlKey('c'))),
+		Description: "Assign a context to the current note",
+		Category:    "Entry Actions",
 	})
 
 	registry.Register(string(HOME_KEY), (*Organizer).scrollPreviewHome, CommandInfo{
@@ -313,4 +328,46 @@ func (o *Organizer) displayContainerInfo() {
 	fmt.Fprintf(&ab, "note count: %d%s", c.count, "\n")
 
 	o.drawNotice(ab.String())
+}
+
+func (o *Organizer) newContextNormal() {
+	o.altView = CONTEXT
+	o.command = ""
+	o.command_line = ""
+
+	context_map := o.Database.contextList()
+	context_slice := slices.Collect(maps.Keys(context_map))
+	sort.Strings(context_slice)
+	o.containerList = context_slice
+	var sb strings.Builder
+	for i, k := range context_slice {
+		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
+	}
+	//contexts := strings.Join(context_slice, "\n")
+	o.mode = CONTAINER
+	//o.drawNotice(contexts)
+	o.drawNotice(sb.String())
+	o.altRowoff = 0
+	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
+}
+
+func (o *Organizer) newFolderNormal() {
+	o.altView = FOLDER
+	o.command = ""
+	o.command_line = ""
+
+	folder_map := o.Database.folderList()
+	folder_slice := slices.Collect(maps.Keys(folder_map))
+	sort.Strings(folder_slice)
+	o.containerList = folder_slice
+	var sb strings.Builder
+	for i, k := range folder_slice {
+		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
+	}
+	//contexts := strings.Join(context_slice, "\n")
+	o.mode = CONTAINER
+	//o.drawNotice(contexts)
+	o.drawNotice(sb.String())
+	o.altRowoff = 0
+	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }

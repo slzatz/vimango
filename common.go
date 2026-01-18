@@ -176,6 +176,7 @@ const (
 	SPELLING        // this mode recognizes 'z='
 	NAVIGATE_NOTICE // only in organizer mode
 	HELP            // organizer and editor mode
+	CONTAINER       // overlay for choosing folder/context
 	LINKS           // only in organizer mode
 	PENDING
 	OTHER // Just in case
@@ -382,6 +383,7 @@ func (m Mode) String() string {
 		"SPELLING",
 		"NAVIGATE_NOTICE",
 		"HELP",
+		"CONTAINER",
 		"LINKS",
 		"PENDING",
 		"OTHER",

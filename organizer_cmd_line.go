@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -148,6 +150,22 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 	registry.Register("contexts", (*Organizer).containers, CommandInfo{
 		Aliases:     []string{"c"},
+		Description: "show contexts",
+		Usage:       "contexts",
+		Category:    "Container Management",
+		Examples:    []string{":contexts", "c"},
+	})
+
+	registry.Register("newc", (*Organizer).newContext, CommandInfo{
+		//Aliases:     []string{"c"},
+		Description: "show contexts",
+		Usage:       "contexts",
+		Category:    "Container Management",
+		Examples:    []string{":contexts", "c"},
+	})
+
+	registry.Register("newf", (*Organizer).newFolder, CommandInfo{
+		//Aliases:     []string{"c"},
 		Description: "show contexts",
 		Usage:       "contexts",
 		Category:    "Container Management",
@@ -528,6 +546,47 @@ func (o *Organizer) help(pos int) {
 	o.drawNotice(helpText)
 	o.altRowoff = 0
 	o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
+}
+func (o *Organizer) newContext(pos int) {
+	o.altView = CONTEXT
+	o.command = ""
+	o.command_line = ""
+
+	context_map := o.Database.contextList()
+	context_slice := slices.Collect(maps.Keys(context_map))
+	sort.Strings(context_slice)
+	o.containerList = context_slice
+	var sb strings.Builder
+	for i, k := range context_slice {
+		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
+	}
+	//contexts := strings.Join(context_slice, "\n")
+	o.mode = CONTAINER
+	//o.drawNotice(contexts)
+	o.drawNotice(sb.String())
+	o.altRowoff = 0
+	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
+}
+
+func (o *Organizer) newFolder(pos int) {
+	o.altView = FOLDER
+	o.command = ""
+	o.command_line = ""
+
+	folder_map := o.Database.folderList()
+	folder_slice := slices.Collect(maps.Keys(folder_map))
+	sort.Strings(folder_slice)
+	o.containerList = folder_slice
+	var sb strings.Builder
+	for i, k := range folder_slice {
+		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
+	}
+	//contexts := strings.Join(context_slice, "\n")
+	o.mode = CONTAINER
+	//o.drawNotice(contexts)
+	o.drawNotice(sb.String())
+	o.altRowoff = 0
+	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }
 
 // formatNormalModeHelp returns formatted help for all normal mode commands
@@ -1190,6 +1249,63 @@ func (o *Organizer) setContext(pos int) {
 	o.ShowMessage(BL, "Moved current entry into context %q", input)
 }
 
+func (o *Organizer) setContextNew_(input string) {
+	var contextUUID string
+	var ok bool
+	//o.mode = NORMAL
+	if contextUUID, ok = o.Database.contextExists(input); !ok {
+		o.ShowMessage(BL, "%s is not a valid context!", input)
+		return
+	}
+
+	if len(o.marked_entries) > 0 {
+		for id := range o.marked_entries {
+			err := o.Database.updateTaskContextByUUID(contextUUID, id)
+			if err != nil {
+				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
+				return
+			}
+		}
+		o.ShowMessage(BL, "Marked entries moved into context %q", input)
+		return
+	}
+	id := o.rows[o.fr].id
+	err := o.Database.updateTaskContextByUUID(contextUUID, id)
+	if err != nil {
+		o.showMessage("Error updating context for entry %d: %v", id, err)
+		return
+	}
+	o.ShowMessage(BL, "Moved current entry into context %q", input)
+}
+
+func (o *Organizer) setFolderNew_(input string) {
+	var contextUUID string
+	var ok bool
+	//o.mode = NORMAL
+	if contextUUID, ok = o.Database.contextExists(input); !ok {
+		o.ShowMessage(BL, "%s is not a valid context!", input)
+		return
+	}
+
+	if len(o.marked_entries) > 0 {
+		for id := range o.marked_entries {
+			err := o.Database.updateTaskContextByUUID(contextUUID, id)
+			if err != nil {
+				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
+				return
+			}
+		}
+		o.ShowMessage(BL, "Marked entries moved into context %q", input)
+		return
+	}
+	id := o.rows[o.fr].id
+	err := o.Database.updateTaskContextByUUID(contextUUID, id)
+	if err != nil {
+		o.showMessage("Error updating context for entry %d: %v", id, err)
+		return
+	}
+	o.ShowMessage(BL, "Moved current entry into context %q", input)
+}
 func (o *Organizer) setFolder(pos int) {
 	var input string
 	if pos == -1 {
