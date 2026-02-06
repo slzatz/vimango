@@ -1,6 +1,7 @@
 { "document": { "block_prefix": "\n", "block_suffix": "\n", "color": "7", "margin": 0 },
   "block_quote": {
     "indent": 1,
+    "color": "4",
     "indent_token": "│ "
   },
   "paragraph": {},
