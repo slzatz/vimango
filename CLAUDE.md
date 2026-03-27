@@ -267,6 +267,11 @@ HEIC support requires the following system libraries to be installed at runtime:
 - **libde265** - HEVC/H.265 decoder (required by libheif for HEIC decoding)
 - **aom** - AV1 codec support (note: package name is `aom` on Arch Linux, `libaom-dev` on Debian/Ubuntu)
 
+**macOS (Homebrew):**
+```bash
+brew install libheif libde265 aom
+```
+
 **Arch Linux:**
 ```bash
 sudo pacman -S libheif libde265 aom

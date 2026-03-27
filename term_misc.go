@@ -146,6 +146,9 @@ func loadImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt st
 	defer f.Close()
 
 	img, imgFmt, err = decodeImageWithOrientation(f)
+	if err != nil {
+		return
+	}
 	if img.Bounds().Max.X > maxWidth || img.Bounds().Max.Y > maxHeight {
 		//img = imaging.Resize(img, maxWidth, 0, imaging.Lanczos)
 		img = imaging.Fit(img, maxWidth, maxHeight, imaging.Lanczos)
@@ -167,6 +170,9 @@ func loadWebImage(URL string) (img image.Image, imgFmt string, err error) {
 		return
 	}
 	img, imgFmt, err = decodeImageWithOrientation(response.Body)
+	if err != nil {
+		return
+	}
 	if img.Bounds().Max.Y > app.Session.imgSizeY {
 		img = imaging.Resize(img, 0, app.Session.imgSizeY, imaging.Lanczos)
 	}
