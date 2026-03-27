@@ -2,6 +2,7 @@
 config.json
 go_credentials.json
 token.json
+token_store.json
 preferences.json
 
 # Database files
@@ -21,6 +22,9 @@ vimango
 
 # exclude certificate files
 *.crt
+
+# Python virtual environment
+.venv/
 
 # Image cache
 image_cache/
