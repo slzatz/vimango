@@ -1,4 +1,4 @@
-//go:build linux || freebsd || openbsd || netbsd
+//go:build darwin
 
 package rawmode
 
@@ -32,12 +32,11 @@ func GetWindowSize() (*Winsize, error) {
 
 // Enable switches the console from cooked or canonical mode to raw mode.
 // It returns the current terminal settings for use in restoring console
-// serlialized to a platform independent byte slice via gob
+// serialized to a platform independent byte slice via gob
 func Enable() ([]byte, error) {
 
-	// Gets TermIOS data structure. From glibc, we find the cmd should be TCGETS
-	// https://code.woboq.org/userspace/glibc/sysdeps/unix/sysv/linux/tcgetattr.c.html
-	termios, err := unix.IoctlGetTermios(unix.Stdin, unix.TCGETS)
+	// On macOS, TIOCGETA is the equivalent of Linux's TCGETS
+	termios, err := unix.IoctlGetTermios(unix.Stdin, unix.TIOCGETA)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching existing console settings: %w", err)
 	}
@@ -52,19 +51,16 @@ func Enable() ([]byte, error) {
 	termios.Iflag = termios.Iflag &^ (unix.IXON | unix.ICRNL | unix.BRKINT | unix.INPCK | unix.ISTRIP)
 	termios.Oflag = termios.Oflag &^ (unix.OPOST)
 	termios.Cflag = termios.Cflag | unix.CS8
-	//termios.Cc[unix.VMIN] = 0
-	//termios.Cc[unix.VTIME] = 1
-	// from the code of tcsetattr in glibc, we find that for TCSAFLUSH,
-	// the corresponding command is TCSETSF
-	// https://code.woboq.org/userspace/glibc/sysdeps/unix/sysv/linux/tcsetattr.c.html
-	if err := unix.IoctlSetTermios(unix.Stdin, unix.TCSETSF, termios); err != nil {
+
+	// On macOS, TIOCSETAF is the equivalent of Linux's TCSETSF (set with flush)
+	if err := unix.IoctlSetTermios(unix.Stdin, unix.TIOCSETAF, termios); err != nil {
 		return buf.Bytes(), err
 	}
 
 	return buf.Bytes(), nil
 }
 
-// Restore restoes the console to a previous row setting
+// Restore restores the console to a previous raw setting
 func Restore(original []byte) error {
 
 	var termios unix.Termios
@@ -73,7 +69,7 @@ func Restore(original []byte) error {
 		return fmt.Errorf("error decoding terminal settings: %w", err)
 	}
 
-	if err := unix.IoctlSetTermios(unix.Stdin, unix.TCSETSF, &termios); err != nil {
+	if err := unix.IoctlSetTermios(unix.Stdin, unix.TIOCSETAF, &termios); err != nil {
 		return fmt.Errorf("error restoring original console settings: %w", err)
 	}
 	return nil

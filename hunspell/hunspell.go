@@ -3,8 +3,8 @@
 package hunspell
 
 // #cgo linux LDFLAGS: -lhunspell
-// #cgo darwin LDFLAGS: -lhunspell-1.3 -L/usr/local/Cellar/hunspell/1.3.2/lib
-// #cgo darwin CFLAGS: -I/usr/local/Cellar/hunspell/1.3.2/include
+// #cgo darwin LDFLAGS: -lhunspell-1.7 -L/opt/homebrew/lib
+// #cgo darwin CFLAGS: -I/opt/homebrew/include
 // #cgo freebsd CFLAGS: -I/usr/local/include
 // #cgo freebsd LDFLAGS: -L/usr/local/lib -lhunspell-1.3
 //
