@@ -24,3 +24,7 @@ vimango
 
 # Image cache
 image_cache/
+
+# Go workspace (machine-specific)
+go.work
+go.work.sum

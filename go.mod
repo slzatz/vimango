@@ -70,7 +70,6 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace github.com/charmbracelet/glamour => /home/slzatz/glamour
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
