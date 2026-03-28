@@ -1,4 +1,4 @@
-//go:build (!cgo || windows) && !darwin
+//go:build windows
 
 package main
 

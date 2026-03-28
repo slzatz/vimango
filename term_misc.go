@@ -77,12 +77,12 @@ func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
 			if err != nil {
 				return nil, "", fmt.Errorf("HEIC decode failed: %v", err)
 			}
-			// HEIC images decoded by go-libheif should already have orientation applied
+			// HEIC images decoded by pillow-heif should already have orientation applied
 			// Return as "heic" format - will be converted to PNG for caching
 			return img, "heic", nil
 		}
 		// HEIC not available - return meaningful error
-		return nil, "", fmt.Errorf("HEIC format detected but not supported in this build (requires CGO)")
+		return nil, "", fmt.Errorf("HEIC format detected but not supported (requires .venv with pillow-heif)")
 	}
 
 	// Detect format using standard library for non-HEIC formats

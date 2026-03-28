@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build !windows
 
 package main
 
@@ -44,6 +44,12 @@ func createHEICDecoder() HEICDecoder {
 			script := filepath.Join(base, "heic_convert.py")
 			if _, err := os.Stat(py); err == nil {
 				if _, err := os.Stat(script); err == nil {
+					// Verify pillow-heif is actually importable
+					probe := exec.Command(py, "-c", "import pillow_heif")
+					if out, err := probe.CombinedOutput(); err != nil {
+						pillowInitErr = fmt.Errorf("pillow-heif not importable: %s", string(out))
+						return
+					}
 					pillowPython = py
 					pillowScript = script
 					return
@@ -51,6 +57,7 @@ func createHEICDecoder() HEICDecoder {
 			}
 		}
 		pillowInitErr = fmt.Errorf("HEIC support requires .venv with pillow-heif and heic_convert.py")
+		return
 	})
 
 	return &PillowHEICDecoder{}

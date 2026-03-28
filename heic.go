@@ -19,7 +19,7 @@ type HEICDecoder interface {
 // Global HEIC decoder instance
 var globalHEICDecoder HEICDecoder
 
-// Default availability flag - overridden by heic_cgo.go init()
+// Default availability flag - overridden by heic_pillow.go init()
 var isHEICAvailableDefault = false
 
 // GetHEICDecoder returns the global HEIC decoder instance
@@ -73,7 +73,7 @@ func IsHEICData(data []byte) bool {
 
 // ShowHEICNotAvailableMessage returns a user-friendly message
 func ShowHEICNotAvailableMessage() string {
-	return fmt.Sprintf("%sHEIC format not supported in this build (requires CGO)%s", YELLOW_BG, RESET)
+	return fmt.Sprintf("%sHEIC format not supported (requires .venv with pillow-heif)%s", YELLOW_BG, RESET)
 }
 
 // StubHEICDecoder provides a no-op implementation for platforms without HEIC support
@@ -84,7 +84,7 @@ func (s *StubHEICDecoder) IsAvailable() bool {
 }
 
 func (s *StubHEICDecoder) Decode(r io.Reader) (image.Image, error) {
-	return nil, fmt.Errorf("HEIC decoding not available in this build (requires CGO)")
+	return nil, fmt.Errorf("HEIC decoding not available (requires .venv with pillow-heif)")
 }
 
 func createStubHEICDecoder() HEICDecoder {
