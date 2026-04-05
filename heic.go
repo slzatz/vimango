@@ -73,7 +73,7 @@ func IsHEICData(data []byte) bool {
 
 // ShowHEICNotAvailableMessage returns a user-friendly message
 func ShowHEICNotAvailableMessage() string {
-	return fmt.Sprintf("%sHEIC format not supported (requires .venv with pillow-heif)%s", YELLOW_BG, RESET)
+	return fmt.Sprintf("%sHEIC format not supported (requires CGO with libheif or .venv with pillow-heif)%s", YELLOW_BG, RESET)
 }
 
 // StubHEICDecoder provides a no-op implementation for platforms without HEIC support
@@ -84,7 +84,7 @@ func (s *StubHEICDecoder) IsAvailable() bool {
 }
 
 func (s *StubHEICDecoder) Decode(r io.Reader) (image.Image, error) {
-	return nil, fmt.Errorf("HEIC decoding not available (requires .venv with pillow-heif)")
+	return nil, fmt.Errorf("HEIC decoding not available (requires CGO with libheif or .venv with pillow-heif)")
 }
 
 func createStubHEICDecoder() HEICDecoder {

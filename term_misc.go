@@ -82,7 +82,7 @@ func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
 			return img, "heic", nil
 		}
 		// HEIC not available - return meaningful error
-		return nil, "", fmt.Errorf("HEIC format detected but not supported (requires .venv with pillow-heif)")
+		return nil, "", fmt.Errorf("HEIC format detected but not supported (requires CGO with libheif or .venv with pillow-heif)")
 	}
 
 	// Detect format using standard library for non-HEIC formats
