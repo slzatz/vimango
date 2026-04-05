@@ -5,6 +5,49 @@ This file provides guidance to Claude when working with code in this repository.
 ## Build Commands
 - **Linux/Unix with CGO**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (includes libvim, hunspell, sqlite3)
 NOTE: When updating, fixing or adding to the code, the CGO build is the most comprehensive to ensure all features work as expected.
+NOTE: CGO builds require `libvim.a` in the project root. See "Building libvim.a" below.
+
+### Building libvim.a (CGO Prerequisite)
+
+The static library `libvim.a` is not checked into the repo (it differs per platform). It must be built from [onivim/libvim](https://github.com/onivim/libvim) source and placed in the project root (next to `go.mod`).
+
+**macOS (Apple Silicon / Homebrew):**
+```bash
+brew install ncurses gettext
+cd /path/to/libvim/src
+./configure --disable-selinux --with-tlib=ncurses \
+  CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
+    -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
+    -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
+    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype" \
+  LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
+make libvim.a
+cp libvim.a /path/to/vimango/
+```
+
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt-get install libtinfo-dev libacl1-dev
+cd /path/to/libvim/src
+./configure --disable-selinux CFLAGS=-fPIC
+make libvim.a
+cp libvim.a /path/to/vimango/
+```
+
+**Linux (Arch Linux):**
+```bash
+sudo pacman -S ncurses acl
+cd /path/to/libvim/src
+./configure --disable-selinux CFLAGS=-fPIC
+make libvim.a
+cp libvim.a /path/to/vimango/
+```
+
+**Notes:**
+- The CGO linkage flags in `vim/cvim/cvim.go` reference `libvim.a` as a bare filename resolved from the build working directory (project root).
+- The `auto/config.h` and `auto/pathdef.c` checked into `vim/cvim/auto/` do not need to be regenerated; they work on both platforms.
+- Pure Go builds (`CGO_ENABLED=0`) and the `--go-vim` flag do not require libvim.a.
+
 - **Linux/Unix Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
 - **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
 - Run: `go run main.go`

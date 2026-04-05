@@ -23,21 +23,92 @@ This wasn't developed thinking anyone else would use it so there isn't an instal
  - Go 1.20 or later
  - SQLite3 development files
  - Hunspell development files
- - libvimi.a is included in the repository
+ - libvim.a (must be built from source — see [Building libvim.a](#building-libvima) below)
+
+## Building libvim.a
+
+The `libvim.a` static library provides vim modal editing via CGO. It must be compiled from source because the binary differs between macOS and Linux. This is only needed for CGO builds — pure Go builds (`CGO_ENABLED=0`) with the `--go-vim` flag do not require it.
+
+**Source:** Clone [onivim/libvim](https://github.com/onivim/libvim) and build in its `src/` directory.
+
+### macOS (Apple Silicon / Homebrew)
+
+Install prerequisites:
+```bash
+brew install ncurses gettext
+```
+
+Configure and build:
+```bash
+cd /path/to/libvim/src
+./configure --disable-selinux --with-tlib=ncurses \
+  CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
+    -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
+    -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
+    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype" \
+  LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
+make libvim.a
+```
+
+The `-Wno-error` flags are needed because Xcode's Clang is stricter than GCC and treats certain legacy C patterns as errors.
+
+Copy to the vimango project root:
+```bash
+cp libvim.a /path/to/vimango/
+```
+
+### Linux
+
+Install prerequisites:
+
+**Debian/Ubuntu:**
+```bash
+sudo apt-get install libtinfo-dev libacl1-dev
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S ncurses acl
+```
+
+Configure and build:
+```bash
+cd /path/to/libvim/src
+./configure --disable-selinux CFLAGS=-fPIC
+make libvim.a
+```
+
+The `-fPIC` flag is required on Linux for position-independent code.
+
+Copy to the vimango project root:
+```bash
+cp libvim.a /path/to/vimango/
+```
+
+### Build Notes
+
+- The `libvim.a` file must be placed in the vimango project root directory (next to `go.mod`).
+- You do **not** need to copy or regenerate `auto/config.h` or `auto/pathdef.c` from your libvim build; the versions checked into this repo work on both platforms.
+- If you only want to run vimango without libvim (pure Go mode), skip this step and build with `CGO_ENABLED=0 go build --tags=fts5`, then run with `--go-vim`.
 
 ## Quick Start
 
 **First-time setup (recommended):**
 ```bash
-# 1. Clone and build
+# 1. Clone the repository
 git clone https://github.com/slzatz/vimango.git
 cd vimango
+
+# 2. Build libvim.a and copy to this directory (see "Building libvim.a" above)
+#    Or skip this step and use --go-vim for pure Go vim
+
+# 3. Build the application
 CGO_ENABLED=1 go build --tags="fts5,cgo"
 
-# 2. Run first-time setup (creates config.json and databases)
+# 4. Run first-time setup (creates config.json and databases)
 ./vimango --init
 
-# 3. Run the application
+# 5. Run the application
 ./vimango
 ```
 
