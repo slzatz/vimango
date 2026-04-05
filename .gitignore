@@ -29,6 +29,9 @@ vimango
 # Image cache
 image_cache/
 
+# libvim.a different on mac and linux
+libvim.a
+
 # Go workspace (machine-specific)
 go.work
 go.work.sum
