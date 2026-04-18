@@ -74,11 +74,13 @@ sudo pacman -S ncurses acl
 Configure and build:
 ```bash
 cd /path/to/libvim/src
-./configure --disable-selinux CFLAGS=-fPIC
+./configure --disable-selinux --with-tlib=tinfo \
+  CFLAGS="-fPIC -Wno-error=implicit-function-declaration \
+    -Wno-error=implicit-int -Wno-error=int-conversion"
 make libvim.a
 ```
 
-The `-fPIC` flag is required on Linux for position-independent code.
+The `-fPIC` flag is required on Linux for position-independent code. The `-Wno-error` flags are needed because GCC 14+ treats implicit function declarations and implicit int return types as errors, which breaks the legacy C in configure's test programs.
 
 Copy to the vimango project root:
 ```bash
