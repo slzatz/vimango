@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 
@@ -76,8 +77,8 @@ func main() {
 	// Initialize database connections
 	err = app.InitDatabases("config.json", sqliteConfig)
 	if err != nil {
-		// Check if this is a missing config.json error
-		if os.IsNotExist(err) {
+		// Distinguish "config.json itself is missing" from "config references a missing file"
+		if _, statErr := os.Stat("config.json"); os.IsNotExist(statErr) {
 			fmt.Println("Error: config.json not found.")
 			fmt.Println()
 			fmt.Println("If this is a new installation, run:")
@@ -89,6 +90,13 @@ func main() {
 		// Check if database files are missing
 		if errors.Is(err, ErrDatabaseNotFound) {
 			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		// Some other file referenced by config.json is missing, or another failure
+		var pathErr *fs.PathError
+		if errors.As(err, &pathErr) && os.IsNotExist(pathErr) {
+			fmt.Printf("Error: file referenced by config.json not found: %s\n", pathErr.Path)
+			fmt.Println("Check paths in config.json (e.g., postgres SSL cert, sqlite DB).")
 			os.Exit(1)
 		}
 		log.Fatal(err)
