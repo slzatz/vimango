@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"sync"
 )
 
 // HEICDecoder provides an interface for HEIC decoding functionality
@@ -17,16 +18,19 @@ type HEICDecoder interface {
 }
 
 // Global HEIC decoder instance
-var globalHEICDecoder HEICDecoder
+var (
+	globalHEICDecoder     HEICDecoder
+	globalHEICDecoderOnce sync.Once
+)
 
 // Default availability flag - overridden by heic_pillow.go init()
 var isHEICAvailableDefault = false
 
 // GetHEICDecoder returns the global HEIC decoder instance
 func GetHEICDecoder() HEICDecoder {
-	if globalHEICDecoder == nil {
+	globalHEICDecoderOnce.Do(func() {
 		globalHEICDecoder = createHEICDecoder()
-	}
+	})
 	return globalHEICDecoder
 }
 

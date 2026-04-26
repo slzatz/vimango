@@ -93,6 +93,25 @@ cp libvim.a /path/to/vimango/
 - You do **not** need to copy or regenerate `auto/config.h` or `auto/pathdef.c` from your libvim build; the versions checked into this repo work on both platforms.
 - If you only want to run vimango without libvim (pure Go mode), skip this step and build with `CGO_ENABLED=0 go build --tags=fts5`, then run with `--go-vim`.
 
+## Building heic_worker
+
+The CGO HEIC decoder uses a separate worker subprocess (`heic_worker`) so libheif crashes can't take down vimango. The worker binary must be built per-platform and placed alongside the main `vimango` executable. It is excluded from version control via `.gitignore`.
+
+Install `libheif`:
+
+- **Arch Linux:** `sudo pacman -S libheif`
+- **Debian/Ubuntu:** `sudo apt-get install libheif-dev`
+- **macOS:** `brew install libheif`
+
+Build and copy:
+
+```bash
+cd cmd/heic_worker
+CGO_ENABLED=1 go build -o ../../heic_worker
+```
+
+If `heic_worker` is missing or built for the wrong architecture, vimango will silently fall through HEIC images (the placeholder will not render). HEIC support is optional — non-HEIC images are unaffected, and pure Go builds use a `pillow-heif` Python fallback when `.venv` is set up (see "HEIC Image Support" below).
+
 ## Quick Start
 
 **First-time setup (recommended):**
@@ -104,13 +123,16 @@ cd vimango
 # 2. Build libvim.a and copy to this directory (see "Building libvim.a" above)
 #    Or skip this step and use --go-vim for pure Go vim
 
-# 3. Build the application
+# 3. Build heic_worker (only if you want CGO HEIC support — see "Building heic_worker" above)
+cd cmd/heic_worker && CGO_ENABLED=1 go build -o ../../heic_worker && cd ../..
+
+# 4. Build the application
 CGO_ENABLED=1 go build --tags="fts5,cgo"
 
-# 4. Run first-time setup (creates config.json and databases)
+# 5. Run first-time setup (creates config.json and databases)
 ./vimango --init
 
-# 5. Run the application
+# 6. Run the application
 ./vimango
 ```
 

@@ -48,6 +48,23 @@ cp libvim.a /path/to/vimango/
 - The `auto/config.h` and `auto/pathdef.c` checked into `vim/cvim/auto/` do not need to be regenerated; they work on both platforms.
 - Pure Go builds (`CGO_ENABLED=0`) and the `--go-vim` flag do not require libvim.a.
 
+### Building heic_worker (CGO HEIC Prerequisite)
+
+The CGO HEIC decoder shells out to a separate `heic_worker` subprocess (built from `cmd/heic_worker/main.go`) so libheif crashes can't take down vimango. Like `libvim.a`, this binary differs per platform and is excluded from version control via `.gitignore`.
+
+Requires `libheif`:
+- **Arch Linux:** `sudo pacman -S libheif`
+- **Debian/Ubuntu:** `sudo apt-get install libheif-dev`
+- **macOS:** `brew install libheif`
+
+Build:
+```bash
+cd cmd/heic_worker
+CGO_ENABLED=1 go build -o ../../heic_worker
+```
+
+`heic_cgo.go` looks for `heic_worker` next to the main executable, then in the current directory. If it's missing or built for the wrong architecture, `IsHEICAvailable()` returns false and HEIC images silently fail to render. The pure Go pillow-heif fallback (see "HEIC Image Support" below) is unaffected.
+
 - **Linux/Unix Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
 - **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
 - Run: `go run main.go`

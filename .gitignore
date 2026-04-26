@@ -32,6 +32,9 @@ image_cache/
 # libvim.a different on mac and linux
 libvim.a
 
+# heic_worker subprocess binary - must be built per platform
+heic_worker
+
 # Go workspace (machine-specific)
 go.work
 go.work.sum
