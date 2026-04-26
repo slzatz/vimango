@@ -434,6 +434,9 @@ func (o *Organizer) drawRenderedNote() {
 	if len(o.note) == 0 {
 		return
 	}
+	if o.altRowoff >= len(o.note) {
+		o.altRowoff = 0
+	}
 	start := o.altRowoff
 	var end int
 	// check if there are more lines than can fit on the screen
