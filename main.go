@@ -21,6 +21,9 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Reject unknown flags before doing any other work
+	ValidateArgs(os.Args)
+
 	// Check for --init flag for first-time setup
 	if CheckForInit(os.Args) {
 		os.Exit(0)

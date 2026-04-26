@@ -2,8 +2,33 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 )
+
+// validFlags lists every command-line flag the application accepts.
+// Keep this in sync with ShowHelp and the Determine*/CheckFor* functions.
+var validFlags = map[string]bool{
+	"--help":       true,
+	"-h":           true,
+	"--init":       true,
+	"--go-vim":     true,
+	"--go-sqlite":  true,
+	"--cgo-sqlite": true,
+}
+
+// ValidateArgs checks that every argument in args[1:] is a recognized flag.
+// On the first unknown argument it prints an error and the help text to
+// stderr, then exits with status 2.
+func ValidateArgs(args []string) {
+	for _, arg := range args[1:] {
+		if !validFlags[arg] {
+			fmt.Fprintf(os.Stderr, "Error: unrecognized command-line argument %q\n\n", arg)
+			ShowHelp()
+			os.Exit(2)
+		}
+	}
+}
 
 const version = "0.1.0"
 
