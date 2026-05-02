@@ -20,6 +20,8 @@ require (
 	modernc.org/sqlite v1.39.1
 )
 
+replace github.com/webview/webview_go => ./third_party/webview_go
+
 require (
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
