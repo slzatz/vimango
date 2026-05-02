@@ -33,7 +33,10 @@ image_cache/
 libvim.a
 
 # heic_worker subprocess binary - must be built per platform
-heic_worker
+/heic_worker
+
+# webview_worker subprocess binary - must be built per platform
+/webview_worker
 
 # Go workspace (machine-specific)
 go.work

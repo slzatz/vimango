@@ -65,6 +65,20 @@ CGO_ENABLED=1 go build -o ../../heic_worker
 
 `heic_cgo.go` looks for `heic_worker` next to the main executable, then in the current directory. If it's missing or built for the wrong architecture, `IsHEICAvailable()` returns false and HEIC images silently fail to render. The pure Go pillow-heif fallback (see "HEIC Image Support" below) is unaffected.
 
+### Building webview_worker (CGO Webview Prerequisite)
+
+**Required on both Linux and macOS for CGO builds.** The CGO webview opens notes in a native window via WebKit. On macOS this requires running the WebKit/Cocoa event loop on the process's main thread, which conflicts with the terminal main loop already pinned there; on Linux the same architecture is correct and harmless. Vimango therefore shells out to a separate `webview_worker` subprocess (built from `cmd/webview_worker/main.go`) that owns its own main thread; the parent drives it over stdin with line-delimited JSON. Like `heic_worker` and `libvim.a`, this binary differs per platform and is excluded from version control via `.gitignore`.
+
+Requires the same webview platform dependencies as the main app (GTK 3 + webkit2gtk 4.1 on Linux; native WebKit framework on macOS — no extra install).
+
+Build (same on Linux and macOS):
+```bash
+cd cmd/webview_worker
+CGO_ENABLED=1 go build -o ../../webview_worker
+```
+
+`webview_cgo.go` looks for `webview_worker` next to the main executable, then in the current directory. If the binary is missing, `IsWebviewAvailable()` returns false and `OpenNoteInWebview` falls back to opening the rendered HTML in the system browser (`open` on macOS, `xdg-open` on Linux). The fallback is silent and graceful — the application never crashes due to a missing worker. Worker errors are logged to `$TMPDIR/vimango_webview_worker.log`.
+
 - **Linux/Unix Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
 - **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
 - Run: `go run main.go`
