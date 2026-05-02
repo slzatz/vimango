@@ -24,6 +24,7 @@ This wasn't developed thinking anyone else would use it so there isn't an instal
  - SQLite3 development files
  - Hunspell development files
  - libvim.a (must be built from source — see [Building libvim.a](#building-libvima) below)
+ - webkit2gtk 4.1 and GTK 3 (Linux only, for the built-in webviewer — see [Webview dependencies](#webview-dependencies) below)
 
 ## Building libvim.a
 
@@ -111,6 +112,19 @@ CGO_ENABLED=1 go build -o ../../heic_worker
 ```
 
 If `heic_worker` is missing or built for the wrong architecture, vimango will silently fall through HEIC images (the placeholder will not render). HEIC support is optional — non-HEIC images are unaffected, and pure Go builds use a `pillow-heif` Python fallback when `.venv` is set up (see "HEIC Image Support" below).
+
+## Webview dependencies
+
+The built-in HTML webviewer uses `github.com/webview/webview_go`, which on Linux/BSD links against GTK 3 and webkit2gtk 4.1. These must be installed before building:
+
+- **Arch Linux:** `sudo pacman -S gtk3 webkit2gtk-4.1`
+- **Debian/Ubuntu:** `sudo apt-get install libgtk-3-dev libwebkit2gtk-4.1-dev`
+- **macOS:** no install needed — uses the native WebKit framework
+- **Windows:** no install needed — uses the bundled Edge WebView2
+
+The webview import is unconditional, so these libraries are required for any CGO build (the pure-Go cross-compiled Windows build does not need them on the build host).
+
+A patched fork of `webview_go` lives under `third_party/webview_go` (referenced via a `replace` directive in `go.mod`) to pin the pkg-config target to `webkit2gtk-4.1`, since upstream still references the deprecated `webkit2gtk-4.0`.
 
 ## Quick Start
 
