@@ -74,11 +74,11 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	registry.Register("sync", (*Organizer).synchronize, CommandInfo{
-		Aliases:     []string{"test"},
-		Description: "Synchronize with remote server (test for dry-run)",
+		Aliases:     []string{"test", "sync?"},
+		Description: "Synchronize with remote server (test or sync? for dry-run)",
 		Usage:       "sync",
 		Category:    "Data Management",
-		Examples:    []string{":sync", ":test (dry-run)"},
+		Examples:    []string{":sync", ":test (dry-run)", ":sync? (dry-run)"},
 	})
 
 	/*
@@ -1083,7 +1083,7 @@ func (o *Organizer) find(pos int) {
 func (o *Organizer) synchronize(_ int) {
 	var log string
 	var err error
-	if o.command_line == "test" {
+	if o.command_line == "test" || o.command_line == "sync?" {
 		// true => reportOnly
 		log = app.Synchronize(true) //Synchronize should return an error
 		err = nil                   //FIXME
