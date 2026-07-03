@@ -49,6 +49,14 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":writeall", ":wa"},
 	})
 
+	registry.Register("sync", (*Editor).synchronize, CommandInfo{
+		Aliases:     []string{"test", "sync?"},
+		Description: "Synchronize with remote server (test or sync? for dry-run)",
+		Usage:       "sync",
+		Category:    "Data Management",
+		Examples:    []string{":sync", ":test (dry-run)", ":sync? (dry-run)"},
+	})
+
 	registry.Register("read", (*Editor).readFile, CommandInfo{
 		Aliases:     []string{"r"},
 		Description: "Read contents from file into current note",
@@ -1039,4 +1047,22 @@ func (e *Editor) printDocument() {
 	if err != nil {
 		e.ShowMessage(BR, "Error printing document: %v", err)
 	}
+}
+
+// synchronize makes :sync work from the editor pane (the macOS host
+// app's Sync menu feeds ":sync\r" into the pty without knowing which
+// pane has focus). It returns focus to the organizer — same steps as
+// moveLeft's return path — and delegates to the organizer's synchronize
+// so the full report renders in the notice view exactly as it does when
+// syncing from the organizer.
+func (e *Editor) synchronize() {
+	if e.Screen.divider < 10 {
+		e.Screen.edPct = 80
+		app.moveDividerPct(80)
+	}
+	e.Session.editorMode = false
+	vim.SetCurrentBuffer(app.Organizer.vbuf)
+	app.Organizer.command_line = e.command_line // dry-run detection (:test / :sync?)
+	app.Organizer.synchronize(0)
+	app.returnCursor()
 }
