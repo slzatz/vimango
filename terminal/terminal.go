@@ -95,6 +95,16 @@ func ReadKey() (Key, error) {
 		return Key{27, KeyNoSpl}, nil
 	}
 
+	// Every escape sequence we recognize (specialKeys) is introduced by
+	// '[' (CSI) or 'O' (SS3). Anything else buffered behind ESC is
+	// independent input that happened to arrive in the same read — e.g.
+	// a host app injecting "\x1b:open <id>\r" through the pty in one
+	// write. Return the bare ESC and leave those bytes for later reads;
+	// without this peek they would be swallowed by the sequence matcher.
+	if next, err := bufr.Peek(1); err == nil && next[0] != '[' && next[0] != 'O' {
+		return Key{27, KeyNoSpl}, nil
+	}
+
 	stack := [4]byte{}
 	for j := 0; j < 4; j++ {
 		b, err := bufr.ReadByte() // could these just be bufr.Readbyte
