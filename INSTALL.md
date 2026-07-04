@@ -98,8 +98,14 @@ Go version, or the toolchain will complain.
 ## 3. Native dependencies (Homebrew)
 
 ```bash
-brew install hunspell ncurses gettext libheif
+brew install pkg-config hunspell ncurses gettext libheif
 ```
+
+> **`pkg-config` is required for the `heic_worker` build** (§5). The go-libheif
+> CGO binding invokes `pkg-config` to locate libheif's compiler/linker flags. It
+> is often present as a transitive dependency of other formulae, but on a fresh
+> machine it may be absent — its omission produces
+> `exec: "pkg-config": executable file not found in $PATH`.
 
 ### hunspell — header path caveat
 
@@ -193,6 +199,34 @@ cd ../..
 If missing / built for the wrong arch, `IsHEICAvailable()` returns false and
 HEIC images silently fail (a pure-Go fallback covers most cases). Not fatal.
 
+**Symptom if `pkg-config` or libheif is missing:**
+`exec: "pkg-config": executable file not found in $PATH` (or
+`Package libheif was not found in the pkg-config search path`). Install both
+with `brew install pkg-config libheif` (§3). Note: `brew --prefix libheif`
+prints an expected path even when libheif is *not* installed — confirm the
+install with `brew list libheif` or `pkg-config --modversion libheif`.
+
+**Symptom of a libheif version mismatch:** cgo type errors from the binding,
+e.g. `cannot use uint32(compression) ... as _Ctype_heif_compression_format`.
+The `github.com/strukturag/libheif` Go binding is versioned to track the
+libheif **C library** release, but `github.com/klippa-app/go-libheif` (used by
+`heic_worker`) pins an older binding (`v1.17.6`) that only compiles against
+libheif 1.17's headers. Homebrew ships only the current libheif, so the pinned
+binding won't build against it. Fix by overriding the binding to match your
+installed libheif version:
+
+```bash
+# match the version reported by: pkg-config --modversion libheif
+go get github.com/strukturag/libheif@v1.23.1
+```
+
+This adds a `require github.com/strukturag/libheif vX.Y.Z // indirect` line to
+`go.mod`. Because that version must match the libheif installed on the build
+machine, keep it in sync with Homebrew's libheif (bump it after a
+`brew upgrade libheif` if the cgo type errors reappear). A benign
+`ld: warning: ignoring duplicate libraries: '-lheif'` during the build is
+expected and harmless.
+
 ### webview_worker (native WebKit note preview)
 
 ```bash
@@ -277,6 +311,9 @@ Run it:
 | `hunspell/hunspell.h: file not found` | hunspell not installed / Intel paths | §3 |
 | `libvim.a` not found / link errors | libvim.a not built or not in root | §4 |
 | libvim build fails on a warning (e.g. `long long` to `double`) | newer clang promotes warnings under `-Werror` | blanket `-Wno-error` in §4 CFLAGS |
+| `exec: "pkg-config": executable file not found in $PATH` | `pkg-config` (and maybe libheif) not installed | `brew install pkg-config libheif` (§3) |
+| `Package libheif was not found in the pkg-config search path` | libheif not actually installed (despite `brew --prefix` printing a path) | `brew install libheif`; verify with `brew list libheif` (§5) |
+| `cannot use uint32(...) as _Ctype_heif_*` when building `heic_worker` | strukturag/libheif binding version ≠ installed libheif | `go get github.com/strukturag/libheif@<installed-version>` (§5) |
 | HEIC images don't render | `heic_worker` missing/wrong arch | §5 (non-fatal) |
 | Web view opens in browser instead of window | `webview_worker` missing | §5 (non-fatal) |
 | `config.json` / database errors on first run | never initialized | `./vimango --init` (§8) |
