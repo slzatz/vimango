@@ -73,6 +73,14 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":save backup.txt", ":savefile /tmp/note.md"},
 	})
 
+	registry.Register("open", (*Editor).openNote, CommandInfo{
+		Aliases:     []string{"open!"},
+		Description: "Switch this editor to the note with the given database id (open! discards unsaved changes)",
+		Usage:       "open <id>",
+		Category:    "File Operations",
+		Examples:    []string{":open 5", ":open! 5"},
+	})
+
 	// Editing commands
 	registry.Register("syntax", (*Editor).syntax, CommandInfo{
 		Description: "Set syntax highlighting for current note",
@@ -736,6 +744,14 @@ func (e *Editor) quitActions() {
 		return
 	}
 
+	if e.Session.editorOnly && len(e.Session.Editors) == 1 {
+		// no organizer to return to: quitting the last editor exits the app
+		// (leave the buffer intact; the main loop finishes this iteration
+		// before a.Run is checked)
+		app.Run = false
+		return
+	}
+
 	vim.ExecuteCommand("bw") // wipout the buffer
 
 	if len(e.Session.Editors) == 1 {
@@ -773,6 +789,19 @@ func (e *Editor) writeAll() {
 }
 
 func (e *Editor) quitAll() {
+	if e.Session.editorOnly {
+		// no organizer to return to: quitting all editors exits the app,
+		// respecting unsaved changes (buffers left intact — see quitActions)
+		for _, ed := range e.Session.Editors {
+			if ed.isModified() {
+				e.ShowMessage(BR, "Some editors had no write since the last change")
+				return
+			}
+		}
+		app.Run = false
+		return
+	}
+
 	var editorsToKeep []*Editor
 
 	// First pass: identify which editors to keep and clean up those we're closing
@@ -817,6 +846,60 @@ func (e *Editor) quitAll() {
 		app.returnCursor()
 	}
 }
+
+// openNote implements :open <id> / :open! <id> — switch this editor window
+// to another note in place. This is the host→editor control channel when
+// vimango runs as an embedded editor pane (--editor): the host injects
+// "\x1b:open <id>\r" into the pty. Follows editNote's buffer setup; unsaved
+// changes are refused exactly like :q unless open! is used.
+func (e *Editor) openNote() {
+	force := strings.HasPrefix(e.command_line, "open!")
+
+	pos := strings.Index(e.command_line, " ")
+	if pos == -1 {
+		e.ShowMessage(BR, "Usage: open <note id>")
+		return
+	}
+	arg := strings.TrimSpace(e.command_line[pos+1:])
+	id, err := strconv.Atoi(arg)
+	if err != nil {
+		e.ShowMessage(BR, "open: %q is not a note id", arg)
+		return
+	}
+	if !force && e.isModified() {
+		e.ShowMessage(BR, "No write since last change (:w first or :open! %d)", id)
+		return
+	}
+	if !e.Database.entryExists(id) {
+		e.ShowMessage(BR, "No note with id %d", id)
+		return
+	}
+
+	vim.ExecuteCommand("bw") // wipe the old note's buffer
+
+	note := e.Database.readNoteIntoString(id)
+	e.id = id
+	e.title = e.Database.getTitle(id)
+	e.ss = strings.Split(note, "\n")
+	if len(e.ss) == 0 {
+		e.ss = []string{""}
+	}
+	e.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(e.vbuf)
+	e.vbuf.SetLines(0, -1, e.ss)
+	e.bufferTick = e.vbuf.GetLastChangedTick()
+	e.saveTick = e.bufferTick
+	e.fr, e.fc, e.cy, e.cx = 0, 0, 0, 0
+	e.lineOffset = 0
+	e.firstVisibleRow = 0
+	vim.SetCursorPosition(1, 0)
+
+	e.Screen.positionWindows()
+	e.Screen.eraseRightScreen()
+	e.Screen.drawRightScreen()
+	e.ShowMessage(BR, "Opened note %d", id)
+}
+
 func (e *Editor) number() {
 	e.numberLines = !e.numberLines
 	if e.numberLines {
@@ -1056,6 +1139,18 @@ func (e *Editor) printDocument() {
 // so the full report renders in the notice view exactly as it does when
 // syncing from the organizer.
 func (e *Editor) synchronize() {
+	if e.Session.editorOnly {
+		// no organizer to hand focus to: run the sync and show the report
+		// as a notice overlay over the editor, with the same interaction
+		// as :help (PgUp/PgDn scroll via PreviewModeKeyHandler, Esc
+		// dismisses and redraws the editor)
+		app.Organizer.command_line = e.command_line // dry-run detection (:test / :sync?)
+		app.Organizer.synchronize(0)
+		e.command_line = ""
+		e.mode = HELP
+		return
+	}
+
 	if e.Screen.divider < 10 {
 		e.Screen.edPct = 80
 		app.moveDividerPct(80)

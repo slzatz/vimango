@@ -228,6 +228,10 @@ func (e *Editor) moveLeft(_ int) {
 	}
 
 	if len(e.Session.Editors) == 1 {
+		if e.Session.editorOnly {
+			e.ShowMessage(BR, "No organizer in editor-only mode")
+			return
+		}
 
 		if e.Screen.divider < 10 {
 			e.Screen.edPct = 80
@@ -261,6 +265,10 @@ func (e *Editor) moveLeft(_ int) {
 		ae.ShowMessage(BR, "Cursor position: %+v", vim.GetCursorPosition())
 		return
 	} else {
+		if e.Session.editorOnly {
+			e.ShowMessage(BR, "No organizer in editor-only mode")
+			return
+		}
 
 		if e.Screen.divider < 10 {
 			e.Screen.edPct = 80

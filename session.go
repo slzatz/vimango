@@ -8,6 +8,7 @@ import (
 type Session struct {
 	activeEditor     *Editor
 	editorMode       bool
+	editorOnly       bool // --editor boot mode: set once at startup, never cleared
 	imagePreview     bool
 	imgSizeY         int
 	fts_search_terms string

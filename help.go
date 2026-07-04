@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 )
 
 // validFlags lists every command-line flag the application accepts.
@@ -15,19 +16,66 @@ var validFlags = map[string]bool{
 	"--go-vim":     true,
 	"--go-sqlite":  true,
 	"--cgo-sqlite": true,
+	"--editor":     true,
+	"--open":       true, // takes a value: --open <id>; requires --editor
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
 // On the first unknown argument it prints an error and the help text to
 // stderr, then exits with status 2.
 func ValidateArgs(args []string) {
-	for _, arg := range args[1:] {
+	rest := args[1:]
+	skipNext := false
+	for i, arg := range rest {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		if arg == "--open" {
+			if i+1 >= len(rest) {
+				fmt.Fprintf(os.Stderr, "Error: --open requires a note id\n\n")
+				ShowHelp()
+				os.Exit(2)
+			}
+			if _, err := strconv.Atoi(rest[i+1]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: --open requires a numeric note id, got %q\n\n", rest[i+1])
+				ShowHelp()
+				os.Exit(2)
+			}
+			skipNext = true
+			continue
+		}
 		if !validFlags[arg] {
 			fmt.Fprintf(os.Stderr, "Error: unrecognized command-line argument %q\n\n", arg)
 			ShowHelp()
 			os.Exit(2)
 		}
 	}
+	if editorOnly, openId := DetermineEditorBoot(args); openId != -1 && !editorOnly {
+		fmt.Fprintf(os.Stderr, "Error: --open requires --editor\n\n")
+		ShowHelp()
+		os.Exit(2)
+	}
+}
+
+// DetermineEditorBoot reports whether --editor was given and the note id
+// passed to --open (-1 if absent). ValidateArgs has already guaranteed the
+// --open value is present and numeric.
+func DetermineEditorBoot(args []string) (editorOnly bool, openId int) {
+	openId = -1
+	for i, arg := range args {
+		switch arg {
+		case "--editor":
+			editorOnly = true
+		case "--open":
+			if i+1 < len(args) {
+				if id, err := strconv.Atoi(args[i+1]); err == nil {
+					openId = id
+				}
+			}
+		}
+	}
+	return editorOnly, openId
 }
 
 const version = "0.1.0"
@@ -69,6 +117,17 @@ OPTIONS:
         Requirements: Only available on Linux/Unix with CGO-enabled builds.
         Note: Silently ignored on Windows or in pure Go builds.
 
+    --editor
+        Boot directly into the editor, full-width; the organizer is never
+        rendered. Intended for host applications embedding vimango as an
+        editor pane, but works in any terminal. Use :open <id> to switch
+        notes; :q quits the application.
+
+    --open <id>
+        With --editor, load the note with the given database id into the
+        boot editor window. Without --open, the most recently modified
+        note in the configured startup view is opened. Requires --editor.
+
 EXAMPLES:
     # First-time setup (creates config.json and databases)
     ./vimango --init
@@ -84,6 +143,9 @@ EXAMPLES:
 
     # Combine multiple options
     ./vimango --go-vim --cgo-sqlite
+
+    # Editor-only mode (e.g. embedded in a host app), opening note 5
+    ./vimango --editor --open 5
 
 BUILD INFORMATION:
     Platform: %s

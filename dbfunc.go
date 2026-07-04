@@ -401,6 +401,12 @@ func getContextTid(id int) int {
 }
 */
 // not currently in use
+func (db *Database) entryExists(id int) bool {
+	var exists bool
+	err := db.MainDB.QueryRow("SELECT EXISTS(SELECT 1 FROM task WHERE id=?);", id).Scan(&exists)
+	return err == nil && exists
+}
+
 func (db *Database) getTitle(id int) string {
 	row := db.MainDB.QueryRow("SELECT title FROM task WHERE id=?;", id)
 	var title string

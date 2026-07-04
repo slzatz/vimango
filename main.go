@@ -29,7 +29,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	// --editor boots straight into a full-width editor (host-embedding mode)
+	editorOnly, openId := DetermineEditorBoot(os.Args)
+
 	app = CreateApp()
+	app.Session.editorOnly = editorOnly
 
 	// Load user preferences (before DetectKittyCapabilities so we can override imageScale)
 	prefs := app.LoadPreferences("preferences.json")
@@ -115,6 +119,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Validate --open id while we can still print to a cooked terminal
+	if openId != -1 && !app.Database.entryExists(openId) {
+		fmt.Printf("Error: no note with id %d\n", openId)
+		os.Exit(1)
+	}
+
 	// Migrate existing databases to UUID-based containers if needed
 	if err := app.MigrateToUUID(); err != nil {
 		fmt.Printf("Error: Database migration failed.\n")
@@ -165,8 +175,23 @@ func main() {
 	// Set edPct BEFORE LoadInitialData() so it uses the correct value
 	// LoadInitialData() will calculate divider and totaleditorcols based on this
 	app.Screen.edPct = prefs.EdPct
+	if editorOnly {
+		// full-width editor; organizer never rendered (divider = 1)
+		app.Screen.edPct = 100
+	}
 
 	app.LoadInitialData()
+
+	if editorOnly {
+		// openId == -1 opens the current (most recently modified) row
+		app.Organizer.editNote(openId)
+		if app.Session.activeEditor == nil {
+			// e.g. empty database: nothing to edit
+			rawmode.Restore(app.origTermCfg)
+			fmt.Println("Error: no note to open (database has no saved entries)")
+			os.Exit(1)
+		}
+	}
 
 	app.Run = true
 	app.MainLoop()

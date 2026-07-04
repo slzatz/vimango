@@ -729,6 +729,11 @@ func (a *App) MainLoop() {
 			} else {
 				k = key.Special
 			}
+			// editor-only mode: focus can never leave the editor. Safety
+			// net in case some unguarded path clears the focus flag.
+			if a.Session.editorOnly && a.Session.activeEditor != nil {
+				a.Session.editorMode = true
+			}
 			if a.Session.editorMode {
 				ae := a.Session.activeEditor
 				redraw := ae.editorProcessKey(k)

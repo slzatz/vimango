@@ -889,7 +889,13 @@ func (o *Organizer) editNote(id int) {
 		ae = app.NewEditor()
 		o.Session.Editors = append(o.Session.Editors, ae)
 		ae.id = id
-		ae.title = o.rows[o.fr].title
+		// an explicit id (e.g. --editor --open <id>) may not match the
+		// current row, whose title may also carry unsaved edits
+		if o.fr < len(o.rows) && o.rows[o.fr].id == id {
+			ae.title = o.rows[o.fr].title
+		} else {
+			ae.title = o.Database.getTitle(id)
+		}
 		ae.top_margin = TOP_MARGIN + 1
 		note := o.Database.readNoteIntoString(id)
 		ae.ss = strings.Split(note, "\n")
