@@ -10,14 +10,15 @@ import (
 // validFlags lists every command-line flag the application accepts.
 // Keep this in sync with ShowHelp and the Determine*/CheckFor* functions.
 var validFlags = map[string]bool{
-	"--help":       true,
-	"-h":           true,
-	"--init":       true,
-	"--go-vim":     true,
-	"--go-sqlite":  true,
-	"--cgo-sqlite": true,
-	"--editor":     true,
-	"--open":       true, // takes a value: --open <id>; requires --editor
+	"--help":        true,
+	"-h":            true,
+	"--init":        true,
+	"--go-vim":      true,
+	"--go-sqlite":   true,
+	"--cgo-sqlite":  true,
+	"--editor":      true,
+	"--open":        true, // takes a value: --open <id>; requires --editor
+	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
@@ -31,14 +32,14 @@ func ValidateArgs(args []string) {
 			skipNext = false
 			continue
 		}
-		if arg == "--open" {
+		if arg == "--open" || arg == "--render-html" {
 			if i+1 >= len(rest) {
-				fmt.Fprintf(os.Stderr, "Error: --open requires a note id\n\n")
+				fmt.Fprintf(os.Stderr, "Error: %s requires a note id\n\n", arg)
 				ShowHelp()
 				os.Exit(2)
 			}
 			if _, err := strconv.Atoi(rest[i+1]); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: --open requires a numeric note id, got %q\n\n", rest[i+1])
+				fmt.Fprintf(os.Stderr, "Error: %s requires a numeric note id, got %q\n\n", arg, rest[i+1])
 				ShowHelp()
 				os.Exit(2)
 			}
@@ -128,6 +129,12 @@ OPTIONS:
         boot editor window. Without --open, the most recently modified
         note in the configured startup view is opened. Requires --editor.
 
+    --render-html <id>
+        Render the note with the given database id as a standalone HTML
+        document on stdout and exit. Headless (no terminal UI); intended
+        for host applications embedding a preview pane. Google Drive
+        images are inlined as data URIs when Drive is configured.
+
 EXAMPLES:
     # First-time setup (creates config.json and databases)
     ./vimango --init
@@ -146,6 +153,9 @@ EXAMPLES:
 
     # Editor-only mode (e.g. embedded in a host app), opening note 5
     ./vimango --editor --open 5
+
+    # Print note 5 as HTML (e.g. for a host app's preview pane)
+    ./vimango --render-html 5
 
 BUILD INFORMATION:
     Platform: %s

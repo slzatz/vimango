@@ -29,6 +29,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	// --render-html <id> is headless: print the note as HTML and exit,
+	// before any terminal probing / vim / raw-mode setup.
+	if id := DetermineRenderHTML(os.Args); id != -1 {
+		os.Exit(RunRenderHTML(id))
+	}
+
 	// --editor boots straight into a full-width editor (host-embedding mode)
 	editorOnly, openId := DetermineEditorBoot(os.Args)
 

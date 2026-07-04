@@ -125,6 +125,30 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
             background-color: #f2f2f2;
             font-weight: bold;
         }
+        @media (prefers-color-scheme: dark) {
+            body {
+                color: #ddd;
+                background-color: #1e1e1e;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: #e8ecf1;
+            }
+            code, pre {
+                background-color: #2d2d2d;
+            }
+            blockquote {
+                color: #9aa4ab;
+            }
+            th, td {
+                border-color: #444;
+            }
+            th {
+                background-color: #2d2d2d;
+            }
+            a {
+                color: #6cb6ff;
+            }
+        }
     </style>
 </head>
 <body>
