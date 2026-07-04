@@ -63,7 +63,8 @@ echo "Configuring libvim..."
   CFLAGS="-I${NCURSES_PREFIX}/include -I${BREW_PREFIX}/include \
     -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
     -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
-    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype" \
+    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype \
+    -Wno-error=implicit-int-float-conversion -Wno-error" \
   LDFLAGS="-L${NCURSES_PREFIX}/lib -L${BREW_PREFIX}/lib"
 
 echo "Building libvim.a..."

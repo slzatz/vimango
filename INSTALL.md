@@ -155,13 +155,18 @@ cd libvim/src
   CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
     -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
     -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
-    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype" \
+    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype \
+    -Wno-error=implicit-int-float-conversion -Wno-error" \
   LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
 make libvim.a
 cp libvim.a /path/to/vimango/
 ```
 
-On **Intel**, substitute `/usr/local` for `/opt/homebrew` above.
+> libvim builds with `-Werror`, and newer clang/Xcode versions promote more
+> warnings to errors (e.g. `implicit conversion from 'long long' to 'double'`).
+> The trailing blanket `-Wno-error` downgrades *all* warnings back to warnings so
+> the build survives whatever your clang version flags. If you still hit a hard
+> error, it's a real compile failure, not a warning.
 
 > The CGO linker directives in `vim/cvim/cvim.go` reference `libvim.a` as a bare
 > filename resolved from the build working directory, so it must sit in the
@@ -271,6 +276,7 @@ Run it:
 | `undefined: unix.TCGETS` on macOS | fork's darwin termios split not pulled | `git -C ../glamour pull` (§2) |
 | `hunspell/hunspell.h: file not found` | hunspell not installed / Intel paths | §3 |
 | `libvim.a` not found / link errors | libvim.a not built or not in root | §4 |
+| libvim build fails on a warning (e.g. `long long` to `double`) | newer clang promotes warnings under `-Werror` | blanket `-Wno-error` in §4 CFLAGS |
 | HEIC images don't render | `heic_worker` missing/wrong arch | §5 (non-fatal) |
 | Web view opens in browser instead of window | `webview_worker` missing | §5 (non-fatal) |
 | `config.json` / database errors on first run | never initialized | `./vimango --init` (§8) |
