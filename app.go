@@ -341,13 +341,11 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 			connect += fmt.Sprintf(" sslrootcert=%s", config.Postgres.SSLCACert)
 		}
 
+		// sql.Open only validates the connection string; no network I/O
+		// happens until the first query, so booting offline works and sync
+		// recovers on its own when connectivity returns. Reachability is
+		// checked in Synchronize, where a failure can be reported usefully.
 		a.Database.PG, err = sql.Open("postgres", connect)
-		if err != nil {
-			return err
-		}
-
-		// Ping to verify connection
-		err = a.Database.PG.Ping()
 		if err != nil {
 			return err
 		}

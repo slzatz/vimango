@@ -5,6 +5,10 @@ package main
 // vimango-sync CLI under cmd/vimango-sync/.
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	"github.com/slzatz/vimango/internal/sync"
 )
 
@@ -17,6 +21,14 @@ func (a *App) Synchronize(reportOnly bool) string {
 
 	if a.SyncInProcess {
 		return "Synchronization already in process"
+	}
+
+	// Connections are lazy (InitDatabases no longer pings at boot so the app
+	// can start offline); verify the server is reachable before starting.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := a.Database.PG.PingContext(ctx); err != nil {
+		return fmt.Sprintf("### Remote sync unavailable\n\nCould not reach the PostgreSQL server at %s: %v\n\nCheck your network connection. Local changes are safe and will sync once the server is reachable.", a.Config.Postgres.Host, err)
 	}
 
 	a.SyncInProcess = true

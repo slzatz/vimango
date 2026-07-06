@@ -373,6 +373,9 @@ HEIC files are detected by magic bytes (ftyp box with heic/heix/hevc/hevx/mif1/m
 
 The application supports full local-only operation without requiring PostgreSQL synchronization. This is achieved through UUID-based container identification.
 
+### Offline Startup
+Startup performs no network I/O even when PostgreSQL is configured: `InitDatabases` opens the Postgres handle lazily (`sql.Open` only validates the connection string) and does not ping. This means the TUI, `--editor`, and `--render-html` all work offline against the local SQLite databases. Reachability is checked in `(*App).Synchronize` (bounded 5s ping), which reports a friendly "sync unavailable" message when offline; sync recovers automatically once connectivity returns. The `vimango-sync` CLI still pings at boot and fails fast offline, which is intentional.
+
 ### How It Works
 - **Containers** (contexts, folders, keywords) are identified by UUID rather than PostgreSQL-assigned `tid` values
 - **Tasks** reference containers via `context_uuid`, `folder_uuid`, and `keyword_uuid` foreign keys
