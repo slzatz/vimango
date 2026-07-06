@@ -463,7 +463,7 @@ func (e *Editor) showWebView(_ int) {
 	}
 
 	// Convert to HTML
-	htmlContent, err := RenderNoteAsHTML(title, note)
+	htmlContent, err := RenderNoteAsHTML(title, note, true)
 	if err != nil {
 		e.ShowMessage(BR, "Error rendering HTML: %v", err)
 		return

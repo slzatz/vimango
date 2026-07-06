@@ -55,7 +55,9 @@ func RunRenderHTML(id int) int {
 		return 1
 	}
 
-	html, err := RenderNoteAsHTML(title, note.String)
+	// No <h1> heading: the host app shows the title in its own native
+	// header, so the rendered document is the note body only.
+	html, err := RenderNoteAsHTML(title, note.String, false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)
 		return 1

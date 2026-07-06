@@ -57,8 +57,12 @@ func openNoteInWebview(title, htmlContent string) error {
 	return fmt.Errorf("webview not available")
 }
 
-// RenderNoteAsHTML converts a note's markdown content to HTML for webview display
-func RenderNoteAsHTML(title, markdownContent string) (string, error) {
+// RenderNoteAsHTML converts a note's markdown content to HTML for webview display.
+// showHeading controls the <h1> title heading in the body: the TUI webview
+// window wants it (the window has no other title chrome); the hybrid app's
+// --render-html preview omits it because the host shows the title natively —
+// there the title is metadata, not part of the note.
+func RenderNoteAsHTML(title, markdownContent string, showHeading bool) (string, error) {
 	// Pre-process markdown to handle Google Drive images
 	processedMarkdown, err := preprocessMarkdownImages(markdownContent)
 	if err != nil {
@@ -152,8 +156,8 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
     </style>
 </head>
 <body>
-    <h1>{{.Title}}</h1>
-    <div id="content">
+    {{if .ShowHeading}}<h1>{{.Title}}</h1>
+    {{end}}<div id="content">
         {{.Content}}
     </div>
 </body>
@@ -166,11 +170,13 @@ func RenderNoteAsHTML(title, markdownContent string) (string, error) {
 
 	var buf strings.Builder
 	err = tmpl.Execute(&buf, struct {
-		Title   string
-		Content template.HTML
+		Title       string
+		Content     template.HTML
+		ShowHeading bool
 	}{
-		Title:   title,
-		Content: template.HTML(htmlContent),
+		Title:       title,
+		Content:     template.HTML(htmlContent),
+		ShowHeading: showHeading,
 	})
 
 	if err != nil {

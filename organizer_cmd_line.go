@@ -1599,7 +1599,7 @@ func (o *Organizer) showWebView(_ int) {
 	}
 
 	// Convert to HTML
-	htmlContent, err := RenderNoteAsHTML(title, note)
+	htmlContent, err := RenderNoteAsHTML(title, note, true)
 	if err != nil {
 		o.ShowMessage(BL, "Error rendering HTML: %v", err)
 		return
