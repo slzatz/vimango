@@ -55,8 +55,9 @@ func RunRenderHTML(id int) int {
 		return 1
 	}
 
-	// No <h1> heading: the host app shows the title in its own native
-	// header, so the rendered document is the note body only.
+	// Embedded-pane style (standalone=false): no <h1> — the host app
+	// shows the title in its own native header — and left-aligned
+	// content instead of a centered reading column.
 	html, err := RenderNoteAsHTML(title, note.String, false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)

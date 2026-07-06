@@ -58,11 +58,13 @@ func openNoteInWebview(title, htmlContent string) error {
 }
 
 // RenderNoteAsHTML converts a note's markdown content to HTML for webview display.
-// showHeading controls the <h1> title heading in the body: the TUI webview
-// window wants it (the window has no other title chrome); the hybrid app's
-// --render-html preview omits it because the host shows the title natively —
-// there the title is metadata, not part of the note.
-func RenderNoteAsHTML(title, markdownContent string, showHeading bool) (string, error) {
+// standalone selects the document style. The TUI webview window is a
+// standalone document: <h1> title (the window has no other title chrome)
+// and a centered reading column. The hybrid app's --render-html preview is
+// an embedded pane: no <h1> (the host shows the title natively — it is
+// metadata, not part of the note) and left-aligned content, since
+// auto-centering inside a pane reads as a large wasted indent.
+func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, error) {
 	// Pre-process markdown to handle Google Drive images
 	processedMarkdown, err := preprocessMarkdownImages(markdownContent)
 	if err != nil {
@@ -85,7 +87,7 @@ func RenderNoteAsHTML(title, markdownContent string, showHeading bool) (string, 
             line-height: 1.6;
             color: #333;
             max-width: 800px;
-            margin: 0 auto;
+            margin: {{if .Standalone}}0 auto{{else}}0{{end}};
             padding: 20px;
             background-color: #fff;
         }
@@ -156,7 +158,7 @@ func RenderNoteAsHTML(title, markdownContent string, showHeading bool) (string, 
     </style>
 </head>
 <body>
-    {{if .ShowHeading}}<h1>{{.Title}}</h1>
+    {{if .Standalone}}<h1>{{.Title}}</h1>
     {{end}}<div id="content">
         {{.Content}}
     </div>
@@ -170,13 +172,13 @@ func RenderNoteAsHTML(title, markdownContent string, showHeading bool) (string, 
 
 	var buf strings.Builder
 	err = tmpl.Execute(&buf, struct {
-		Title       string
-		Content     template.HTML
-		ShowHeading bool
+		Title      string
+		Content    template.HTML
+		Standalone bool
 	}{
-		Title:       title,
-		Content:     template.HTML(htmlContent),
-		ShowHeading: showHeading,
+		Title:      title,
+		Content:    template.HTML(htmlContent),
+		Standalone: standalone,
 	})
 
 	if err != nil {
