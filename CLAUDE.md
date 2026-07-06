@@ -94,7 +94,15 @@ NOTE: Generally we have not been running tests but have tested key functionality
 - `--go-vim`: Use pure Go vim implementation (default: CGO-based libvim)
 - `--go-sqlite`: Use pure Go SQLite driver (modernc.org/sqlite) - default
 - `--cgo-sqlite`: Use CGO SQLite driver (mattn/go-sqlite3) - only available in CGO builds
+- `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer and drive the editor over the pty (`:open <id>` / `:open! <id>` ex commands).
+- `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
+- `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
 - Spell check: Available in CGO builds, shows graceful message in pure Go builds
+
+### Host App Integration (vimango_hybrid)
+`RenderNoteAsHTML(title, markdown, standalone)` renders two document styles:
+- **standalone=true** (TUI `:v` webview window): `<h1>` title heading + centered 800px reading column — the window has no other title chrome.
+- **standalone=false** (`--render-html`, embedded host pane): no `<h1>` and left-aligned content — the host shows the title in its own native header (the title is metadata, not part of the note), and auto-centering inside a pane reads as a large wasted indent.
 
 ## Help System
 The application supports standard `--help` and `-h` flags to display comprehensive usage information:
