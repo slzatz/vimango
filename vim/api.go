@@ -164,6 +164,24 @@ func GetMatchingPair() [2]int {
 	return Engine.SearchGetMatchingPair()
 }
 
+// Command-line (cmdline) state, C implementation only — like BufferNew,
+// these bypass the engine abstraction and call cvim directly.
+
+// CommandLineGetType returns ':', '/' or '?' while vim is in cmdline mode, 0 otherwise
+func CommandLineGetType() byte {
+	return cvim.CommandLineGetType()
+}
+
+// CommandLineGetText returns the current contents of vim's cmdline buffer
+func CommandLineGetText() string {
+	return cvim.CommandLineGetText()
+}
+
+// CommandLineGetPosition returns the cursor position within the cmdline
+func CommandLineGetPosition() int {
+	return cvim.CommandLineGetPosition()
+}
+
 // IsUsingGoImplementation checks if we're using the Go implementation
 func IsUsingGoImplementation() bool {
 	return GetActiveImplementation() == ImplGo

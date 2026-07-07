@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
@@ -638,8 +639,16 @@ func (a *App) returnCursor() {
 			// we don't need to position cursor and don't want cursor visible
 			fmt.Print(ab.String())
 			return
-		case EX_COMMAND, SEARCH:
+		case SEARCH:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, len(ae.command_line)+a.Screen.divider+2)
+		case EX_COMMAND:
+			// cursor tracks vim's cmdline position (mirrored in cmdLineCursor)
+			cur := ae.cmdLineCursor
+			if cur > len(ae.command_line) {
+				cur = len(ae.command_line)
+			}
+			col := utf8.RuneCountInString(ae.command_line[:cur])
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, col+a.Screen.divider+2)
 		default:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", ae.cy+ae.top_margin, ae.cx+ae.left_margin+ae.left_margin_offset+1)
 		}

@@ -330,6 +330,29 @@ func CBufferGetLastChangedTick(vbuf *C.buf_T) int {
 	return int(tick)
 }
 
+// char_u vimCommandLineGetType(void);
+// ':', '/' or '?' while in cmdline mode; NUL otherwise
+func CommandLineGetType() byte {
+	return byte(C.vimCommandLineGetType())
+}
+
+// char_u *vimCommandLineGetText(void);
+// current contents of vim's cmdline buffer; may be NULL outside cmdline mode
+func CommandLineGetText() string {
+	t := C.vimCommandLineGetText()
+	if t == nil {
+		return ""
+	}
+	data := (*C.char)(unsafe.Pointer(t))
+	return C.GoString(data)
+}
+
+// int vimCommandLineGetPosition(void);
+// cursor position within the cmdline (byte offset)
+func CommandLineGetPosition() int {
+	return int(C.vimCommandLineGetPosition())
+}
+
 /* topline doesn't seem to work so no need for the below
 func WindowGetTopLine() int {
 	t := C.vimWindowGetTopLine()

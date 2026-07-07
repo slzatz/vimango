@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os/user"
 	"path/filepath"
@@ -90,15 +91,20 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		//e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %q", mode, e.mode, rune(c)) //////Debug
 		return false
 	case 8: //SEARCH and EX_COMMAND
-		// Note: will not hit this case if we are in e.mode == Ex_COMMAND because we
-		// park vim in NORMAL mode and don't feed it keys
+		// Note: will not hit this case if we are in e.mode == EX_COMMAND because
+		// ExModeKeyHandler sends keys to vim itself and never falls through here
 		// note that if e.mode has been set to SEARCH, this code does nothing
-		if e.mode != SEARCH {
+		if e.mode != SEARCH && e.mode != EX_COMMAND {
 			e.command_line = ""
 			e.command = ""
 			if c == ':' {
+				// vim stays in cmdline mode: its cmdline buffer is the line
+				// editor; ExModeKeyHandler intercepts Enter so vim never
+				// executes anything
 				e.mode = EX_COMMAND
-				vim.SendKey("<esc>") // park in NORMAL mode
+				e.cmdLineCursor = 0
+				e.tabCompletion.index = 0
+				e.tabCompletion.list = nil
 				e.ShowMessage(BR, ":")
 			} else {
 				e.mode = SEARCH
@@ -172,8 +178,10 @@ func (e *Editor) PreviewModeKeyHandler(c int) (redraw, exit bool) {
 		app.Organizer.scrollNoticeHome()
 	case ':': // COMMAND or SEARCH
 		e.ShowMessage(BR, ":")
-		vim.SendKey("<esc>") // park in NORMAL mode
+		vim.SendKey("<esc>")
+		vim.SendInput(":") // put vim in cmdline mode (the line editor)
 		e.command_line = ""
+		e.cmdLineCursor = 0
 		e.mode = EX_COMMAND
 		e.tabCompletion.index = 0
 		e.tabCompletion.list = nil
@@ -269,8 +277,25 @@ func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 }
 
 // case EX_COMMAND:
+// vim sits in cmdline mode acting purely as a line editor: keys are forwarded
+// and the line + cursor are mirrored from vim's cmdline buffer. vim executes
+// nothing until it sees a CR, and Enter is intercepted below, so dispatch
+// stays vimango's and custom commands like :open never collide with vim's.
 func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	if c == '\r' {
+		// vim's cmdline buffer is authoritative; read it, then cancel vim's
+		// cmdline before dispatching
+		e.command_line = vim.CommandLineGetText()
+		vim.SendKey("<esc>")
+		if e.command_line == "" {
+			e.mode = NORMAL
+			e.ShowMessage(BR, "")
+			return false, true
+		}
+		// make the line recallable with <up>/<down> next time (vim only adds
+		// history on a concluded cmdline, and we never forward the CR)
+		vim.ExecuteCommand("call histadd(':', '" + strings.ReplaceAll(e.command_line, "'", "''") + "')")
+
 		// Index doesn't work for vert resize
 		// and LastIndex doesn't work for run
 		// so total kluge below
@@ -381,18 +406,41 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 			}
 		}
 		e.command_line = e.command_line[:pos+1] + e.tabCompletion.list[e.tabCompletion.index]
+		// write the completed line back into vim's cmdline buffer so vim and
+		// the display stay in sync (end, clear, retype)
+		vim.SendKey("<c-e>")
+		vim.SendKey("<c-u>")
+		vim.SendMultiInput(e.command_line)
+		e.cmdLineCursor = len(e.command_line)
 		e.ShowMessage(BR, ":%s", e.command_line)
 		return false, true
 	}
 
-	// process the key typed in COMMAND_LINE mode
-	if c == DEL_KEY || c == BACKSPACE {
-		if len(e.command_line) > 0 {
-			e.command_line = e.command_line[:len(e.command_line)-1]
-		}
+	// forward the key to vim's cmdline
+	if z, found := termcodes[c]; found {
+		vim.SendKey(z)
+	} else if c == END_KEY {
+		vim.SendKey("<end>")
+	} else if c >= 1 && c <= 26 { // Ctrl-A..Ctrl-Z (Enter/Tab intercepted above)
+		vim.SendKey(fmt.Sprintf("<c-%c>", rune('a'+c-1)))
+	} else if c < 32 {
+		return false, true // other control chars: ignore
 	} else {
-		e.command_line += string(c)
+		vim.SendInput(string(c))
 	}
+
+	// backspacing over the ':' (or Ctrl-C) makes vim leave cmdline mode
+	if vim.GetCurrentMode() != 8 {
+		e.command_line = ""
+		e.cmdLineCursor = 0
+		e.mode = NORMAL
+		e.ShowMessage(BR, "")
+		return false, true
+	}
+
+	// mirror line and cursor from vim for display
+	e.command_line = vim.CommandLineGetText()
+	e.cmdLineCursor = vim.CommandLineGetPosition()
 
 	e.tabCompletion.index = 0
 	e.tabCompletion.list = nil
