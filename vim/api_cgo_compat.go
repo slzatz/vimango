@@ -1,5 +1,3 @@
-//go:build cgo && !windows
-
 package vim
 
 import (

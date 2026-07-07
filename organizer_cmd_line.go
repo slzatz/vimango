@@ -440,13 +440,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":quit", ":q", ":q!"},
 	})
 
-	registry.Register("which", (*Organizer).whichVim, CommandInfo{
-		Description: "Show which vim implementation is active",
-		Usage:       "which",
-		Category:    "System",
-		Examples:    []string{":which"},
-	})
-
 	// Help command
 	registry.Register("help", (*Organizer).help, CommandInfo{
 		Aliases:     []string{"h"},
@@ -1647,18 +1640,6 @@ func (o *Organizer) closeWebView(_ int) {
 	} else {
 		o.ShowMessage(BL, "Closed webview window")
 	}
-	o.mode = NORMAL
-	o.command_line = ""
-}
-
-func (o *Organizer) whichVim(_ int) {
-	var msg string
-	if vim.ActiveImplementation == vim.ImplGo {
-		msg = "Go Vim"
-	} else {
-		msg = "CGO Vim"
-	}
-	o.ShowMessage(BL, "vim version: %s", msg)
 	o.mode = NORMAL
 	o.command_line = ""
 }

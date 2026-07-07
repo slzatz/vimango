@@ -28,7 +28,7 @@ This wasn't developed thinking anyone else would use it so there isn't an instal
 
 ## Building libvim.a
 
-The `libvim.a` static library provides vim modal editing via CGO. It must be compiled from source because the binary differs between macOS and Linux. This is only needed for CGO builds — pure Go builds (`CGO_ENABLED=0`) with the `--go-vim` flag do not require it.
+The `libvim.a` static library provides vim modal editing via CGO. It must be compiled from source because the binary differs between macOS and Linux. CGO is required: libvim is the only vim engine (the pure-Go govim engine was removed; Windows is unsupported).
 
 **Source:** Clone [onivim/libvim](https://github.com/onivim/libvim) and build in its `src/` directory.
 
@@ -92,7 +92,6 @@ cp libvim.a /path/to/vimango/
 
 - The `libvim.a` file must be placed in the vimango project root directory (next to `go.mod`).
 - You do **not** need to copy or regenerate `auto/config.h` or `auto/pathdef.c` from your libvim build; the versions checked into this repo work on both platforms.
-- If you only want to run vimango without libvim (pure Go mode), skip this step and build with `CGO_ENABLED=0 go build --tags=fts5`, then run with `--go-vim`.
 
 ## Building heic_worker
 
@@ -139,7 +138,7 @@ CGO_ENABLED=1 go build -o ../../webview_worker
 
 The worker must sit next to the main `vimango` executable (or in the current working directory). If it's missing or built for the wrong architecture, `Ctrl-W` falls back to opening the rendered note in the system browser (`open` on macOS, `xdg-open` on Linux) — graceful, but you lose the in-app live-update behavior. Worker errors are logged to `$TMPDIR/vimango_webview_worker.log`.
 
-Pure-Go builds (`CGO_ENABLED=0`) and Windows cross-compiled builds do not use the worker; they always use the browser fallback.
+Builds without the worker binary always use the browser fallback.
 
 ## Quick Start
 
@@ -150,7 +149,6 @@ git clone https://github.com/slzatz/vimango.git
 cd vimango
 
 # 2. Build libvim.a and copy to this directory (see "Building libvim.a" above)
-#    Or skip this step and use --go-vim for pure Go vim
 
 # 3. Build heic_worker (only if you want CGO HEIC support — see "Building heic_worker" above)
 cd cmd/heic_worker && CGO_ENABLED=1 go build -o ../../heic_worker && cd ../..
@@ -222,13 +220,11 @@ The full application makes heavy use of CGO to access various C libraries but it
 So if this hasn't been offputting enough, after you can clone the repository you can build as follows:
 
  - **Linux with CGO**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (includes libvim, hunspell, sqlite3)
- - **Linux Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
  - **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
 
 The main runtime options are:
 
  - `--help`, `-h`: Display help message with all available options and exit
- - `--go-vim`: Use pure Go vim implementation (default: CGO-based libvim)
  - `--go-sqlite`: Use pure Go SQLite driver (modernc.org/sqlite) - default
  - `--cgo-sqlite`: Use CGO SQLite driver (mattn/go-sqlite3)
 

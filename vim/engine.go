@@ -1,5 +1,3 @@
-//go:build cgo && !windows
-
 package vim
 
 import (
@@ -7,23 +5,12 @@ import (
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
-// CGOImplementation provides the C-based vim implementation
-type CGOImplementation struct{}
-
-// GetEngineWrapper returns the C-based engine wrapper
-func (c *CGOImplementation) GetEngineWrapper() interfaces.VimEngine {
-	return &CGOEngineWrapper{}
-}
-
-// GetName returns the implementation name
-func (c *CGOImplementation) GetName() string {
-	return ImplC
-}
-
-// activeImpl is the current implementation (C or Go)
-// This is initialized here for non-Windows builds
-func init() {
-	activeImpl = &CGOImplementation{}
+// InitializeVim sets up the vim engine. libvim via CGO is the only
+// implementation (the pure-Go govim engine and its adapter layer were
+// removed; Windows and CGO-free builds are unsupported).
+func InitializeVim(argc int) {
+	Engine = &CGOEngineWrapper{}
+	Engine.Init(argc)
 }
 
 // CGOEngineWrapper wraps the C-based vim implementation in package cvim

@@ -192,15 +192,6 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"<leader>su - Get spelling suggestions"},
 	})
 
-	// System commands
-	registry.Register(string(ctrlKey('z')), (*Editor).switchImplementation, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('z'))),
-		Description: "Switch between Go and C vim implementations",
-		Usage:       "Ctrl-Z",
-		Category:    "System",
-		Examples:    []string{"Ctrl-Z - Toggle vim implementation"},
-	})
-
 	// Store registry in editor for help command access
 	editor.normalCommandRegistry = registry
 
@@ -540,18 +531,4 @@ func (e *Editor) spellSuggest(_ int) {
 
 	suggestions := GetSpellingSuggestions(w)
 	e.ShowMessage(BR, "%q -> %s", w, strings.Join(suggestions, "|"))
-}
-
-func (e *Editor) switchImplementation(_ int) {
-	// Toggle between C and Go implementations
-	currentImpl := vim.GetActiveImplementation()
-	if currentImpl == vim.ImplC {
-		// Switch to Go implementation
-		e.ShowMessage(BL, "Switching to Go implementation")
-		vim.SwitchToGoImplementation()
-	} else {
-		// Switch to C implementation
-		e.ShowMessage(BL, "Switching to C implementation")
-		vim.SwitchToCImplementation()
-	}
 }

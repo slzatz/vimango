@@ -262,11 +262,7 @@ From the project root:
 CGO_ENABLED=1 go build --tags="fts5,cgo"
 ```
 
-Pure-Go build (no libvim/hunspell/CGO-sqlite, no worker CGO needed):
-
-```bash
-CGO_ENABLED=0 go build --tags=fts5
-```
+CGO is required — libvim is the only vim engine (pure-Go builds and Windows are unsupported).
 
 ---
 

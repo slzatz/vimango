@@ -64,23 +64,8 @@ func main() {
 	// Initialize image cache
 	initImageCache()
 
-	// Configure Vim implementation selection
-	vimConfig := DetermineVimDriver(os.Args)
-	//LogVimDriverChoice(vimConfig) //debugging
-	useGoVim := vimConfig.ShouldUseGoVim()
-
-	// Set up logging if Go implementation is used
-	if useGoVim {
-		// Set up logging to file instead of console to avoid flashing messages
-		logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err == nil {
-			log.SetOutput(logFile)
-			log.Println("Go Vim implementation initialized")
-		}
-	}
-
-	// Initialize Vim with the appropriate implementation
-	vim.InitializeVim(useGoVim, 0)
+	// Initialize Vim (libvim via CGO — the only implementation)
+	vim.InitializeVim(0)
 
 	// Configure SQLite driver selection
 	// currently defaulting to modernc sqlite driver unless --cgo-sqlite3 is specified

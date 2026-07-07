@@ -13,7 +13,6 @@ var validFlags = map[string]bool{
 	"--help":        true,
 	"-h":            true,
 	"--init":        true,
-	"--go-vim":      true,
 	"--go-sqlite":   true,
 	"--cgo-sqlite":  true,
 	"--editor":      true,
@@ -103,11 +102,6 @@ OPTIONS:
         initializes the SQLite databases (vimango.db and fts5_vimango.db).
         Use this when running vimango for the first time after cloning.
 
-    --go-vim
-        Use the pure Go vim implementation (govim) instead of the CGO-based libvim.
-        Default: Uses libvim on Linux/Unix when available, govim on Windows or when
-        CGO is not available.
-
     --go-sqlite
         Use the pure Go SQLite driver (modernc.org/sqlite).
         Default: This is already the default driver.
@@ -139,17 +133,11 @@ EXAMPLES:
     # First-time setup (creates config.json and databases)
     ./vimango --init
 
-    # Run with default settings (pure Go SQLite, libvim on Linux/CGO builds)
+    # Run with default settings (pure Go SQLite, libvim)
     ./vimango
 
-    # Run with pure Go vim implementation
-    ./vimango --go-vim
-
-    # Run with CGO SQLite driver (requires CGO build)
+    # Run with CGO SQLite driver
     ./vimango --cgo-sqlite
-
-    # Combine multiple options
-    ./vimango --go-vim --cgo-sqlite
 
     # Editor-only mode (e.g. embedded in a host app), opening note 5
     ./vimango --editor --open 5
@@ -162,25 +150,8 @@ BUILD INFORMATION:
     Architecture: %s
     Go Version: %s
 
-    Linux/Unix Pure Go Build:
-        CGO_ENABLED=0 go build --tags=fts5
-
-    Linux/Unix with CGO (libvim, hunspell, sqlite3):
+    Build (CGO is required — vim editing is libvim; Windows is unsupported):
         CGO_ENABLED=1 go build --tags="fts5,cgo"
-
-    Windows Cross-Compilation:
-        GOOS=windows GOARCH=amd64 go build --tags=fts5
-
-PLATFORM-SPECIFIC BEHAVIOR:
-    Windows:
-        - Automatically uses pure Go implementations for vim and SQLite
-        - --cgo-sqlite flag is ignored (not available on Windows)
-        - Spell checking is not available (shows helpful message)
-
-    Linux/Unix:
-        - CGO builds support libvim, hunspell spell checking, and CGO SQLite
-        - Pure Go builds use govim and modernc.org/sqlite
-        - All features gracefully degrade when unavailable
 
 FEATURES:
     - Vim-based text editing with normal and insert modes

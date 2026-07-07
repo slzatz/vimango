@@ -46,7 +46,7 @@ cp libvim.a /path/to/vimango/
 **Notes:**
 - The CGO linkage flags in `vim/cvim/cvim.go` reference `libvim.a` as a bare filename resolved from the build working directory (project root).
 - The `auto/config.h` and `auto/pathdef.c` checked into `vim/cvim/auto/` do not need to be regenerated; they work on both platforms.
-- Pure Go builds (`CGO_ENABLED=0`) and the `--go-vim` flag do not require libvim.a.
+- CGO is required: libvim is the only vim engine (the pure-Go `govim` engine and its adapter layer were removed 2026-07; Windows and `CGO_ENABLED=0` builds are unsupported).
 
 ### Building heic_worker (CGO HEIC Prerequisite)
 
@@ -79,8 +79,6 @@ CGO_ENABLED=1 go build -o ../../webview_worker
 
 `webview_cgo.go` looks for `webview_worker` next to the main executable, then in the current directory. If the binary is missing, `IsWebviewAvailable()` returns false and `OpenNoteInWebview` falls back to opening the rendered HTML in the system browser (`open` on macOS, `xdg-open` on Linux). The fallback is silent and graceful — the application never crashes due to a missing worker. Worker errors are logged to `$TMPDIR/vimango_webview_worker.log`.
 
-- **Linux/Unix Pure Go**: `CGO_ENABLED=0 go build --tags=fts5` (no CGO dependencies)
-- **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
 - Run: `go run main.go`
 
 ### Tests
@@ -91,13 +89,12 @@ NOTE: Generally we have not been running tests but have tested key functionality
 
 ## Runtime Options
 - `--help`, `-h`: Display help message with all available options and exit
-- `--go-vim`: Use pure Go vim implementation (default: CGO-based libvim)
 - `--go-sqlite`: Use pure Go SQLite driver (modernc.org/sqlite) - default
 - `--cgo-sqlite`: Use CGO SQLite driver (mattn/go-sqlite3) - only available in CGO builds
 - `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer and drive the editor over the pty (`:open <id>` / `:open! <id>` ex commands).
 - `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
 - `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
-- Spell check: Available in CGO builds, shows graceful message in pure Go builds
+- Spell check: via hunspell (CGO)
 
 ### Host App Integration (vimango_hybrid)
 `RenderNoteAsHTML(title, markdown, standalone)` renders two document styles:
@@ -126,18 +123,16 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 - The application supports dual SQLite driver selection:
   - `modernc.org/sqlite` (Pure Go, default) - Works on all platforms
   - `mattn/go-sqlite3` (CGO-based) - Only available on Linux/Unix with CGO enabled
-- The application uses vim editor functionality for editing notes and can switch between CGO-based libvim and a pure Go implementation.
+- The application uses vim editor functionality (libvim via CGO) for editing notes.
 - The application supports full-text search using the `fts5` extension of SQLite.
 - The application uses a terminal-based user interface for interaction.
-- Cross-platform compatibility: Windows builds automatically use pure Go implementations for all components.
 - The application supports conditional spell checking:
   - `hunspell` (CGO-based) - Available on Linux/Unix with CGO enabled
   - Graceful degradation - Shows helpful messages when spell check unavailable
 
 ## Platform-Specific Behavior
-- **Linux/Unix**: Supports vim, SQLite, and spell check options via build flags
-- **Windows**: Automatically uses pure Go implementations (no CGO dependencies)
-- **Cross-Platform**: Full Windows compatibility achieved through platform-specific signal handling and terminal operations
+- **Linux/macOS**: the supported platforms (CGO builds only)
+- **Windows**: unsupported (support was dropped along with the pure-Go vim engine)
 
 ## Cross-Compilation Support
 The application now supports full Windows cross-compilation from Linux/Unix systems:

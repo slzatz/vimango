@@ -1,59 +1,15 @@
 package vim
 
 import (
-	"fmt"
-	"log"
-	"os"
-
 	"github.com/slzatz/vimango/vim/cvim"
 	"github.com/slzatz/vimango/vim/interfaces"
 )
 
-// This file provides an API layer for the application to interact with vim
-// regardless of whether the C or Go implementation is being used.
+// This file provides the API layer the application uses to interact with vim.
+// libvim via CGO is the only implementation.
 
-// Engine is the active engine wrapper of the C or Go implementation:
-// either  CGOEngineWrapper or  GoEngineWrapper, which satisfy the VimEngine interface
+// Engine is the active engine wrapper (CGOEngineWrapper, set by InitializeVim)
 var Engine interfaces.VimEngine
-
-// activeImpl is the current implementation (C or Go)
-var activeImpl VimImplementation
-
-// ActiveImplementation tracks which implementation is active
-var ActiveImplementation = ImplC
-
-// API Functions that deal with which implementation is being used
-
-// SwitchToGoImplementation switches to the Go implementation
-func SwitchToGoImplementation() {
-	// Set up logging for the Go implementation
-	logFile, err := os.OpenFile("govim_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		// Log to stderr instead of stdout to avoid affecting the UI
-		fmt.Fprintf(os.Stderr, "Failed to open govim log file: %v\n", err)
-	}
-
-	ActiveImplementation = ImplGo
-	goImpl := &GoImplementation{}
-
-	// Initialize the logger if file was opened successfully
-	if err == nil {
-		goImpl.logger = log.New(logFile, "GoVim: ", log.Ltime|log.Lshortfile)
-		goImpl.logger.Println("Go implementation activated")
-	}
-
-	activeImpl = goImpl
-}
-
-// GetActiveImplementation returns the name of the active implementation
-func GetActiveImplementation() string {
-	return activeImpl.GetName()
-}
-
-// GetEngine gets the current engine implementation
-func GetEngineWrapper() interfaces.VimEngine {
-	return activeImpl.GetEngineWrapper()
-}
 
 // API Functions - These functions are called by package main as vim.OpenBuffer (..) for example
 
@@ -117,14 +73,6 @@ func SendMultiInput(s string) {
 
 // SendKey sends special key input
 func SendKey(s string) {
-	// For the enter key in insert mode, we need special handling in our Go implementation
-	// This ensures the auto-indent functionality works properly
-	if (s == "<cr>" || s == "<enter>" || s == "<return>") && IsUsingGoImplementation() && GetCurrentMode() == 16 {
-		// Handle enter key specially - as if \r was typed
-		Engine.Input("\r")
-		return
-	}
-
 	Engine.Key(s)
 }
 
@@ -164,8 +112,8 @@ func GetMatchingPair() [2]int {
 	return Engine.SearchGetMatchingPair()
 }
 
-// Command-line (cmdline) state, C implementation only — like BufferNew,
-// these bypass the engine abstraction and call cvim directly.
+// Command-line (cmdline) state — like BufferNew, these call cvim directly
+// rather than going through the Engine wrapper.
 
 // CommandLineGetType returns ':', '/' or '?' while vim is in cmdline mode, 0 otherwise
 func CommandLineGetType() byte {
@@ -181,15 +129,6 @@ func CommandLineGetText() string {
 func CommandLineGetPosition() int {
 	return cvim.CommandLineGetPosition()
 }
-
-// IsUsingGoImplementation checks if we're using the Go implementation
-func IsUsingGoImplementation() bool {
-	return GetActiveImplementation() == ImplGo
-}
-
-// Additional backward compatibility functions
-
-// ToggleImplementation switches between Go and C implementations
 
 // Helper functions to convert between buffer types
 // (CGO-specific conversion functions are in api_cgo_compat.go)
