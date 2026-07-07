@@ -88,9 +88,15 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             color: #333;
             max-width: 800px;
             margin: {{if .Standalone}}0 auto{{else}}0{{end}};
-            padding: 20px;
+            padding: {{if .Standalone}}20px{{else}}4px 20px 20px{{end}};
             background-color: #fff;
         }
+        {{if not .Standalone}}/* Embedded pane: the host's native title bar sits directly
+           above, so drop the first element's default top margin too. */
+        #content > :first-child {
+            margin-top: 0;
+        }
+        {{end}}
         h1, h2, h3, h4, h5, h6 {
             color: #2c3e50;
         }
