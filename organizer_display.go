@@ -426,11 +426,6 @@ func (o *Organizer) drawAltRows() {
 }
 
 func (o *Organizer) drawRenderedNote() {
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "drawRenderedNote: ENTER (note has %d lines)\n", len(o.note))
-		debugLog.Close()
-	}
-
 	if len(o.note) == 0 {
 		return
 	}
@@ -447,11 +442,6 @@ func (o *Organizer) drawRenderedNote() {
 		end = len(o.note)
 	}
 
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "drawRenderedNote: printing lines %d to %d\n", start, end)
-		debugLog.Close()
-	}
-
 	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
 	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
 	fmt.Print(strings.Join(o.note[start:end], lf_ret))
@@ -460,11 +450,6 @@ func (o *Organizer) drawRenderedNote() {
 	// Note: With Unicode placeholders (U+10EEEE), we don't need separate placements
 	// The placeholders are embedded directly in the text and reference the transmitted images
 	// Calling createImagePlacementsAtPositions() would delete the images!
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "drawRenderedNote: COMPLETE\n")
-		debugLog.Close()
-	}
 }
 
 // deleteAllKittyPlacements deletes all kitty image placements
@@ -483,11 +468,6 @@ func deleteAllKittyPlacements() {
 	cmd := oscOpen + "a=d,d=A,q=1" + oscClose
 	fmt.Fprint(os.Stdout, cmd)
 	os.Stdout.Sync()
-
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "DELETED: all kitty placements\n")
-		debugLog.Close()
-	}
 }
 
 // createKittyPlacement creates a placement at the current cursor position
@@ -553,18 +533,7 @@ func (o *Organizer) createImagePlacementsAtPositions(startLine, endLine int) {
 			fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", screenRow, screenCol)
 
 			// Create placement at current cursor position
-			if err := createKittyPlacement(uint32(imageID), cols, rows); err != nil {
-				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-					fmt.Fprintf(debugLog, "ERROR creating placement: %v\n", err)
-					debugLog.Close()
-				}
-			} else {
-				if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-					fmt.Fprintf(debugLog, "PLACEMENT: created i=%d at row=%d,col=%d (%dx%d cells)\n",
-						imageID, screenRow, screenCol, cols, rows)
-					debugLog.Close()
-				}
-			}
+			_ = createKittyPlacement(uint32(imageID), cols, rows)
 		}
 	}
 
@@ -960,11 +929,6 @@ func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, 
 		kittySessionImageMux.RUnlock()
 
 		if ok && (entry.fingerprint == prep.cachedFingerprint || entry.fingerprint == "") && (entry.confirmed || trustKittyCache) {
-			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "transmitKittyImage[reuse-kitty]: %s -> ID=%d, cols=%d, rows=%d\n",
-					prep.url, prep.cachedImageID, targetCols, rows)
-				debugLog.Close()
-			}
 			_ = kittyUpdateVirtualPlacement(prep.cachedImageID, targetCols, rows, isTmux)
 			if prep.isGoogleDrive && globalImageCache != nil {
 				_ = globalImageCache.UpdateKittyMeta(prep.url, prep.cachedImageID, targetCols, rows, prep.cachedFingerprint)
@@ -975,12 +939,6 @@ func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, 
 
 	// Need to transmit
 	imageID := nextSmallKittyID(prep.url)
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "transmitKittyImage[%s]: %s -> ID=%d, cols=%d, rows=%d (scale=%d)\n",
-			prep.source, prep.url, imageID, targetCols, rows, app.imageScale)
-		debugLog.Close()
-	}
-
 	if err := kittyTransmitActualImage(prep.data, imageID, targetCols, rows, isTmux); err != nil {
 		return 0, 0, 0
 	}
@@ -1127,13 +1085,6 @@ func transmitTransparentPlaceholder() error {
 	}
 
 	transparentPlaceholderTransmitted = true
-
-	// DEBUG: Log successful transmission
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "TRANSPARENT PLACEHOLDER: transmitted i=%d with a=T\n", KITTY_PLACEHOLDER_IMAGE_ID)
-		fmt.Fprintf(debugLog, "VIRTUAL PLACEMENT: created p=%d with U=1, c=1, r=1\n", KITTY_PLACEHOLDER_PLACEMENT_ID)
-		debugLog.Close()
-	}
 
 	return nil
 }
@@ -1287,20 +1238,11 @@ func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
 		id := currentRenderImageOrder[currentRenderOrderIdx]
 		currentRenderOrderIdx++
 		if dims, exists := currentRenderImageDims[id]; exists {
-			if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-				fmt.Fprintf(debugLog, "kittyImageCacheLookup(%s): returning ID=%d, cols=%d, rows=%d (ord=%d/%d)\n",
-					url, id, dims.cols, dims.rows, currentRenderOrderIdx, len(currentRenderImageOrder))
-				debugLog.Close()
-			}
 			return id, dims.cols, dims.rows, true
 		}
 	}
 
 	// Not found - shouldn't happen if pre-transmission worked
-	if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-		fmt.Fprintf(debugLog, "kittyImageCacheLookup(%s): NOT FOUND (ordIdx=%d len=%d)\n", url, currentRenderOrderIdx, len(currentRenderImageOrder))
-		debugLog.Close()
-	}
 	return 0, 0, 0, false
 }
 
@@ -1330,11 +1272,6 @@ func replaceKittyImageMarkers(text string) string {
 		// For virtual placements (a=T,U=1), placementID = imageID
 		placementID := uint32(imageID)
 
-		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-			fmt.Fprintf(debugLog, "REPLACE: Converting marker to grid: id=%d, cols=%d, rows=%d\n", imageID, cols, rows)
-			debugLog.Close()
-		}
-
 		// Build the result: optionally prepend image info, then the placeholder grid
 		var result strings.Builder
 
@@ -1347,14 +1284,6 @@ func replaceKittyImageMarkers(text string) string {
 		// Generate the Unicode placeholder grid
 		grid := buildPlaceholderGrid(uint32(imageID), placementID, cols, rows)
 		result.WriteString(grid)
-
-		if debugLog, err := os.OpenFile("kitty_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666); err == nil {
-			fmt.Fprintf(debugLog, "PLACEHOLDER GRID: Building grid for id=%d, cols=%d, rows=%d\n", imageID, cols, rows)
-			// Count actual newlines in the grid
-			newlineCount := strings.Count(grid, "\n")
-			fmt.Fprintf(debugLog, "GRID STATS: grid length=%d, newline count=%d, expected rows=%d\n", len(grid), newlineCount, rows)
-			debugLog.Close()
-		}
 		return result.String()
 	})
 }
