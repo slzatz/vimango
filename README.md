@@ -18,7 +18,7 @@ There are a few semi-notable features:
 - Spell checking through the use of the hunspell library
 - You can launch deep research via Claude and the results will be stored as a note
 
-This wasn't developed thinking anyone else would use it so there isn't an installable package. You'll need to clone the repository and build it yourself.  There are a few dependencies that you'll need to have installed first.  These are:
+This wasn't developed thinking anyone else would use it so there isn't an installable package. You'll need to clone the repository and build it yourself. On macOS, [MACOS_SETUP.md](./MACOS_SETUP.md) walks a completely fresh machine (no git/Homebrew/Go) through the whole setup; [INSTALL.md](./INSTALL.md) is the condensed build guide. There are a few dependencies that you'll need to have installed first.  These are:
 
  - Go 1.20 or later
  - SQLite3 development files

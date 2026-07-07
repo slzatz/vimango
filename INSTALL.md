@@ -1,5 +1,10 @@
 # Installing / Building vimango
 
+> **Starting from a completely fresh Mac** (no git, Homebrew, or Go installed)?
+> Use [MACOS_SETUP.md](./MACOS_SETUP.md) — it bootstraps the machine from zero
+> (developer tools, Homebrew, a terminal that can display images, hunspell
+> dictionaries) and covers the same build steps as this file.
+
 This is a step-by-step guide to building vimango from scratch on a new machine.
 It focuses on the **full CGO build** on **macOS**, which is the most involved
 path because several artifacts are deliberately *not* checked into the repo
