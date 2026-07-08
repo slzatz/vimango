@@ -661,6 +661,14 @@ func (e *Editor) generateWWStringFromBuffer() string {
 }
 
 func (e *Editor) drawStatusBar() {
+	// editor-only mode: the hybrid host shows note id/title in its own
+	// native status bar, so the in-grid reverse-video row is kept erased
+	// instead of drawn.
+	if e.Session.editorOnly {
+		fmt.Printf("\x1b[%d;%dH\x1b[%dX", e.screenlines+e.top_margin, e.left_margin+1, e.screencols)
+		return
+	}
+
 	var ab strings.Builder
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", e.screenlines+e.top_margin, e.left_margin+1)
 

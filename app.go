@@ -620,6 +620,16 @@ func (a *App) LoadInitialData() {
 
 	a.Organizer.readRowsIntoBuffer()
 	a.Organizer.bufferTick = a.Organizer.vbuf.GetLastChangedTick()
+
+	// editor-only mode: the organizer is never rendered (divider = 1), so
+	// its boot draw would paint fragments into the editor's screen area —
+	// the status bar's first column, the current-row marker, and a BL
+	// message truncated to divider width (one char). The data loads above
+	// still run: editNote() reads o.rows / o.fr.
+	if a.Session.editorOnly {
+		return
+	}
+
 	a.Organizer.displayNote()
 	a.Organizer.refreshScreen()
 	a.Organizer.drawStatusBar()
