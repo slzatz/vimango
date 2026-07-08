@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html/template"
 	"image/jpeg"
@@ -123,6 +124,15 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             height: auto;
             border-radius: 5px;
         }
+        .img-placeholder {
+            display: inline-block;
+            padding: 10px 14px;
+            border: 1px dashed #bbb;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
         table {
             border-collapse: collapse;
             width: 100%;
@@ -149,6 +159,11 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
                 background-color: #2d2d2d;
             }
             blockquote {
+                color: #9aa4ab;
+            }
+            .img-placeholder {
+                border-color: #555;
+                background-color: #2d2d2d;
                 color: #9aa4ab;
             }
             th, td {
@@ -212,6 +227,24 @@ func detectImageFormat(base64Data string) string {
 	return "png"
 }
 
+// imagePlaceholderHTML renders a visible stand-in for a Google Drive image
+// that could not be inlined (not signed in, offline, undecodable) instead of
+// leaving a dead gdrive: URL that browsers show as a broken-image icon. The
+// full error is tucked into the title attribute (hover to read it). Raw HTML
+// survives the markdown conversion because goldmark runs WithUnsafe.
+func imagePlaceholderHTML(altText string, err error) string {
+	label := altText
+	if label == "" {
+		label = "image"
+	}
+	reason := "could not be loaded"
+	if errors.Is(err, ErrGoogleDriveNotConfigured) {
+		reason = "sign in to Google Drive to view it"
+	}
+	return fmt.Sprintf(`<span class="img-placeholder" title="%s">&#128444;&#65039; %s &mdash; %s</span>`,
+		template.HTMLEscapeString(err.Error()), template.HTMLEscapeString(label), reason)
+}
+
 // preprocessMarkdownImages processes Google Drive images in markdown before HTML conversion
 func preprocessMarkdownImages(markdown string) (string, error) {
 	// Initialize cache if needed
@@ -251,8 +284,8 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 				// Cache miss - download and convert to data URI
 				dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
 				if err != nil {
-					// If we can't convert, leave the original URL
 					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
+					processedMarkdown = strings.Replace(processedMarkdown, fullMatch, imagePlaceholderHTML(altText, err), 1)
 					continue
 				}
 
@@ -266,8 +299,8 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 			// No cache available - fallback to direct conversion
 			dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
 			if err != nil {
-				// If we can't convert, leave the original URL
 				log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
+				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, imagePlaceholderHTML(altText, err), 1)
 				continue
 			}
 		}
@@ -286,7 +319,7 @@ func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
 	// Note: We'll use reasonable defaults for max width/height for web display
 	img, imgFmt, err := loadGoogleImage(googleURL, 1200, 800)
 	if err != nil {
-		return "", fmt.Errorf("failed to load Google Drive image: %v", err)
+		return "", fmt.Errorf("failed to load Google Drive image: %w", err)
 	}
 
 	// Convert image to bytes
