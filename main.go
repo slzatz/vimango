@@ -35,6 +35,12 @@ func main() {
 		os.Exit(RunRenderHTML(id))
 	}
 
+	// --gdrive-auth: sign in to Google Drive (create/refresh token.json)
+	// and exit. No terminal UI.
+	if CheckForGDriveAuth(os.Args) {
+		os.Exit(RunGDriveAuth())
+	}
+
 	// --editor boots straight into a full-width editor (host-embedding mode)
 	editorOnly, openId := DetermineEditorBoot(os.Args)
 
@@ -51,8 +57,16 @@ func main() {
 	app.imageScale = prefs.ImageScale
 	app.imageCacheMaxWidth = prefs.ImageCacheMaxWidth
 
-	// Google Drive is optional - initialize if credentials are available
-	srv, err := auth.GetDriveService()
+	// Google Drive is optional - initialize if credentials are available.
+	// In host-embedded editor mode stdio is a hidden pty, so a missing
+	// token must fail quietly (images degrade with a message) instead of
+	// wedging the editor on the interactive OAuth prompt; sign in with
+	// `vimango --gdrive-auth` in a real terminal.
+	getDriveService := auth.GetDriveService
+	if editorOnly {
+		getDriveService = auth.GetDriveServiceHeadless
+	}
+	srv, err := getDriveService()
 	if err != nil {
 		// Google Drive not configured - this is OK, the app will work without it
 		// Users with gdrive: images will see a message explaining how to set it up

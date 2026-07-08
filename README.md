@@ -267,12 +267,18 @@ If you want to use Google Drive images in your notes, follow these steps:
 
 1. Rename the downloaded file to `go_credentials.json`
 2. Place it in the vimango directory (same directory as the executable)
-3. Run vimango - on first run, it will:
+3. Run `./vimango --gdrive-auth`. It will:
    - Print an authorization URL
    - Open the URL in your browser (or copy/paste it)
    - Sign in with your Google account and authorize the app
    - Paste the authorization code back into the terminal
 4. A `token.json` file will be created to store your access token
+
+`--gdrive-auth` is also the fix whenever the stored token stops working
+(expired or revoked): it verifies `token.json` with a live API call and
+re-runs the sign-in flow if needed. (Running the TUI without a `token.json`
+triggers the same prompt as a side effect, but the flag is the reliable,
+scriptable way in.)
 
 ### 4. Using Google Drive Images
 

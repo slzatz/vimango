@@ -18,6 +18,7 @@ var validFlags = map[string]bool{
 	"--editor":      true,
 	"--open":        true, // takes a value: --open <id>; requires --editor
 	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
+	"--gdrive-auth": true, // sign in to Google Drive (create/refresh token.json) and exit
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
@@ -129,6 +130,14 @@ OPTIONS:
         for host applications embedding a preview pane. Google Drive
         images are inlined as data URIs when Drive is configured.
 
+    --gdrive-auth
+        Sign in to Google Drive and exit: runs the OAuth flow (prints a
+        URL to open in a browser, accepts the code) and saves token.json
+        next to the binary. Verifies an existing token with a live API
+        call and re-runs the flow if it no longer works. Google Drive
+        images (gdrive:) need this; requires go_credentials.json (see
+        README.md, Google Drive Setup).
+
 EXAMPLES:
     # First-time setup (creates config.json and databases)
     ./vimango --init
@@ -144,6 +153,9 @@ EXAMPLES:
 
     # Print note 5 as HTML (e.g. for a host app's preview pane)
     ./vimango --render-html 5
+
+    # Sign in to Google Drive (creates/refreshes token.json)
+    ./vimango --gdrive-auth
 
 BUILD INFORMATION:
     Platform: %s

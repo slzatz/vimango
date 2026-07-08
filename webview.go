@@ -239,7 +239,7 @@ func imagePlaceholderHTML(altText string, err error) string {
 	}
 	reason := "could not be loaded"
 	if errors.Is(err, ErrGoogleDriveNotConfigured) {
-		reason = "sign in to Google Drive to view it"
+		reason = "sign in to Google Drive to view it (run <code>vimango --gdrive-auth</code> in a terminal)"
 	}
 	return fmt.Sprintf(`<span class="img-placeholder" title="%s">&#128444;&#65039; %s &mdash; %s</span>`,
 		template.HTMLEscapeString(err.Error()), template.HTMLEscapeString(label), reason)
