@@ -105,7 +105,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             background-color: #f4f4f4;
             padding: 2px 4px;
             border-radius: 3px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-family: ui-monospace, 'SF Mono', 'Menlo', 'Ubuntu Mono', monospace;
         }
         pre {
             background-color: #f4f4f4;
