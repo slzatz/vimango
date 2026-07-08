@@ -35,10 +35,14 @@ func RunRenderHTML(id int) int {
 	prefs := app.LoadPreferences("preferences.json")
 	app.imageCacheMaxWidth = prefs.ImageCacheMaxWidth
 
-	// Optional, same as the TUI boot path: without it gdrive: images stay
-	// as-is and everything else still renders.
-	if srv, err := auth.GetDriveService(); err == nil {
+	// Optional: without Drive the note still renders, with a visible
+	// placeholder where each gdrive: image would be. Headless variant —
+	// stdio is piped, so the interactive OAuth prompt the TUI boot path
+	// falls into on a missing token.json would block forever here.
+	if srv, err := auth.GetDriveServiceHeadless(); err == nil {
 		app.Session.googleDrive = srv
+	} else {
+		fmt.Fprintf(os.Stderr, "Warning: Google Drive unavailable: %v\n", err)
 	}
 	initImageCache()
 

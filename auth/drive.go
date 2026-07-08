@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 
 	"golang.org/x/oauth2"
@@ -16,7 +15,21 @@ import (
 )
 
 // GetDriveService creates and returns an authenticated Google Drive service client.
+// If no stored token exists it walks the user through the interactive OAuth
+// flow on stdin/stdout.
 func GetDriveService() (*drive.Service, error) {
+	return getDriveService(false)
+}
+
+// GetDriveServiceHeadless is GetDriveService for non-interactive contexts
+// (e.g. --render-html spawned by a host app with pipes for stdio): if no
+// usable token.json exists it returns an error instead of blocking forever
+// on the interactive OAuth prompt.
+func GetDriveServiceHeadless() (*drive.Service, error) {
+	return getDriveService(true)
+}
+
+func getDriveService(headless bool) (*drive.Service, error) {
 	ctx := context.Background()
 
 	// 1. Read the client secret file from Google Cloud Console.
@@ -32,31 +45,26 @@ func GetDriveService() (*drive.Service, error) {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
 	}
 
-	// 3. Get the token. It will try to read token.json, and if it's not there,
-	// it will guide the user through the web-based auth flow.
-	client := getClient(config)
+	// 3. Get the token. The file token.json stores the user's access and
+	// refresh tokens; it is created by the interactive web-based auth flow,
+	// which headless callers must not fall into.
+	tok, err := tokenFromFile("token.json")
+	if err != nil {
+		if headless {
+			return nil, fmt.Errorf("no stored Google token (token.json): %w", err)
+		}
+		tok = getTokenFromWeb(config)
+		saveToken("token.json", tok)
+	}
+	client := config.Client(ctx, tok)
 
 	// 4. Use the authenticated client to create the Drive service.
-	// THIS IS THE CALL FROM YOUR CODE.
 	srv, err := drive.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve Drive client: %w", err)
 	}
 
 	return srv, nil
-}
-
-// getClient retrieves a token, saves it, and returns the generated client.
-func getClient(config *oauth2.Config) *http.Client {
-	// The file token.json stores the user's access and refresh tokens, and is
-	// created automatically when the authorization flow completes for the first time.
-	tokFile := "token.json"
-	tok, err := tokenFromFile(tokFile)
-	if err != nil {
-		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
-	}
-	return config.Client(context.Background(), tok)
 }
 
 // Request a token from the web, then returns the retrieved token.
