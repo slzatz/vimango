@@ -296,12 +296,13 @@ func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
 		err = png.Encode(&buf, img)
 	case "jpeg", "jpg":
 		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
+	case "heic":
+		// HEIC decodes to a standard image.Image but browsers can't
+		// display image/heic; re-encode as JPEG for the data URI.
+		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
+		imgFmt = "jpeg"
 	default:
-		// Default to PNG for unknown formats
-		//err = png.Encode(&buf, img)
-		//imgFmt = "png"
-		//heic caused panic with the png assumption
-		return "", fmt.Errorf("Unsupported image format: %s.")
+		return "", fmt.Errorf("unsupported image format: %s", imgFmt)
 	}
 
 	if err != nil {
