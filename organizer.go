@@ -132,6 +132,13 @@ func (o *Organizer) showMessage(format string, a ...interface{}) {
 }
 
 func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) {
+	// editor-only mode: the BL message area is divider(=1) columns wide,
+	// so a BL message renders as a single stray character at column 1 of
+	// the cmdline row. Route to the full-width BR area instead (same rule
+	// as Editor.ShowMessage).
+	if o.Session.editorOnly {
+		loc = BR
+	}
 	max_length := o.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	// breakWord breaks strings (can be several words) into first segment

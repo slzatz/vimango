@@ -26,6 +26,20 @@ type Screen struct {
 }
 
 func (s *Screen) eraseScreenRedrawLines() {
+	// editor-only mode: no top border row (the host's native title bar
+	// sits directly above, and the text area starts at row 1) — just the
+	// vertical left border, full height.
+	if s.Session.editorOnly {
+		fmt.Fprint(os.Stdout, "\x1b[2J")
+		fmt.Fprint(os.Stdout, "\x1b(0")
+		for j := 1; j <= s.screenLines; j++ {
+			fmt.Fprintf(os.Stdout, "\x1b[%d;%dH\x1b[37;1mx", j, s.divider)
+		}
+		fmt.Fprint(os.Stdout, "\x1b[0m")
+		fmt.Fprint(os.Stdout, "\x1b(B")
+		return
+	}
+
 	fmt.Fprint(os.Stdout, "\x1b[2J") //Erase the screen
 	fmt.Fprint(os.Stdout, "\x1b(0")  //Enter line drawing mode
 	for j := 1; j < s.screenLines+1; j++ {
@@ -80,16 +94,20 @@ func (s *Screen) eraseRightScreen() {
 	// redraw top horizontal line which has t's and was erased above
 	// ? if the individual editors draw top lines do we need to just
 	// erase but not draw
-	ab.WriteString("\x1b(0")                   // Enter line drawing mode
-	for j := 1; j < s.totaleditorcols+1; j++ { //added +1 0906/2020
-		fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN, s.divider+j)
-		// below x = 0x78 vertical line (q = 0x71 is horizontal) 37 = white;
-		// 1m = bold (note only need one 'm'
-		ab.WriteString("\x1b[37;1mq")
-	}
+	// (skipped in editor-only mode: there is no top border row — the
+	// text area starts at row 1 and this would overwrite it)
+	if !s.Session.editorOnly {
+		ab.WriteString("\x1b(0")                   // Enter line drawing mode
+		for j := 1; j < s.totaleditorcols+1; j++ { //added +1 0906/2020
+			fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN, s.divider+j)
+			// below x = 0x78 vertical line (q = 0x71 is horizontal) 37 = white;
+			// 1m = bold (note only need one 'm'
+			ab.WriteString("\x1b[37;1mq")
+		}
 
-	//exit line drawing mode
-	ab.WriteString("\x1b(B")
+		//exit line drawing mode
+		ab.WriteString("\x1b(B")
+	}
 
 	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+1, s.divider+2)
 	ab.WriteString("\x1b[0m") // needed or else in bold mode from line drawing above

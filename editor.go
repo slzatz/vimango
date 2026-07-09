@@ -56,6 +56,13 @@ type Editor struct {
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
+	// editor-only mode: there is no organizer pane, so the BL message
+	// area is divider(=1) columns wide — a BL message renders as a single
+	// stray character at column 1 of the cmdline row. Route everything to
+	// the editor's own (full-width) BR area instead.
+	if e.Session.editorOnly {
+		loc = BR
+	}
 	max_length := e.Screen.PositionMessage(loc)
 	str := fmt.Sprintf(format, a...)
 	if len(str) > max_length {

@@ -247,7 +247,11 @@ func (a *App) moveDividerPct(pct int) {
 	} else if a.Organizer.view == TASK {
 		a.Organizer.displayNote()
 	}
-	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
+	// diagnostics noise in the hybrid app: every host-window resize lands
+	// here via SIGWINCH and would flash this over the editor's message row
+	if !a.Session.editorOnly {
+		a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
+	}
 	a.returnCursor()
 }
 

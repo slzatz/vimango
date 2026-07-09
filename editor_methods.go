@@ -74,6 +74,16 @@ func (e *Editor) setLinesMargins() { //also sets top margin
 			}
 		} else {
 	*/
+	// editor-only mode: no top border row (native title bar above) and no
+	// status-bar row (native status bar below) — but keep one blank row
+	// between the text and the message/cmdline line as a visual separator,
+	// so the net gain over the TUI layout is one text row. Text runs from
+	// row 1 (top_margin=1) to two rows above the cmdline.
+	if e.Session.editorOnly {
+		e.screenlines = e.Screen.textLines + 1
+		e.top_margin = 1
+		return
+	}
 	e.screenlines = e.Screen.textLines
 	e.top_margin = TOP_MARGIN + 1
 }
@@ -662,10 +672,10 @@ func (e *Editor) generateWWStringFromBuffer() string {
 
 func (e *Editor) drawStatusBar() {
 	// editor-only mode: the hybrid host shows note id/title in its own
-	// native status bar, so the in-grid reverse-video row is kept erased
-	// instead of drawn.
+	// native status bar; the row below the text area (screenlines +
+	// top_margin) is a deliberately blank separator above the
+	// message/cmdline line (setLinesMargins), so there is nothing to draw.
 	if e.Session.editorOnly {
-		fmt.Printf("\x1b[%d;%dH\x1b[%dX", e.screenlines+e.top_margin, e.left_margin+1, e.screencols)
 		return
 	}
 
@@ -705,12 +715,17 @@ func (e *Editor) drawFrame() {
 	}
 
 	//'T' corner = w or right top corner = k
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", e.top_margin-1, e.left_margin+e.screencols+1)
+	// (skipped in editor-only mode: top_margin is 1, so the corner row
+	// (top_margin-1 = 0) doesn't exist — the cursor would clamp to row 1
+	// and stamp the corner glyph over the border/text there)
+	if !e.Session.editorOnly {
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", e.top_margin-1, e.left_margin+e.screencols+1)
 
-	if e.left_margin+e.screencols > e.Screen.screenCols-4 {
-		ab.WriteString("\x1b[37;1mk") //draw corner
-	} else {
-		ab.WriteString("\x1b[37;1mw")
+		if e.left_margin+e.screencols > e.Screen.screenCols-4 {
+			ab.WriteString("\x1b[37;1mk") //draw corner
+		} else {
+			ab.WriteString("\x1b[37;1mw")
+		}
 	}
 
 	//exit line drawing mode
