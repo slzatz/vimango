@@ -22,7 +22,7 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Config struct {
@@ -103,7 +103,7 @@ func main() {
 	fmt.Printf("Connected to PostgreSQL: %s/%s\n", config.Postgres.Host, config.Postgres.DB)
 
 	// Connect to SQLite
-	sqliteConn, err := sql.Open("sqlite", *localDB)
+	sqliteConn, err := sql.Open("sqlite3", *localDB)
 	if err != nil {
 		fmt.Printf("Error connecting to SQLite: %v\n", err)
 		os.Exit(1)

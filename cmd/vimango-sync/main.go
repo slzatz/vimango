@@ -22,8 +22,8 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	syncpkg "github.com/slzatz/vimango/internal/sync"
-	_ "modernc.org/sqlite"
 )
 
 type postgresConfig struct {
@@ -61,7 +61,7 @@ func main() {
 		fatal("postgres config missing 'host'")
 	}
 
-	mainDB, err := sql.Open("sqlite", *dbPath)
+	mainDB, err := sql.Open("sqlite3", *dbPath)
 	if err != nil {
 		fatal("opening main SQLite db: %v", err)
 	}
@@ -70,7 +70,7 @@ func main() {
 		fatal("enabling foreign keys on main db: %v", err)
 	}
 
-	ftsDB, err := sql.Open("sqlite", *ftsDBPath)
+	ftsDB, err := sql.Open("sqlite3", *ftsDBPath)
 	if err != nil {
 		fatal("opening FTS SQLite db: %v", err)
 	}

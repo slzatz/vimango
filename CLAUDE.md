@@ -89,8 +89,6 @@ NOTE: Generally we have not been running tests but have tested key functionality
 
 ## Runtime Options
 - `--help`, `-h`: Display help message with all available options and exit
-- `--go-sqlite`: Use pure Go SQLite driver (modernc.org/sqlite) - default
-- `--cgo-sqlite`: Use CGO SQLite driver (mattn/go-sqlite3) - only available in CGO builds
 - `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer and drive the editor over the pty (`:open <id>` / `:open! <id>` ex commands).
 - `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
 - `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
@@ -120,9 +118,15 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 - The application operates in two main modes: an editor mode for editing notes and an organizer mode for managing and viewing notes. On the terminal screen the Organizer with the titles of notes is on the left and the Editor for editing notes is on the right.
 - The application supports markdown rendering of notes to enhance the readability of the content.
 - The ability to manage and display images is an important feature of the application.
-- The application supports dual SQLite driver selection:
-  - `modernc.org/sqlite` (Pure Go, default) - Works on all platforms
-  - `mattn/go-sqlite3` (CGO-based) - Only available on Linux/Unix with CGO enabled
+- SQLite driver: `mattn/go-sqlite3` (CGO) everywhere — the modernc.org/sqlite
+  pure-Go driver and the `--go-sqlite`/`--cgo-sqlite` selection layer were
+  removed 2026-07-12 (mattn's built-in 5000ms busy timeout matters: several
+  processes share vimango.db — the TUI, `--editor`, `--render-html`,
+  vimango-sync, and vimango_hybrid's GRDB side). This makes the `fts5` build
+  tag mandatory for every binary touching the FTS database; `fts5_guard.go`
+  files (project root, cmd/vimango-sync, cmd/create_*) turn a tag-less build
+  into a compile error (`undefined: thisBinaryRequiresBuildTagFts5`) instead
+  of a runtime "no such module: fts5" failure.
 - The application uses vim editor functionality (libvim via CGO) for editing notes.
 - The application supports full-text search using the `fts5` extension of SQLite.
 - The application uses a terminal-based user interface for interaction.

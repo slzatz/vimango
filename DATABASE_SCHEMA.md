@@ -288,8 +288,7 @@ CGO_ENABLED=1 go build --tags="fts5,cgo"
 
 ## Database Driver Selection
 
-The application supports two SQLite drivers:
-- **modernc.org/sqlite** (Pure Go, default) - Works on all platforms
-- **mattn/go-sqlite3** (CGO-based) - Only available on Linux/Unix with CGO enabled
-
-Use `--go-sqlite` or `--cgo-sqlite` runtime flags to select the driver.
+The application uses a single SQLite driver: **mattn/go-sqlite3** (CGO).
+Binaries must be built with the `fts5` tag (enforced at compile time by
+`fts5_guard.go` files); the pure-Go modernc.org/sqlite driver was removed
+2026-07-12.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -196,12 +197,8 @@ func runInit() {
 	}
 	fmt.Println("Created config.json")
 
-	// Create SQLite databases using the configurable driver
-	// Use pure Go driver for init since it works everywhere
-	sqliteConfig := &SQLiteConfig{Driver: SQLiteDriverModernC}
-
 	// Create main database
-	mainDB, err := sqliteConfig.OpenSQLiteDB("vimango.db")
+	mainDB, err := sql.Open("sqlite3", "vimango.db")
 	if err != nil {
 		fmt.Printf("Error creating main database: %v\n", err)
 		os.Exit(1)
@@ -240,7 +237,7 @@ func runInit() {
 	fmt.Println("Created vimango.db with schema and default data")
 
 	// Create FTS database
-	ftsDB, err := sqliteConfig.OpenSQLiteDB("fts5_vimango.db")
+	ftsDB, err := sql.Open("sqlite3", "fts5_vimango.db")
 	if err != nil {
 		fmt.Printf("Error creating FTS database: %v\n", err)
 		os.Exit(1)

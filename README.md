@@ -215,18 +215,15 @@ The `config.json` file structure (copy from `config.json.example`):
 - **glamour**: Markdown rendering style - `darkslz.json` and `default.json` are included
 - **claude**: API key for deep research feature (optional)
 
-The full application makes heavy use of CGO to access various C libraries but it can be compiled without using CGO.
+The full application makes heavy use of CGO to access various C libraries (libvim, hunspell, sqlite3); CGO is required — pure-Go builds are unsupported.
 
 So if this hasn't been offputting enough, after you can clone the repository you can build as follows:
 
- - **Linux with CGO**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (includes libvim, hunspell, sqlite3)
- - **Windows Cross-Compilation**: `GOOS=windows GOARCH=amd64 go build --tags=fts5` (pure Go only)
+ - `CGO_ENABLED=1 go build --tags="fts5,cgo"` (the `fts5` tag is mandatory and enforced at compile time by `fts5_guard.go`)
 
 The main runtime options are:
 
  - `--help`, `-h`: Display help message with all available options and exit
- - `--go-sqlite`: Use pure Go SQLite driver (modernc.org/sqlite) - default
- - `--cgo-sqlite`: Use CGO SQLite driver (mattn/go-sqlite3)
 
 If you actually manage to get the application running there is a help system:
 

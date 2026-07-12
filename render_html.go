@@ -46,7 +46,7 @@ func RunRenderHTML(id int) int {
 	}
 	initImageCache()
 
-	if err := app.InitDatabases("config.json", DetermineSQLiteDriver(os.Args)); err != nil {
+	if err := app.InitDatabases("config.json"); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not open databases: %v\n", err)
 		return 1
 	}

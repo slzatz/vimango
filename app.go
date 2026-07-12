@@ -292,7 +292,7 @@ func (a *App) moveDividerAbs(num int) {
 var ErrDatabaseNotFound = fmt.Errorf("database files not found")
 
 // InitDatabases initializes database connections
-func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error {
+func (a *App) InitDatabases(configPath string) error {
 	// Read config file
 	config, err := a.FromFile(configPath)
 	if err != nil {
@@ -309,7 +309,7 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 	}
 
 	// Initialize main database
-	a.Database.MainDB, err = sqliteConfig.OpenSQLiteDB(config.Sqlite3.DB)
+	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (a *App) InitDatabases(configPath string, sqliteConfig *SQLiteConfig) error
 		return err
 	}
 	// Initialize FTS database
-	a.Database.FtsDB, err = sqliteConfig.OpenSQLiteDB(config.Sqlite3.FTS_DB)
+	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
 	if err != nil {
 		return err
 	}

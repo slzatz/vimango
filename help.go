@@ -13,8 +13,6 @@ var validFlags = map[string]bool{
 	"--help":        true,
 	"-h":            true,
 	"--init":        true,
-	"--go-sqlite":   true,
-	"--cgo-sqlite":  true,
 	"--editor":      true,
 	"--open":        true, // takes a value: --open <id>; requires --editor
 	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
@@ -103,16 +101,6 @@ OPTIONS:
         initializes the SQLite databases (vimango.db and fts5_vimango.db).
         Use this when running vimango for the first time after cloning.
 
-    --go-sqlite
-        Use the pure Go SQLite driver (modernc.org/sqlite).
-        Default: This is already the default driver.
-        Note: Works on all platforms including Windows.
-
-    --cgo-sqlite
-        Use the CGO-based SQLite driver (github.com/mattn/go-sqlite3).
-        Requirements: Only available on Linux/Unix with CGO-enabled builds.
-        Note: Silently ignored on Windows or in pure Go builds.
-
     --editor
         Boot directly into the editor, full-width; the organizer is never
         rendered. Intended for host applications embedding vimango as an
@@ -142,11 +130,8 @@ EXAMPLES:
     # First-time setup (creates config.json and databases)
     ./vimango --init
 
-    # Run with default settings (pure Go SQLite, libvim)
+    # Run with default settings
     ./vimango
-
-    # Run with CGO SQLite driver
-    ./vimango --cgo-sqlite
 
     # Editor-only mode (e.g. embedded in a host app), opening note 5
     ./vimango --editor --open 5

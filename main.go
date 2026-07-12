@@ -81,13 +81,8 @@ func main() {
 	// Initialize Vim (libvim via CGO — the only implementation)
 	vim.InitializeVim(0)
 
-	// Configure SQLite driver selection
-	// currently defaulting to modernc sqlite driver unless --cgo-sqlite3 is specified
-	sqliteConfig := DetermineSQLiteDriver(os.Args)
-	//LogSQLiteDriverChoice(sqliteConfig) //debugging
-
 	// Initialize database connections
-	err = app.InitDatabases("config.json", sqliteConfig)
+	err = app.InitDatabases("config.json")
 	if err != nil {
 		// Distinguish "config.json itself is missing" from "config references a missing file"
 		if _, statErr := os.Stat("config.json"); os.IsNotExist(statErr) {
