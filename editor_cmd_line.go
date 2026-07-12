@@ -852,6 +852,12 @@ func (e *Editor) quitAll() {
 // vimango runs as an embedded editor pane (--editor): the host injects
 // "\x1b:open <id>\r" into the pty. Follows editNote's buffer setup; unsaved
 // changes are refused exactly like :q unless open! is used.
+//
+// Opening the note that is already open is a no-op (unless forced, which
+// keeps :e!-style revert-from-DB semantics). This is contract: the host
+// injects :open on every edit intent without tracking which note the
+// editor is on — the editor is the single source of truth for its own
+// note + dirty state, so the "already open" check must live here.
 func (e *Editor) openNote() {
 	force := strings.HasPrefix(e.command_line, "open!")
 
@@ -864,6 +870,9 @@ func (e *Editor) openNote() {
 	id, err := strconv.Atoi(arg)
 	if err != nil {
 		e.ShowMessage(BR, "open: %q is not a note id", arg)
+		return
+	}
+	if id == e.id && !force {
 		return
 	}
 	if !force && e.isModified() {
