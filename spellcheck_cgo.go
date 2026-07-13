@@ -1,4 +1,9 @@
-//go:build cgo && !windows
+// Spell checking is opt-in: build with `--tags spell` (in addition to the
+// usual fts5) to link hunspell. The default build uses the stub in
+// spellcheck_nocgo.go — the dictionary paths below are Linux paths that
+// don't exist on macOS, so linking hunspell there bought a broken feature
+// (empty dictionary flags every word) plus a Homebrew dylib dependency.
+//go:build spell && cgo && !windows
 
 package main
 
