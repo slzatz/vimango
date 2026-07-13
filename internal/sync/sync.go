@@ -22,6 +22,10 @@ import (
 // Constants for default container IDs
 const (
 	DefaultContainerID = 1 // Represents "none" for context/folder
+	// Sentinel uuids of the "none" context/folder rows (tid 1). Task rows
+	// reference containers by uuid; the deprecated *_tid columns go stale.
+	DefaultContextUUID = "00000000-0000-0000-0000-000000000001"
+	DefaultFolderUUID  = "00000000-0000-0000-0000-000000000002"
 )
 
 // Syncer holds DB connections and Postgres metadata used to format the
@@ -959,9 +963,35 @@ func (s *Syncer) deleteClientEntriesFromServer(entries []entry, lg io.Writer) {
 
 // deleteContainerFromBoth deletes a container from both server and client, updating task references
 func (s *Syncer) deleteContainerFromBoth(ct containerType, c container, isServerDeleted bool, taskField string, lg io.Writer) {
-	// Update tasks to reference default container (ID 1 = "none") on server and client
-	query := fmt.Sprintf("UPDATE task SET %s=%d, modified=now() WHERE %s=$1;", taskField, DefaultContainerID, taskField)
-	res, err := s.PG.Exec(query, c.tid)
+	uuidField := "context_uuid"
+	defaultUUID := DefaultContextUUID
+	if ct == containerTypeFolder {
+		uuidField = "folder_uuid"
+		defaultUUID = DefaultFolderUUID
+	}
+
+	// The "none" container must never be deleted — every reassignment
+	// below lands on it.
+	if c.tid == DefaultContainerID || c.uuid == defaultUUID {
+		fmt.Fprintf(lg, "Refusing to delete the 'none' %s (tid %d)\n", ct, c.tid)
+		return
+	}
+
+	// Move the container's tasks to "none" (tid 1) on server and client.
+	// Membership is matched by uuid — the authoritative reference; the
+	// deprecated *_tid columns go stale (uuid-based reassignments never
+	// update them) and would both miss and over-match. Both columns are
+	// reset so the tid side can't dangle either. Containers predating the
+	// uuid migration fall back to tid matching.
+	match := uuidField
+	var matchArg interface{} = c.uuid
+	if c.uuid == "" {
+		match = taskField
+		matchArg = c.tid
+	}
+	query := fmt.Sprintf("UPDATE task SET %s=%d, %s='%s', modified=now() WHERE %s=$1;",
+		taskField, DefaultContainerID, uuidField, defaultUUID, match)
+	res, err := s.PG.Exec(query, matchArg)
 	if err != nil {
 		fmt.Fprintf(lg, "Error trying to change server entry %s for a deleted %s: %v\n", taskField, ct, err)
 	} else {
@@ -969,8 +999,9 @@ func (s *Syncer) deleteContainerFromBoth(ct containerType, c container, isServer
 		fmt.Fprintf(lg, "The number of server entries that were changed to 'none': **%d**\n", rowsAffected)
 	}
 
-	query = fmt.Sprintf("UPDATE task SET %s=%d, modified=datetime('now') WHERE %s=?;", taskField, DefaultContainerID, taskField)
-	res, err = s.MainDB.Exec(query, c.tid)
+	query = fmt.Sprintf("UPDATE task SET %s=%d, %s='%s', modified=datetime('now') WHERE %s=?;",
+		taskField, DefaultContainerID, uuidField, defaultUUID, match)
+	res, err = s.MainDB.Exec(query, matchArg)
 	if err != nil {
 		fmt.Fprintf(lg, "Error trying to change client entry %s for a deleted %s: %v\n", taskField, ct, err)
 	} else {
