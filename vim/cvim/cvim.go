@@ -11,7 +11,7 @@ import (
 #cgo CFLAGS: -Iproto -DHAVE_CONFIG_H
 #cgo linux LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
 #cgo darwin CFLAGS: -I/opt/homebrew/include
-#cgo darwin LDFLAGS: libvim.a -lm -lncurses -lintl -liconv -L/opt/homebrew/lib -framework CoreServices -framework AppKit
+#cgo darwin LDFLAGS: libvim.a -lm -lncurses /opt/homebrew/opt/gettext/lib/libintl.a -liconv -L/opt/homebrew/lib -framework CoreServices -framework AppKit
 */
 import "C"
 
