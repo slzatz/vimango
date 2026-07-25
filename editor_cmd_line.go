@@ -1149,14 +1149,12 @@ func (e *Editor) printDocument() {
 // syncing from the organizer.
 func (e *Editor) synchronize() {
 	if e.Session.editorOnly {
-		// no organizer to hand focus to: run the sync and show the report
-		// as a notice overlay over the editor, with the same interaction
-		// as :help (PgUp/PgDn scroll via PreviewModeKeyHandler, Esc
-		// dismisses and redraws the editor)
-		app.Organizer.command_line = e.command_line // dry-run detection (:test / :sync?)
-		app.Organizer.synchronize(0)
-		e.command_line = ""
-		e.mode = HELP
+		// --editor runs inside a host app that owns sync (it spawns
+		// vimango-sync itself and refreshes its list, status bar, and
+		// :synclog afterwards). An in-process sync here would run behind
+		// the host's back — and could race a host-initiated sync — so
+		// redirect instead of syncing.
+		e.ShowMessage(BR, "sync is handled by the app — use the Sync menu")
 		return
 	}
 
