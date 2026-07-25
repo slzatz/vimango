@@ -119,6 +119,13 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             padding-left: 20px;
             color: #7f8c8d;
         }
+        dt {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        dd {
+            margin: 0 0 8px 24px;
+        }
         img {
             max-width: 100%;
             height: auto;
@@ -160,6 +167,9 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             }
             blockquote {
                 color: #9aa4ab;
+            }
+            dt {
+                color: #e8ecf1;
             }
             .img-placeholder {
                 border-color: #555;
@@ -356,11 +366,12 @@ func convertMarkdownToHTML(markdown string) string {
 	// Configure goldmark with common extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
-			extension.GFM,           // GitHub Flavored Markdown
-			extension.Table,         // Tables
-			extension.Strikethrough, // Strikethrough text
-			extension.Linkify,       // Auto-link URLs
-			extension.TaskList,      // Task lists
+			extension.GFM,            // GitHub Flavored Markdown
+			extension.Table,          // Tables
+			extension.Strikethrough,  // Strikethrough text
+			extension.Linkify,        // Auto-link URLs
+			extension.TaskList,       // Task lists
+			extension.DefinitionList, // Definition lists (PHP Markdown Extra syntax)
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs
