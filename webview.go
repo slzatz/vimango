@@ -132,6 +132,16 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             /* Headings are large; body's 1.6 leading makes wrapped
                headlines look double-spaced. */
             line-height: 1.20;
+            /* Default heading margin-bottom is ~21px at h1, and it
+               collapses against the following block's own top margin
+               (16px on p/ul) — the larger wins, so both halves have to
+               come down to tighten the gap. Space *above* a heading is
+               left alone: the asymmetry is what groups a heading with
+               the text it introduces. */
+            margin-bottom: 0.5rem;
+        }
+        h1 + *, h2 + *, h3 + *, h4 + *, h5 + *, h6 + * {
+            margin-top: 0;
         }
         code {
             background-color: #f4f4f4;
