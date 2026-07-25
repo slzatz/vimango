@@ -58,6 +58,35 @@ func openNoteInWebview(title, htmlContent string) error {
 	return fmt.Errorf("webview not available")
 }
 
+// defaultAccent is the blue used for the blockquote bar and list markers
+// when config.json has no webview.accent entry.
+const defaultAccent = "#3498db"
+
+var accentHexRe = regexp.MustCompile(`^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
+
+// previewAccent resolves config.json's webview.accent to a CSS color:
+// "" → the default blue, "none"/"off" → currentColor (markers and the
+// blockquote bar take the surrounding text color), any #rgb/#rrggbb →
+// itself. Anything else falls back to the default rather than injecting
+// arbitrary text into the stylesheet.
+func previewAccent() string {
+	if app == nil || app.Config == nil {
+		return defaultAccent
+	}
+	accent := strings.TrimSpace(app.Config.Webview.Accent)
+	switch strings.ToLower(accent) {
+	case "":
+		return defaultAccent
+	case "none", "off":
+		return "currentColor"
+	}
+	if accentHexRe.MatchString(accent) {
+		return accent
+	}
+	log.Printf("Warning: ignoring invalid webview.accent %q (want #rgb, #rrggbb, or \"none\")", accent)
+	return defaultAccent
+}
+
 // RenderNoteAsHTML converts a note's markdown content to HTML for webview display.
 // standalone selects the document style. The TUI webview window is a
 // standalone document: <h1> title (the window has no other title chrome)
@@ -113,11 +142,17 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             border-radius: 5px;
             overflow-x: auto;
         }
+        :root {
+            --accent: {{.Accent}};
+        }
         blockquote {
-            border-left: 4px solid #3498db;
+            border-left: 4px solid var(--accent);
             margin: 0;
             padding-left: 20px;
             color: #7f8c8d;
+        }
+        li::marker {
+            color: var(--accent);
         }
         dt {
             font-weight: bold;
@@ -206,10 +241,14 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
 		Title      string
 		Content    template.HTML
 		Standalone bool
+		Accent     template.CSS
 	}{
 		Title:      title,
 		Content:    template.HTML(htmlContent),
 		Standalone: standalone,
+		// template.CSS is safe here: previewAccent only returns
+		// regex-validated hex or fixed keywords.
+		Accent: template.CSS(previewAccent()),
 	})
 
 	if err != nil {

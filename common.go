@@ -70,6 +70,13 @@ type dbConfig struct {
 	Glamour struct {
 		Style string `json:"style"`
 	} `json:"glamour"`
+
+	Webview struct {
+		// Accent colors the blockquote bar and list markers in rendered
+		// HTML previews. "" → default blue, "none"/"off" → no accent
+		// (they take the surrounding text color), or any #rgb/#rrggbb.
+		Accent string `json:"accent"`
+	} `json:"webview"`
 }
 
 // Preferences holds user UI preferences that persist across sessions

@@ -22,5 +22,8 @@
   },
   "glamour": {
     "style": "darkslz.json"
+  },
+  "webview": {
+    "accent": ""
   }
 }
