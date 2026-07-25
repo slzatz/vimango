@@ -129,6 +129,9 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         {{end}}
         h1, h2, h3, h4, h5, h6 {
             color: #2c3e50;
+            /* Headings are large; body's 1.6 leading makes wrapped
+               headlines look double-spaced. */
+            line-height: 1.20;
         }
         code {
             background-color: #f4f4f4;
