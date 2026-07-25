@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -491,19 +490,6 @@ func stripANSI(s string) string {
 func WordWrap(text string, limit int, hangingIndentOffset int) string {
 	if limit <= 0 { // Cannot wrap to zero or negative width
 		return text // Or handle as an error
-	}
-
-	// DEBUG: Log input to WordWrap
-	if strings.Contains(text, "\x1b]66;") {
-		if f, err := os.OpenFile("/tmp/osc66_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			fmt.Fprintf(f, "DEBUG WordWrap: found OSC66 in input, limit=%d\n", limit)
-			logLen := 500
-			if len(text) < logLen {
-				logLen = len(text)
-			}
-			fmt.Fprintf(f, "DEBUG WordWrap input: %q\n", text[:logLen])
-			f.Close()
-		}
 	}
 
 	var finalResult strings.Builder

@@ -49,17 +49,12 @@ func (a *App) DetectKittyCapabilities() {
 	// (these work in ghostty too) but only enable text sizing for actual kitty
 	if version == "" {
 		a.kittyPlace = true
-		// a.kittyRelative = true // Reserved for future side-by-side image support
 		// Only enable text sizing for actual kitty - ghostty doesn't support OSC 66
 		a.kittyTextSizing = isActualKitty
 	} else {
 		if semverAtLeast(version, "0.28.0") {
 			a.kittyPlace = true
 		}
-		// Reserved for future side-by-side image support:
-		// if semverAtLeast(version, "0.31.0") {
-		// 	a.kittyRelative = true
-		// }
 		if semverAtLeast(version, "0.40.0") {
 			a.kittyTextSizing = true
 		}
