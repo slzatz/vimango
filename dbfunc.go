@@ -945,23 +945,38 @@ func generateWWString_(text string, width int, length int, ret string) string {
 	return ab.String()
 }
 
+// copyEntry duplicates a task row: the title prefixed with "Copy of ",
+// plus the source's note, star, context and folder.
+//
+// One INSERT…SELECT rather than a read-then-write. That is what keeps
+// context_uuid and folder_uuid — the authoritative container references
+// since the uuid migration — attached to the copy. The previous version
+// read the containers through getEntryInfo, which stopped selecting the
+// deprecated *_tid columns during that migration, so entry.folder_tid /
+// entry.context_tid were always 0 and every copy silently landed in
+// context/folder "none" instead of the source's. Copying the columns in
+// SQL also carries a NULL note through as NULL, matching updateNote.
+//
+// Deliberately not copied: tid (NULL is what makes the next sync insert
+// a server row and assign one), folder_tid/context_tid (left at their
+// column defaults, as insertTitle does — sync re-derives them from the
+// uuids), archived/deleted, and keywords (task_keyword keys off tid,
+// which the new row does not have yet). Like insertTitle this writes no
+// fts row: there is no tid to key one on until the entry syncs, and
+// sync inserts it then. modified takes its CURRENT_TIMESTAMP default,
+// which is what makes the copy a sync candidate.
 func (db *Database) copyEntry(sourceID int) (int, error) {
-	// Get source entry info
-	entry := db.getEntryInfo(sourceID)
-	if entry.id == 0 {
-		return -1, fmt.Errorf("source entry not found")
-	}
-
-	// Get the note content
-	note := db.readNoteIntoString(sourceID)
-
-	// Insert new entry with copied data
-	newTitle := "Copy of " + entry.title
 	var newID int
 	err := db.MainDB.QueryRow(
-		`INSERT INTO task (title, folder_tid, context_tid, star, note, added)
-		 VALUES (?, ?, ?, ?, ?, datetime('now')) RETURNING id;`,
-		newTitle, entry.folder_tid, entry.context_tid, entry.star, note).Scan(&newID)
+		`INSERT INTO task (title, note, context_uuid, folder_uuid, star, added)
+		 SELECT 'Copy of ' || title, note, context_uuid, folder_uuid, star, datetime('now')
+		 FROM task WHERE id=?
+		 RETURNING id;`,
+		sourceID).Scan(&newID)
+	if err == sql.ErrNoRows {
+		// The SELECT matched nothing, so nothing was inserted.
+		return -1, fmt.Errorf("source entry not found")
+	}
 	if err != nil {
 		return -1, err
 	}
