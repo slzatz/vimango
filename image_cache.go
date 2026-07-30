@@ -38,11 +38,23 @@ type CacheIndex struct {
 	KittyWindow string                `json:"kitty_window,omitempty"`
 }
 
+// Cache capacity. The real limit is maxCacheBytes — cached entries are
+// base64 text (~33% larger than the image), and they range from ~175KB to
+// several MB, so a count alone is a 20x-loose proxy for disk use.
+// maxCacheEntries is only a backstop against an index of pathologically
+// tiny images: every entry costs ~440 bytes of cache_index.json, which is
+// rewritten in full on every cache hit.
+const (
+	maxCacheBytes   int64 = 500 * 1024 * 1024
+	maxCacheEntries       = 2000
+)
+
 // ImageCache manages the disk-based image cache
 type ImageCache struct {
 	cacheDir   string
 	indexFile  string
 	maxEntries int
+	maxBytes   int64
 	mutex      sync.RWMutex
 	index      CacheIndex
 }
@@ -56,7 +68,8 @@ func NewImageCache() (*ImageCache, error) {
 	cache := &ImageCache{
 		cacheDir:   cacheDir,
 		indexFile:  indexFile,
-		maxEntries: 50, // Default to 50 cached images
+		maxEntries: maxCacheEntries,
+		maxBytes:   maxCacheBytes,
 		index: CacheIndex{
 			Version: 1,
 			Entries: make(map[string]CacheEntry),
@@ -265,28 +278,51 @@ func (c *ImageCache) UpdateGDriveMeta(url, gdriveName, gdriveFolder string) erro
 	return c.saveIndex()
 }
 
-// evictOldestEntry removes the oldest cache entry (FIFO)
+// evictLRUEntry removes the least recently used cache entry.
+//
+// Eviction keys off LastAccessed, not Created: an image you look at every
+// day was otherwise evicted purely for being old, so a note's images went
+// cold on a timetable that ignored how often it was read, and the next
+// preview paid a full Drive round trip again. LastAccessed is written
+// through to the index on every cache hit (GetCachedImageData), which is
+// what makes this work across processes — each `--render-html` is its own
+// short-lived process and sees only what the previous one persisted.
+//
+// Entries predating that bookkeeping can carry a zero LastAccessed; fall
+// back to Created for those so they age normally instead of all tying at
+// the zero time and evicting in map order.
+// Returns the number of bytes reclaimed, so the caller can track the
+// running total without re-summing the index on every pass.
 // Note: Caller must hold write lock
-func (c *ImageCache) evictOldestEntry() error {
+func (c *ImageCache) evictLRUEntry() (int64, error) {
 	if len(c.index.Entries) == 0 {
-		return nil
+		return 0, nil
 	}
 
-	// Find oldest entry by creation time
+	used := func(e CacheEntry) time.Time {
+		if e.LastAccessed.IsZero() {
+			return e.Created
+		}
+		return e.LastAccessed
+	}
+
 	var oldestKey string
 	var oldestTime time.Time
 	first := true
 
 	for key, entry := range c.index.Entries {
-		if first || entry.Created.Before(oldestTime) {
+		t := used(entry)
+		if first || t.Before(oldestTime) {
 			oldestKey = key
-			oldestTime = entry.Created
+			oldestTime = t
 			first = false
 		}
 	}
 
 	// Remove cache file
+	var reclaimed int64
 	if entry, exists := c.index.Entries[oldestKey]; exists {
+		reclaimed = entry.SizeBytes
 		cacheFile := filepath.Join(c.cacheDir, entry.Filename)
 		if err := os.Remove(cacheFile); err != nil && !os.IsNotExist(err) {
 			// Silently ignore removal errors (avoid printing to stdout which interferes with TUI)
@@ -296,7 +332,17 @@ func (c *ImageCache) evictOldestEntry() error {
 	// Remove from index
 	delete(c.index.Entries, oldestKey)
 
-	return nil
+	return reclaimed, nil
+}
+
+// totalBytesLocked sums the cached bytes recorded in the index.
+// Note: Caller must hold at least a read lock
+func (c *ImageCache) totalBytesLocked() int64 {
+	var total int64
+	for _, entry := range c.index.Entries {
+		total += entry.SizeBytes
+	}
+	return total
 }
 
 // InvalidateCacheEntry removes a specific cache entry by URL, forcing re-download on next access.
@@ -416,12 +462,28 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// Check if we need to evict entries before adding new one
-	if len(c.index.Entries) >= c.maxEntries {
-		if err := c.evictOldestEntry(); err != nil {
+	// Evict down to capacity before adding the new one. A loop, not a
+	// single eviction: the budget is in bytes and this entry may be many
+	// times the size of the ones it displaces, and lowering a limit (or an
+	// index left oversized by an earlier failure) would otherwise leave
+	// the cache permanently over, shedding one entry per store and never
+	// catching up.
+	//
+	// Tracked by subtracting as we go rather than re-summing the map each
+	// pass. The len() guard is what stops a single image larger than the
+	// whole budget from evicting everything and then still not fitting:
+	// the cache goes over budget for that one entry instead.
+	incoming := fileInfo.Size()
+	total := c.totalBytesLocked()
+	for len(c.index.Entries) > 0 &&
+		(total+incoming > c.maxBytes || len(c.index.Entries) >= c.maxEntries) {
+		evicted, err := c.evictLRUEntry()
+		if err != nil {
 			// Continue anyway - better to have oversized cache than fail
 			// (avoid printing to stdout which interferes with TUI)
+			break
 		}
+		total -= evicted
 	}
 
 	// Normalize URL to gdrive: format before storing
