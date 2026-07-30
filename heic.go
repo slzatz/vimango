@@ -75,6 +75,24 @@ func IsHEICData(data []byte) bool {
 	return false
 }
 
+// ShutdownHEICDecoder releases anything the HEIC decoder holds open,
+// and must be called before the process exits.
+//
+// It exists because the CGO decoder is not self-contained: go-libheif
+// runs the `heic_worker` binary as a hashicorp/go-plugin RPC subprocess,
+// and that worker is not tied to its parent's lifetime — it survives a
+// clean exit, holding ~136MB, until something kills it. `--render-html`
+// is a fresh process per preview, so without this every preview of a
+// note containing a HEIC image leaks one worker, for as long as the
+// machine is up.
+//
+// Safe to call unconditionally: a no-op when no decoder was ever
+// created, when this build has no worker to kill (pillow spawns a
+// short-lived python per decode and waits on it), or when called twice.
+func ShutdownHEICDecoder() {
+	shutdownHEICDecoder()
+}
+
 // ShowHEICNotAvailableMessage returns a user-friendly message
 func ShowHEICNotAvailableMessage() string {
 	return fmt.Sprintf("%sHEIC format not supported (requires CGO with libheif or .venv with pillow-heif)%s", YELLOW_BG, RESET)

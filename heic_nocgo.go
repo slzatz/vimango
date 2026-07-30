@@ -8,3 +8,6 @@ package main
 func createHEICDecoder() HEICDecoder {
 	return createStubHEICDecoder()
 }
+
+// shutdownHEICDecoder is a no-op: the stub decoder holds nothing open.
+func shutdownHEICDecoder() {}

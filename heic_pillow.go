@@ -67,6 +67,11 @@ func (d *PillowHEICDecoder) IsAvailable() bool {
 	return pillowInitErr == nil && pillowPython != ""
 }
 
+// shutdownHEICDecoder is a no-op here: each decode runs a python3
+// subprocess through cmd.Run, which waits for it, so nothing outlives
+// the call.
+func shutdownHEICDecoder() {}
+
 func (d *PillowHEICDecoder) Decode(r io.Reader) (image.Image, error) {
 	if !d.IsAvailable() {
 		return nil, fmt.Errorf("pillow HEIC decoder not available: %v", pillowInitErr)

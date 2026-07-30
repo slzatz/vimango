@@ -19,6 +19,11 @@ var (
 	heicInitOnce sync.Once
 	heicInitErr  error
 	devNull      *os.File
+
+	// Guards ShutdownHEICDecoder: libheif.DeInit unconditionally calls
+	// Kill on the plugin client, which is nil until a successful Init.
+	heicWorkerMu      sync.Mutex
+	heicWorkerStarted bool
 )
 
 func init() {
@@ -117,10 +122,37 @@ func createHEICDecoder() HEICDecoder {
 			return
 		}
 
+		heicWorkerMu.Lock()
+		heicWorkerStarted = true
+		heicWorkerMu.Unlock()
+
 		decoder.initialized = true
 	})
 
 	return decoder
+}
+
+// shutdownHEICDecoder kills the heic_worker plugin subprocess. See
+// ShutdownHEICDecoder in heic.go for why this is not automatic.
+//
+// One-shot by design: go-libheif v1.3.0's DeInit leaves its
+// isInitialized flag set to true (an upstream bug — it should clear
+// it), so a later Init returns early and decoding would fail against a
+// killed worker. Callers must treat this as a shutdown, not a way to
+// recycle the worker.
+func shutdownHEICDecoder() {
+	heicWorkerMu.Lock()
+	defer heicWorkerMu.Unlock()
+	if !heicWorkerStarted {
+		return
+	}
+	heicWorkerStarted = false
+
+	// go-plugin chatters on stderr as it tears the client down, and
+	// stdout here is the rendered HTML.
+	restore := suppressOutput()
+	defer restore()
+	libheif.DeInit()
 }
 
 func (d *CGOHEICDecoder) IsAvailable() bool {

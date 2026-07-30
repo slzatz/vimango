@@ -30,6 +30,12 @@ func DetermineRenderHTML(args []string) int {
 // the same auth token and image cache the TUI uses; if Drive is not
 // configured the image markdown is passed through untouched.
 func RunRenderHTML(id int) int {
+	// The HEIC decoder leaves a plugin subprocess running that outlives
+	// this process unless it is killed. Deferred rather than placed at
+	// the end: every return below is an early one, and main() calls
+	// os.Exit on our result, which runs no defers of its own.
+	defer ShutdownHEICDecoder()
+
 	app = CreateApp()
 
 	prefs := app.LoadPreferences("preferences.json")
