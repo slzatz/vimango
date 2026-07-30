@@ -699,6 +699,13 @@ func (a *App) Cleanup() {
 	if a.Database.PG != nil {
 		a.Database.PG.Close()
 	}
+
+	// The kitty image path decodes HEIC, and that leaves a plugin
+	// subprocess running which outlives this one unless it is killed.
+	// Must come before quitApp, which calls os.Exit and so runs nothing
+	// after it.
+	ShutdownHEICDecoder()
+
 	a.quitApp()
 }
 
