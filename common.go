@@ -76,6 +76,12 @@ type dbConfig struct {
 		// HTML previews. "" → default blue, "none"/"off" → no accent
 		// (they take the surrounding text color), or any #rgb/#rrggbb.
 		Accent string `json:"accent"`
+		// CodeAccent colors inline code and code blocks (fenced or
+		// indented). Same vocabulary as Accent, but a separate knob:
+		// code and the blockquote/marker accent are different kinds of
+		// emphasis and are meant to be retunable apart. "" → whatever
+		// Accent resolved to, so out of the box they match.
+		CodeAccent string `json:"code_accent"`
 	} `json:"webview"`
 }
 

@@ -24,6 +24,7 @@
     "style": "darkslz.json"
   },
   "webview": {
-    "accent": ""
+    "accent": "",
+    "code_accent": ""
   }
 }

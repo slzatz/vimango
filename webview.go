@@ -73,18 +73,38 @@ func previewAccent() string {
 	if app == nil || app.Config == nil {
 		return defaultAccent
 	}
-	accent := strings.TrimSpace(app.Config.Webview.Accent)
-	switch strings.ToLower(accent) {
+	return resolveAccent(app.Config.Webview.Accent, "webview.accent", defaultAccent)
+}
+
+// previewCodeAccent resolves config.json's webview.code_accent — the
+// color of inline code and code blocks (fenced or indented). Its own
+// key rather than a share of webview.accent: code and the
+// blockquote/marker accent are different kinds of emphasis, and tuning
+// one shouldn't drag the other. Unset it falls back to whatever the
+// accent resolved to, so the two match until told otherwise.
+func previewCodeAccent() string {
+	accent := previewAccent()
+	if app == nil || app.Config == nil {
+		return accent
+	}
+	return resolveAccent(app.Config.Webview.CodeAccent, "webview.code_accent", accent)
+}
+
+// resolveAccent is the shared vocabulary behind both keys. `fallback`
+// is what "" and an unusable value resolve to.
+func resolveAccent(configured, key, fallback string) string {
+	value := strings.TrimSpace(configured)
+	switch strings.ToLower(value) {
 	case "":
-		return defaultAccent
+		return fallback
 	case "none", "off":
 		return "currentColor"
 	}
-	if accentHexRe.MatchString(accent) {
-		return accent
+	if accentHexRe.MatchString(value) {
+		return value
 	}
-	log.Printf("Warning: ignoring invalid webview.accent %q (want #rgb, #rrggbb, or \"none\")", accent)
-	return defaultAccent
+	log.Printf("Warning: ignoring invalid %s %q (want #rgb, #rrggbb, or \"none\")", key, value)
+	return fallback
 }
 
 // RenderNoteAsHTML converts a note's markdown content to HTML for webview display.
@@ -143,20 +163,29 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         h1 + *, h2 + *, h3 + *, h4 + *, h5 + *, h6 + * {
             margin-top: 0;
         }
+        :root {
+            --accent: {{.Accent}};
+            --code-accent: {{.CodeAccent}};
+        }
+        /* --code-accent covers all three markdown spellings of code:
+           inline, fenced and indented. goldmark renders both block
+           forms as pre > code, so the color rides on the code rule and
+           pre carries it for any stray text outside the inner element.
+           (No backticks in this comment: the whole template is a Go raw
+           string literal and one would end it.) */
         code {
+            color: var(--code-accent);
             background-color: #f4f4f4;
             padding: 2px 4px;
             border-radius: 3px;
             font-family: ui-monospace, 'SF Mono', 'Menlo', 'Ubuntu Mono', monospace;
         }
         pre {
+            color: var(--code-accent);
             background-color: #f4f4f4;
             padding: 15px;
             border-radius: 5px;
             overflow-x: auto;
-        }
-        :root {
-            --accent: {{.Accent}};
         }
         blockquote {
             border-left: 4px solid var(--accent);
@@ -255,13 +284,15 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
 		Content    template.HTML
 		Standalone bool
 		Accent     template.CSS
+		CodeAccent template.CSS
 	}{
 		Title:      title,
 		Content:    template.HTML(htmlContent),
 		Standalone: standalone,
-		// template.CSS is safe here: previewAccent only returns
+		// template.CSS is safe here: both resolvers only return
 		// regex-validated hex or fixed keywords.
-		Accent: template.CSS(previewAccent()),
+		Accent:     template.CSS(previewAccent()),
+		CodeAccent: template.CSS(previewCodeAccent()),
 	})
 
 	if err != nil {
