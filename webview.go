@@ -197,8 +197,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             color: var(--accent);
         }
         dt {
-            font-weight: bold;
-            color: #2c3e50;
+            color: var(--accent);
         }
         dd {
             margin: 0 0 8px 24px;
@@ -244,9 +243,6 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             }
             blockquote {
                 color: #9aa4ab;
-            }
-            dt {
-                color: #e8ecf1;
             }
             .img-placeholder {
                 border-color: #555;
