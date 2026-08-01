@@ -175,16 +175,10 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
            string literal and one would end it.) */
         code {
             color: var(--code-accent);
-            background-color: #f4f4f4;
-            padding: 2px 4px;
-            border-radius: 3px;
             font-family: ui-monospace, 'SF Mono', 'Menlo', 'Ubuntu Mono', monospace;
         }
         pre {
             color: var(--code-accent);
-            background-color: #f4f4f4;
-            padding: 15px;
-            border-radius: 5px;
             overflow-x: auto;
         }
         blockquote {
@@ -237,9 +231,6 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             }
             h1, h2, h3, h4, h5, h6 {
                 color: #e8ecf1;
-            }
-            code, pre {
-                background-color: #2d2d2d;
             }
             blockquote {
                 color: #9aa4ab;
