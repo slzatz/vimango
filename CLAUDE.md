@@ -383,6 +383,16 @@ The application supports full local-only operation without requiring PostgreSQL 
 ### Offline Startup
 Startup performs no network I/O even when PostgreSQL is configured: `InitDatabases` opens the Postgres handle lazily (`sql.Open` only validates the connection string) and does not ping. This means the TUI, `--editor`, and `--render-html` all work offline against the local SQLite databases. Reachability is checked in `(*App).Synchronize` (bounded 5s ping), which reports a friendly "sync unavailable" message when offline; sync recovers automatically once connectivity returns. The `vimango-sync` CLI still pings at boot and fails fast offline, which is intentional.
 
+**`connect_timeout` is mandatory in the DSN** (`buildPGConnString`, `cmd/vimango-sync/main.go`). Without it lib/pq falls back to OS TCP behavior: wifi-off, DNS failure and connection-refused all fail fast, but a *blackholed* route (dropped VPN, captive portal) retries SYNs for **75s measured** on macOS. That is long enough to wedge a caller — it stranded vimango_hybrid's quit path, which awaits an in-flight sync unbounded. Set to 10s. Note this bounds the *connect* only; a server that accepts and then stalls needs a caller-side deadline.
+
+### `vimango-sync` modes
+Three, in ascending cost — pick the cheapest that answers the question:
+- `--probe`: "how many changes is the server ahead by?" One watermark read from SQLite (`sync` table, `machine='server'`) plus one Postgres `SELECT` of four `COUNT(*)`s. Prints a single integer, applies nothing, writes to neither database, never opens the FTS db. Cheap enough to run unattended — vimango_hybrid probes on window activation.
+- `--report-only`: the full engine, reporting without applying. Use when you need the *breakdown*, not a count — it costs a dozen-plus round trips and pulls full note bodies over the wire.
+- (no flag): sync and apply.
+
+`Probe` deliberately omits the `deleted` filter: deletions bump `modified`, and `fetchAllChanges` counts both updated and deleted rows, so an unfiltered count matches what a real sync would find. Cross-checked against `--report-only` on a rewound watermark — 57 updated + 3 deleted = 60, and `Probe` returned 60.
+
 ### How It Works
 - **Containers** (contexts, folders, keywords) are identified by UUID rather than PostgreSQL-assigned `tid` values
 - **Tasks** reference containers via `context_uuid`, `folder_uuid`, and `keyword_uuid` foreign keys

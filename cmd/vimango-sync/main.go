@@ -11,6 +11,10 @@
 // stdout receives the formatted markdown sync log on completion. stderr
 // receives a one-line error message on fatal failure. Exit code 0 means
 // success, non-zero means fatal error.
+//
+// --probe is a separate, much cheaper mode: it prints a single integer
+// (the number of server-side changes since the last sync) and nothing
+// else, applying no changes and writing to neither database.
 package main
 
 import (
@@ -40,6 +44,7 @@ func main() {
 	dbPath := flag.String("db", "", "path to SQLite main database (required)")
 	ftsDBPath := flag.String("fts-db", "", "path to SQLite FTS database (defaults to --db)")
 	reportOnly := flag.Bool("report-only", false, "only report changes; do not apply them")
+	probe := flag.Bool("probe", false, "print the number of server changes since the last sync and exit")
 	flag.Parse()
 
 	if *dbPath == "" {
@@ -70,11 +75,15 @@ func main() {
 		fatal("enabling foreign keys on main db: %v", err)
 	}
 
-	ftsDB, err := sql.Open("sqlite3", *ftsDBPath)
-	if err != nil {
-		fatal("opening FTS SQLite db: %v", err)
+	// The probe never touches FTS — don't even open it.
+	var ftsDB *sql.DB
+	if !*probe {
+		ftsDB, err = sql.Open("sqlite3", *ftsDBPath)
+		if err != nil {
+			fatal("opening FTS SQLite db: %v", err)
+		}
+		defer ftsDB.Close()
 	}
-	defer ftsDB.Close()
 
 	pgDB, err := sql.Open("postgres", buildPGConnString(pg))
 	if err != nil {
@@ -86,6 +95,17 @@ func main() {
 	}
 
 	syncer := syncpkg.New(mainDB, ftsDB, pgDB, pg.Host, pg.DB)
+
+	// Probe mode: one integer on stdout, no log, no writes.
+	if *probe {
+		count, err := syncer.Probe()
+		if err != nil {
+			fatal("probe failed: %v", err)
+		}
+		fmt.Println(count)
+		return
+	}
+
 	log, syncErr := syncer.Synchronize(*reportOnly)
 
 	// Always emit the log (it contains diagnostic detail even on failure).
@@ -126,9 +146,16 @@ func applyEnvOverrides(pg *postgresConfig) {
 	}
 }
 
+// connectTimeoutSecs bounds how long a connection attempt can hang.
+// Without it lib/pq falls back to the OS TCP behavior: a blackholed route
+// (dropped VPN, captive portal) retries SYNs for ~75s on macOS, during
+// which the calling app's sync-in-progress flag stays set and its quit
+// path waits. Fast failures (DNS, connection refused) are unaffected.
+const connectTimeoutSecs = 10
+
 func buildPGConnString(pg postgresConfig) string {
-	conn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		pg.Host, pg.Port, pg.User, pg.Password, pg.DB, pg.SSLMode)
+	conn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s connect_timeout=%d",
+		pg.Host, pg.Port, pg.User, pg.Password, pg.DB, pg.SSLMode, connectTimeoutSecs)
 	if pg.SSLCACert != "" {
 		conn += fmt.Sprintf(" sslrootcert=%s", pg.SSLCACert)
 	}

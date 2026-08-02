@@ -1074,6 +1074,41 @@ func (s *Syncer) deleteKeywordFromBoth(c container, isServerDeleted bool, lg io.
 	}
 }
 
+// Probe reports how many server-side rows have changed since the last
+// sync — "is the remote ahead of us?" — without applying anything.
+//
+// This is deliberately *not* Synchronize(reportOnly=true): that runs the
+// whole engine (a dozen-plus round trips, dragging full note bodies over
+// the wire just to count them) and reads the client database, which is
+// shared with the editor and --render-html. Probe is one SELECT against
+// Postgres plus one watermark read from SQLite, so it is cheap enough to
+// run unattended.
+//
+// The watermark is the same one Synchronize uses: the 'server' row of the
+// client's sync table. No `deleted` filter — deletions bump `modified`
+// too, and fetchAllChanges counts both, so an unfiltered count matches
+// what a real sync would find.
+//
+// Returns the change count. Any error means "unknown", never zero.
+func (s *Syncer) Probe() (int, error) {
+	var serverTime string
+	row := s.MainDB.QueryRow("SELECT timestamp FROM sync WHERE machine=$1;", "server")
+	if err := row.Scan(&serverTime); err != nil {
+		return 0, fmt.Errorf("retrieving last server sync: %v", err)
+	}
+
+	var count int
+	row = s.PG.QueryRow(`
+		SELECT (SELECT COUNT(*) FROM task    WHERE modified > $1)
+		     + (SELECT COUNT(*) FROM context WHERE modified > $1)
+		     + (SELECT COUNT(*) FROM folder  WHERE modified > $1)
+		     + (SELECT COUNT(*) FROM keyword WHERE modified > $1);`, serverTime)
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting server changes since %s: %v", serverTime, err)
+	}
+	return count, nil
+}
+
 // Synchronize runs a sync between client (SQLite) and server (Postgres).
 // reportOnly: if true, only reports changes without applying them.
 //
