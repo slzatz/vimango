@@ -46,12 +46,13 @@ cd /path/to/libvim/src
   CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
     -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
     -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
-    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype" \
+    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype \
+    -Wno-error=implicit-int-float-conversion" \
   LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
 make libvim.a
 ```
 
-The `-Wno-error` flags are needed because Xcode's Clang is stricter than GCC and treats certain legacy C patterns as errors.
+The `-Wno-error` flags are needed because Xcode's Clang is stricter than GCC and treats certain legacy C patterns as errors. `-Wno-error=implicit-int-float-conversion` in particular is required on current clang — without it the build stops at `evalfunc.c:3751` on `VARNUM_MAX` (`-Wimplicit-const-int-float-conversion`).
 
 Copy to the vimango project root:
 ```bash

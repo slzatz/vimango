@@ -31,11 +31,14 @@ cd /path/to/libvim/src
   CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
     -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
     -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
-    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype" \
+    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype \
+    -Wno-error=implicit-int-float-conversion" \
   LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
 make libvim.a
 cp libvim.a /path/to/vimango/
 ```
+
+`-Wno-error=implicit-int-float-conversion` is required on current clang; without it the build stops at `evalfunc.c:3751` on `VARNUM_MAX` (`-Werror,-Wimplicit-const-int-float-conversion`). Verified by configuring and building a fresh clone from scratch — an existing checkout may already carry the flag in `auto/config.mk` and so not show the failure.
 
 **Linux (Debian/Ubuntu):**
 ```bash
