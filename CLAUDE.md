@@ -11,18 +11,17 @@ NOTE: CGO builds require `libvim.a` in the project root. See "Building libvim.a"
 
 ### Building libvim.a (CGO Prerequisite)
 
-The static library `libvim.a` is not checked into the repo (it differs per platform). It must be built from [onivim/libvim](https://github.com/onivim/libvim) source and placed in the project root (next to `go.mod`).
-
-**Apply `patches/` first.** libvim is unmaintained upstream, so vimango carries its own patches against the libvim source tree and does not track upstream. Before configuring, apply every patch in `patches/` from the root of a libvim checkout:
+The static library `libvim.a` is not checked into the repo (it differs per platform). Build it from **[slzatz/libvim](https://github.com/slzatz/libvim)** — *not* onivim/libvim — and place it in the project root (next to `go.mod`):
 
 ```bash
-cd /path/to/libvim
-git apply /path/to/vimango/patches/*.patch
+git clone https://github.com/slzatz/libvim
 ```
 
-- `libvim-visual-block-insert.patch` — restores stock vim behavior for `I`/`A` in Visual mode. libvim had replaced vim's `v_visop()` operator path in `nv_edit()` with an Onivim-2 multiple-cursor model (report one cursor per block line via `cursorAddCallback`, then do a single plain insert), so `ctrl-v jjI- <esc>` inserted on one line only. The patch calls `v_visop()` as upstream does, and converts `op_insert()` into the `state_insert_*` state machine trio the way libvim already did for `op_change()` — necessary because libvim's `edit()` cannot block, so the block replication has to run from the cleanup callback when Insert mode ends. Regression tests: `vim/cvim/blockops_test.go` and `blockedge_test.go` here, `src/apitest/visual_mode.c` in libvim.
-  - The patch also brings its own documentation: it adds `PATCHES.md` to the libvim tree and a banner to libvim's README, because the checkout stops being stock libvim and `vimSetCursorAddCallback()` stops firing for blockwise `I`/`A` — which matters to any *other* app built against that same checkout. `PATCHES.md` is the authoritative writeup; this entry is the summary.
-  - If Steve's own libvim checkout is at hand (`~/libvim`), it already has this committed on `master` — the patch file is for a fresh clone of upstream.
+That repo is a permanent fork. Upstream onivim/libvim is unmaintained and nothing goes back to it, so fixes live as ordinary commits on the fork's `master`; there is no patch queue to apply. Building from a pristine upstream clone produces a `libvim.a` that is missing them. Its `PATCHES.md` lists what diverges — read it before changing anything in that tree, since vimango is not necessarily its only consumer.
+
+The divergence that matters most here: Visual-mode `I`/`A` are vim's `OP_INSERT`/`OP_APPEND` operators again, so `ctrl-v jjI- <esc>` prefixes every line of the block. Upstream libvim instead reported one cursor per block line through `cursorAddCallback` and did a single plain insert, leaving replication to the embedder (Onivim 2) — vimango never registered that callback, so the block insert was silently dropped. Regression tests: `vim/cvim/blockops_test.go` and `blockedge_test.go` here, `src/apitest/visual_mode.c` in libvim.
+
+NOTE: a stale `libvim.a` is invisible — the Go build succeeds and the behavior is simply missing. If a libvim-level fix does not appear to take effect, check that the checkout you built from is the fork and is current (`git log --oneline -1`), then rebuild `libvim.a` and copy it here.
 
 **macOS (Apple Silicon / Homebrew):**
 ```bash

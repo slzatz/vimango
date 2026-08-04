@@ -30,7 +30,7 @@ This wasn't developed thinking anyone else would use it so there isn't an instal
 
 The `libvim.a` static library provides vim modal editing via CGO. It must be compiled from source because the binary differs between macOS and Linux. CGO is required: libvim is the only vim engine (the pure-Go govim engine was removed; Windows is unsupported).
 
-**Source:** Clone [onivim/libvim](https://github.com/onivim/libvim) and build in its `src/` directory.
+**Source:** Clone [slzatz/libvim](https://github.com/slzatz/libvim) and build in its `src/` directory. Use that fork rather than the original [onivim/libvim](https://github.com/onivim/libvim), which is unmaintained: the fork carries fixes vimango depends on — notably Visual-mode `I`/`A` behaving as vim's operators, so blockwise `ctrl-v jjI- <esc>` prefixes every selected line. Building from an upstream clone yields a `libvim.a` that silently lacks them. See that repo's `PATCHES.md`.
 
 ### macOS (Apple Silicon / Homebrew)
 
