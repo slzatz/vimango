@@ -3,13 +3,24 @@
 This file provides guidance to Claude when working with code in this repository.
 
 ## Build Commands
-- **Linux/Unix with CGO**: `CGO_ENABLED=1 go build --tags="fts5,cgo"` (includes libvim, hunspell, sqlite3)
+- **Linux/Unix with CGO**: `CGO_ENABLED=1 go build --tags=fts5` (includes libvim, sqlite3)
 NOTE: When updating, fixing or adding to the code, the CGO build is the most comprehensive to ensure all features work as expected.
+NOTE: `fts5` is the only tag this build needs. Do **not** add `cgo` to the tag list — `cgo` is one of Go's automatic build constraints, set by the toolchain whenever cgo is in use, so `CGO_ENABLED=1` already satisfies every `//go:build cgo` file. Passing `-tags=cgo` selects an identical file set (verified with `go list`) and is only misleading: with `CGO_ENABLED=0` it does not enable cgo, it just pulls in `//go:build cgo` files that don't import `"C"`.
+NOTE: hunspell spell check is opt-in behind a second tag: `CGO_ENABLED=1 go build --tags="fts5,spell"`. Without it `spellcheck_nocgo.go` (the stub) is compiled instead of `spellcheck_cgo.go`, so `<leader>sp`, `<leader>su` and `z=` degrade to the "spell check unavailable" messages. Left out of the default build deliberately — spelling has not been exercised in a while and needs testing before it goes back in by default.
 NOTE: CGO builds require `libvim.a` in the project root. See "Building libvim.a" below.
 
 ### Building libvim.a (CGO Prerequisite)
 
 The static library `libvim.a` is not checked into the repo (it differs per platform). It must be built from [onivim/libvim](https://github.com/onivim/libvim) source and placed in the project root (next to `go.mod`).
+
+**Apply `patches/` first.** libvim is unmaintained upstream, so vimango carries its own patches against the libvim source tree and does not track upstream. Before configuring, apply every patch in `patches/` from the root of a libvim checkout:
+
+```bash
+cd /path/to/libvim
+git apply /path/to/vimango/patches/*.patch
+```
+
+- `libvim-visual-block-insert.patch` — restores stock vim behavior for `I`/`A` in Visual mode. libvim had replaced vim's `v_visop()` operator path in `nv_edit()` with an Onivim-2 multiple-cursor model (report one cursor per block line via `cursorAddCallback`, then do a single plain insert), so `ctrl-v jjI- <esc>` inserted on one line only. The patch calls `v_visop()` as upstream does, and converts `op_insert()` into the `state_insert_*` state machine trio the way libvim already did for `op_change()` — necessary because libvim's `edit()` cannot block, so the block replication has to run from the cleanup callback when Insert mode ends. Regression test: `vim/cvim/blockops_test.go`.
 
 **macOS (Apple Silicon / Homebrew):**
 ```bash
@@ -92,7 +103,7 @@ NOTE: Generally we have not been running tests but have tested key functionality
 - `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer and drive the editor over the pty (`:open <id>` / `:open! <id>` ex commands).
 - `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
 - `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
-- Spell check: via hunspell (CGO)
+- Spell check: via hunspell (CGO) — requires the `spell` build tag, which is not in the default build command; see "Build Commands"
 
 ### Host App Integration (vimango_hybrid)
 `RenderNoteAsHTML(title, markdown, standalone)` renders two document styles:

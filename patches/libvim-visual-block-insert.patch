@@ -1,0 +1,327 @@
+diff --git a/src/normal.c b/src/normal.c
+index 49097e715..f5d4bb2e2 100644
+--- a/src/normal.c
++++ b/src/normal.c
+@@ -1683,20 +1683,16 @@ void do_pending_operator(cmdarg_T *cap, int old_col, int gui_yank)
+           get_op_vcol(oap, redo_VIsual_mode, FALSE);
+         }
+ #endif
+-        op_insert(oap, cap->count1);
++        /* Reset finish_op now, don't want it set inside edit(). */
++        finish_op = FALSE;
++
++        sm_push_insert_op(oap, cap->count1);
++        restart_edit = 0;
+ #ifdef FEAT_LINEBREAK
+         /* Reset linebreak, so that formatting works correctly. */
+         curwin->w_p_lbr = FALSE;
+ #endif
+-
+-        /* TODO: when inserting in several lines, should format all
+-         * the lines. */
+-        auto_format(FALSE, TRUE);
+-
+-        if (restart_edit == 0)
+-          restart_edit = restart_edit_save;
+-        else
+-          cap->retval |= CA_COMMAND_BUSY;
++        return;
+       }
+       break;
+ 
+@@ -6398,7 +6394,6 @@ static void nv_edit(cmdarg_T *cap)
+   if (cap->cmdchar == K_INS || cap->cmdchar == K_KINS)
+     cap->cmdchar = 'i';
+ 
+-  int was_visual_block = 0;
+   /* in Visual mode "A" and "I" are an operator */
+   if (VIsual_active && (cap->cmdchar == 'A' || cap->cmdchar == 'I'))
+   {
+@@ -6411,75 +6406,21 @@ static void nv_edit(cmdarg_T *cap)
+       return;
+     }
+ #endif
+-    // Block 'I'insert or 'A'ppend - special case to produce multiple cursors
+-    if (VIsual_mode == Ctrl_V)
+-    {
+-      was_visual_block = 1;
+-      int minCol = VIsual.col;
+-      if (minCol > curwin->w_cursor.col)
+-      {
+-        minCol = curwin->w_cursor.col;
+-      }
+-
+-      // If 'A' was used, jump to next character
+-      if (cap->cmdchar == 'A')
+-      {
+-        inc_cursor();
+-        minCol = curwin->w_cursor.col;
+-      }
+-
+-      int vcol = getviscol();
+-
+-      curbuf->b_visual.vi_mode = VIsual_mode;
+-      curbuf->b_visual.vi_start = VIsual;
+-      curbuf->b_visual.vi_end = curwin->w_cursor;
+-
+-      int start = VIsual.lnum < curwin->w_cursor.lnum ? VIsual.lnum : curwin->w_cursor.lnum;
+-      int end = VIsual.lnum > curwin->w_cursor.lnum ? VIsual.lnum : curwin->w_cursor.lnum;
+-
+-      int inclusive = curwin->w_cursor.lnum > VIsual.lnum;
+-      int stop = inclusive ? end : end + 1;
+-      int initial = inclusive ? start : start + 1;
+-
+-      pos_T originalPos = curwin->w_cursor;
+-
+-      for (int i = initial; i < stop; i++)
+-      {
+-        int lnum = i;
+-
+-        // Try to advance to virtual column
+-        curwin->w_cursor.lnum = lnum;
+-        curwin->w_cursor.col = 0;
+-
+-        pos_T pos;
+-        pos.lnum = lnum;
+-        pos.col = 0;
+-        if (getvpos(&pos, vcol))
+-        {
+-          if (cursorAddCallback != NULL)
+-          {
+-            cursorAddCallback(pos);
+-          }
+-        }
+-      }
+-
+-      end_visual_mode();
+-      // end_visual_mode may adjust cursor position; but we want to persist it - so restore after.
+-      curwin->w_cursor = originalPos;
+-      clearop(cap->oap);
+-      invoke_edit(cap, FALSE, cap->cmdchar, FALSE);
+-    }
+-    else
+-    {
+-      // Not block - default to original Vim behavior:
+-      end_visual_mode();
+-      clearop(cap->oap);
+-      //v_visop(cap);
+-    }
++    /*
++     * Upstream vim behavior, restored: "I" and "A" become the OP_INSERT /
++     * OP_APPEND operators, so blockwise-visual "I"/"A" repeat the inserted
++     * text on every line of the block.
++     *
++     * libvim replaced this with a multiple-cursor model: it reported one
++     * position per block line through cursorAddCallback() and then did a
++     * single plain insert at the cursor, leaving the replication to the
++     * embedder (Onivim 2).  vimango wants stock vim behavior, and never
++     * registered the callback, so the block insert was simply lost.
++     */
++    v_visop(cap);
+   }
+-
+   /* in Visual mode and after an operator "a" and "i" are for text objects */
+-  if ((cap->cmdchar == 'a' || cap->cmdchar == 'i') &&
++  else if ((cap->cmdchar == 'a' || cap->cmdchar == 'i') &&
+       (cap->oap->op_type != OP_NOP || VIsual_active))
+   {
+ #ifdef FEAT_TEXTOBJ
+@@ -6533,7 +6474,7 @@ static void nv_edit(cmdarg_T *cap)
+     /* Insert to replace the deleted text with the pasted text. */
+     invoke_edit(cap, FALSE, cap->cmdchar, FALSE);
+   }
+-  else if (!was_visual_block && !checkclearopq(cap->oap))
++  else if (!checkclearopq(cap->oap))
+   {
+     switch (cap->cmdchar)
+     {
+diff --git a/src/ops.c b/src/ops.c
+index bed4ed540..671257c68 100644
+--- a/src/ops.c
++++ b/src/ops.c
+@@ -2343,15 +2343,49 @@ int swapchar(int op_type, pos_T *pos)
+ 
+ /*
+  * op_insert - Insert and append operators for Visual mode.
++ *
++ * Split into the state_insert_* trio below (initialize / execute / cleanup),
++ * the same treatment op_change got: edit() cannot block in libvim, so the
++ * work that upstream vim does after edit() returns - copying the inserted
++ * text to the remaining lines of a blockwise selection - has to run from the
++ * cleanup callback when Insert mode ends.
+  */
+-void op_insert(oparg_T *oap, long count1)
++typedef struct
+ {
+-  long ins_len, pre_textlen = 0;
+-  char_u *firstline, *ins_text;
+-  colnr_T ind_pre = 0, ind_post;
++  oparg_T *oap;
++  void *editContext;
++  long pre_textlen;
++  colnr_T ind_pre;
+   struct block_def bd;
+-  int i;
+   pos_T t1;
++} insertState_T;
++
++/*
++ * Give up before entering Insert mode (the u_save_cursor() failures below).
++ * Leaving editContext NULL makes execute pop the state again right away and
++ * makes cleanup skip the block replication.
++ */
++static void *insert_state_abort(insertState_T *context)
++{
++  context->editContext = NULL;
++  return (void *)context;
++}
++
++void *state_insert_initialize(oparg_T *oap, long count1)
++{
++  insertState_T *context = (insertState_T *)alloc(sizeof(insertState_T));
++  char_u *firstline;
++  colnr_T ind_pre = 0;
++  struct block_def bd;
++  int i;
++
++  if (context == NULL)
++    return NULL;
++
++  context->oap = oap;
++  context->editContext = NULL;
++  context->pre_textlen = 0;
++  context->ind_pre = 0;
+ 
+   /* edit() changes this - record it for OP_APPEND */
+   bd.is_MAX = (curwin->w_curswant == MAXCOL);
+@@ -2372,7 +2406,7 @@ void op_insert(oparg_T *oap, long count1)
+ 
+       ve_flags = VE_ALL;
+       if (u_save_cursor() == FAIL)
+-        return;
++        return insert_state_abort(context);
+       coladvance_force(oap->op_type == OP_APPEND ? oap->end_vcol + 1
+                                                  : getviscol());
+       if (oap->op_type == OP_APPEND)
+@@ -2387,7 +2421,8 @@ void op_insert(oparg_T *oap, long count1)
+ 
+     if (oap->op_type == OP_APPEND)
+       firstline += bd.textlen;
+-    pre_textlen = (long)STRLEN(firstline);
++    context->pre_textlen = (long)STRLEN(firstline);
++    context->ind_pre = ind_pre;
+   }
+ 
+   if (oap->op_type == OP_APPEND)
+@@ -2404,7 +2439,7 @@ void op_insert(oparg_T *oap, long count1)
+         /* First line was too short, make it longer and adjust the
+          * values in "bd". */
+         if (u_save_cursor() == FAIL)
+-          return;
++          return insert_state_abort(context);
+         for (i = 0; i < bd.endspaces; ++i)
+           ins_char(' ');
+         bd.textlen += bd.endspaces;
+@@ -2421,8 +2456,47 @@ void op_insert(oparg_T *oap, long count1)
+     }
+   }
+ 
+-  t1 = oap->start;
+-  (void)edit(NUL, FALSE, (linenr_T)count1);
++  context->bd = bd;
++  context->t1 = oap->start;
++  context->editContext = state_edit_initialize(NUL, FALSE, (linenr_T)count1);
++
++  return (void *)context;
++}
++
++executionStatus_T state_insert_execute(void *ctx, int c)
++{
++  insertState_T *context = (insertState_T *)ctx;
++
++  if (context->editContext == NULL)
++    return COMPLETED_UNHANDLED;
++
++  return state_edit_execute(context->editContext, c);
++}
++
++/*
++ * Runs when Insert mode ends - this is everything op_insert did after its
++ * call to edit() returned.
++ */
++void state_insert_cleanup(void *ctx)
++{
++  insertState_T *context = (insertState_T *)ctx;
++  oparg_T *oap = context->oap;
++  struct block_def bd = context->bd;
++  long pre_textlen = context->pre_textlen;
++  colnr_T ind_pre = context->ind_pre;
++  pos_T t1 = context->t1;
++  long ins_len;
++  char_u *firstline, *ins_text;
++  colnr_T ind_post;
++
++  if (context->editContext == NULL)
++  {
++    vim_free(context);
++    return;
++  }
++
++  state_edit_cleanup(context->editContext);
++  vim_free(context);
+ 
+   /* When a tab was inserted, and the characters in front of the tab
+    * have been converted to a tab as well, the column of the cursor
+diff --git a/src/proto/ops.pro b/src/proto/ops.pro
+index 76f6d8a11..b87b92507 100644
+--- a/src/proto/ops.pro
++++ b/src/proto/ops.pro
+@@ -3,6 +3,10 @@ void *state_change_initialize(oparg_T *oap);
+ executionStatus_T state_change_execute(void *ctx, int c);
+ void state_change_cleanup(void *ctx);
+ 
++void *state_insert_initialize(oparg_T *oap, long count1);
++executionStatus_T state_insert_execute(void *ctx, int c);
++void state_insert_cleanup(void *ctx);
++
+ int get_op_type(int char1, int char2);
+ int op_on_lines(int op);
+ int op_is_change(int op);
+@@ -34,7 +38,6 @@ int op_delete(oparg_T *oap);
+ int op_replace(oparg_T *oap, int c);
+ void op_tilde(oparg_T *oap);
+ int swapchar(int op_type, pos_T *pos);
+-void op_insert(oparg_T *oap, long count1);
+ void init_yank(void);
+ void clear_registers(void);
+ int op_yank(oparg_T *oap, int deleting, int mess);
+diff --git a/src/proto/state_machine.pro b/src/proto/state_machine.pro
+index a6766e903..8bf6f637e 100644
+--- a/src/proto/state_machine.pro
++++ b/src/proto/state_machine.pro
+@@ -8,6 +8,7 @@ void sm_push_insert(int cmdchar, int startln, long count);
+ void sm_push_insert_literal(int *ret);
+ void sm_push_normal();
+ void sm_push_change(oparg_T *oap);
++void sm_push_insert_op(oparg_T *oap, long count1);
+ void sm_push_cmdline(int cmdchar, long count, int indent);
+ 
+ // Execute a cmd as if in normal mode, reverting to the previous state when complete
+diff --git a/src/state_machine.c b/src/state_machine.c
+index 38e34e993..7c90974a7 100644
+--- a/src/state_machine.c
++++ b/src/state_machine.c
+@@ -90,6 +90,13 @@ void sm_push_change(oparg_T *oap)
+           state_change_cleanup);
+ }
+ 
++/* Visual mode "I" / "A" (OP_INSERT / OP_APPEND) */
++void sm_push_insert_op(oparg_T *oap, long count1)
++{
++  sm_push(INSERT, SM_NONE, state_insert_initialize(oap, count1),
++          state_insert_execute, no_pending_operator, state_insert_cleanup);
++}
++
+ /*
+  * sm_execute_normal
+  *

@@ -157,7 +157,7 @@ cd cmd/heic_worker && CGO_ENABLED=1 go build -o ../../heic_worker && cd ../..
 cd cmd/webview_worker && CGO_ENABLED=1 go build -o ../../webview_worker && cd ../..
 
 # 5. Build the application
-CGO_ENABLED=1 go build --tags="fts5,cgo"
+CGO_ENABLED=1 go build --tags=fts5
 
 # 6. Run first-time setup (creates config.json and databases)
 ./vimango --init
@@ -170,7 +170,7 @@ CGO_ENABLED=1 go build --tags="fts5,cgo"
 1. Copy the example config: `cp config.json.example config.json`
 2. Edit `config.json` with your settings (see below)
 3. Create SQLite databases manually or let `--init` do it
-4. Build: `CGO_ENABLED=1 go build --tags="fts5,cgo"`
+4. Build: `CGO_ENABLED=1 go build --tags=fts5`
 5. Run: `./vimango`
 
 ## Configuration
@@ -219,7 +219,7 @@ The full application makes heavy use of CGO to access various C libraries (libvi
 
 So if this hasn't been offputting enough, after you can clone the repository you can build as follows:
 
- - `CGO_ENABLED=1 go build --tags="fts5,cgo"` (the `fts5` tag is mandatory and enforced at compile time by `fts5_guard.go`)
+ - `CGO_ENABLED=1 go build --tags=fts5` (the `fts5` tag is mandatory and enforced at compile time by `fts5_guard.go`; add `spell` — `--tags="fts5,spell"` — for hunspell spell check)
 
 The main runtime options are:
 
