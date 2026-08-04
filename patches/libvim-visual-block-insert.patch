@@ -1,3 +1,378 @@
+diff --git a/PATCHES.md b/PATCHES.md
+new file mode 100644
+index 000000000..b719c06c5
+--- /dev/null
++++ b/PATCHES.md
+@@ -0,0 +1,142 @@
++# Local patches
++
++This checkout is **not** stock [onivim/libvim](https://github.com/onivim/libvim).
++It carries deliberate changes on top of it, listed below.
++
++libvim is unmaintained upstream, so these live as ordinary commits on `master`
++rather than as a rebasing patch queue — there is nothing left to merge from
++`origin`. If you are building an application against this checkout, read this
++file first: one of the changes removes a feature that upstream libvim
++advertises, and if your application wanted that feature you need to know before
++you build on it.
++
++Each change is also kept as a standalone diff so it can be applied to, or
++reverted from, a pristine libvim tree.
++
++---
++
++## 1. Visual-mode `I` and `A` are vim's operators again, not multiple cursors
++
++**Standalone diff:** `vimango/patches/libvim-visual-block-insert.patch`
++**Touches:** `src/normal.c`, `src/ops.c`, `src/state_machine.c`,
++`src/proto/ops.pro`, `src/proto/state_machine.pro`
++**Tests:** `src/apitest/visual_mode.c`
++
++### What upstream libvim does
++
++In stock vim, `I` and `A` in Visual mode are *operators*: `nv_edit()` hands
++them to `v_visop()`, which turns them into `OP_INSERT` / `OP_APPEND`, which
++`do_pending_operator()` routes to `op_insert()` in ops.c. For a blockwise
++selection `op_insert()` runs `edit()` on the first line and then replicates
++the text you typed onto every other line of the block. That is what makes
++`ctrl-v jjjI- <esc>` prefix four lines with `- `.
++
++libvim replaced that with a multiple-cursor model aimed at Onivim 2. Its
++`nv_edit()` computes one position per line of the block, reports each through
++the `vimSetCursorAddCallback()` hook, ends Visual mode, and then performs a
++single ordinary insert at the cursor. The replication is left to the embedder,
++which is expected to maintain real multiple cursors and apply the typed text at
++each of them.
++
++That is a reasonable design for a GUI editor with a multi-cursor UI. It is a
++trap for anything else: an embedder that does not register the callback — and
++registering it is optional — silently gets a plain single-line insert with no
++error, no beep, and no indication that the block was dropped. libvim's own test
++suite recorded the gap: `test_insert_block_mode_change` in
++`apitest/visual_mode.c` was committed commented out, with the note "this test
++fails and will be commented out".
++
++Non-blockwise Visual `I`/`A` were affected too, and more bluntly: in the
++non-block branch of `nv_edit()` the `v_visop()` call was simply commented out,
++so charwise and linewise `I`/`A` also fell through to a plain insert at the
++cursor rather than at the start/end of the selection.
++
++### What this checkout does
++
++Restores upstream vim's behavior. `nv_edit()` calls `v_visop(cap)` for Visual
++`I`/`A` — block and non-block alike — and the multiple-cursor path is gone.
++
++Restoring that one call is necessary but not sufficient, because of how libvim
++reworked insert mode. libvim's `edit()` cannot block waiting for keystrokes; it
++was refactored into a pushdown state machine (`src/state_machine.c`) whose
++states are driven one key at a time by `vimInput()`/`vimKey()`. Any operator
++that needs to run code *after* Insert mode ends must therefore split itself in
++two and put that code in a cleanup callback. libvim had already done this for
++the change operator — `op_change()` became
++`state_change_initialize` / `state_change_execute` / `state_change_cleanup`,
++with the blockwise replication in the cleanup half — which is why blockwise `c`
++worked in stock libvim while blockwise `I` did not.
++
++`op_insert()` never got that treatment. It still called `edit()` inline and did
++its replication immediately afterwards, which under the state machine meant it
++could not work at all; nothing called it, so nobody noticed.
++
++So this change also converts it, exactly parallel to the change operator:
++
++| | |
++|---|---|
++| `state_insert_initialize(oap, count1)` | everything `op_insert()` did before `edit()`; ends by creating the nested edit state |
++| `state_insert_execute(ctx, c)` | forwards each key to the nested edit state |
++| `state_insert_cleanup(ctx)` | everything `op_insert()` did after `edit()` returned — the `block_insert()` replication |
++
++State carried across the split lives in `insertState_T` (`oap`, the
++`block_def`, `pre_textlen`, `ind_pre`, `t1`). The two `u_save_cursor() == FAIL`
++bail-outs leave `editContext` NULL, which makes execute pop the state
++immediately and cleanup skip the replication, instead of running on a
++half-initialized context.
++
++`do_pending_operator()`'s `OP_INSERT` / `OP_APPEND` case now pushes that state
++via `sm_push_insert_op()` and returns, mirroring the `OP_CHANGE` case —
++including its `finish_op = FALSE` and `restart_edit = 0`. The `restart_edit = 0`
++is load-bearing: without it, `state_normal_cmd_execute()` pushes a *second*
++insert state on top of the one just pushed.
++
++One upstream call was intentionally dropped: `auto_format(FALSE, TRUE)` after
++the insert, which only matters with `'formatoptions'` containing `a`. libvim's
++`op_change()` conversion dropped the equivalent call, and this follows it.
++
++### If you want multiple cursors
++
++Revert this change. `vimSetCursorAddCallback()` and the `cursorAddCallback`
++global still exist and are still wired up in `libvim.c` — nothing calls the
++callback any more for a blockwise `I`/`A`, that is all. The six disabled tests
++in `apitest/cursor.c` (`test_add_cursors_visual_I` and friends, kept behind
++`#if 0`) are the specification of what the callback used to report; they are
++the fastest way back if you need it.
++
++The two behaviors are mutually exclusive, not additive: if libvim replicates
++the text itself *and* an embedder applies it at each reported cursor, every
++line but the first gets it twice.
++
++### Verifying
++
++```sh
++cd src
++make libvim.a
++make apitest/visual_mode.test.exe
++cd apitest && ./visual_mode.test.exe
++```
++
++`apitest/visual_mode.c` covers block `I`, block `A`, block `$A`, and a line too
++short to reach the block's start column (`I` skips it, `A` pads it with
++spaces). `test_insert_block_mode_change` is upstream's own disabled test,
++re-enabled — its expectations were right all along, it just needed the two
++`vimInput("<c-v>")`/`vimInput("<esc>")` calls corrected to `vimKey()`, since
++`vimInput()` passes its argument verbatim rather than parsing termcodes.
++
++Expectations throughout were taken from stock vim 9.1, which is worth doing for
++anything in this area:
++
++```sh
++printf 'alpha\nbravo\ncharlie\ndelta\n' > /tmp/f.txt
++vim -u NONE -N -es -c 'exe "normal! gg0\<C-v>jjI- \<esc>"' -c 'wq!' /tmp/f.txt
++cat /tmp/f.txt
++```
++
++### Downstream
++
++Built for [vimango](https://github.com/slzatz/vimango), which embeds libvim as
++a static `libvim.a` and wants stock vim keybindings rather than a multi-cursor
++editor. Its `patches/` directory holds this diff, and its CLAUDE.md tells its
++own build process to apply it. Nothing here is vimango-specific — the result is
++just closer to vim than upstream libvim is.
+diff --git a/README.md b/README.md
+index 8bb373e54..366587e9e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,15 @@
+ [![Build Status](https://dev.azure.com/onivim/oni2/_apis/build/status/onivim.libvim?branchName=master)](https://dev.azure.com/onivim/oni2/_build/latest?definitionId=4&branchName=master)
+ 
++> **This is a patched checkout, not stock libvim.** It carries local changes on
++> top of [onivim/libvim](https://github.com/onivim/libvim) — most notably,
++> Visual-mode `I` and `A` behave as vim's operators (blockwise insert/append
++> repeats on every line of the block) instead of reporting multiple cursors
++> through `vimSetCursorAddCallback()`, which is no longer called for a blockwise
++> selection. Read [PATCHES.md](PATCHES.md) before building anything against
++> this tree, especially if you want the multiple-cursor behavior. Upstream is
++> unmaintained, so the changes are committed here rather than kept as a patch
++> queue.
++
+ ## What is `libvim`?
+ 
+ `libvim` is a fork of [Vim](https://github.com/vim/vim), with the goal of providing a [minimal C-based API](https://github.com/onivim/libvim/blob/master/src/libvim.h), modelling Vim modal editing. It does not include any user interface at all (not even a terminal UI), and is primarily responsible for acting as a fast buffer manipulation engine, faithful to Vim keystrokes. It's still a work-in-progress and there is lots of work left to stabilize.
+diff --git a/src/apitest/cursor.c b/src/apitest/cursor.c
+index 04b4b75b0..f14cb2db8 100644
+--- a/src/apitest/cursor.c
++++ b/src/apitest/cursor.c
+@@ -73,6 +73,16 @@ MU_TEST(test_set_cursor_invalid_column)
+   mu_check(vimCursorGetColumn() == 5);
+ }
+ 
++#if 0
++/*
++ * The multiple-cursor tests below are disabled in this fork: Visual "I"/"A"
++ * now go through vim's OP_INSERT/OP_APPEND operators instead of reporting one
++ * cursor per block line through cursorAddCallback(), so nothing calls the
++ * callback for a blockwise selection any more.  Kept, rather than deleted, as
++ * the specification of the behavior a multiple-cursor embedder would want.
++ * See PATCHES.md.
++ */
++
+ MU_TEST(test_add_cursors_visual_I)
+ {
+   vimKey("<c-v>");
+@@ -233,6 +243,8 @@ MU_TEST(test_add_cursors_eol)
+   // Verify we switch to insert mode
+   mu_check((vimGetMode() & INSERT) == INSERT);
+ }
++#endif
++
+ 
+ MU_TEST_SUITE(test_suite)
+ {
+@@ -243,12 +255,22 @@ MU_TEST_SUITE(test_suite)
+   MU_RUN_TEST(test_set_cursor_invalid_column);
+   MU_RUN_TEST(test_set_cursor_doesnt_move_topline);
+ 
+-  MU_RUN_TEST(test_add_cursors_visual_I);
+-  MU_RUN_TEST(test_add_cursors_visual_reverse_I);
+-  MU_RUN_TEST(test_add_cursors_visual_after);
+-  MU_RUN_TEST(test_add_cursors_visual_skip_empty_line);
+-  MU_RUN_TEST(test_add_cursors_visual_utf8_vcol);
+-  MU_RUN_TEST(test_add_cursors_eol);
++  /*
++   * Disabled: this fork replaced the multiple-cursor handling of Visual
++   * "I"/"A" with vim's own OP_INSERT/OP_APPEND operators, so
++   * cursorAddCallback() is no longer invoked for a blockwise selection and
++   * these six tests cannot pass.  The editing behavior they were a proxy for
++   * is now asserted directly in apitest/visual_mode.c
++   * (test_insert_block_mode_change and friends).
++   * See PATCHES.md - getting multiple cursors back means reverting that patch.
++   *
++   * MU_RUN_TEST(test_add_cursors_visual_I);
++   * MU_RUN_TEST(test_add_cursors_visual_reverse_I);
++   * MU_RUN_TEST(test_add_cursors_visual_after);
++   * MU_RUN_TEST(test_add_cursors_visual_skip_empty_line);
++   * MU_RUN_TEST(test_add_cursors_visual_utf8_vcol);
++   * MU_RUN_TEST(test_add_cursors_eol);
++   */
+ }
+ 
+ int main(int argc, char **argv)
+diff --git a/src/apitest/visual_mode.c b/src/apitest/visual_mode.c
+index 48e24e240..968d51a7a 100644
+--- a/src/apitest/visual_mode.c
++++ b/src/apitest/visual_mode.c
+@@ -107,16 +107,18 @@ MU_TEST(test_insert_block_mode)
+ /**
+  * This test case does a visual block select and then an "I" insert
+  * which should insert at the start of each line.
+- * this test fails and will be commented out.
++ *
++ * Was disabled ("this test fails") while nv_edit() handled Visual "I"/"A"
++ * with the multiple-cursor callback instead of vim's OP_INSERT operator.
++ * See PATCHES.md - re-enabled now that the operator behavior is back.
+  */
+ 
+-/*
+ MU_TEST(test_insert_block_mode_change)
+ {
+   char_u *lines[] = {"line1", "line2", "line3", "line4", "line5"};
+   vimBufferSetLines(curbuf, 0, 3, lines, 5);
+ 
+-  vimInput("<c-v>");
++  vimKey("<c-v>");
+   vimInput("j");
+   vimInput("j");
+   vimInput("j");
+@@ -127,14 +129,107 @@ MU_TEST(test_insert_block_mode_change)
+   vimInput("b");
+   vimInput("c");
+ 
+-  vimInput("<esc>");
++  vimKey("<esc>");
+ 
+   char_u *line = vimBufferGetLine(curbuf, 1);
+   mu_check(strcmp(line, "abcline1") == 0);
+   line = vimBufferGetLine(curbuf, 3);
+   mu_check(strcmp(line, "abcline3") == 0);
++  line = vimBufferGetLine(curbuf, 4);
++  mu_check(strcmp(line, "abcline4") == 0);
++  // The block ended at line 4 - line 5 must be untouched.
++  line = vimBufferGetLine(curbuf, 5);
++  mu_check(strcmp(line, "line5") == 0);
++}
++
++/**
++ * Visual block "A" appends after the right edge of the block on every line.
++ */
++
++MU_TEST(test_append_block_mode_change)
++{
++  char_u *lines[] = {"line1", "line2", "line3", "line4", "line5"};
++  vimBufferSetLines(curbuf, 0, 3, lines, 5);
++
++  vimKey("<c-v>");
++  vimInput("j");
++  vimInput("j");
++
++  vimInput("A");
++
++  vimInput("X");
++
++  vimKey("<esc>");
++
++  char_u *line = vimBufferGetLine(curbuf, 1);
++  mu_check(strcmp(line, "lXine1") == 0);
++  line = vimBufferGetLine(curbuf, 3);
++  mu_check(strcmp(line, "lXine3") == 0);
++  line = vimBufferGetLine(curbuf, 4);
++  mu_check(strcmp(line, "line4") == 0);
++}
++
++/**
++ * Visual block "$A" appends at the end of every line in the block,
++ * however ragged the right edge is.
++ */
++
++MU_TEST(test_append_eol_block_mode_change)
++{
++  char_u *lines[] = {"a", "bbbb", "cc", "line4", "line5"};
++  vimBufferSetLines(curbuf, 0, 3, lines, 5);
++
++  vimKey("<c-v>");
++  vimInput("j");
++  vimInput("j");
++  vimInput("$");
++
++  vimInput("A");
++
++  vimInput("X");
++
++  vimKey("<esc>");
++
++  char_u *line = vimBufferGetLine(curbuf, 1);
++  mu_check(strcmp(line, "aX") == 0);
++  line = vimBufferGetLine(curbuf, 2);
++  mu_check(strcmp(line, "bbbbX") == 0);
++  line = vimBufferGetLine(curbuf, 3);
++  mu_check(strcmp(line, "ccX") == 0);
++  line = vimBufferGetLine(curbuf, 4);
++  mu_check(strcmp(line, "line4") == 0);
++}
++
++/**
++ * A line too short to reach the block's start column is skipped by "I"
++ * (stock vim behavior), but "A" pads it out with spaces.
++ */
++
++MU_TEST(test_insert_block_mode_short_line)
++{
++  char_u *lines[] = {"line1", "ab", "line3", "line4", "line5"};
++  vimBufferSetLines(curbuf, 0, 3, lines, 5);
++
++  vimInput("l");
++  vimInput("l");
++  vimInput("l");
++  vimKey("<c-v>");
++  vimInput("j");
++  vimInput("j");
++
++  vimInput("I");
++
++  vimInput("X");
++
++  vimKey("<esc>");
++
++  char_u *line = vimBufferGetLine(curbuf, 1);
++  mu_check(strcmp(line, "linXe1") == 0);
++  line = vimBufferGetLine(curbuf, 2);
++  mu_check(strcmp(line, "ab") == 0);
++  line = vimBufferGetLine(curbuf, 3);
++  mu_check(strcmp(line, "linXe3") == 0);
+ }
+-*/
+ 
+ /**
+  * This test case does a visual block select and then an "c" insert
+@@ -279,7 +374,10 @@ MU_TEST_SUITE(test_suite)
+   MU_RUN_TEST(test_ctrl_q);
+   MU_RUN_TEST(test_ctrl_Q);
+   MU_RUN_TEST(test_insert_block_mode);
+-  // MU_RUN_TEST(test_insert_block_mode_change);
++  MU_RUN_TEST(test_insert_block_mode_change);
++  MU_RUN_TEST(test_append_block_mode_change);
++  MU_RUN_TEST(test_append_eol_block_mode_change);
++  MU_RUN_TEST(test_insert_block_mode_short_line);
+   MU_RUN_TEST(test_change_block_mode_change);
+   MU_RUN_TEST(test_in_parentheses);
+   MU_RUN_TEST(test_adjust_start_visual_line);
 diff --git a/src/normal.c b/src/normal.c
 index 49097e715..f5d4bb2e2 100644
 --- a/src/normal.c

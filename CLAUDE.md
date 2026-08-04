@@ -20,7 +20,9 @@ cd /path/to/libvim
 git apply /path/to/vimango/patches/*.patch
 ```
 
-- `libvim-visual-block-insert.patch` — restores stock vim behavior for `I`/`A` in Visual mode. libvim had replaced vim's `v_visop()` operator path in `nv_edit()` with an Onivim-2 multiple-cursor model (report one cursor per block line via `cursorAddCallback`, then do a single plain insert), so `ctrl-v jjI- <esc>` inserted on one line only. The patch calls `v_visop()` as upstream does, and converts `op_insert()` into the `state_insert_*` state machine trio the way libvim already did for `op_change()` — necessary because libvim's `edit()` cannot block, so the block replication has to run from the cleanup callback when Insert mode ends. Regression test: `vim/cvim/blockops_test.go`.
+- `libvim-visual-block-insert.patch` — restores stock vim behavior for `I`/`A` in Visual mode. libvim had replaced vim's `v_visop()` operator path in `nv_edit()` with an Onivim-2 multiple-cursor model (report one cursor per block line via `cursorAddCallback`, then do a single plain insert), so `ctrl-v jjI- <esc>` inserted on one line only. The patch calls `v_visop()` as upstream does, and converts `op_insert()` into the `state_insert_*` state machine trio the way libvim already did for `op_change()` — necessary because libvim's `edit()` cannot block, so the block replication has to run from the cleanup callback when Insert mode ends. Regression tests: `vim/cvim/blockops_test.go` and `blockedge_test.go` here, `src/apitest/visual_mode.c` in libvim.
+  - The patch also brings its own documentation: it adds `PATCHES.md` to the libvim tree and a banner to libvim's README, because the checkout stops being stock libvim and `vimSetCursorAddCallback()` stops firing for blockwise `I`/`A` — which matters to any *other* app built against that same checkout. `PATCHES.md` is the authoritative writeup; this entry is the summary.
+  - If Steve's own libvim checkout is at hand (`~/libvim`), it already has this committed on `master` — the patch file is for a fresh clone of upstream.
 
 **macOS (Apple Silicon / Homebrew):**
 ```bash
