@@ -256,8 +256,17 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
                 color: #b8b8b8;
                 background-color: #1e1e1e;
             }
+            /* Same tone as the headings below, deliberately: it keeps
+               one bright value in the dark sheet instead of two, and
+               stops bold from out-shining the headings it sits under
+               (#fff is L* 100 against their 93.2). Costs ~7 points of
+               separation from the body, leaving 18.4 -- exactly what
+               the headings themselves live on. Dark only: in light mode
+               bold is #000, already darker than the #2c3e50 headings,
+               and matching them there would collapse its separation
+               from 21.3 points to 5.1. */
             strong, b {
-                color: #fff;
+                color: #e8ecf1;
             }
             h1, h2, h3, h4, h5, h6 {
                 color: #e8ecf1;
