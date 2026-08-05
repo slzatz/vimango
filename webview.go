@@ -181,6 +181,29 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             color: var(--code-accent);
             overflow-x: auto;
         }
+        /* Bold is the one kind of emphasis with no accent of its own, so
+           it earns its weight twice over: a real 800 (the system font's
+           variable weight axis has the range, so this is SF Heavy, not a
+           synthetic bold) plus a color that pulls away from the body
+           text. The dark branch below lowers the body rather than
+           raising the bold -- #ddd sat close enough to white that there
+           was nowhere left to go. */
+        strong, b {
+            font-weight: 800;
+            color: #000;
+        }
+        /* Emphasis stands down wherever a block owns its own color.
+           Inside a heading it would both fight the heading color and say
+           nothing (a heavier weight inside an already-bold heading);
+           inside a quote it would punch out of the quote it belongs to. */
+        h1 strong, h2 strong, h3 strong, h4 strong, h5 strong, h6 strong,
+        h1 b, h2 b, h3 b, h4 b, h5 b, h6 b {
+            color: inherit;
+            font-weight: inherit;
+        }
+        blockquote strong, blockquote b {
+            color: inherit;
+        }
         blockquote {
             border-left: 4px solid var(--accent);
             margin: 0;
@@ -226,8 +249,15 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         }
         @media (prefers-color-scheme: dark) {
             body {
-                color: #ddd;
+                /* Dimmer than the #ddd this used to be, which buys bold
+                   ~25 points of perceptual lightness to separate by
+                   instead of ~12, and glares less besides. Still 8.4:1
+                   against the ground. */
+                color: #b8b8b8;
                 background-color: #1e1e1e;
+            }
+            strong, b {
+                color: #fff;
             }
             h1, h2, h3, h4, h5, h6 {
                 color: #e8ecf1;
