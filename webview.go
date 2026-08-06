@@ -163,6 +163,29 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         h1 + *, h2 + *, h3 + *, h4 + *, h5 + *, h6 + * {
             margin-top: 0;
         }
+        /* The UA ladder runs h4/h5/h6 at 1em/0.83em/0.67em -- h4 exactly
+           body size, the last two smaller than the text they head. That
+           left h4 leaning entirely on weight and color to read as a
+           heading, and in dark mode it has neither to spare: headings
+           and bold share #e8ecf1 below, so an h4 line and a bold line
+           differed by one weight step (UA bold 700 vs the 800 on
+           strong) and nothing else. Sizes only -- the weights stay as
+           they are, so bold body text remains the heavier of the two.
+           h3 comes up from its own 1.17em to keep the steps apart:
+           everything below it has to fit between it and body size, and
+           0.17em will not hold three of them. */
+        h3 {
+            font-size: 1.30em;
+        }
+        h4 {
+            font-size: 1.15em;
+        }
+        h5 {
+            font-size: 1.08em;
+        }
+        h6 {
+            font-size: 1.02em;
+        }
         :root {
             --accent: {{.Accent}};
             --code-accent: {{.CodeAccent}};
@@ -249,18 +272,23 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         }
         @media (prefers-color-scheme: dark) {
             body {
-                /* Dimmer than the #ddd this used to be, which buys bold
-                   ~25 points of perceptual lightness to separate by
-                   instead of ~12, and glares less besides. Still 8.4:1
-                   against the ground. */
-                color: #b8b8b8;
+                /* Dimmer than the #ddd this used to be. Back then bold
+                   had no color rule at all, so it inherited this value
+                   and separated by weight alone; dropping to #b8b8b8
+                   opened 18.4 points of perceptual lightness for it to
+                   use, and glared less besides. #c4c4c4 hands 4.4 of
+                   those back -- #b8b8b8 read dimmer than wanted for
+                   plain reading -- which still leaves bold 14.1 points
+                   and every one of them more than it had before.
+                   9.6:1 against the ground. */
+                color: #c4c4c4;
                 background-color: #1e1e1e;
             }
             /* Same tone as the headings below, deliberately: it keeps
                one bright value in the dark sheet instead of two, and
                stops bold from out-shining the headings it sits under
                (#fff is L* 100 against their 93.2). Costs ~7 points of
-               separation from the body, leaving 18.4 -- exactly what
+               separation from the body, leaving 14.1 -- exactly what
                the headings themselves live on. Dark only: in light mode
                bold is #000, already darker than the #2c3e50 headings,
                and matching them there would collapse its separation
