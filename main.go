@@ -152,6 +152,9 @@ func main() {
 	vim.ExecuteCommand("set iskeyword+=*")
 	vim.ExecuteCommand("set iskeyword+=`")
 
+	// Registers saved by the previous run (see registers.go)
+	restoreRegisters()
+
 	// Enable raw mode
 	origCfg, err := rawmode.Enable()
 	if err != nil {

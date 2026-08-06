@@ -685,6 +685,10 @@ func (a *App) returnCursor() {
 }
 
 func (a *App) Cleanup() {
+	// Persist registers for the next run (see registers.go) while vim
+	// state is still alive.
+	saveRegisters()
+
 	// Stop async render manager
 	if a.RenderManager != nil {
 		a.RenderManager.Stop()
