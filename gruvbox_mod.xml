@@ -23,7 +23,7 @@
   <entry type="GenericDeleted" style="noinherit #c4c4c4"/>
   <entry type="GenericEmph" style="italic #c4c4c4"/>
   <entry type="GenericError" style="bold bg:#fb4934"/>
-  <entry type="GenericHeading" style="bold #e8ecf1 bg:#5e5747"/>
+  <entry type="GenericHeading" style="bold #e8ecf1"/>
   <entry type="GenericInserted" style="noinherit #282828 bg:#b8bb26"/>
   <entry type="GenericOutput" style="noinherit #504945"/>
   <entry type="GenericPrompt" style="#689d6a"/>
