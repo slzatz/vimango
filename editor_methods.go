@@ -440,7 +440,7 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 	note := e.generateWWStringFromBuffer()
 	var buf bytes.Buffer
 	if lang == "markdown" {
-		_ = Highlight2(&buf, note, lang, "terminal16m", e.Session.markdown_style)
+		_ = Highlight2(&buf, note, lang, MDFormatter, e.Session.markdown_style)
 	} else {
 		_ = Highlight(&buf, note, lang, "terminal16m", e.Session.style[e.Session.styleIndex])
 	}
