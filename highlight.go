@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
@@ -25,6 +26,11 @@ import (
 // smxx=\E[9m, rmxx=\E[29m), and ghostty is what runs the plain terminal,
 // vimango_ghostty, and the hybrid app's embedded surface.
 const MDFormatter = "terminal16m-md"
+
+const (
+	strikeSGR   = "\x1b[9m"
+	strikeDelim = "~~"
+)
 
 func init() {
 	formatters.Register(MDFormatter, chroma.FormatterFunc(formatMarkdownTTY))
@@ -70,8 +76,8 @@ func writeStyledToken(w io.Writer, formatting, text string) {
 
 // formatMarkdownTTY is chroma's trueColourFormatter with strikethrough added
 // for GenericDeleted, which is what the markdown lexer tags ~~text~~ as. The
-// tildes are part of that token and get struck along with the text -- the
-// editor shows raw markdown, so the delimiters stay visible.
+// editor shows raw markdown, so the tildes stay on screen, but the line stops
+// at them: they delimit the struck run rather than belonging to it.
 func formatMarkdownTTY(w io.Writer, style *chroma.Style, it chroma.Iterator) error {
 	style = clearStyleBackground(style)
 	for token := it(); token != chroma.EOF; token = it() {
@@ -83,9 +89,6 @@ func formatMarkdownTTY(w io.Writer, style *chroma.Style, it chroma.Iterator) err
 		}
 
 		formatting := ""
-		if struck {
-			formatting += "\x1b[9m"
-		}
 		if entry.Bold == chroma.Yes {
 			formatting += "\x1b[1m"
 		}
@@ -102,9 +105,35 @@ func formatMarkdownTTY(w io.Writer, style *chroma.Style, it chroma.Iterator) err
 			formatting += fmt.Sprintf("\x1b[48;2;%d;%d;%dm", entry.Background.Red(), entry.Background.Green(), entry.Background.Blue())
 		}
 
+		if struck {
+			// The delimiters mark the text up, they are not struck text
+			// themselves, so the line stops at the tildes on both ends.
+			if inner, ok := splitStrikeDelimiters(token.Value); ok {
+				writeStyledToken(w, formatting, strikeDelim)
+				writeStyledToken(w, formatting+strikeSGR, inner)
+				writeStyledToken(w, formatting, strikeDelim)
+				continue
+			}
+			// Not shaped like ~~text~~ after all; strike the lot rather
+			// than silently dropping the attribute.
+			formatting += strikeSGR
+		}
+
 		writeStyledToken(w, formatting, token.Value)
 	}
 	return nil
+}
+
+// splitStrikeDelimiters peels the ~~ off a GenericDeleted token, whose value
+// the markdown lexer hands over with the delimiters included.
+func splitStrikeDelimiters(value string) (inner string, ok bool) {
+	if len(value) <= 2*len(strikeDelim) {
+		return "", false
+	}
+	if !strings.HasPrefix(value, strikeDelim) || !strings.HasSuffix(value, strikeDelim) {
+		return "", false
+	}
+	return value[len(strikeDelim) : len(value)-len(strikeDelim)], true
 }
 
 func selectMDStyle(style string) (*chroma.Style, error) {

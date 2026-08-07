@@ -30,8 +30,8 @@ func highlightMD(t *testing.T, source, formatter string) string {
 	return buf.String()
 }
 
-// ~~text~~ must come out struck, and the tildes are struck with it: the
-// editor shows raw markdown, so the delimiters stay on screen.
+// ~~text~~ must come out struck between the tildes but not through them: the
+// editor shows raw markdown, so the delimiters stay on screen unstruck.
 func TestMarkdownFormatterStrikesDeleted(t *testing.T) {
 	const source = "plain line\n\n~~struck text~~\n\nplain again\n"
 
@@ -40,16 +40,19 @@ func TestMarkdownFormatterStrikesDeleted(t *testing.T) {
 		t.Fatalf("no SGR 9 in output for %q", source)
 	}
 
-	// The struck run must cover the whole token, tildes included, and stop
-	// there -- the reset chroma writes at each token end closes it.
+	// The struck run must be the inner text alone, and stop there -- the
+	// reset chroma writes at each token end closes it.
 	start := strings.Index(got, strikeOn) + len(strikeOn)
 	end := strings.Index(got[start:], "\x1b[0m")
 	if end < 0 {
 		t.Fatal("SGR 9 never reset")
 	}
 	run := stripSGR(got[start : start+end])
-	if run != "~~struck text~~" {
-		t.Errorf("struck run = %q, want %q", run, "~~struck text~~")
+	if run != "struck text" {
+		t.Errorf("struck run = %q, want %q", run, "struck text")
+	}
+	if strings.Contains(run, strikeDelim) {
+		t.Errorf("delimiters fell inside the struck run: %q", run)
 	}
 
 	// Nothing else may pick up the attribute.
