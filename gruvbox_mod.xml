@@ -1,5 +1,5 @@
 <style name="gruvbox">
-  <entry type="Background" style="noinherit #ebdbb2 bg:#282828"/>
+  <entry type="Background" style="noinherit #c4c4c4 bg:#282828"/>
   <entry type="Keyword" style="noinherit #689d6a"/>
   <entry type="KeywordType" style="noinherit #fabd2f"/>
   <entry type="Name" style="#ebdbb2"/>
@@ -21,13 +21,13 @@
   <entry type="CommentPreproc" style="noinherit #8ec07c"/>
   <entry type="Generic" style="#689d6a"/>
   <entry type="GenericDeleted" style="noinherit #282828 bg:#fb4934"/>
-  <entry type="GenericEmph" style="italic #ebdbb2"/>
+  <entry type="GenericEmph" style="italic #c4c4c4"/>
   <entry type="GenericError" style="bold bg:#fb4934"/>
-  <entry type="GenericHeading" style="bold #ebdbb2 bg:#5e5747"/>
+  <entry type="GenericHeading" style="bold #e8ecf1 bg:#5e5747"/>
   <entry type="GenericInserted" style="noinherit #282828 bg:#b8bb26"/>
   <entry type="GenericOutput" style="noinherit #504945"/>
   <entry type="GenericPrompt" style="#689d6a"/>
-  <entry type="GenericStrong" style="bold #ebdbb2"/>
-  <entry type="GenericSubheading" style="bold #689d6a"/>
+  <entry type="GenericStrong" style="bold #e8ecf1"/>
+  <entry type="GenericSubheading" style="bold #e8ecf1"/>
   <entry type="GenericTraceback" style="bold bg:#fb4934"/>
 </style>
