@@ -256,14 +256,31 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             color: #7f8c8d;
             font-size: 0.9em;
         }
+        /* Tables are scanned, not read: the eye tracks across a row and
+           down a column, and the borders already mark where each cell
+           begins. body's 1.6 is leading sized for 800px-wide prose
+           lines and buys a table nothing -- it made every row tall and
+           charged again for each line of a cell that wrapped, which is
+           the line that sets the row's height. Setting line-height here
+           is an addition rather than an override; nothing else in the
+           sheet touches it. The step below body size is the other half
+           of the ~36% a row lost. margin here is a ceiling, not a gap:
+           adjacent margins collapse to the larger and p carries 16px,
+           so 12px is invisible against a paragraph (and a table after a
+           heading is already at 0, from the h1 + * rule above) -- what
+           it guarantees is that a table never claims more room than the
+           prose around it, whichever neighbor it lands next to. Only
+           two adjacent tables ever see the number itself. */
         table {
             border-collapse: collapse;
             width: 100%;
-            margin: 20px 0;
+            margin: 12px 0;
+            line-height: 1.20;
+            font-size: 0.88em;
         }
         th, td {
             border: 1px solid #ddd;
-            padding: 12px;
+            padding: 7px 8px;
             text-align: left;
         }
         th {
