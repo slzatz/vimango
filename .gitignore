@@ -5,6 +5,9 @@ token.json
 token_store.json
 preferences.json
 
+# Runtime state, rewritten on every quit (saveRegisters)
+registers.json
+
 # Database files
 *.db
 
