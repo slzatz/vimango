@@ -922,9 +922,9 @@ func (e *Editor) openNote() {
 	e.ShowMessage(BR, "Opened note %d", id)
 }
 
-// checkStale asks whether the database row moved underneath this editor
-// since it last read or wrote the note, and reloads a clean buffer when
-// it did — vim's 'autoread', for a row instead of a file.
+// checkStale asks whether this note's row changed in the database since
+// the editor last read or wrote it, and reloads a clean buffer when it
+// did — vim's 'autoread', for a row instead of a file.
 //
 // It exists because a sync writes the database from a *separate* process
 // (vimango-sync), so the editor has no way to notice: its buffer is
@@ -950,7 +950,7 @@ func (e *Editor) checkStale() {
 	}
 
 	if e.isModified() {
-		// Both sides moved. Reloading would discard the user's edits and
+		// Both sides changed. Reloading would discard the user's edits and
 		// `:w` will discard the database's — only they can choose, so
 		// say so and touch nothing.
 		e.ShowMessage(BR, "Note %d changed in the database and you have unsaved changes — :w will overwrite it", e.id)

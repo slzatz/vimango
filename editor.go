@@ -42,13 +42,13 @@ type Editor struct {
 	saveTick           int
 	// dbText is the note exactly as this editor last read it from — or
 	// wrote it to — the database. It is the baseline :checkstale compares
-	// against, which is what separates "the row moved underneath me"
-	// (news) from "I have unsaved edits" (not news). Set wherever a note
-	// is loaded into an editor or written back.
-	dbText string
-	modified           bool     // tracks if the buffer has been modified
-	title              string   // title of the note
-	tabCompletion      struct { // for tab completion
+	// against, which is what separates "the row changed in the database
+	// since I read it" (news) from "I have unsaved edits" (not news). Set
+	// wherever a note is loaded into an editor or written back.
+	dbText        string
+	modified      bool     // tracks if the buffer has been modified
+	title         string   // title of the note
+	tabCompletion struct { // for tab completion
 		list  []string
 		index int
 	}
