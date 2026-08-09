@@ -891,6 +891,7 @@ func (o *Organizer) editNote(id int) {
 		}
 		ae.top_margin = TOP_MARGIN + 1
 		note := o.Database.readNoteIntoString(id)
+		ae.dbText = note
 		ae.ss = strings.Split(note, "\n")
 		// Make sure we have at least one line, even if the note was empty
 		if len(ae.ss) == 0 {

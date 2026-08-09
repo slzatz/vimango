@@ -81,6 +81,14 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":open 5", ":open! 5"},
 	})
 
+	registry.Register("checkstale", (*Editor).checkStale, CommandInfo{
+		Description: "Reload this note if the database changed underneath it (a clean buffer only; " +
+			"warns instead when you have unsaved changes). Injected by the host app after a sync",
+		Usage:    "checkstale",
+		Category: "File Operations",
+		Examples: []string{":checkstale"},
+	})
+
 	// Editing commands
 	registry.Register("syntax", (*Editor).syntax, CommandInfo{
 		Description: "Set syntax highlighting for current note",
@@ -398,6 +406,10 @@ func (e *Editor) writeNote() {
 		return
 	}
 	e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
+
+	// The database now holds exactly this text, so it becomes the
+	// baseline :checkstale compares against.
+	e.dbText = text
 
 	//explicitly writes note to set isModified to false
 	//vim.Execute("w")
@@ -889,6 +901,7 @@ func (e *Editor) openNote() {
 	note := e.Database.readNoteIntoString(id)
 	e.id = id
 	e.title = e.Database.getTitle(id)
+	e.dbText = note
 	e.ss = strings.Split(note, "\n")
 	if len(e.ss) == 0 {
 		e.ss = []string{""}
@@ -907,6 +920,69 @@ func (e *Editor) openNote() {
 	e.Screen.eraseRightScreen()
 	e.Screen.drawRightScreen()
 	e.ShowMessage(BR, "Opened note %d", id)
+}
+
+// checkStale asks whether the database row moved underneath this editor
+// since it last read or wrote the note, and reloads a clean buffer when
+// it did — vim's 'autoread', for a row instead of a file.
+//
+// It exists because a sync writes the database from a *separate* process
+// (vimango-sync), so the editor has no way to notice: its buffer is
+// process memory, and `:w` is an unconditional UPDATE that would push
+// the pre-sync text back over the synced version, locally and then to
+// the server. The host injects this after every sync.
+//
+// The comparison is against dbText, not against the buffer, so unsaved
+// edits of your own are never mistaken for the database moving — and a
+// buffer that is clean is byte-identical to what was saved, which is
+// what makes reloading it safe rather than destructive.
+func (e *Editor) checkStale() {
+	if !e.Database.entryExists(e.id) {
+		e.ShowMessage(BR, "Note %d was deleted elsewhere — :w will not bring it back", e.id)
+		return
+	}
+
+	dbText := e.Database.readNoteIntoString(e.id)
+	if dbText == e.dbText {
+		// Silence is the point: this runs after every sync, and most
+		// syncs don't touch the note you happen to have open.
+		return
+	}
+
+	if e.isModified() {
+		// Both sides moved. Reloading would discard the user's edits and
+		// `:w` will discard the database's — only they can choose, so
+		// say so and touch nothing.
+		e.ShowMessage(BR, "Note %d changed in the database and you have unsaved changes — :w will overwrite it", e.id)
+		return
+	}
+
+	e.dbText = dbText
+	e.title = e.Database.getTitle(e.id)
+	e.ss = strings.Split(dbText, "\n")
+	if len(e.ss) == 0 {
+		e.ss = []string{""}
+	}
+	e.vbuf.SetLines(0, -1, e.ss)
+	// The reload is not an edit: keep the buffer clean so the quit guard
+	// and `:w` see it for what it is.
+	e.bufferTick = e.vbuf.GetLastChangedTick()
+	e.saveTick = e.bufferTick
+
+	// Hold the cursor where the user left it, clamped into the new text
+	// (the synced version can be shorter).
+	if e.fr >= len(e.ss) {
+		e.fr = len(e.ss) - 1
+	}
+	if e.fc > len(e.ss[e.fr]) {
+		e.fc = len(e.ss[e.fr])
+	}
+	vim.SetCursorPosition(e.fr+1, e.fc)
+	e.scroll()
+
+	e.Screen.eraseRightScreen()
+	e.Screen.drawRightScreen()
+	e.ShowMessage(BR, "Note %d reloaded — it changed in the database since you opened it", e.id)
 }
 
 func (e *Editor) number() {
