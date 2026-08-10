@@ -20,6 +20,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/util"
 )
 
 func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
@@ -1126,6 +1127,13 @@ func (e *Editor) createPDFGoldmark() {
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs
+			// Callouts, for the marker-stripping half only: goldmark-pdf
+			// has no attribute rendering, so a callout reaches the PDF as
+			// an unstyled quote. That is the point -- without this the
+			// marker would print as a literal "[!NOTE]" line.
+			parser.WithParagraphTransformers(
+				util.Prioritized(calloutTransformer{}, 100),
+			),
 		),
 		goldmark.WithRenderer(
 			pdf.New(
