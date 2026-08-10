@@ -250,7 +250,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             background-color: var(--callout-bg);
             color: inherit;
             margin: 16px 0;
-            padding: 12px 16px;
+            padding: 5px 16px;
             border-radius: 4px;
         }
         /* The label is a heading in everything but name, so it takes
@@ -262,7 +262,13 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             color: var(--callout);
             font-weight: 700;
             line-height: 1.25;
-            margin-bottom: 3px;
+            /* Negative on purpose. Roughly 7px of the visible gap is
+               half-leading, not margin -- the label's line box is 1.25x
+               its font size and the body's is 1.6x, and each centers its
+               text, so there is empty box under the label and above the
+               first body line before any margin is involved. Zero would
+               still read loose; this pulls some of that back. */
+            margin-bottom: -2px;
         }
         /* The label is a block box, so its bottom margin collapses
            against the first paragraph's 16px top margin and the larger
