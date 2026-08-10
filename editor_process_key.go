@@ -22,14 +22,14 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		prevMode := e.mode
 		mode := vim.GetCurrentMode() ////////
 		e.mode = modeMap[mode]
-		e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
+		//e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 		e.command = ""
 		e.command_line = ""
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
 		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+		// vim clears the message line on <esc>; it does not announce NORMAL
 		e.ShowMessage(BR, "")
-		e.ShowMessage(BR, "%s", prevMode)
 		//return false
 		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
 		if prevMode == VISUAL || prevMode == PREVIEW || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving preview
