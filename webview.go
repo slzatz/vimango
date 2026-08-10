@@ -253,20 +253,24 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             padding: 12px 16px;
             border-radius: 4px;
         }
-        /* One text run, so the icon and the word are separated by the
-           single space in the label -- and emoji advance widths vary
-           enough between the five that one space reads as "touching" on
-           some and "spaced" on others. word-spacing evens it out
-           without needing a second pseudo-element. Delete the icon from
-           the five labels below and this whole rule still works; the
-           label just becomes the word. */
+        /* The label is a heading in everything but name, so it takes
+           heading leading rather than the body's 1.6 -- at one word the
+           extra half-line is pure gap above and below it. */
         blockquote.callout::before {
             content: var(--callout-label);
             display: block;
             color: var(--callout);
             font-weight: 700;
-            word-spacing: 0.2em;
-            margin-bottom: 6px;
+            line-height: 1.25;
+            margin-bottom: 3px;
+        }
+        /* The label is a block box, so its bottom margin collapses
+           against the first paragraph's 16px top margin and the larger
+           wins -- without this the margin above is dead code and the gap
+           is whatever the paragraph says. Zeroing it here makes the gap
+           the label's to set, and the two rules the only place it lives. */
+        blockquote.callout > :first-child {
+            margin-top: 0;
         }
         /* The padding owns the bottom gap; the last child's margin would
            double it. */
@@ -276,27 +280,27 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         blockquote.callout-note {
             --callout: #0969da;
             --callout-bg: rgba(9, 105, 218, 0.08);
-            --callout-label: "\2139\FE0F  Note";
+            --callout-label: "Note";
         }
         blockquote.callout-tip {
             --callout: #1a7f37;
             --callout-bg: rgba(26, 127, 55, 0.08);
-            --callout-label: "\1F4A1  Tip";
+            --callout-label: "Tip";
         }
         blockquote.callout-important {
             --callout: #8250df;
             --callout-bg: rgba(130, 80, 223, 0.08);
-            --callout-label: "\1F4E3  Important";
+            --callout-label: "Important";
         }
         blockquote.callout-warning {
             --callout: #9a6700;
             --callout-bg: rgba(154, 103, 0, 0.10);
-            --callout-label: "\26A0\FE0F  Warning";
+            --callout-label: "Warning";
         }
         blockquote.callout-caution {
             --callout: #cf222e;
             --callout-bg: rgba(207, 34, 46, 0.08);
-            --callout-label: "\1F6D1  Caution";
+            --callout-label: "Caution";
         }
         li::marker {
             color: var(--accent);
