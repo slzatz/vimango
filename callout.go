@@ -15,6 +15,9 @@ import (
 //	> [!NOTE]
 //	> Useful information the reader should not miss.
 //
+// plus one of our own, "[!]", which tints the block without labeling
+// it (see calloutPlainKind below).
+//
 // The syntax is deliberately just a blockquote whose first line is a
 // marker, so nothing here invents a block type: the marker line is
 // stripped and the surviving blockquote gets a class the stylesheet
@@ -29,7 +32,7 @@ import (
 // to excise than one line of source. Paragraph transformers run at
 // paragraph close, while Lines() still points at raw source.
 
-var calloutMarker = regexp.MustCompile(`^\[!([A-Za-z]+)\]\s*$`)
+var calloutMarker = regexp.MustCompile(`^\[!([A-Za-z]*)\]\s*$`)
 
 // calloutKinds is the closed set GitHub recognizes. Anything else --
 // "[!BOGUS]", or a quote that merely opens with a bracket -- is left
@@ -42,6 +45,17 @@ var calloutKinds = map[string]bool{
 	"warning":   true,
 	"caution":   true,
 }
+
+// calloutPlainKind is ours, not GitHub's: "[!]" is a callout with no
+// label at all, for pointing at a passage without naming a category.
+// The empty marker is the right spelling for it precisely because
+// GitHub can never claim it -- every alert kind they have or could add
+// is "[!WORD]". There is no spelling that survives a GitHub render
+// either way (an unrecognized marker prints literally there), so the
+// shortest one wins. Deliberately not reachable as "[!PLAIN]": that
+// would be a second name for one thing, and it stays an unrecognized
+// word like any other.
+const calloutPlainKind = "plain"
 
 type calloutTransformer struct{}
 
@@ -62,7 +76,10 @@ func (calloutTransformer) Transform(p *ast.Paragraph, reader text.Reader, pc par
 		return
 	}
 	kind := strings.ToLower(string(m[1]))
-	if !calloutKinds[kind] {
+	switch {
+	case kind == "":
+		kind = calloutPlainKind
+	case !calloutKinds[kind]:
 		return
 	}
 
