@@ -353,6 +353,55 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         li::marker {
             color: var(--accent);
         }
+        /* Task lists. goldmark's TaskList extension emits a bare
+           disabled input as the item's first inline and tags neither
+           the ul nor the li, so there is no class to hang this on --
+           the item has to be recognized by its own shape. Until it
+           is, li::marker above draws an accent disc beside the box
+           and every task item carries two marks. Both spellings of
+           the first child are matched: a tight list puts the input
+           directly in the li, a loose one wraps it in a p. */
+        li:has(> input[type="checkbox"]),
+        li:has(> p:first-child > input[type="checkbox"]) {
+            list-style: none;
+        }
+        /* Scoped to li on purpose: the renderer runs WithUnsafe, so a
+           note can carry its own raw input and none of this is meant
+           for it. The check is an inline SVG rather than a rotated
+           ::after border -- it strokes round-capped, which is the one
+           part of the iOS symbol worth keeping. The box itself is
+           square, which that symbol cannot be. */
+        li input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 0.92em;
+            height: 0.92em;
+            /* The negative left margin hangs the box in the slot
+               list-style: none just gave up, so an item's text starts
+               in the same column a plain bullet item's does and a
+               wrapped line aligns under the text, not under the box.
+               The right margin is short of the gap it looks like
+               because goldmark emits a literal space between the
+               input and the text; that space is roughly the missing
+               0.11em, and counting it is what puts the two kinds of
+               item in one text column instead of 1.8px apart. */
+            margin: 0 0.24em 0 -1.45em;
+            vertical-align: -0.09em;
+            border: 2px solid var(--accent);
+            background: transparent;
+            /* Every box is disabled -- the preview is read-only, and
+               the state lives in the markdown. Undo what that earns:
+               the dimming and the pointer. */
+            opacity: 1;
+            cursor: default;
+        }
+        li input[type="checkbox"]:checked {
+            background-color: var(--accent);
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.5l3 3 6-6"/></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 0.78em 0.78em;
+        }
         dt {
             color: var(--accent);
         }
