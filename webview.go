@@ -371,22 +371,45 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
            ::after border -- it strokes round-capped, which is the one
            part of the iOS symbol worth keeping. The box itself is
            square, which that symbol cannot be. */
+        /* Every length here is px, and em is unusable: em on a form
+           control resolves against the *control's* font, not the
+           body's. WebKit gives an input font: -webkit-small-control,
+           which is 11px -- so the 0.92em this rule used to say was
+           10.1px, not the 14.7px it read as, and -1.45em was -15.9px,
+           not -23.2px. Blink resolves the same control font to 13.3px,
+           so the rule did not even mean one thing. What it is being
+           aligned to is a fixed 40px UA list indent anyway. */
         li input[type="checkbox"] {
             appearance: none;
             -webkit-appearance: none;
-            width: 0.92em;
-            height: 0.92em;
+            /* Explicit rather than inherited from the UA sheet, so the
+               widths below mean the visible box, border included. */
+            box-sizing: border-box;
+            /* SF's cap height at 16px, so the box stands as tall as a
+               capital beside the text it marks. */
+            width: 11.5px;
+            height: 11.5px;
             /* The negative left margin hangs the box in the slot
                list-style: none just gave up, so an item's text starts
                in the same column a plain bullet item's does and a
                wrapped line aligns under the text, not under the box.
+               -25px puts the left edge at 40 - 25 = 15px, which is
+               where a *two-digit* ordered marker starts its first
+               glyph: "10. " measures 24.88px, so the numeral begins at
+               40 - 24.88 = 15.13px. One-digit items sit further in;
+               the wider marker is the one worth matching, because it
+               is the column the eye settles on in a long list.
                The right margin is short of the gap it looks like
-               because goldmark emits a literal space between the
-               input and the text; that space is roughly the missing
-               0.11em, and counting it is what puts the two kinds of
-               item in one text column instead of 1.8px apart. */
-            margin: 0 0.24em 0 -1.45em;
-            vertical-align: -0.09em;
+               because goldmark emits a literal space between the input
+               and the text, and that space measures 3.19px in flow (an
+               isolated space measures 4.19px -- the difference is real
+               and only shows up in a laid-out line). Counting it is
+               what lands the text back on exactly 40px:
+               40 - 25 + 11.5 + 10.3 + 3.19 = 39.99. */
+            margin: 0 10.3px 0 -25px;
+            /* One rule at any size: centre the box on the lowercase
+               x-band, so vertical-align = 4.16 - height/2. */
+            vertical-align: -1.6px;
             border: 2px solid var(--accent);
             background: transparent;
             /* Every box is disabled -- the preview is read-only, and
@@ -400,7 +423,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M3.5 8.5l3 3 6-6"/></svg>');
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 0.78em 0.78em;
+            background-size: 9.8px 9.8px;
         }
         dt {
             color: var(--accent);
