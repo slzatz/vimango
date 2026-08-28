@@ -116,14 +116,32 @@ func resolveAccent(configured, key, fallback string) string {
 // metadata, not part of the note) and left-aligned content, since
 // auto-centering inside a pane reads as a large wasted indent.
 func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, error) {
+	// Peel off a YAML frontmatter block, if the note opens with one, and
+	// render it as its own metadata card (frontmatter.go). Ahead of the
+	// image pass and of goldmark both: goldmark has no notion of
+	// frontmatter and would read the closing "---" as a setext heading
+	// underline, swallowing the whole block into an <h2>.
+	//
+	// Either half can decline -- no fenced block, or one this parser has
+	// no display for -- and then body is still the whole note and nothing
+	// downstream changes. A note that renders correctly today renders
+	// identically after this.
+	body := markdownContent
+	var frontmatterCard string
+	if fm, rest, ok := splitFrontmatter(markdownContent); ok {
+		if entries := parseFrontmatter(fm); entries != nil {
+			frontmatterCard, body = frontmatterHTML(entries), rest
+		}
+	}
+
 	// Pre-process markdown to handle Google Drive images
-	processedMarkdown, err := preprocessMarkdownImages(markdownContent)
+	processedMarkdown, err := preprocessMarkdownImages(body)
 	if err != nil {
 		return "", fmt.Errorf("failed to preprocess markdown images: %v", err)
 	}
 
 	// Convert markdown to HTML using goldmark
-	htmlContent := convertMarkdownToHTML(processedMarkdown)
+	htmlContent := frontmatterCard + convertMarkdownToHTML(processedMarkdown)
 
 	// Wrap in basic HTML template
 	htmlTemplate := `<!DOCTYPE html>
@@ -431,6 +449,94 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
         dd {
             margin: 0 0 8px 24px;
         }
+        /* YAML frontmatter, lifted out of the markdown stream and emitted
+           as a dl by frontmatter.go. A dl because that is what a block of
+           key/value pairs is -- which also means the keys need no color
+           rule of their own: dt above already hands them the preview
+           accent, the sheet's standing answer for the term half of a pair,
+           shared with li::marker and the task checkbox. So the accent this
+           block reads as is the one the user configured, and the light and
+           dark sheets differ by exactly one line (the tint, below).
+           Everything here is geometry.
+           A grid rather than the flow dl above: the values are the content
+           and want a straight left edge to be scanned down, which a dd
+           indented from a variable-width dt cannot give them. max-content
+           sizes the key column to the longest key, so it is as narrow as
+           the block allows rather than a guess.
+           minmax(0, 1fr) rather than 1fr on the value column: a grid
+           track's automatic minimum is its content's min-content width,
+           and an originSessionId is a 36-character token that cannot
+           break, so a plain 1fr would let one row push the grid wider than
+           the pane and raise a horizontal scrollbar. */
+        dl.frontmatter {
+            display: grid;
+            grid-template-columns: max-content minmax(0, 1fr);
+            column-gap: 12px;
+            row-gap: 2px;
+            /* The callouts' bleed cancel, same numbers and for the same
+               reason: 4px of negative margin against 4px of padding puts
+               the keys on the body's own left edge while the tint starts
+               outside the content column, so the first glyph is not
+               crushed against the edge of the color. Safe at every width
+               because both the standalone and the embedded body carry
+               20px of horizontal padding, which does not shrink with the
+               viewport. */
+            margin: 0 -4px 16px;
+            padding: 8px 4px;
+            border-radius: 4px;
+            background-color: var(--fm-bg);
+            /* The same neutral wash as an unlabeled callout: this block
+               is a surface with no category, and the sheet should not
+               grow a second tone for the same idea. */
+            --fm-bg: rgba(27, 31, 36, 0.06);
+            /* Metadata is scanned, not read. body's 1.6 is leading for
+               800px prose lines and buys a two-word value nothing, and
+               the step below body size keeps the card subordinate to the
+               note it labels -- it is about the note, not the note. */
+            line-height: 1.4;
+            font-size: 0.9em;
+        }
+        dl.frontmatter dd {
+            /* Overrides the dd above outright. The grid owns both the
+               column and the gap now, so that rule's 24px indent would
+               indent an already-placed track and its 8px would double the
+               row-gap.
+               overflow-wrap is what makes minmax(0, 1fr) usable rather
+               than merely safe: the track may now be narrower than the
+               longest token, and without this the token would simply
+               overflow it. */
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+        /* Nesting, on the key column only -- the values stay in one
+           column, which is the whole reason for the grid. 16px is the
+           indent the source itself reads as: two spaces of the monospace
+           the note is edited in, near enough. */
+        dl.frontmatter dt.fm-l1 {
+            padding-left: 16px;
+        }
+        dl.frontmatter dt.fm-l2 {
+            padding-left: 32px;
+        }
+        /* Wiki-style cross references, [[note-name]], which the notes that
+           carry frontmatter also use to point at each other. The brackets
+           are gone by here -- the parser keeps the target and drops the
+           punctuation (wikilink.go), so what is left has to carry the
+           whole signal on its own.
+           The accent, because a reference to another note is the same
+           kind of thing as the accent's other jobs and the sheet should
+           not grow a fourth blue. The dotted rule is the honest part:
+           this does not navigate, and a solid underline in something very
+           near link blue would promise that it does. Dotted against the
+           UA's solid is the one difference a reader can see without
+           clicking to find out. */
+        .wikilink {
+            color: var(--accent);
+            text-decoration: underline dotted;
+            /* Clear of the descenders. The default sits the rule on the
+               baseline, and these names are full of g, y and p. */
+            text-underline-offset: 2px;
+        }
         img {
             max-width: 100%;
             height: auto;
@@ -539,6 +645,15 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
                tone in the dark sheet, not two. */
             blockquote.callout-plain {
                 --callout-bg: rgba(255, 255, 255, 0.09);
+            }
+            /* The one line the frontmatter card owes the dark sheet: it
+               shares callout-plain's neutral surface, so it shares the
+               reason that value goes up here too -- a dark ground
+               swallows a 6% wash. The keys ride the configured accent and
+               the geometry is theme-independent, so there is nothing
+               else. */
+            dl.frontmatter {
+                --fm-bg: rgba(255, 255, 255, 0.09);
             }
             .img-placeholder {
                 border-color: #555;
@@ -747,6 +862,9 @@ func convertMarkdownToHTML(markdown string) string {
 			extension.Linkify,        // Auto-link URLs
 			extension.TaskList,       // Task lists
 			extension.DefinitionList, // Definition lists (PHP Markdown Extra syntax)
+			// [[note-name]] cross references (wikilink.go). Styled, not
+			// navigable -- see the note there on why it is a span.
+			wikiLinkExtension{},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs
