@@ -17,6 +17,7 @@ var validFlags = map[string]bool{
 	"--open":        true, // takes a value: --open <id>; requires --editor
 	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
 	"--gdrive-auth": true, // sign in to Google Drive (create/refresh token.json) and exit
+	"--wiki-links":  true, // with --render-html: emit [[refs]] as clickable anchors
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
@@ -117,6 +118,12 @@ OPTIONS:
         document on stdout and exit. Headless (no terminal UI); intended
         for host applications embedding a preview pane. Google Drive
         images are inlined as data URIs when Drive is configured.
+
+    --wiki-links
+        With --render-html, emit [[note-name]] cross references as
+        anchors with a vimango://note/ href instead of inert spans. Only
+        for a host that intercepts that scheme: without one the links are
+        dead, so this is off unless asked for.
 
     --gdrive-auth
         Sign in to Google Drive and exit: runs the OAuth flow (prints a

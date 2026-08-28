@@ -9,6 +9,19 @@ import (
 	"github.com/slzatz/vimango/auth"
 )
 
+// DetermineWikiLinks reports whether --wiki-links was given: the caller
+// declaring itself a host that will intercept vimango://note/ clicks. Off
+// by default, because a link nothing handles is worse than no link at all
+// (wikilink.go).
+func DetermineWikiLinks(args []string) bool {
+	for _, arg := range args {
+		if arg == "--wiki-links" {
+			return true
+		}
+	}
+	return false
+}
+
 // DetermineRenderHTML returns the note id passed to --render-html, or -1 if
 // the flag is absent. ValidateArgs has already guaranteed the value is
 // present and numeric.
@@ -29,7 +42,7 @@ func DetermineRenderHTML(args []string) int {
 // app's preview pane). Google Drive images resolve to inline data URIs via
 // the same auth token and image cache the TUI uses; if Drive is not
 // configured the image markdown is passed through untouched.
-func RunRenderHTML(id int) int {
+func RunRenderHTML(id int, linkNotes bool) int {
 	// The HEIC decoder leaves a plugin subprocess running that outlives
 	// this process unless it is killed. Deferred rather than placed at
 	// the end: every return below is an early one, and main() calls
@@ -68,7 +81,7 @@ func RunRenderHTML(id int) int {
 	// Embedded-pane style (standalone=false): no <h1> — the host app
 	// shows the title in its own native header — and left-aligned
 	// content instead of a centered reading column.
-	html, err := RenderNoteAsHTML(title, note.String, false)
+	html, err := RenderNoteAsHTML(title, note.String, false, linkNotes)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)
 		return 1

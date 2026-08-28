@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"net/url"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -20,16 +21,23 @@ import (
 // no such syntax, so they used to survive to the screen as literal
 // brackets -- readable, but noise rather than a reference.
 //
-// A span, deliberately, not an anchor. Nothing here navigates: resolving
-// a target means asking the host which note has that title, and the two
-// programs that render this HTML disagree about whether there is a host
-// at all (the TUI's own webview window has none). An <a> would be a click
-// target that does nothing in one of them, and a custom href scheme
-// handed to an unhandled navigation is worse than nothing. So the markup
-// says what is true today -- this is a named reference -- and the styling
-// says it too, with a dotted rule rather than a link's solid one.
-// data-target is the seam if that ever changes: it is also the only place
-// the target survives when a label renames it.
+// A span by default, not an anchor, because the two programs that render
+// this HTML disagree about whether there is a host at all: the TUI's own
+// webview window has none, and an <a> there would be a click target that
+// does nothing, or worse, a custom scheme handed to an unhandled
+// navigation. So the default markup says what is true -- this is a named
+// reference -- and the dotted rule rather than a link's solid one says it
+// in CSS too.
+//
+// A caller that *is* a host says so, and only then does the reference
+// become an anchor (anchors below). That is not a preference: it is what
+// keeps the promise structural rather than remembered. The TUI cannot
+// emit a link it has no way to handle, and the hybrid app's read-only
+// peek window renders without it, so a peeked note's own references stay
+// inert and one click can never become a pile of windows.
+//
+// The target rides in data-target either way -- it is the only place the
+// target survives when a [[target|label]] renames it.
 //
 // An inline parser rather than a regex over the source, which is the
 // whole reason this is worth writing: goldmark never runs inline parsers
@@ -101,33 +109,55 @@ func (wikiLinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Contex
 	return &wikiLinkNode{Target: target, Label: label}
 }
 
-type wikiLinkRenderer struct{}
+// wikiLinkScheme is the URL scheme a host intercepts. Deliberately not a
+// scheme anything else could claim, and deliberately hierarchical, so the
+// target is a path component the receiver can percent-decode with the
+// same URL parser it would use for any other link.
+const wikiLinkScheme = "vimango://note/"
+
+type wikiLinkRenderer struct{ anchors bool }
 
 func (r wikiLinkRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(kindWikiLink, r.render)
 }
 
-func (wikiLinkRenderer) render(w util.BufWriter, source []byte, node ast.Node,
+func (r wikiLinkRenderer) render(w util.BufWriter, source []byte, node ast.Node,
 	entering bool) (ast.WalkStatus, error) {
 	if !entering {
 		return ast.WalkContinue, nil
 	}
 	n := node.(*wikiLinkNode)
-	_, _ = w.WriteString(`<span class="wikilink" data-target="`)
+	if r.anchors {
+		// PathEscape, not EscapeHTML, for the href: a title may hold a
+		// slash, a question mark or a hash, and each of those means
+		// something to a URL parser before it ever reaches the host.
+		// The result is then HTML-escaped like any attribute value.
+		_, _ = w.WriteString(`<a class="wikilink" href="`)
+		_, _ = w.Write(util.EscapeHTML([]byte(wikiLinkScheme + url.PathEscape(string(n.Target)))))
+		_, _ = w.WriteString(`" data-target="`)
+	} else {
+		_, _ = w.WriteString(`<span class="wikilink" data-target="`)
+	}
 	_, _ = w.Write(util.EscapeHTML(n.Target))
 	_, _ = w.WriteString(`">`)
 	_, _ = w.Write(util.EscapeHTML(n.Label))
-	_, _ = w.WriteString(`</span>`)
+	if r.anchors {
+		_, _ = w.WriteString(`</a>`)
+	} else {
+		_, _ = w.WriteString(`</span>`)
+	}
 	// The node has no children -- the label is not re-parsed as markdown,
 	// because a reference is a name and not a place to put emphasis.
 	return ast.WalkSkipChildren, nil
 }
 
 // wikiLinkExtension bundles the two halves so the call site registers one
-// thing, the way the goldmark extensions beside it do.
-type wikiLinkExtension struct{}
+// thing, the way the goldmark extensions beside it do. anchors is the
+// caller saying "I am a host and I will handle a click"; see the note at
+// the top of this file for why that is the caller's to say.
+type wikiLinkExtension struct{ anchors bool }
 
-func (wikiLinkExtension) Extend(m goldmark.Markdown) {
+func (e wikiLinkExtension) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(parser.WithInlineParsers(
 		// Between the code span parser (100) and the link parser (200).
 		// Ahead of links so the brackets are never claimed as a link
@@ -136,6 +166,6 @@ func (wikiLinkExtension) Extend(m goldmark.Markdown) {
 		util.Prioritized(wikiLinkParser{}, 150),
 	))
 	m.Renderer().AddOptions(renderer.WithNodeRenderers(
-		util.Prioritized(wikiLinkRenderer{}, 500),
+		util.Prioritized(wikiLinkRenderer{anchors: e.anchors}, 500),
 	))
 }

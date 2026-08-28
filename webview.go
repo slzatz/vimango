@@ -115,7 +115,7 @@ func resolveAccent(configured, key, fallback string) string {
 // an embedded pane: no <h1> (the host shows the title natively — it is
 // metadata, not part of the note) and left-aligned content, since
 // auto-centering inside a pane reads as a large wasted indent.
-func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, error) {
+func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool) (string, error) {
 	// Peel off a YAML frontmatter block, if the note opens with one, and
 	// render it as its own metadata card (frontmatter.go). Ahead of the
 	// image pass and of goldmark both: goldmark has no notion of
@@ -141,7 +141,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone bool) (string, e
 	}
 
 	// Convert markdown to HTML using goldmark
-	htmlContent := frontmatterCard + convertMarkdownToHTML(processedMarkdown)
+	htmlContent := frontmatterCard + convertMarkdownToHTML(processedMarkdown, linkNotes)
 
 	// Wrap in basic HTML template
 	htmlTemplate := `<!DOCTYPE html>
@@ -852,7 +852,7 @@ func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
 }
 
 // convertMarkdownToHTML converts markdown to HTML using goldmark
-func convertMarkdownToHTML(markdown string) string {
+func convertMarkdownToHTML(markdown string, linkNotes bool) string {
 	// Configure goldmark with common extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
@@ -862,9 +862,10 @@ func convertMarkdownToHTML(markdown string) string {
 			extension.Linkify,        // Auto-link URLs
 			extension.TaskList,       // Task lists
 			extension.DefinitionList, // Definition lists (PHP Markdown Extra syntax)
-			// [[note-name]] cross references (wikilink.go). Styled, not
-			// navigable -- see the note there on why it is a span.
-			wikiLinkExtension{},
+			// [[note-name]] cross references (wikilink.go). Anchors only
+			// when the caller is a host that will intercept the click --
+			// see the note there on why that is the caller's to say.
+			wikiLinkExtension{anchors: linkNotes},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs

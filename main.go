@@ -32,7 +32,7 @@ func main() {
 	// --render-html <id> is headless: print the note as HTML and exit,
 	// before any terminal probing / vim / raw-mode setup.
 	if id := DetermineRenderHTML(os.Args); id != -1 {
-		os.Exit(RunRenderHTML(id))
+		os.Exit(RunRenderHTML(id, DetermineWikiLinks(os.Args)))
 	}
 
 	// --gdrive-auth: sign in to Google Drive (create/refresh token.json)

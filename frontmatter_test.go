@@ -190,7 +190,7 @@ func TestFrontmatterHTMLEscapes(t *testing.T) {
 
 // End to end, through the function the three render paths actually call.
 func TestRenderNoteAsHTMLFrontmatter(t *testing.T) {
-	out, err := RenderNoteAsHTML("t", "---\nname: a\nmetadata:\n  type: user\n---\n\nBody text.\n", false)
+	out, err := RenderNoteAsHTML("t", "---\nname: a\nmetadata:\n  type: user\n---\n\nBody text.\n", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
