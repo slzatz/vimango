@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	// "unicode/utf8" // Not strictly needed
+	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth" // Import the key library
 )
@@ -637,4 +637,65 @@ func WordWrap(text string, limit int, hangingIndentOffset int) string {
 	} // End of loop over original lines
 
 	return finalResult.String()
+}
+
+// wrapSegment is one screen line produced by wrapping a buffer row. start and
+// end are byte offsets into the row (end exclusive) and always fall on rune
+// boundaries.
+type wrapSegment struct {
+	start int
+	end   int
+}
+
+// wrapRow breaks row into screen lines no wider than width *display columns*,
+// breaking after the last space that fits when there is one. Measuring in
+// display columns rather than bytes is what keeps multi-byte content — box
+// drawing, arrows, accented text — from wrapping several times too often and
+// from being sliced in the middle of a rune.
+//
+// A row that fits returns a single segment; an empty row returns a single
+// empty segment, so the result is never empty.
+func wrapRow(row string, width int) []wrapSegment {
+	if width < 1 {
+		width = 1
+	}
+
+	var segs []wrapSegment
+	start := 0
+	for start < len(row) {
+		w := 0
+		end := -1       // byte offset where this segment must stop, -1 = rest fits
+		lastSpace := -1 // byte offset just past the last space that fits
+		for i, r := range row[start:] {
+			rw := runewidth.RuneWidth(r)
+			if w+rw > width {
+				end = start + i
+				break
+			}
+			w += rw
+			if r == ' ' {
+				lastSpace = start + i + utf8.RuneLen(r)
+			}
+		}
+
+		if end == -1 { // remainder of the row fits on this line
+			segs = append(segs, wrapSegment{start, len(row)})
+			return segs
+		}
+
+		if lastSpace > start {
+			end = lastSpace
+		}
+		if end <= start { // a single rune wider than the whole line
+			_, size := utf8.DecodeRuneInString(row[start:])
+			end = start + size
+		}
+		segs = append(segs, wrapSegment{start, end})
+		start = end
+	}
+
+	if len(segs) == 0 {
+		segs = append(segs, wrapSegment{0, 0})
+	}
+	return segs
 }

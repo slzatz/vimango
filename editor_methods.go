@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	//	"time"
-	"unicode/utf8"
-
+	"github.com/mattn/go-runewidth"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -93,33 +92,49 @@ func (e *Editor) bufferToString() string {
 	return strings.Join(e.ss, "\n")
 }
 
-func (e *Editor) getScreenXFromRowColWW(r, c int) int {
+// wrapWidth is the number of display columns available to wrapped buffer text.
+func (e *Editor) wrapWidth() int {
+	return e.screencols - e.left_margin_offset
+}
+
+// wrapRowText returns buffer row r with tabs expanded and byte offset c
+// adjusted to match the expansion, ready to hand to wrapRow. The four-character
+// "$$$$" stand-in keeps byte offsets and display width in step with the four
+// spaces the drawing code substitutes.
+func (e *Editor) wrapRowText(r, c int) (string, int) {
 	row := e.ss[r]
-	row = strings.ReplaceAll(row, "\t", "$$$$")
-	tabCount := strings.Count(e.ss[r][:c], "\t")
-	c = c + 3*tabCount
-	width := e.screencols - e.left_margin_offset
-	if width >= len(row) {
-		return c
+	if c > len(row) {
+		c = len(row)
 	}
-	start := 0
-	end := 0
-	for {
-		if width >= len(row[start:]) {
-			break
-		}
-		pos := strings.LastIndex(row[start:start+width], " ")
-		if pos == -1 {
-			end = start + width - 1
-		} else {
-			end = start + pos
-		}
-		if end >= c {
-			break
-		}
-		start = end + 1
+	if c < 0 {
+		c = 0
 	}
-	return c - start
+	if tabCount := strings.Count(row[:c], "\t"); tabCount > 0 {
+		c += 3 * tabCount
+	}
+	return strings.ReplaceAll(row, "\t", "$$$$"), c
+}
+
+// wrapSegmentAt returns the segment holding byte offset c, or the last segment
+// when c is past the end of the row (the cursor may sit there in INSERT mode).
+func wrapSegmentAt(segs []wrapSegment, c int) wrapSegment {
+	for _, seg := range segs {
+		if c < seg.end {
+			return seg
+		}
+	}
+	return segs[len(segs)-1]
+}
+
+// getScreenXFromRowColWW returns the screen column (0-based, in display
+// columns) of byte offset c within buffer row r.
+func (e *Editor) getScreenXFromRowColWW(r, c int) int {
+	row, c := e.wrapRowText(r, c)
+	seg := wrapSegmentAt(wrapRow(row, e.wrapWidth()), c)
+	if c > seg.end {
+		c = seg.end
+	}
+	return runewidth.StringWidth(row[seg.start:c])
 }
 
 func (e *Editor) getScreenYFromRowColWW(r, c int) int {
@@ -133,66 +148,23 @@ func (e *Editor) getScreenYFromRowColWW(r, c int) int {
 	return screenLine
 }
 
+// getLinesInRowWW returns how many screen lines buffer row r occupies.
 func (e *Editor) getLinesInRowWW(r int) int {
-	row := e.ss[r]
-	row = strings.ReplaceAll(row, "\t", "$$$$")
-	width := e.screencols - e.left_margin_offset
-	if width >= len(row) {
-		return 1
-	}
-	lines := 0
-	start := 0
-	end := 0
-	for {
-
-		if width >= len(row[start:]) {
-			lines++
-			break
-		}
-		pos := strings.LastIndex(row[start:start+width], " ")
-		if pos == -1 {
-			end = start + width - 1
-		} else {
-			end = start + pos
-		}
-		lines++
-		start = end + 1
-	}
-	return lines
+	row, _ := e.wrapRowText(r, 0)
+	return len(wrapRow(row, e.wrapWidth()))
 }
 
+// getLineInRowWW returns which screen line of buffer row r (1-based) contains
+// byte offset c.
 func (e *Editor) getLineInRowWW(r, c int) int {
-	row := e.ss[r]
-	tabCount := strings.Count(row[:c], "\t")
-	if tabCount > 0 {
-		row = strings.ReplaceAll(row, "\t", "$$$$")
-		c += 3 * tabCount
-	}
-	width := e.screencols - e.left_margin_offset
-	if width >= len(row) {
-		return 1
-	}
-	lines := 0
-	start := 0
-	end := 0
-	for {
-		if width >= len(row[start:]) {
-			lines++
-			break
+	row, c := e.wrapRowText(r, c)
+	segs := wrapRow(row, e.wrapWidth())
+	for i, seg := range segs {
+		if c < seg.end {
+			return i + 1
 		}
-		pos := strings.LastIndex(row[start:start+width], " ")
-		if pos == -1 {
-			end = start + width - 1
-		} else {
-			end = start + pos
-		}
-		lines++
-		if end >= c { //+3
-			break
-		}
-		start = end + 1
 	}
-	return lines
+	return len(segs)
 }
 
 func (e *Editor) drawText() {
@@ -342,44 +314,18 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 	pab.WriteString(RESET)
 }
 
+// getLineCharCountWW returns the number of bytes of buffer row r that land on
+// screen line `line` (1-based).
 func (e *Editor) getLineCharCountWW(r, line int) int {
-	row := e.ss[r]
-	row = strings.ReplaceAll(row, "\t", "$$$$")
-
-	width := e.screencols - e.left_margin_offset
-
-	if width >= len(row) {
-		return len(row)
+	row, _ := e.wrapRowText(r, 0)
+	segs := wrapRow(row, e.wrapWidth())
+	if line < 1 {
+		line = 1
 	}
-
-	lines := 0
-	pos := 0
-	prev_pos := 0
-
-	for {
-
-		if width >= len(row[prev_pos:]) {
-			return len(row[prev_pos:])
-		}
-
-		pos = strings.LastIndex(row[prev_pos:pos+width], " ")
-
-		if pos == -1 {
-			pos = prev_pos + width - 1
-		} else {
-			pos = pos + prev_pos
-		}
-
-		lines++
-
-		if lines == line {
-			break
-		}
-
-		prev_pos = pos + 1
+	if line > len(segs) {
+		line = len(segs)
 	}
-
-	return pos - prev_pos + 1
+	return segs[line-1].end - segs[line-1].start
 }
 
 func (e *Editor) drawPlainRows(pab *strings.Builder) {
@@ -518,8 +464,8 @@ func (e *Editor) drawHighlights(pab *strings.Builder) {
 		if p.start < 0 || p.end > len(row) {
 			continue // skip if out of bounds
 		}
-		chars := "\x1b[48;5;31m" + string(row[p.start:p.end]) + "\x1b[0m"
-		start := utf8.RuneCountInString(row[:p.start])
+		chars := "\x1b[48;5;31m" + row[p.start:p.end] + "\x1b[0m"
+		start := p.start
 		y := e.getScreenYFromRowColWW(p.rowNum, start) + e.top_margin - e.lineOffset          // - 1
 		x := e.getScreenXFromRowColWW(p.rowNum, start) + e.left_margin + e.left_margin_offset // - 1
 		if y >= e.top_margin && y <= e.screenlines {
@@ -622,52 +568,38 @@ func (e *Editor) generateWWStringFromBuffer() string {
 
 	var ab strings.Builder
 	y := 0
-	filerow := 0
-	width := e.screencols - e.left_margin_offset
+	maxLines := e.screenlines + e.lineOffset
+	width := e.wrapWidth()
 
-	for {
-		if filerow == numRows || y == e.screenlines+e.lineOffset {
-			return ab.String()[:ab.Len()-1] // delete last \n
-		}
-
+	for filerow := 0; filerow < numRows && y < maxLines; filerow++ {
 		row := strings.ReplaceAll(e.ss[filerow], "\t", "    ")
 
 		if len(row) == 0 {
 			ab.WriteString("\n")
-			filerow++
 			y++
 			continue
 		}
 
-		start := 0
-		end := 0
-		for {
-			// if remainder of line is less than screen width
-			if start+width > len(row)-1 {
-				//ab.WriteString(row[start:])
-				//ab.WriteString("\n")
-				fmt.Fprintf(&ab, "%s%s", row[start:], "\n")
+		segs := wrapRow(row, width)
+		for i, seg := range segs {
+			ab.WriteString(row[seg.start:seg.end])
+			if i == len(segs)-1 {
+				ab.WriteString("\n")
 				y++
-				filerow++
 				break
 			}
-
-			pos := strings.LastIndex(row[start:start+width], " ")
-			if pos == -1 {
-				end = start + width - 1
-			} else {
-				end = start + pos
-			}
-
-			ab.WriteString(row[start : end+1])
-			if y == e.screenlines+e.lineOffset-1 {
+			if y == maxLines-1 {
 				return ab.String()
 			}
 			ab.WriteString("\t")
 			y++
-			start = end + 1
 		}
 	}
+
+	if ab.Len() == 0 {
+		return ""
+	}
+	return ab.String()[:ab.Len()-1] // delete last \n
 }
 
 func (e *Editor) drawStatusBar() {
