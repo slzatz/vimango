@@ -103,16 +103,21 @@ func (e *Editor) wrapWidth() int {
 // spaces the drawing code substitutes.
 func (e *Editor) wrapRowText(r, c int) (string, int) {
 	row := e.ss[r]
-	if c > len(row) {
-		c = len(row)
-	}
-	if c < 0 {
-		c = 0
-	}
-	if tabCount := strings.Count(row[:c], "\t"); tabCount > 0 {
-		c += 3 * tabCount
-	}
-	return strings.ReplaceAll(row, "\t", "$$$$"), c
+	return strings.ReplaceAll(row, "\t", "$$$$"), expandedOffset(row, c)
+}
+
+// visualRowText returns buffer row r exactly as the drawing code puts it on
+// screen — tabs widened to the four spaces generateWWStringFromBuffer emits —
+// so a highlight drawn over it lines up with the text underneath.
+func (e *Editor) visualRowText(r int) string {
+	return strings.ReplaceAll(e.ss[r], "\t", strings.Repeat(" ", tabWidth))
+}
+
+// displayCol returns the display column of byte offset c in buffer row r,
+// measured from the start of the row.
+func (e *Editor) displayCol(r, c int) int {
+	row := e.ss[r]
+	return runewidth.StringWidth(e.visualRowText(r)[:expandedOffset(row, c)])
 }
 
 // wrapSegmentAt returns the segment holding byte offset c, or the last segment
@@ -213,8 +218,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 
 		for n := 0; n < (endRow - startRow + 1); n++ { //++n
 			rowNum := startRow + n
-			row := e.ss[rowNum]
-			row = strings.ReplaceAll(row, "\t", "    ")
+			row := e.visualRowText(rowNum)
 			pos := 0
 			for line := 1; line <= e.getLinesInRowWW(rowNum); line++ { //++line
 				if y < 0 {
@@ -235,7 +239,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 	}
 
 	if e.vmode == VISUAL {
-		startCol, endcol := e.highlight[0][1], e.highlight[1][1]
+		startCol, endCol := e.highlight[0][1], e.highlight[1][1]
 
 		// startRow always <= endRow and need to subtract 1 since counting starts at 1 not zero
 		startRow, endRow := e.highlight[0][0]-1, e.highlight[1][0]-1 //startRow always <= endRow
@@ -252,62 +256,59 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			} else {
 				fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, 1+e.left_margin+e.left_margin_offset)
 			}
-			row := e.ss[startRow+n]
-
-			// I do not know why this works!!
-			row = strings.ReplaceAll(row, "\t", " ")
+			raw := e.ss[startRow+n]
+			row := e.visualRowText(startRow + n)
 
 			if len(row) == 0 {
 				continue
 			}
-			if numrows == 1 {
-				// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
-				if len(row) == endcol {
-					pab.WriteString(row[startCol:endcol])
-				} else {
-					pab.WriteString(row[startCol : endcol+1])
-				}
-			} else if n == 0 {
-				pab.WriteString(row[startCol:])
-			} else if n < numrows-1 {
-				pab.WriteString(row)
-			} else {
-				if len(row) < endcol {
-					pab.WriteString(row)
-				} else {
-					pab.WriteString(row[:endcol])
-				}
+
+			// the columns vim reports are byte offsets and the selection takes
+			// in the character under the cursor, so the end of the last row has
+			// to step over a whole rune
+			lo, hi := 0, len(row)
+			if n == 0 {
+				lo = runeStart(row, expandedOffset(raw, startCol))
 			}
+			if n == numrows-1 {
+				// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
+				hi = inclusiveEnd(row, expandedOffset(raw, endCol))
+			}
+			if hi < lo {
+				hi = lo
+			}
+			pab.WriteString(row[lo:hi])
 		}
 	}
 
 	if e.vmode == VISUAL_BLOCK {
 
-		var left, right int
-		if e.highlight[1][1] > e.highlight[0][1] {
-			right, left = e.highlight[1][1], e.highlight[0][1]
-		} else {
-			left, right = e.highlight[1][1], e.highlight[0][1]
+		topRow, botRow := e.highlight[0][0]-1, e.highlight[1][0]-1
+
+		// vim reports each corner as a byte offset in its own row, but a block
+		// is a rectangle on screen: the edges only compare once both are
+		// display columns, and each row then needs its own byte range.
+		leftCol := e.displayCol(topRow, e.highlight[0][1])
+		rightCol := e.displayCol(botRow, e.highlight[1][1])
+		if rightCol < leftCol {
+			leftCol, rightCol = rightCol, leftCol
 		}
-		x := e.getScreenXFromRowColWW(e.highlight[0][0]-1, left) + e.left_margin + e.left_margin_offset + 1 //-1
-		y := e.getScreenYFromRowColWW(e.highlight[0][0]-1, left) + e.top_margin - e.lineOffset
-		//sess.showOrgMessage("highlight = %v, right = %v, left = %v, x = %v, y = %v", e.highlight, right, left, x, y)
+
+		y := e.getScreenYFromRowColWW(topRow, e.highlight[0][1]) + e.top_margin - e.lineOffset
 
 		pab.WriteString("\x1b[48;5;237m")
-		for n := 0; n < (e.highlight[1][0] - e.highlight[0][0] + 1); n++ {
+		for n := 0; n <= botRow-topRow; n++ {
+			row := e.visualRowText(topRow + n)
+			lo := byteAtDisplayCol(row, leftCol)
+			hi := byteAfterDisplayCol(row, rightCol)
+			if lo >= hi {
+				continue // row stops short of the block
+			}
+			// a wide rune straddling the left edge is drawn whole, so take the
+			// column from the slice rather than from leftCol
+			x := runewidth.StringWidth(row[:lo]) + e.left_margin + e.left_margin_offset + 1
 			fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, x)
-			row := e.ss[e.highlight[0][0]+n-1]
-			rowLen := len(row)
-
-			if rowLen == 0 || rowLen < left {
-				continue
-			}
-
-			if rowLen < right+1 {
-				pab.WriteString(row[left:rowLen])
-			} else {
-				pab.WriteString(row[left : right+1])
-			}
+			pab.WriteString(row[lo:hi])
 		}
 	}
 

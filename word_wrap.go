@@ -699,3 +699,77 @@ func wrapRow(row string, width int) []wrapSegment {
 	}
 	return segs
 }
+
+// tabWidth is the number of columns a tab occupies in the editor; the drawing
+// code substitutes four spaces and the width helpers a four-character
+// stand-in, so a tab never changes a row's length in bytes.
+const tabWidth = 4
+
+// expandedOffset maps byte offset c in row to its offset in the tab-expanded
+// row, clamping c to the row.
+func expandedOffset(row string, c int) int {
+	if c > len(row) {
+		c = len(row)
+	}
+	if c < 0 {
+		c = 0
+	}
+	return c + (tabWidth-1)*strings.Count(row[:c], "\t")
+}
+
+// runeStart backs c up to the first byte of the rune it lands inside, so a
+// column that arrives mid-rune cannot produce a torn slice.
+func runeStart(row string, c int) int {
+	if c >= len(row) {
+		return len(row)
+	}
+	if c < 0 {
+		return 0
+	}
+	for c > 0 && !utf8.RuneStart(row[c]) {
+		c--
+	}
+	return c
+}
+
+// inclusiveEnd returns the byte offset just past the rune covering c. A visual
+// selection includes the character under the cursor and vim reports that
+// cursor as a byte offset, so the end of the selection has to step over a
+// whole rune rather than a single byte.
+func inclusiveEnd(row string, c int) int {
+	if c >= len(row) {
+		return len(row)
+	}
+	c = runeStart(row, c)
+	_, size := utf8.DecodeRuneInString(row[c:])
+	return c + size
+}
+
+// byteAtDisplayCol returns the byte offset of the rune covering display column
+// col, or len(row) if the row ends before it. A wide rune straddling col
+// counts as covering it.
+func byteAtDisplayCol(row string, col int) int {
+	w := 0
+	for i, r := range row {
+		rw := runewidth.RuneWidth(r)
+		if w+rw > col {
+			return i
+		}
+		w += rw
+	}
+	return len(row)
+}
+
+// byteAfterDisplayCol returns the byte offset just past the last rune that
+// begins at or before display column col, so a wide rune straddling col is
+// included whole.
+func byteAfterDisplayCol(row string, col int) int {
+	w := 0
+	for i, r := range row {
+		if w > col {
+			return i
+		}
+		w += runewidth.RuneWidth(r)
+	}
+	return len(row)
+}
