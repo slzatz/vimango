@@ -199,134 +199,89 @@ func (e *Editor) drawText() {
 	e.drawHighlightedBraces() //has to come after drawing rows
 }
 
-func (e *Editor) drawVisual(pab *strings.Builder) {
-
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin+e.left_margin_offset)
-
-	if e.vmode == VISUAL_LINE {
-		startRow := e.highlight[0][0] - 1 // highlight line starts a 1
-		endRow := e.highlight[1][0] - 1   //ditto - done differently for visual and v_block
-
-		x := e.left_margin + e.left_margin_offset + 1
-		y := e.getScreenYFromRowColWW(startRow, 0) - e.lineOffset
-
-		if y >= 0 {
-			fmt.Fprintf(pab, "\x1b[%d;%dH\x1b[48;5;237m", y+e.top_margin, x) //244
-		} else {
-			fmt.Fprintf(pab, "\x1b[%d;%dH\x1b[48;5;237m", e.top_margin, x)
-		}
-
-		for n := 0; n < (endRow - startRow + 1); n++ { //++n
-			rowNum := startRow + n
-			row := e.visualRowText(rowNum)
-			pos := 0
-			for line := 1; line <= e.getLinesInRowWW(rowNum); line++ { //++line
-				if y < 0 {
-					y += 1
-					continue
-				}
-				if y == e.screenlines {
-					break //out for should be done (theoretically) - 1
-				}
-				line_char_count := e.getLineCharCountWW(rowNum, line)
-				//pab.WriteString(strings.ReplaceAll(e.ss[rowNum][pos:pos+line_char_count], "\t", "$$$$"))
-				pab.WriteString(row[pos : pos+line_char_count])
-				pab.WriteString(lf_ret)
-				y += 1
-				pos += line_char_count
+// highlightRowRange draws bytes [lo, hi) of row — already tab-expanded — in
+// reverse video, split across the screen lines the row wraps onto. y is the
+// screen line, 0-based within the pane, that the row's first wrapped line sits
+// on; the line the row after it starts on is returned. Lines scrolled off the
+// top or bottom are counted but not drawn.
+func (e *Editor) highlightRowRange(pab *strings.Builder, row string, lo, hi, y int) int {
+	for _, seg := range wrapRow(row, e.wrapWidth()) {
+		if y >= 0 && y < e.screenlines {
+			start, end := lo, hi
+			if start < seg.start {
+				start = seg.start
 			}
+			if end > seg.end {
+				end = seg.end
+			}
+			if start < end {
+				x := runewidth.StringWidth(row[seg.start:start]) + e.left_margin + e.left_margin_offset + 1
+				fmt.Fprintf(pab, "\x1b[%d;%dH", y+e.top_margin, x)
+				pab.WriteString(row[start:end])
+			}
+		}
+		y++
+	}
+	return y
+}
+
+func (e *Editor) drawVisual(pab *strings.Builder) {
+	if len(e.ss) == 0 {
+		return
+	}
+
+	// note the rows vim reports are 1-based
+	startRow, endRow := e.highlight[0][0]-1, e.highlight[1][0]-1
+	if startRow < 0 {
+		startRow = 0
+	}
+	if endRow > len(e.ss)-1 {
+		endRow = len(e.ss) - 1
+	}
+
+	// vim reports each VISUAL_BLOCK corner as a byte offset in its own row, but
+	// a block is a rectangle on screen: the edges only compare once both are
+	// display columns, and each row then needs its own byte range.
+	var leftCol, rightCol int
+	if e.vmode == VISUAL_BLOCK {
+		leftCol = e.displayCol(startRow, e.highlight[0][1])
+		rightCol = e.displayCol(endRow, e.highlight[1][1])
+		if rightCol < leftCol {
+			leftCol, rightCol = rightCol, leftCol
 		}
 	}
 
-	if e.vmode == VISUAL {
-		startCol, endCol := e.highlight[0][1], e.highlight[1][1]
+	y := e.getScreenYFromRowColWW(startRow, 0) - e.lineOffset
 
-		// startRow always <= endRow and need to subtract 1 since counting starts at 1 not zero
-		startRow, endRow := e.highlight[0][0]-1, e.highlight[1][0]-1 //startRow always <= endRow
-		numrows := endRow - startRow + 1
+	pab.WriteString("\x1b[48;5;237m")
+	for r := startRow; r <= endRow && y < e.screenlines; r++ {
+		row := e.visualRowText(r)
+		lo, hi := 0, len(row) // VISUAL_LINE takes the whole row
 
-		x := e.getScreenXFromRowColWW(startRow, startCol) + e.left_margin + e.left_margin_offset + 1
-		y := e.getScreenYFromRowColWW(startRow, startCol) + e.top_margin - e.lineOffset // - 1
-
-		pab.WriteString("\x1b[48;5;237m")
-		for n := 0; n < numrows; n++ {
-			// i think would check here to see if a row has multiple lines (ie wraps)
-			if n == 0 {
-				fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, x)
-			} else {
-				fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, 1+e.left_margin+e.left_margin_offset)
-			}
-			raw := e.ss[startRow+n]
-			row := e.visualRowText(startRow + n)
-
-			if len(row) == 0 {
-				continue
-			}
-
+		switch e.vmode {
+		case VISUAL:
 			// the columns vim reports are byte offsets and the selection takes
-			// in the character under the cursor, so the end of the last row has
-			// to step over a whole rune
-			lo, hi := 0, len(row)
-			if n == 0 {
-				lo = runeStart(row, expandedOffset(raw, startCol))
+			// in the character under the cursor, so the end has to step over a
+			// whole rune
+			if r == startRow {
+				lo = runeStart(row, expandedOffset(e.ss[r], e.highlight[0][1]))
 			}
-			if n == numrows-1 {
+			if r == endRow {
 				// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
-				hi = inclusiveEnd(row, expandedOffset(raw, endCol))
+				hi = inclusiveEnd(row, expandedOffset(e.ss[r], e.highlight[1][1]))
 			}
 			if hi < lo {
 				hi = lo
 			}
-			pab.WriteString(row[lo:hi])
+		case VISUAL_BLOCK:
+			// a block clips to each screen line the row occupies
+			lo = byteAtDisplayCol(row, leftCol)
+			hi = byteAfterDisplayCol(row, rightCol)
 		}
+
+		y = e.highlightRowRange(pab, row, lo, hi, y)
 	}
-
-	if e.vmode == VISUAL_BLOCK {
-
-		topRow, botRow := e.highlight[0][0]-1, e.highlight[1][0]-1
-
-		// vim reports each corner as a byte offset in its own row, but a block
-		// is a rectangle on screen: the edges only compare once both are
-		// display columns, and each row then needs its own byte range.
-		leftCol := e.displayCol(topRow, e.highlight[0][1])
-		rightCol := e.displayCol(botRow, e.highlight[1][1])
-		if rightCol < leftCol {
-			leftCol, rightCol = rightCol, leftCol
-		}
-
-		y := e.getScreenYFromRowColWW(topRow, e.highlight[0][1]) + e.top_margin - e.lineOffset
-
-		pab.WriteString("\x1b[48;5;237m")
-		for n := 0; n <= botRow-topRow; n++ {
-			row := e.visualRowText(topRow + n)
-			lo := byteAtDisplayCol(row, leftCol)
-			hi := byteAfterDisplayCol(row, rightCol)
-			if lo >= hi {
-				continue // row stops short of the block
-			}
-			// a wide rune straddling the left edge is drawn whole, so take the
-			// column from the slice rather than from leftCol
-			x := runewidth.StringWidth(row[:lo]) + e.left_margin + e.left_margin_offset + 1
-			fmt.Fprintf(pab, "\x1b[%d;%dH", y+n, x)
-			pab.WriteString(row[lo:hi])
-		}
-	}
-
 	pab.WriteString(RESET)
-}
-
-// getLineCharCountWW returns the number of bytes of buffer row r that land on
-// screen line `line` (1-based).
-func (e *Editor) getLineCharCountWW(r, line int) int {
-	row, _ := e.wrapRowText(r, 0)
-	segs := wrapRow(row, e.wrapWidth())
-	if line < 1 {
-		line = 1
-	}
-	if line > len(segs) {
-		line = len(segs)
-	}
-	return segs[line-1].end - segs[line-1].start
 }
 
 func (e *Editor) drawPlainRows(pab *strings.Builder) {

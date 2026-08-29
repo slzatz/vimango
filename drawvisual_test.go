@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // a highlighted span as drawVisual emits it: the cursor is parked at (row, col)
@@ -66,6 +68,19 @@ func drawVisualSpans(t *testing.T, rows []string, vmode Mode, highlight [2][2]in
 	t.Helper()
 	var sb strings.Builder
 	visualEditor(rows, vmode, highlight).drawVisual(&sb)
+	return parseSpans(t, sb.String())
+}
+
+// drawVisualSpansIn is drawVisualSpans in a pane narrow or short enough that
+// rows wrap and the selection can run off the top or bottom.
+func drawVisualSpansIn(t *testing.T, rows []string, vmode Mode, highlight [2][2]int, screencols, screenlines, lineOffset int) []span {
+	t.Helper()
+	e := visualEditor(rows, vmode, highlight)
+	e.screencols = screencols
+	e.screenlines = screenlines
+	e.lineOffset = lineOffset
+	var sb strings.Builder
+	e.drawVisual(&sb)
 	return parseSpans(t, sb.String())
 }
 
@@ -169,16 +184,12 @@ func TestDrawVisualBlockCornersInEitherOrder(t *testing.T) {
 }
 
 func TestDrawVisualLineCoversWholeRows(t *testing.T) {
-	rows := []string{"aé b", "xyz"}
+	rows := []string{"a\u00e9 b", "xyz"}
 	got := drawVisualSpans(t, rows, VISUAL_LINE, [2][2]int{{1, 0}, {2, 0}})
-	if len(got) != 1 {
-		t.Fatalf("got %d spans %v, want 1", len(got), got)
-	}
-	// VISUAL_LINE writes every row in one run separated by carriage returns
-	lines := strings.Split(got[0].text, "\r\n")
-	if len(lines) < 2 || lines[0] != "aé b" || !strings.HasPrefix(lines[1], "xyz") {
-		t.Errorf("got %q, want the two whole rows", got[0].text)
-	}
+	wantSpans(t, got, []span{
+		{1, 1, "a\u00e9 b"},
+		{2, 1, "xyz"},
+	})
 }
 
 // vim reports byte offsets that sit on rune boundaries, but nothing downstream
@@ -193,6 +204,115 @@ func TestDrawVisualNeverEmitsTornRunes(t *testing.T) {
 					for c1 := 0; c1 <= len(rows[r1-1]); c1++ {
 						// parseSpans fails the test on invalid UTF-8
 						drawVisualSpans(t, rows, vmode, [2][2]int{{r0, c0}, {r1, c1}})
+					}
+				}
+			}
+		}
+	}
+}
+
+// wrapped is 24 columns wide; in a 20-column pane wrapRow breaks it after the
+// space at index 19, giving "aaaa bbbb cccc dddd " and "eeee".
+const wrapped = "aaaa bbbb cccc dddd eeee"
+
+func TestDrawVisualSplitsAcrossWrappedLines(t *testing.T) {
+	got := drawVisualSpansIn(t, []string{wrapped}, VISUAL, [2][2]int{{1, 0}, {1, len(wrapped) - 1}}, 20, 40, 0)
+	wantSpans(t, got, []span{
+		{1, 1, "aaaa bbbb cccc dddd "},
+		{2, 1, "eeee"},
+	})
+}
+
+func TestDrawVisualPartialRangeOnWrappedRow(t *testing.T) {
+	// bytes 5..21 -> "bbbb cccc dddd ee", which straddles the wrap point
+	got := drawVisualSpansIn(t, []string{wrapped}, VISUAL, [2][2]int{{1, 5}, {1, 21}}, 20, 40, 0)
+	wantSpans(t, got, []span{
+		{1, 6, "bbbb cccc dddd "},
+		{2, 1, "ee"},
+	})
+}
+
+// the bug this rewrite was for: a row that wraps used to consume one screen
+// line, so every row after it in the selection was drawn too high.
+func TestDrawVisualRowAfterWrappedRowLandsOnRightLine(t *testing.T) {
+	rows := []string{wrapped, "second"}
+	got := drawVisualSpansIn(t, rows, VISUAL, [2][2]int{{1, 0}, {2, 2}}, 20, 40, 0)
+	wantSpans(t, got, []span{
+		{1, 1, "aaaa bbbb cccc dddd "},
+		{2, 1, "eeee"},
+		{3, 1, "sec"}, // line 3, not line 2
+	})
+}
+
+func TestDrawVisualLineOnWrappedRows(t *testing.T) {
+	rows := []string{wrapped, "second"}
+	got := drawVisualSpansIn(t, rows, VISUAL_LINE, [2][2]int{{1, 0}, {2, 0}}, 20, 40, 0)
+	wantSpans(t, got, []span{
+		{1, 1, "aaaa bbbb cccc dddd "},
+		{2, 1, "eeee"},
+		{3, 1, "second"},
+	})
+}
+
+func TestDrawVisualBlockClipsToEachWrappedLine(t *testing.T) {
+	rows := []string{wrapped, wrapped}
+	// columns 5..8 -> "bbbb" on the first screen line of each row
+	got := drawVisualSpansIn(t, rows, VISUAL_BLOCK, [2][2]int{{1, 5}, {2, 8}}, 20, 40, 0)
+	wantSpans(t, got, []span{
+		{1, 6, "bbbb"},
+		{3, 6, "bbbb"},
+	})
+}
+
+func TestDrawVisualClipsAboveThePane(t *testing.T) {
+	rows := []string{wrapped, "second"}
+	// scrolled down one screen line: the row's first wrapped line is off the top
+	got := drawVisualSpansIn(t, rows, VISUAL_LINE, [2][2]int{{1, 0}, {2, 0}}, 20, 40, 1)
+	wantSpans(t, got, []span{
+		{1, 1, "eeee"},
+		{2, 1, "second"},
+	})
+}
+
+func TestDrawVisualClipsBelowThePane(t *testing.T) {
+	rows := []string{wrapped, "second"}
+	got := drawVisualSpansIn(t, rows, VISUAL_LINE, [2][2]int{{1, 0}, {2, 0}}, 20, 2, 0)
+	wantSpans(t, got, []span{
+		{1, 1, "aaaa bbbb cccc dddd "},
+		{2, 1, "eeee"},
+	})
+}
+
+// nothing may be drawn wider than the pane or outside it — writing an unwrapped
+// row into a narrow pane is what bled the highlight across the split.
+func TestDrawVisualStaysInsideThePane(t *testing.T) {
+	rows := []string{
+		"This is a long markdown paragraph line of the kind that fills a note and wraps several times.",
+		"αβγ a much longer line with multi-byte runes in it that also has to wrap somewhere δεζ",
+		"short",
+		"",
+		"another reasonably long line that will wrap in a narrow pane without any trouble at all",
+	}
+	modes := []Mode{VISUAL, VISUAL_BLOCK, VISUAL_LINE}
+	for _, width := range []int{12, 20, 33, 60} {
+		for _, lines := range []int{3, 10, 40} {
+			for _, offset := range []int{0, 1, 4} {
+				for _, vmode := range modes {
+					for r0 := 1; r0 <= len(rows); r0++ {
+						for r1 := r0; r1 <= len(rows); r1++ {
+							h := [2][2]int{{r0, 0}, {r1, len(rows[r1-1])}}
+							for _, sp := range drawVisualSpansIn(t, rows, vmode, h, width, lines, offset) {
+								if w := runewidth.StringWidth(sp.text); w > width {
+									t.Fatalf("width %d mode %v: span of %d columns: %q", width, vmode, w, sp.text)
+								}
+								if sp.row < 1 || sp.row > lines {
+									t.Fatalf("width %d lines %d mode %v: span on screen line %d", width, lines, vmode, sp.row)
+								}
+								if sp.col < 1 || sp.col+runewidth.StringWidth(sp.text)-1 > width {
+									t.Fatalf("width %d mode %v: span at col %d is %d wide", width, vmode, sp.col, runewidth.StringWidth(sp.text))
+								}
+							}
+						}
 					}
 				}
 			}
