@@ -34,16 +34,21 @@ import (
 
 var calloutMarker = regexp.MustCompile(`^\[!([A-Za-z]*)\]\s*$`)
 
-// calloutKinds is the closed set GitHub recognizes. Anything else --
-// "[!BOGUS]", or a quote that merely opens with a bracket -- is left
-// alone and renders as the plain blockquote it is, which is also what
-// GitHub does.
+// calloutKinds is GitHub's alert kinds minus "caution", plus
+// "question", which is ours. GitHub has no [!QUESTION]; these notes ask
+// questions and never caution, so the trade is the one worth making.
+// Anything else -- "[!BOGUS]", a retired "[!CAUTION]", or a quote that
+// merely opens with a bracket -- is left alone and renders as the plain
+// blockquote it is, marker line and all, which is also what GitHub does.
+// That is exactly the cost of the addition, and the same one
+// calloutPlainKind below already pays: a marker GitHub does not know
+// prints literally there.
 var calloutKinds = map[string]bool{
 	"note":      true,
 	"tip":       true,
 	"important": true,
 	"warning":   true,
-	"caution":   true,
+	"question":  true,
 }
 
 // calloutPlainKind is ours, not GitHub's: "[!]" is a callout with no

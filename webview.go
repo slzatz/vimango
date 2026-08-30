@@ -350,10 +350,10 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
             --callout-bg: rgba(154, 103, 0, 0.10);
             --callout-label: "Warning";
         }
-        blockquote.callout-caution {
+        blockquote.callout-question {
             --callout: #cf222e;
             --callout-bg: rgba(207, 34, 46, 0.08);
-            --callout-label: "Caution";
+            --callout-label: "Question";
         }
         /* "[!]" -- ours, not GitHub's: a tint and nothing else, for
            pointing at a passage without naming a category. The label
@@ -635,7 +635,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
                 --callout: #d29922;
                 --callout-bg: rgba(210, 153, 34, 0.12);
             }
-            blockquote.callout-caution {
+            blockquote.callout-question {
                 --callout: #f85149;
                 --callout-bg: rgba(248, 81, 73, 0.12);
             }
