@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/slzatz/vimango/terminal"
+	"github.com/slzatz/vimango/vim"
 )
 
 type Location int
@@ -363,21 +366,49 @@ type Container struct {
 	count    int
 }
 
-// type outlineKey int
+// Keys that produce no character arrive from the key reader as synthetic codes
+// well above any rune a terminal will send. These are aliases for the reader's
+// own constants rather than a second hand-maintained copy: the two blocks used
+// to be kept in step by hand and had already drifted -- terminal.KeyF1 and
+// KeyF2 landed on codes main had named NOP and SHIFT_TAB, and F3 through Ins
+// had no name here at all.
+//
+// isSyntheticKey is what keeps that safe. Only the codes in termcodes mean
+// anything to vim; every other synthetic code has to be dropped rather than
+// forwarded, because string(rune(c)) on one of them is a Greek letter, not a
+// keystroke. A key added to the terminal package is therefore inert here by
+// default instead of inserting mojibake into a note.
 const (
-	BACKSPACE  = iota + 127
-	ARROW_LEFT = iota + 999 //would have to be < 127 to be chars
-	ARROW_RIGHT
-	ARROW_UP
-	ARROW_DOWN
-	DEL_KEY
-	HOME_KEY
-	END_KEY
-	PAGE_UP
-	PAGE_DOWN
-	NOP
-	SHIFT_TAB
+	BACKSPACE = 127 // a real byte, unlike the codes below
+
+	ARROW_LEFT  = terminal.KeyArrowLeft
+	ARROW_RIGHT = terminal.KeyArrowRight
+	ARROW_UP    = terminal.KeyArrowUp
+	ARROW_DOWN  = terminal.KeyArrowDown
+	DEL_KEY     = terminal.KeyDelete
+	HOME_KEY    = terminal.KeyHome
+	END_KEY     = terminal.KeyEnd
+	PAGE_UP     = terminal.KeyPageUp
+	PAGE_DOWN   = terminal.KeyPageDown
 )
+
+// isSyntheticKey reports whether c is one of those reader codes rather than a
+// character the user actually typed.
+func isSyntheticKey(c int) bool { return c >= terminal.KeyArrowLeft }
+
+// sendToVim forwards one key. termcodes names the synthetic keys vim
+// understands; any other synthetic code is dropped, since vim would insert its
+// code point as text.
+func sendToVim(c int) {
+	if z, found := termcodes[c]; found {
+		vim.SendKey(z)
+		return
+	}
+	if isSyntheticKey(c) {
+		return
+	}
+	vim.SendInput(string(rune(c)))
+}
 
 func (m Mode) String() string {
 	return [...]string{

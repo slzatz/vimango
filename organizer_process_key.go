@@ -50,14 +50,6 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 	return
 }
 
-func sendToVim(c int) {
-	if z, found := termcodes[c]; found {
-		vim.SendKey(z)
-	} else {
-		vim.SendInput(string(rune(c)))
-	}
-}
-
 func (o *Organizer) updateRowStatus() {
 	row := &o.rows[o.fr]
 	tick := o.vbuf.GetLastChangedTick()
@@ -346,7 +338,11 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 
 	default:
-		o.command_line += string(rune(c))
+		// the organizer's command line is its own buffer, not a mirror of
+		// vim's, so a reader code with no meaning here is simply dropped
+		if !isSyntheticKey(c) {
+			o.command_line += string(rune(c))
+		}
 	} // end switch c in COMMAND_LINE
 
 	o.tabCompletion.index = 0

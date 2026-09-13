@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -21,6 +22,9 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	e.screenlines = 30
 	e.normalCmds = a.setEditorNormalCmds(e)
 	e.exCmds = a.setEditorExCmds(e)
+	// vim is a process-wide singleton, so a previous test may have left it in
+	// INSERT or VISUAL; start every editor from NORMAL
+	vim.SendKey("<esc>")
 	e.vbuf = vim.NewBuffer(0)
 	vim.SetCurrentBuffer(e.vbuf)
 	e.vbuf.SetLines(0, -1, lines)
@@ -153,6 +157,82 @@ func TestBufferChangingExCommandRequestsRedraw(t *testing.T) {
 	e2.sendKeys(":number")
 	if redraw := e2.editorProcessKey('\r'); redraw {
 		t.Error(":number returned redraw=true but changed no text")
+	}
+}
+
+// Keys with no character (F-keys, Ins) arrive as synthetic codes above any
+// real rune. Only the ones in termcodes mean anything to vim; forwarding any
+// other one types its code point as text, because string(rune(1011)) is the
+// Greek letter that 1011 happens to name. F1 and F2 used to collide with
+// constants named NOP and SHIFT_TAB, and F3 upward had no name here at all.
+func TestSyntheticKeysAreNotForwarded(t *testing.T) {
+	unmapped := []struct {
+		name string
+		code int
+	}{
+		{"F1", terminal.KeyF1},
+		{"F3", terminal.KeyF3},
+		{"F12", terminal.KeyF12},
+		{"Ins", terminal.KeyIns},
+	}
+
+	for _, k := range unmapped {
+		if _, mapped := termcodes[k.code]; mapped {
+			t.Errorf("%s is in termcodes; this test assumes it is not", k.name)
+		}
+
+		e := newTestEditor(t, "alpha")
+		e.editorProcessKey('i') // INSERT, where a forwarded key becomes text
+		e.editorProcessKey(k.code)
+		if got := e.vbuf.Lines()[0]; got != "alpha" {
+			t.Errorf("%s in INSERT changed the buffer to %q", k.name, got)
+		}
+
+		e2 := newTestEditor(t, "alpha")
+		e2.sendKeys(":")
+		e2.editorProcessKey(k.code)
+		if e2.command_line != "" {
+			t.Errorf("%s in EX put %q on the command line", k.name, e2.command_line)
+		}
+	}
+
+	// the keys vim does understand must still get through
+	for _, k := range []struct {
+		name string
+		code int
+	}{
+		{"Home", HOME_KEY},
+		{"PageUp", PAGE_UP},
+		{"ArrowLeft", ARROW_LEFT},
+	} {
+		if _, mapped := termcodes[k.code]; !mapped {
+			t.Errorf("%s (%d) is no longer in termcodes", k.name, k.code)
+		}
+	}
+}
+
+// main's key codes are aliases for the reader's, not a second hand-maintained
+// copy -- the two blocks had already drifted once.
+func TestKeyConstantsTrackTheReader(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		main, term int
+	}{
+		{"ARROW_LEFT", ARROW_LEFT, terminal.KeyArrowLeft},
+		{"DEL_KEY", DEL_KEY, terminal.KeyDelete},
+		{"HOME_KEY", HOME_KEY, terminal.KeyHome},
+		{"END_KEY", END_KEY, terminal.KeyEnd},
+		{"PAGE_DOWN", PAGE_DOWN, terminal.KeyPageDown},
+	} {
+		if tc.main != tc.term {
+			t.Errorf("%s = %d but reader says %d", tc.name, tc.main, tc.term)
+		}
+	}
+	if isSyntheticKey(BACKSPACE) {
+		t.Error("BACKSPACE is a real byte and must not be treated as synthetic")
+	}
+	if !isSyntheticKey(terminal.KeyF1) {
+		t.Error("F1 should be treated as synthetic")
 	}
 }
 

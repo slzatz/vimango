@@ -66,11 +66,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		return
 	}
 	// Process the key
-	if z, found := termcodes[c]; found {
-		vim.SendKey(z)
-	} else {
-		vim.SendInput(string(rune(c)))
-	}
+	sendToVim(c)
 
 	tick := e.vbuf.GetLastChangedTick()
 	if tick > e.bufferTick {
@@ -199,7 +195,7 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 		if len(e.command_line) > 0 {
 			e.command_line = e.command_line[:len(e.command_line)-1]
 		}
-	} else {
+	} else if !isSyntheticKey(c) {
 		e.command_line += string(rune(c))
 	}
 	return false, true
@@ -436,8 +432,10 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		vim.SendKey("<end>")
 	} else if c >= 1 && c <= 26 { // Ctrl-A..Ctrl-Z (Enter/Tab intercepted above)
 		vim.SendKey(fmt.Sprintf("<c-%c>", rune('a'+c-1)))
-	} else if c < 32 {
-		return false, true // other control chars: ignore
+	} else if c < 32 || isSyntheticKey(c) {
+		// other control chars, and reader codes vim has no binding for --
+		// forwarding one of those would type its code point into the cmdline
+		return false, true
 	} else {
 		vim.SendInput(string(rune(c)))
 	}
@@ -470,7 +468,9 @@ func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
 		if len(e.command_line) > 0 {
 			e.command_line = e.command_line[:len(e.command_line)-1]
 		}
-	} else {
+	} else if !isSyntheticKey(c) {
+		// sendToVim drops the other reader codes, so mirroring one here would
+		// show a character vim never received
 		e.command_line += string(rune(c))
 	}
 	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
