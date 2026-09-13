@@ -327,13 +327,40 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		if cmd0, found := e.exCmds[cmd]; found {
 			cmd0(e)
 			e.command_line = ""
-			if e.mode != HELP {
+			// a command that put up its own screen (:help, :preview) owns the
+			// mode from here; everything else lands back in NORMAL
+			if e.mode != HELP && e.mode != PREVIEW {
 				e.mode = NORMAL
 			}
 			e.tabCompletion.index = 0
 			e.tabCompletion.list = nil
 			if cmd == "read" || cmd == "r" {
 				return true, false
+			}
+			// A command that changed the buffer has to be drawn now. The
+			// caller only redraws when this returns true, and dispatch ends
+			// the keystroke, so otherwise the edit sits invisible until the
+			// next key happens to trip the tick check in editorProcessKey --
+			// which is what ":bold" looked like: correct text, blank screen.
+			if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != PREVIEW {
+				e.bufferTick = tick
+				e.ss = e.vbuf.Lines()
+				if len(e.ss) == 0 {
+					e.ss = []string{""}
+				}
+				pos := vim.GetCursorPosition()
+				e.fr = pos[0] - 1
+				if e.fr >= len(e.ss) {
+					e.fr = len(e.ss) - 1
+				}
+				if e.fr < 0 {
+					e.fr = 0
+				}
+				if pos[1] > len(e.ss[e.fr]) {
+					pos[1] = len(e.ss[e.fr])
+				}
+				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+				return true, true
 			}
 			return false, true
 		}

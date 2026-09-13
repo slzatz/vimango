@@ -128,6 +128,34 @@ func TestBoldExCommand(t *testing.T) {
 	}
 }
 
+// A buffer-changing ex command must ask the caller to redraw. MainLoop only
+// calls drawText when editorProcessKey returns true, and dispatch ends the
+// keystroke, so returning false leaves the edit invisible until some later key
+// trips the tick check -- ":bold" showed the old text until you pressed l.
+func TestBufferChangingExCommandRequestsRedraw(t *testing.T) {
+	e := newTestEditor(t, "alpha bravo charlie")
+	vim.SetCursorPosition(1, 6)
+	e.ss = e.vbuf.Lines()
+	e.fr, e.fc = 0, 6
+
+	e.sendKeys(":bold")
+	if redraw := e.editorProcessKey('\r'); !redraw {
+		t.Error(":bold returned redraw=false; the change would not be drawn")
+	}
+	// and the editor's own copy of the text must be current, since drawText
+	// renders e.ss rather than re-reading the buffer
+	if got, want := e.ss[0], "alpha **bravo** charlie"; got != want {
+		t.Errorf("e.ss[0] = %q, want %q", got, want)
+	}
+
+	// a command that changes nothing should not force a redraw
+	e2 := newTestEditor(t, "alpha bravo")
+	e2.sendKeys(":number")
+	if redraw := e2.editorProcessKey('\r'); redraw {
+		t.Error(":number returned redraw=true but changed no text")
+	}
+}
+
 func TestSplitExRange(t *testing.T) {
 	for _, tc := range []struct{ in, rng, rest string }{
 		{"bold", "", "bold"},
