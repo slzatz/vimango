@@ -117,7 +117,7 @@ func main() {
 	fmt.Printf("Connected to SQLite: %s\n\n", *localDB)
 
 	if *dryRun {
-		fmt.Println("=== DRY RUN MODE - No changes will be made ===\n")
+		fmt.Println("=== DRY RUN MODE - No changes will be made ===")
 	}
 
 	// Sync UUIDs for each container type

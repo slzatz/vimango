@@ -31,7 +31,7 @@ type dbConfig struct {
 	Options struct {
 		Type  string `json:"type"`
 		Title string `json:"title"`
-	} `json:"options`
+	} `json:"options"`
 }
 
 var db *sql.DB

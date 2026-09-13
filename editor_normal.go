@@ -39,24 +39,24 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 
 	// Markup shortcuts -- the one-keystroke form of :bold / :italic / :code.
 	// In VISUAL mode these act on the selection (see VisualModeKeyHandler).
-	registry.Register(string(ctrlKey('b')), (*Editor).decorateWord, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('b'))),
+	registry.Register(string(rune(ctrlKey('b'))), (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('b')))),
 		Description: "Make word bold (toggle **word**)",
 		Usage:       "Ctrl-B",
 		Category:    "Markup Shortcuts",
 		Examples:    []string{"Ctrl-B - Toggle bold formatting on current word", ":bold - same, and works on a visual selection"},
 	})
 
-	registry.Register(string(ctrlKey('e')), (*Editor).decorateWord, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('e'))),
+	registry.Register(string(rune(ctrlKey('e'))), (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('e')))),
 		Description: "Make word code (toggle `word`)",
 		Usage:       "Ctrl-E",
 		Category:    "Markup Shortcuts",
 		Examples:    []string{"Ctrl-E - Toggle code formatting on current word", ":code - same, and works on a visual selection"},
 	})
 
-	registry.Register(string(ctrlKey('i')), (*Editor).decorateWord, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('i'))),
+	registry.Register(string(rune(ctrlKey('i'))), (*Editor).decorateWord, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('i')))),
 		Description: "Make word italic (toggle *word*)",
 		Usage:       "Ctrl-I",
 		Category:    "Markup Shortcuts",
@@ -370,7 +370,7 @@ func (e *Editor) showWebView(_ int) {
 
 	// Check if webview is available
 	if !IsWebviewAvailable() {
-		e.ShowMessage(BR, ShowWebviewNotAvailableMessage())
+		e.ShowMessage(BR, "%s", ShowWebviewNotAvailableMessage())
 		// Fall back to opening in browser
 		err = OpenNoteInWebview(title, htmlContent)
 		if err != nil {
@@ -411,7 +411,7 @@ func (e *Editor) readGoTemplate(_ int) {
 func (e *Editor) spellingCheck(_ int) {
 	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
 	if !IsSpellCheckAvailable() {
-		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
+		e.ShowMessage(BR, "%s", ShowSpellCheckNotAvailableMessage())
 		return
 	}
 
@@ -424,7 +424,7 @@ func (e *Editor) spellingCheck(_ int) {
 
 func (e *Editor) spellSuggest(_ int) {
 	if !IsSpellCheckAvailable() {
-		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
+		e.ShowMessage(BR, "%s", ShowSpellCheckNotAvailableMessage())
 		return
 	}
 

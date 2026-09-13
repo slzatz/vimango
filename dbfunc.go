@@ -1000,7 +1000,7 @@ func (db *Database) updateCodeFile(id int, text string) {
 
 	f, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "error opening file %s: %w", filePath, err)
+		app.Organizer.ShowMessage(BL, "error opening file %s: %v", filePath, err)
 		return
 	}
 	defer f.Close()

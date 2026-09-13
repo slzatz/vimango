@@ -388,7 +388,7 @@ func (e *Editor) drawCodeRows(pab *strings.Builder) {
 
 func (e *Editor) highlightMispelledWords() {
 	if !IsSpellCheckAvailable() {
-		e.ShowMessage(BR, ShowSpellCheckNotAvailableMessage())
+		e.ShowMessage(BR, "%s", ShowSpellCheckNotAvailableMessage())
 		return
 	}
 

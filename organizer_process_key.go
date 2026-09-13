@@ -54,7 +54,7 @@ func sendToVim(c int) {
 	if z, found := termcodes[c]; found {
 		vim.SendKey(z)
 	} else {
-		vim.SendInput(string(c))
+		vim.SendInput(string(rune(c)))
 	}
 }
 
@@ -124,13 +124,13 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
 	// commands are letters or control characters, and always a single byte --
 	// like the editor, the organizer has no prefixes and no leader
-	if _, err := strconv.Atoi(string(c)); err != nil {
+	if _, err := strconv.Atoi(string(rune(c))); err != nil {
 		key := string(rune(c))
 		if cmd, found := o.normalCmds[key]; found {
 			//o.ShowMessage(BR, "key pressed: %T", cmd) ///debug
 			cmd(o)
 			switch key {
-			case string(ctrlKey('a')), string(ctrlKey('d')), string(ctrlKey('x')), "m":
+			case string(rune(ctrlKey('a'))), string(rune(ctrlKey('d'))), string(rune(ctrlKey('x'))), "m":
 				redraw = RedrawPartial
 			default:
 				redraw = RedrawNone
@@ -346,7 +346,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 
 	default:
-		o.command_line += string(c)
+		o.command_line += string(rune(c))
 	} // end switch c in COMMAND_LINE
 
 	o.tabCompletion.index = 0
@@ -379,8 +379,8 @@ func (o *Organizer) NavigateNoticeModeKeyHandler(c int) RedrawScope {
 }
 
 func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
-	if _, err := strconv.Atoi(string(c)); err == nil {
-		o.command += string(c)
+	if _, err := strconv.Atoi(string(rune(c))); err == nil {
+		o.command += string(rune(c))
 	}
 	o.ShowMessage(BR, "%s", o.command) //debug
 	if c == '\r' {
@@ -425,7 +425,7 @@ func (o *Organizer) NavigateContainerModeKeyHandler_(c int) RedrawScope {
 		}
 		o.mode = NORMAL
 		o.view = TASK
-		o.ShowMessage(BL, "NavigateContainer mode: %s %s", string(c), o.containerList[index])
+		o.ShowMessage(BL, "NavigateContainer mode: %s %s", string(rune(c)), o.containerList[index])
 		return RedrawNone
 	}
 	switch c {

@@ -1533,7 +1533,7 @@ func (o *Organizer) printDocument(_ int) {
 
 		_, err = f.WriteString(buf.String())
 		if err != nil {
-			o.ShowMessage(BL, "Error writing output.html: %s: %v", err)
+			o.ShowMessage(BL, "Error writing output.html: %v", err)
 			return
 		}
 		cmd := exec.Command("wkhtmltopdf", "--enable-local-file-access",
@@ -1601,7 +1601,7 @@ func (o *Organizer) showWebView(_ int) {
 
 	// Check if webview is available
 	if !IsWebviewAvailable() {
-		o.ShowMessage(BL, ShowWebviewNotAvailableMessage())
+		o.ShowMessage(BL, "%s", ShowWebviewNotAvailableMessage())
 		// Fall back to opening in browser
 		err = OpenNoteInWebview(title, htmlContent)
 		if err != nil {
@@ -1845,7 +1845,7 @@ func (o *Organizer) toggleImages(_ int) {
 		status = "ON"
 	}
 
-	o.ShowMessage(BL, fmt.Sprintf("Images: %s", status))
+	o.ShowMessage(BL, "Images: %s", status)
 	o.displayNote()
 }
 
@@ -1861,7 +1861,7 @@ func (o *Organizer) showImageInfo(_ int) {
 		status = "ON"
 	}
 
-	o.ShowMessage(BL, fmt.Sprintf("Image info: %s", status))
+	o.ShowMessage(BL, "Image info: %s", status)
 	o.displayNote()
 }
 
@@ -1902,7 +1902,7 @@ func (o *Organizer) refreshImageInfo(pos int) {
 		return
 	}
 
-	o.ShowMessage(BL, fmt.Sprintf("Refreshing metadata for %d image(s)...", gdriveCount))
+	o.ShowMessage(BL, "Refreshing metadata for %d image(s)...", gdriveCount)
 
 	// Process each Google Drive image
 	refreshed := 0
@@ -1936,7 +1936,7 @@ func (o *Organizer) refreshImageInfo(pos int) {
 	if redownload {
 		action = "metadata + images"
 	}
-	o.ShowMessage(BL, fmt.Sprintf("Refreshed %s for %d image(s)", action, refreshed))
+	o.ShowMessage(BL, "Refreshed %s for %d image(s)", action, refreshed)
 	o.displayNote()
 }
 
@@ -1952,7 +1952,7 @@ func (o *Organizer) scaleImages(pos int) {
 	o.command_line = ""
 
 	if argStr == "" {
-		o.ShowMessage(BL, fmt.Sprintf("Current image scale: %d columns", app.imageScale))
+		o.ShowMessage(BL, "Current image scale: %d columns", app.imageScale)
 		return
 	}
 
@@ -1967,7 +1967,7 @@ func (o *Organizer) scaleImages(pos int) {
 	default:
 		newScale, err = strconv.Atoi(argStr)
 		if err != nil {
-			o.ShowMessage(BL, fmt.Sprintf("Invalid scale value: %s (use +, -, or number)", argStr))
+			o.ShowMessage(BL, "Invalid scale value: %s (use +, -, or number)", argStr)
 			return
 		}
 	}
@@ -1994,7 +1994,7 @@ func (o *Organizer) scaleImages(pos int) {
 	// Next render will transmit at the new scale
 	deleteAllKittyImages()
 
-	o.ShowMessage(BL, fmt.Sprintf("Image scale: %d columns", app.imageScale))
+	o.ShowMessage(BL, "Image scale: %d columns", app.imageScale)
 	o.displayNote()
 }
 
@@ -2009,13 +2009,13 @@ func (o *Organizer) cacheWidth(pos int) {
 	o.command_line = ""
 
 	if argStr == "" {
-		o.ShowMessage(BL, fmt.Sprintf("Cache max width: %d pixels", app.imageCacheMaxWidth))
+		o.ShowMessage(BL, "Cache max width: %d pixels", app.imageCacheMaxWidth)
 		return
 	}
 
 	newWidth, err := strconv.Atoi(argStr)
 	if err != nil {
-		o.ShowMessage(BL, fmt.Sprintf("Invalid width value: %s (use a number)", argStr))
+		o.ShowMessage(BL, "Invalid width value: %s (use a number)", argStr)
 		return
 	}
 
@@ -2037,7 +2037,7 @@ func (o *Organizer) cacheWidth(pos int) {
 		// Silently ignore save errors (preferences not critical)
 	}
 
-	o.ShowMessage(BL, fmt.Sprintf("Cache max width: %d pixels (new images will use this size)", app.imageCacheMaxWidth))
+	o.ShowMessage(BL, "Cache max width: %d pixels (new images will use this size)", app.imageCacheMaxWidth)
 }
 
 // clearImageCache removes all files from the disk image cache
@@ -2057,7 +2057,7 @@ func (o *Organizer) clearImageCache(pos int) {
 	cacheDir := "./image_cache"
 	entries, err := os.ReadDir(cacheDir)
 	if err != nil {
-		o.ShowMessage(BL, fmt.Sprintf("Error reading cache directory: %v", err))
+		o.ShowMessage(BL, "Error reading cache directory: %v", err)
 		return
 	}
 
@@ -2078,7 +2078,7 @@ func (o *Organizer) clearImageCache(pos int) {
 	globalImageCache.saveIndex()
 	globalImageCache.mutex.Unlock()
 
-	o.ShowMessage(BL, fmt.Sprintf("Cleared image cache: %d files removed (%.1f MB freed)", count, float64(size)/(1024*1024)))
+	o.ShowMessage(BL, "Cleared image cache: %d files removed (%.1f MB freed)", count, float64(size)/(1024*1024))
 }
 
 // imageReset clears terminal graphics cache and local caches, then rerenders current note.

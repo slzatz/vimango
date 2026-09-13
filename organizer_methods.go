@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 )
 
 func (o *Organizer) moveAltCursor(key int) {
@@ -22,55 +21,6 @@ func (o *Organizer) moveAltCursor(key int) {
 		if o.altFr < len(o.altRows)-1 {
 			o.altFr++
 		}
-	}
-}
-
-func (o *Organizer) getWordUnderCursor() {
-	t := &o.rows[o.fr].title
-	delimiters := " ,.;?:()[]{}&#"
-	if strings.IndexAny(string((*t)[o.fc]), delimiters) != -1 {
-		return
-	}
-
-	var beg int
-	if o.fc != 0 {
-		beg = strings.LastIndexAny((*t)[:o.fc], delimiters)
-		if beg == -1 {
-			beg = 0
-		} else {
-			beg++
-		}
-	}
-	end := strings.IndexAny((*t)[o.fc:], delimiters)
-	if end == -1 {
-		end = len(*t) - 1
-	} else {
-		end = end + o.fc - 1
-	}
-	o.title_search_string = (*t)[beg : end+1]
-}
-
-func (o *Organizer) findNextWord() {
-	var n int
-	if o.fr < len(o.rows)-1 {
-		n = o.fr + 1
-	} else {
-		n = 0
-	}
-
-	for {
-		if n == len(o.rows) {
-			n = 0
-		}
-		pos := strings.Index(o.rows[n].title, o.title_search_string)
-		if pos == -1 {
-			continue
-		} else {
-			o.fr = n
-			o.fc = pos
-			return
-		}
-		n++
 	}
 }
 
@@ -163,21 +113,6 @@ func (o *Organizer) altScroll() {
 	}
 }
 
-func (o *Organizer) insertChar(c int) {
-	if len(o.rows) == 0 {
-		return
-	}
-
-	t := &o.rows[o.fr].title
-	if *t == "" {
-		*t = string(c)
-	} else {
-		*t = (*t)[:o.fc] + string(c) + (*t)[o.fc:]
-	}
-	o.fc++
-	o.rows[o.fr].dirty = true
-}
-
 func (o *Organizer) writeTitle() {
 	row := &o.rows[o.fr]
 	var msg string
@@ -250,7 +185,7 @@ func (o *Organizer) writeTitle() {
 
 	//sess.showOrgMessage("Updated id %d to %s (+fts if Entry)", row.id, truncate(row.title, 15))
 	o.refreshScreen()
-	o.ShowMessage(BR, msg)
+	o.ShowMessage(BR, "%s", msg)
 }
 
 func (o *Organizer) clearMarkedEntries() {

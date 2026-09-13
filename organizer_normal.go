@@ -15,20 +15,20 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	registry := NewCommandRegistry[func(*Organizer)]()
 
 	// Entry Actions commands
-	registry.Register(string(0x4), (*Organizer).del, CommandInfo{
-		Name:        keyToDisplayName(string(0x4)),
+	registry.Register(string(rune(0x4)), (*Organizer).del, CommandInfo{
+		Name:        keyToDisplayName(string(rune(0x4))),
 		Description: "Toggle delete status of current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(0x1), (*Organizer).star, CommandInfo{
-		Name:        keyToDisplayName(string(0x1)),
+	registry.Register(string(rune(0x1)), (*Organizer).star, CommandInfo{
+		Name:        keyToDisplayName(string(rune(0x1))),
 		Description: "Toggle star status of current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(0x18), (*Organizer).archive, CommandInfo{
-		Name:        keyToDisplayName(string(0x18)),
+	registry.Register(string(rune(0x18)), (*Organizer).archive, CommandInfo{
+		Name:        keyToDisplayName(string(rune(0x18))),
 		Description: "Toggle archive status of current note",
 		Category:    "Entry Actions",
 	})
@@ -40,67 +40,67 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	})
 
 	// Navigation commands
-	registry.Register(string(ctrlKey('j')), (*Organizer).scrollPreviewDown, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('j'))) + "/PgDn",
-		Aliases:     []string{string(PAGE_DOWN)},
+	registry.Register(string(rune(ctrlKey('j'))), (*Organizer).scrollPreviewDown, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('j')))) + "/PgDn",
+		Aliases:     []string{string(rune(PAGE_DOWN))},
 		Description: "Scroll rendered note down",
 		Category:    "Navigation",
 	})
 
-	registry.Register(string(ctrlKey('k')), (*Organizer).scrollPreviewUp, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('k'))) + "/PgUp",
-		Aliases:     []string{string(PAGE_UP)},
+	registry.Register(string(rune(ctrlKey('k'))), (*Organizer).scrollPreviewUp, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('k')))) + "/PgUp",
+		Aliases:     []string{string(rune(PAGE_UP))},
 		Description: "Scroll rendered note up",
 		Category:    "Navigation",
 	})
 
-	registry.Register(string(ctrlKey('f')), (*Organizer).newFolderNormal, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('f'))),
+	registry.Register(string(rune(ctrlKey('f'))), (*Organizer).newFolderNormal, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('f')))),
 		Description: "Assign a folder to the current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(ctrlKey('c')), (*Organizer).newContextNormal, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('c'))),
+	registry.Register(string(rune(ctrlKey('c'))), (*Organizer).newContextNormal, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('c')))),
 		Description: "Assign a context to the current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(HOME_KEY), (*Organizer).scrollPreviewHome, CommandInfo{
+	registry.Register(string(rune(HOME_KEY)), (*Organizer).scrollPreviewHome, CommandInfo{
 		Name:        "Home",
 		Description: "Scroll rendered note to top",
 		Category:    "Navigation",
 	})
 
 	// Information commands
-	registry.Register(string(ctrlKey('i')), (*Organizer).info, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('i'))),
+	registry.Register(string(rune(ctrlKey('i'))), (*Organizer).info, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('i')))),
 		Description: "Show detailed information about current note",
 		Category:    "Information",
 	})
 
 	// Mode Switching commands
-	registry.Register(string(ctrlKey('l')), (*Organizer).switchToEditorMode, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('l'))),
+	registry.Register(string(rune(ctrlKey('l'))), (*Organizer).switchToEditorMode, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('l')))),
 		Description: "Switch to editor (if one is active)",
 		Category:    "Mode Switching",
 	})
 
 	// Preview commands
-	registry.Register(string(ctrlKey('w')), (*Organizer).showWebView_n, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('w'))),
+	registry.Register(string(rune(ctrlKey('w'))), (*Organizer).showWebView_n, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('w')))),
 		Description: "Show current note in web browser",
 		Category:    "Preview",
 	})
 
-	registry.Register(string(ctrlKey('q')), (*Organizer).closeWebView_n, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('q'))),
+	registry.Register(string(rune(ctrlKey('q'))), (*Organizer).closeWebView_n, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('q')))),
 		Description: "Close webkit webview window",
 		Category:    "Preview",
 	})
 
-	registry.Register(string(ctrlKey('y')), (*Organizer).showEditorWindows, CommandInfo{
-		Name:        keyToDisplayName(string(ctrlKey('y'))),
+	registry.Register(string(rune(ctrlKey('y'))), (*Organizer).showEditorWindows, CommandInfo{
+		Name:        keyToDisplayName(string(rune(ctrlKey('y')))),
 		Description: "Show open editor windows",
 		Category:    "Preview",
 	})

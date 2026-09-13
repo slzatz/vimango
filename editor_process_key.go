@@ -69,7 +69,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	if z, found := termcodes[c]; found {
 		vim.SendKey(z)
 	} else {
-		vim.SendInput(string(c))
+		vim.SendInput(string(rune(c)))
 	}
 
 	tick := e.vbuf.GetLastChangedTick()
@@ -108,8 +108,8 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				e.ShowMessage(BR, ":")
 			} else {
 				e.mode = SEARCH
-				e.searchPrefix = string(c)
-				e.ShowMessage(BR, e.searchPrefix)
+				e.searchPrefix = string(rune(c))
+				e.ShowMessage(BR, "%s", e.searchPrefix)
 			}
 			return false
 		}
@@ -200,7 +200,7 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 			e.command_line = e.command_line[:len(e.command_line)-1]
 		}
 	} else {
-		e.command_line += string(c)
+		e.command_line += string(rune(c))
 	}
 	return false, true
 }
@@ -237,7 +237,7 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 // case VISUAL:
 func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 	// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
-	if strings.IndexAny(string(c), "\x02\x05\x09") != -1 { // this should define commmands like normalCmds, ie visualCmds
+	if strings.IndexAny(string(rune(c)), "\x02\x05\x09") != -1 { // this should define commmands like normalCmds, ie visualCmds
 		// leave VISUAL first: decorateSpan replaces the span with a counted
 		// "s", which in VISUAL would substitute the selection instead
 		vim.SendKey("<esc>")
@@ -439,7 +439,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	} else if c < 32 {
 		return false, true // other control chars: ignore
 	} else {
-		vim.SendInput(string(c))
+		vim.SendInput(string(rune(c)))
 	}
 
 	// backspacing over the ':' (or Ctrl-C) makes vim leave cmdline mode
@@ -471,7 +471,7 @@ func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
 			e.command_line = e.command_line[:len(e.command_line)-1]
 		}
 	} else {
-		e.command_line += string(c)
+		e.command_line += string(rune(c))
 	}
 	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
 	return false, false

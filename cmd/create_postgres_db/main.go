@@ -33,7 +33,7 @@ type dbConfig struct {
 	Options struct {
 		Type  string `json:"type"`
 		Title string `json:"title"`
-	} `json:"options`
+	} `json:"options"`
 }
 
 // FromFile returns a dbConfig struct parsed from a file.

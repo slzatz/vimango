@@ -621,7 +621,7 @@ func (e *Editor) compile() {
 		// This is helpful because 'go mod tidy' prints its progress to Stderr
 		output, err := cmd0.CombinedOutput()
 		if err != nil {
-			e.ShowMessage(BR, "go mod tidy failed: %w\nOutput: %s", err, string(output))
+			e.ShowMessage(BR, "go mod tidy failed: %v\nOutput: %s", err, string(output))
 			return
 		}
 		//cmd = exec.Command("go", "run", "main.go")
@@ -1252,7 +1252,7 @@ func (e *Editor) printDocument() {
 
 		_, err = f.WriteString(buf.String())
 		if err != nil {
-			e.ShowMessage(BR, "Error writing output.html: %s: %v", err)
+			e.ShowMessage(BR, "Error writing output.html: %v", err)
 			return
 		}
 		cmd := exec.Command("wkhtmltopdf", "--enable-local-file-access",
