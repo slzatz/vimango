@@ -432,8 +432,6 @@ const (
 	BY_FIND
 )
 
-const leader = " "
-
 func getStringInBetween(str string, start string, end string) string {
 	k, v, ok := strings.Cut(str, start)
 	if !ok {

@@ -83,7 +83,6 @@ func (a *App) NewEditor() *Editor {
 		fr:                 0, //'file' y position ""
 		lineOffset:         0, //the number of lines of text at the top scrolled off the screen
 		mode:               NORMAL,
-		command:            "", // "normal mode" outside of editor commands - when editor is in normal mode
 		command_line:       "",
 		firstVisibleRow:    0,
 		highlightSyntax:    true, // applies to golang, c++ etc. and markdown

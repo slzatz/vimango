@@ -21,9 +21,8 @@ type Editor struct {
 	mode               Mode
 	vmode              Mode
 	command_line       string //for commands on the command line; string doesn't include ':'
+	exRange            bool   //the ex command line carried a range ('<,'> or %); reset on every dispatch
 	cmdLineCursor      int    //byte offset of the cursor within command_line (EX_COMMAND: mirrors vim's cmdline position)
-	command            string // right now includes normal mode commands and command line commands
-	last_command       string
 	firstVisibleRow    int
 	highlightSyntax    bool
 	numberLines        bool

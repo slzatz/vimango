@@ -23,7 +23,6 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		mode := vim.GetCurrentMode() ////////
 		e.mode = modeMap[mode]
 		//e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
-		e.command = ""
 		e.command_line = ""
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
@@ -83,20 +82,21 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	mode := vim.GetCurrentMode()
 	//submode := vim.GetSubMode() added this 9-22-25 but really only for obscure submodes
 
+	// The switch performs side effects only; e.mode is set once from modeMap
+	// below, so no case should assign it. The two early returns are the
+	// exceptions, and each says why it skips the buffer/cursor resync.
 	switch mode {
-	//case 1: //NORMAL
-	//	e.mode = NORMAL
 	case 4: //OP_PENDING delete, change, yank, etc
+		// half of an operator (the "d" of "d3w"): the buffer has not changed
+		// and the cursor has not settled, so there is nothing to resync yet
 		e.mode = PENDING
-		//e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %q", mode, e.mode, rune(c)) //////Debug
 		return false
 	case 8: //SEARCH and EX_COMMAND
-		// Note: will not hit this case if we are in e.mode == EX_COMMAND because
-		// ExModeKeyHandler sends keys to vim itself and never falls through here
-		// note that if e.mode has been set to SEARCH, this code does nothing
+		// reached only on the ':' or '/' that opens the line: once e.mode is
+		// EX_COMMAND or SEARCH those handlers send keys to vim themselves and
+		// never fall through to here
 		if e.mode != SEARCH && e.mode != EX_COMMAND {
 			e.command_line = ""
-			e.command = ""
 			if c == ':' {
 				// vim stays in cmdline mode: its cmdline buffer is the line
 				// editor; ExModeKeyHandler intercepts Enter so vim never
@@ -111,34 +111,24 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				e.searchPrefix = string(c)
 				e.ShowMessage(BR, e.searchPrefix)
 			}
-			//e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %q", mode, e.mode, rune(c)) //////Debug
 			return false
 		}
 	case 16: //INSERT
 		if e.mode != INSERT {
-			e.mode = INSERT
 			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 		}
-		//redraw = true
 	case 2: //VISUAL_MODE
-		vmode := vim.GetVisualType()
-		e.vmode = visualModeMap[vmode]
-		e.mode = VISUAL
-		//e.ShowMessage(BR, "Current visualType from vim: %d, visual test: %v", vmode, mode == 118)
+		e.vmode = visualModeMap[vim.GetVisualType()]
 		e.highlightInfo()
-		//e.ShowMessage(BL, "vim mode: %d | vmode: %s | e.mode: %s", mode, e.vmode, e.mode) //////Debug
 		redraw = true
-		//case 257: //NORMAL_BUSY
-		//	e.mode = NORMAL_BUSY
 	}
-	//default:
+
 	if m, ok := modeMap[mode]; ok { //note that 8 => SEARCH (8 is also COMMAND)
 		e.mode = m
 	} else {
 		e.mode = OTHER // not sure this ever happens
 	}
-	//} // was end of switch mode
-	//e.ShowMessage(BL, "vim mode: %d | e.mode: %s | char: %q", mode, e.mode, rune(c)) //////Debug
+
 	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
 	e.ss = e.vbuf.Lines()
 	// Add safety checks to prevent panic with empty buffers
@@ -216,57 +206,43 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 }
 
 // case NORMAL, OTHER (257):
-// note that Crtl-A and Ctrl-X are passed through and perform their usual weird function of incrementing and decrementing the number under the cursor and Ctrl-R also works to undo the last undone change.  All other vim built-in Ctrl commands appear to do nothing.
+// A single-byte lookup, nothing more: no prefix accumulation, no leader. Any
+// key not in the table is handed to vim, which is what keeps <space> working as
+// the motion vim defines it to be. Note that Ctrl-A and Ctrl-X pass through and
+// perform their usual weird function of incrementing and decrementing the
+// number under the cursor, and Ctrl-R also works to redo. All other vim
+// built-in Ctrl commands appear to do nothing.
 func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
-	//leader := ' ' //vim.GetLeaderKey()
-	if c == ' ' { //should become if c == leader
-		e.command = string(c)
-		return false, true
-	}
-	e.command += string(c)
-
-	if len(e.command) > 0 {
-		if e.command[0] != ' ' { //leader
-			e.command = string(c)
-		}
+	cmd, found := e.normalCmds[string(rune(c))]
+	if !found {
+		return false, false // have vim process the key
 	}
 
-	//e.ShowMessage(BR, "e.command = %q", e.command) //Debug
-	if cmd, found := e.normalCmds[e.command]; found {
-		cmd(e, c)
-		vim.SendKey("<esc>")
-		// below is kludge becuse moveLeft and moveRight move you out of current editor
-		if e.command == "\x08" || e.command == "\x0c" { //moveLeft or moveRight
-			e.command = ""
-			return true, true
-		}
-		e.command = ""
-		e.ss = e.vbuf.Lines()
-		pos := vim.GetCursorPosition() //set screen cx and cy from pos
-		e.fr = pos[0] - 1
-		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-		redraw = true
-		if e.mode == PREVIEW {
-			redraw = false
-		}
-		return redraw, true
-	} else {
-		if e.command[0] == ' ' {
-			return false, true // don't process key
-		} else {
-			return false, false // have vim process key
-		}
+	cmd(e, c)
+
+	// moveLeft/moveRight make a different editor current, so the resync below
+	// would read the wrong buffer -- and the <esc> would land in it.
+	if c == '\x08' || c == '\x0c' {
+		return true, true
 	}
+
+	vim.SendKey("<esc>")
+	e.ss = e.vbuf.Lines()
+	pos := vim.GetCursorPosition() //set screen cx and cy from pos
+	e.fr = pos[0] - 1
+	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+	return e.mode != PREVIEW, true
 }
 
 // case VISUAL:
 func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 	// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
 	if strings.IndexAny(string(c), "\x02\x05\x09") != -1 { // this should define commmands like normalCmds, ie visualCmds
-		e.decorateWordVisual(c)
+		// leave VISUAL first: decorateSpan replaces the span with a counted
+		// "s", which in VISUAL would substitute the selection instead
 		vim.SendKey("<esc>")
+		e.decorateWordVisual(c)
 		e.mode = NORMAL
-		e.command = ""
 		e.ss = e.vbuf.Lines()
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
@@ -296,11 +272,20 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		// history on a concluded cmdline, and we never forward the CR)
 		vim.ExecuteCommand("call histadd(':', '" + strings.ReplaceAll(e.command_line, "'", "''") + "')")
 
+		// vim writes its own "'<,'>" range in front of the command when ':'
+		// is pressed from VISUAL mode. Peel any range off so the lookup below
+		// matches on the command name, and record that one was given so
+		// range-aware commands (:bold and friends) act on the selection
+		// rather than the word under the cursor. fullLine keeps the range for
+		// the commands forwarded to vim, which want it.
+		fullLine := e.command_line
+		var exRange string
+		exRange, e.command_line = splitExRange(e.command_line)
+		e.exRange = exRange != ""
+
 		// Index doesn't work for vert resize
 		// and LastIndex doesn't work for run
 		// so total kluge below
-		//if e.command_line[0] == '%'
-		//if strings.Index(e.command_line, "s/") != -1
 
 		// we want libvim to handle the following Ex-Commands:
 		use_vim := []string{"s/", "%s/", "g/", "g!/", "v/"}
@@ -312,14 +297,15 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 					return false, true
 				}
 
-				vim.SendInput(":" + e.command_line + "\r")
+				// forward the line with its range intact -- ":'<,'>s/a/b/"
+				// means something to vim
+				vim.SendInput(":" + fullLine + "\r")
 				e.mode = NORMAL
-				e.command = ""
 				e.ss = e.vbuf.Lines()
 				pos := vim.GetCursorPosition() //set screen cx and cy from pos
 				e.fr = pos[0] - 1
 				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
-				e.ShowMessage(BL, "search and replace: %s", e.command_line)
+				e.ShowMessage(BL, "search and replace: %s", fullLine)
 				return true, true
 			}
 		}

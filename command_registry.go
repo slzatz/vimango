@@ -270,11 +270,6 @@ func min(a, b, c int) int {
 
 // keyToDisplayName converts key sequences to human-readable format for help display
 func keyToDisplayName(key string) string {
-
-	if strings.HasPrefix(key, leader) {
-		return "<leader>" + key[len(leader):]
-	}
-
 	var representation []string
 	for _, b := range []byte(key) {
 		representation = append(representation, representByte(b))

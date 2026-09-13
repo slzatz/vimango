@@ -188,6 +188,74 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":pdf-goldmark output.pdf", ":pdf-goldmark /tmp/note.pdf"},
 	})
 
+	// Markup commands -- Ctrl-B/I/E are the one-keystroke form of these.
+	// With no range they decorate the word under the cursor; pressed from
+	// VISUAL mode vim supplies a "'<,'>" range and they decorate the selection.
+	registry.Register("bold", (*Editor).boldCmd, CommandInfo{
+		Description: "Toggle bold (**) on the selection, or the word under the cursor",
+		Usage:       "bold",
+		Category:    "Markup",
+		Examples:    []string{":bold", ":'<,'>bold - select text, press : and type bold"},
+	})
+
+	registry.Register("italic", (*Editor).italicCmd, CommandInfo{
+		Description: "Toggle italic (*) on the selection, or the word under the cursor",
+		Usage:       "italic",
+		Category:    "Markup",
+		Examples:    []string{":italic", ":'<,'>italic"},
+	})
+
+	registry.Register("code", (*Editor).codeCmd, CommandInfo{
+		Description: "Toggle code (`) on the selection, or the word under the cursor",
+		Usage:       "code",
+		Category:    "Markup",
+		Examples:    []string{":code", ":'<,'>code"},
+	})
+
+	// Preview commands
+	registry.Register("preview", (*Editor).previewCmd, CommandInfo{
+		Description: "Show markdown preview of current note",
+		Usage:       "preview",
+		Category:    "Preview",
+		Examples:    []string{":preview"},
+	})
+
+	registry.Register("webview", (*Editor).webviewCmd, CommandInfo{
+		Description: "Show current note in a webview window",
+		Usage:       "webview",
+		Category:    "Preview",
+		Examples:    []string{":webview"},
+	})
+
+	// Utility commands
+	registry.Register("style", (*Editor).styleCmd, CommandInfo{
+		Description: "Cycle through available glamour styles",
+		Usage:       "style",
+		Category:    "Utility",
+		Examples:    []string{":style"},
+	})
+
+	registry.Register("template", (*Editor).templateCmd, CommandInfo{
+		Description: "Replace the note with the Go template (go.template)",
+		Usage:       "template",
+		Category:    "Utility",
+		Examples:    []string{":template"},
+	})
+
+	registry.Register("spell", (*Editor).spellCmd, CommandInfo{
+		Description: "Highlight misspelled words",
+		Usage:       "spell",
+		Category:    "Utility",
+		Examples:    []string{":spell"},
+	})
+
+	registry.Register("suggest", (*Editor).suggestCmd, CommandInfo{
+		Description: "Show spelling suggestions for the word under the cursor",
+		Usage:       "suggest",
+		Category:    "Utility",
+		Examples:    []string{":suggest"},
+	})
+
 	// System commands
 	registry.Register("quit", (*Editor).quitActions, CommandInfo{
 		Aliases:     []string{"q", "quit!", "q!"},
@@ -751,7 +819,6 @@ func (e *Editor) quitActions() {
 
 	} else if e.isModified() {
 		e.mode = NORMAL
-		e.command = ""
 		e.command_line = ""
 		e.ShowMessage(BR, "No write since last change")
 		return

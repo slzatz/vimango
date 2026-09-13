@@ -122,14 +122,14 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 	}
 
-	// commands are letters or control characters
+	// commands are letters or control characters, and always a single byte --
+	// like the editor, the organizer has no prefixes and no leader
 	if _, err := strconv.Atoi(string(c)); err != nil {
-		o.command += string(c) //note currently all are single characters although future could use leader+chars
-
-		if cmd, found := o.normalCmds[o.command]; found {
+		key := string(rune(c))
+		if cmd, found := o.normalCmds[key]; found {
 			//o.ShowMessage(BR, "key pressed: %T", cmd) ///debug
 			cmd(o)
-			switch o.command {
+			switch key {
 			case string(ctrlKey('a')), string(ctrlKey('d')), string(ctrlKey('x')), "m":
 				redraw = RedrawPartial
 			default:
@@ -141,7 +141,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 		}
 	}
 
-	// in NORMAL mode don't want ? leader, O, o, V, ctrl-V, J being passed to vim
+	// in NORMAL mode don't want ?, O, o, V, ctrl-V, J being passed to vim
 	switch c {
 	case 'J', 'V', ctrlKey('v'), 'o', 'O':
 		o.showMessage("Ascii %d has no effect in Organizer NORMAL mode", c)

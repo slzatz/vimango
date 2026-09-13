@@ -6,7 +6,7 @@ This file provides guidance to Claude when working with code in this repository.
 - **Linux/Unix with CGO**: `CGO_ENABLED=1 go build --tags=fts5` (includes libvim, sqlite3)
 NOTE: When updating, fixing or adding to the code, the CGO build is the most comprehensive to ensure all features work as expected.
 NOTE: `fts5` is the only tag this build needs. Do **not** add `cgo` to the tag list — `cgo` is one of Go's automatic build constraints, set by the toolchain whenever cgo is in use, so `CGO_ENABLED=1` already satisfies every `//go:build cgo` file. Passing `-tags=cgo` selects an identical file set (verified with `go list`) and is only misleading: with `CGO_ENABLED=0` it does not enable cgo, it just pulls in `//go:build cgo` files that don't import `"C"`.
-NOTE: hunspell spell check is opt-in behind a second tag: `CGO_ENABLED=1 go build --tags="fts5,spell"`. Without it `spellcheck_nocgo.go` (the stub) is compiled instead of `spellcheck_cgo.go`, so `<leader>sp`, `<leader>su` and `z=` degrade to the "spell check unavailable" messages. Left out of the default build deliberately — spelling has not been exercised in a while and needs testing before it goes back in by default.
+NOTE: hunspell spell check is opt-in behind a second tag: `CGO_ENABLED=1 go build --tags="fts5,spell"`. Without it `spellcheck_nocgo.go` (the stub) is compiled instead of `spellcheck_cgo.go`, so `:spell`, `:suggest` and `z=` degrade to the "spell check unavailable" messages. Left out of the default build deliberately — spelling has not been exercised in a while and needs testing before it goes back in by default.
 NOTE: CGO builds require `libvim.a` in the project root. See "Building libvim.a" below.
 
 ### Building libvim.a (CGO Prerequisite)
@@ -191,22 +191,45 @@ The command system is loosely based on the vim command system and the existence 
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
-**Editor Ex Commands (20+ commands in 5 categories):**
-- **File Operations**: write, writeall, read, save
-- **Editing**: syntax, number, fmt, run
+**Editor Ex Commands (30+ commands in 8 categories):**
+- **File Operations**: write, writeall, read, save, open, checkstale
+- **Editing**: syntax, number, fmt, run, paste, nopaste
+- **Markup**: bold, italic, code — range-aware (see "Key Interception" below)
+- **Preview**: preview, webview
+- **Utility**: style, template, spell, suggest
 - **Layout**: vertical resize, resize
-- **Output**: ha, print, pdf
-- **System**: quit, quitall
+- **Output**: ha, print, pdf, pdf-goldmark
+- **System**: quit, exit, quitall, help
+
+### Key Interception
+
+Normal mode intercepts **single bytes only** — no prefixes, no multi-key
+sequences, no leader (the `<leader>` prefix matcher and the `<C-w>>`/`<C-w><`
+pair were removed 2026-09-13). A key registered in `normalCmds` never reaches
+vim, so the table is confined to what vim cannot know about (which editor has
+focus) plus the markdown decoration shortcuts. Everything else — anything
+wanting an argument, a range or a name — is an ex command.
+
+This matters because `<Space>` is a real vim motion (`l`): the old leader
+swallowed it, and swallowed the following key too when the pair didn't match a
+registered command. It is not fixable by using vim's own `:map`, because libvim
+registers mappings without ever expanding them (`maparg()` reads a mapping back,
+but pressing the key does nothing) — so anything vimango binds has to be a
+Go-side interception, which is the argument for keeping the set small.
+
+`:bold` / `:italic` / `:code` are range-aware: with no range they decorate the
+word under the cursor, and with the `'<,'>` range vim writes when `:` is pressed
+from VISUAL mode they decorate the selection. `ExModeKeyHandler` strips a
+leading range (`splitExRange`) before looking the command up, and `visualMarks`
+reads `'<`/`'>` back — those marks outlive the `<esc>` that cancels vim's
+cmdline. Replacement uses vim's counted `s` (`decorateSpan`), not `ciw`: `ciw`
+and `expand('<cword>')` disagree whenever the cursor sits on a marker, which is
+why toggling a decoration back off never used to work.
 
 ### Normal Mode Command Organization
-**Editor Normal Mode Commands (17+ commands in 6 categories):**
-- **Movement**: Ctrl-H (move left), Ctrl-L (move right)
-- **Text Editing**: Ctrl-B (bold), Ctrl-I (italic), Ctrl-E (code), \<leader\>b (bold)
-- **Preview**: \<leader\>m (markdown preview), \<leader\>w (web view)
-- **Window Management**: \<C-w\>L, \<C-w\>J, \<C-w\>=, \<C-w\>_, \<C-w\>-, \<C-w\>+, \<C-w\>\>, \<C-w\>\<
-- **Output Control**: Ctrl-J (scroll down), Ctrl-K (scroll up)
-- **Utility**: \<leader\>y (next style), \<leader\>t (go template), \<leader\>sp (spell check), \<leader\>su (spell suggest)
-- **System**: Ctrl-Z (switch vim implementation)
+**Editor Normal Mode Commands (5 commands in 2 categories):**
+- **Editor Selection**: Ctrl-H (previous editor / back to organizer), Ctrl-L (next editor)
+- **Markup Shortcuts**: Ctrl-B (bold), Ctrl-I (italic), Ctrl-E (code) — the one-keystroke form of `:bold` / `:italic` / `:code`; in VISUAL mode they act on the selection
 
 **Organizer Normal Mode Commands (11+ commands in 5 categories):**
 - **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive)

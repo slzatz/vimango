@@ -6,7 +6,7 @@ package main
 
 // createCGOSpellChecker provides a stub implementation when the hunspell
 // spell checker is not compiled in (no `spell` build tag, no CGO, or
-// windows). <leader>sp / <leader>su report "not available".
+// windows). :spell / :suggest report "not available".
 func createCGOSpellChecker() SpellChecker {
 	return createStubSpellChecker()
 }

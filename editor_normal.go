@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
@@ -9,10 +10,17 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
+// Normal mode intercepts single bytes only: no prefixes, no multi-key
+// sequences, no leader. A key registered here never reaches vim, so the table
+// is deliberately confined to what vim cannot know about (which editor has
+// focus) plus the markdown decoration shortcuts, which libvim cannot provide
+// because it registers mappings without ever expanding them. Everything else --
+// anything wanting an argument, a range or a name -- is an ex command; see
+// setEditorExCmds.
 func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) {
 	registry := NewCommandRegistry[func(*Editor, int)]()
 
-	// Movement commands
+	// Editor selection
 	registry.Register("\x08", (*Editor).moveLeft, CommandInfo{
 		Name:        keyToDisplayName("\x08"),
 		Description: "Move to previous editor or return to organizer",
@@ -29,187 +37,36 @@ func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) 
 		Examples:    []string{"Ctrl-L - Switch to next editor"},
 	})
 
-	// Text Editing commands
+	// Markup shortcuts -- the one-keystroke form of :bold / :italic / :code.
+	// In VISUAL mode these act on the selection (see VisualModeKeyHandler).
 	registry.Register(string(ctrlKey('b')), (*Editor).decorateWord, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('b'))),
-		Aliases:     []string{leader + "b"},
 		Description: "Make word bold (toggle **word**)",
 		Usage:       "Ctrl-B",
 		Category:    "Markup Shortcuts",
-		Examples:    []string{"Ctrl-B - Toggle bold formatting on current word"},
+		Examples:    []string{"Ctrl-B - Toggle bold formatting on current word", ":bold - same, and works on a visual selection"},
 	})
 
 	registry.Register(string(ctrlKey('e')), (*Editor).decorateWord, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('e'))),
-		Aliases:     []string{leader + "e"},
 		Description: "Make word code (toggle `word`)",
 		Usage:       "Ctrl-E",
 		Category:    "Markup Shortcuts",
-		Examples:    []string{"Ctrl-E - Toggle code formatting on current word"},
+		Examples:    []string{"Ctrl-E - Toggle code formatting on current word", ":code - same, and works on a visual selection"},
 	})
 
 	registry.Register(string(ctrlKey('i')), (*Editor).decorateWord, CommandInfo{
 		Name:        keyToDisplayName(string(ctrlKey('i'))),
-		Aliases:     []string{leader + "i"},
 		Description: "Make word italic (toggle *word*)",
 		Usage:       "Ctrl-I",
 		Category:    "Markup Shortcuts",
-		Examples:    []string{"Ctrl-I - Toggle italic formatting on current word"},
-	})
-
-	// Preview commands
-	registry.Register(leader+"m", (*Editor).showMarkdownPreview, CommandInfo{
-		Name:        keyToDisplayName(leader + "m"),
-		Description: "Show markdown preview of current note",
-		Usage:       "<leader>m",
-		Category:    "Preview",
-		Examples:    []string{"<leader>m - Display formatted markdown preview"},
-	})
-
-	registry.Register(leader+"w", (*Editor).showWebView, CommandInfo{
-		Name:        keyToDisplayName(leader + "w"),
-		Description: "Show current note in web browser",
-		Usage:       "<leader>w",
-		Category:    "Preview",
-		Examples:    []string{"<leader>w - Open note in web browser"},
-	})
-
-	/*
-		// Window Management commands
-		registry.Register("\x17L", (*Editor).moveOutputWindowRight, CommandInfo{
-			Name:        keyToDisplayName("\x17L"),
-			Description: "Move output window to the right",
-			Usage:       "<C-w>L",
-			Category:    "Window Management",
-			Examples:    []string{"<C-w>L - Position output window to the right"},
-		})
-
-		registry.Register("\x17J", (*Editor).moveOutputWindowBelow, CommandInfo{
-			Name:        keyToDisplayName("\x17J"),
-			Description: "Move output window below editor",
-			Usage:       "<C-w>J",
-			Category:    "Window Management",
-			Examples:    []string{"<C-w>J - Position output window below editor"},
-		})
-
-				registry.Register("\x17=", (*Editor).changeSplit, CommandInfo{
-					Name:        keyToDisplayName("\x17="),
-					Description: "Equalize split sizes",
-					Usage:       "<C-w>=",
-					Category:    "Window Management",
-					Examples:    []string{"<C-w>= - Make editor and output windows equal size"},
-				})
-			registry.Register("\x17_", (*Editor).changeSplit, CommandInfo{
-				Name:        keyToDisplayName("\x17_"),
-				Description: "Minimize output window",
-				Usage:       "<C-w>_",
-				Category:    "Window Management",
-				Examples:    []string{"<C-w>_ - Minimize output window to 2 lines"},
-			})
-
-			registry.Register("\x17-", (*Editor).changeSplit, CommandInfo{
-				Name:        keyToDisplayName("\x17-"),
-				Description: "Decrease output window height",
-				Usage:       "<C-w>-",
-				Category:    "Window Management",
-				Examples:    []string{"<C-w>- - Decrease output window height by 1 line"},
-			})
-
-			registry.Register("\x17+", (*Editor).changeSplit, CommandInfo{
-				Name:        keyToDisplayName("\x17+"),
-				Description: "Increase output window height",
-				Usage:       "<C-w>+",
-				Category:    "Window Management",
-				Examples:    []string{"<C-w>+ - Increase output window height by 1 line"},
-			})
-	*/
-
-	registry.Register("\x17>", (*Editor).changeHSplit, CommandInfo{
-		Name:        keyToDisplayName("\x17>"),
-		Description: "Increase editor width",
-		Usage:       "<C-w>>",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>> - Increase editor width by 1 column"},
-	})
-
-	registry.Register("\x17<", (*Editor).changeHSplit, CommandInfo{
-		Name:        keyToDisplayName("\x17<"),
-		Description: "Decrease editor width",
-		Usage:       "<C-w><",
-		Category:    "Window Management",
-		Examples:    []string{"<C-w>< - Decrease editor width by 1 column"},
-	})
-
-	/*
-		// Output Control commands
-		registry.Register("\x0a", (*Editor).scrollOutputDown, CommandInfo{
-			Name:        keyToDisplayName("\x0a"),
-			Description: "Scroll output window down",
-			Usage:       "Ctrl-J",
-			Category:    "Output Control",
-			Examples:    []string{"Ctrl-J - Scroll down in output window"},
-		})
-
-		registry.Register("\x0b", (*Editor).scrollOutputUp, CommandInfo{
-			Name:        keyToDisplayName("\x0b"),
-			Description: "Scroll output window up",
-			Usage:       "Ctrl-K",
-			Category:    "Output Control",
-			Examples:    []string{"Ctrl-K - Scroll up in output window"},
-		})
-	*/
-
-	// Utility commands
-	registry.Register(leader+"y", (*Editor).nextStyle, CommandInfo{
-		Name:        keyToDisplayName(leader + "y"),
-		Description: "Cycle through available styles",
-		Usage:       "<leader>y",
-		Category:    "Utility",
-		Examples:    []string{"<leader>y - Switch to next available style"},
-	})
-
-	registry.Register(leader+"t", (*Editor).readGoTemplate, CommandInfo{
-		Name:        keyToDisplayName(leader + "t"),
-		Description: "Read Go template into current note",
-		Usage:       "<leader>t",
-		Category:    "Utility",
-		Examples:    []string{"<leader>t - Insert Go template content"},
-	})
-
-	registry.Register(leader+"sp", (*Editor).spellingCheck, CommandInfo{
-		Name:        keyToDisplayName(leader + "sp"),
-		Description: "Highlight misspelled words",
-		Usage:       "<leader>sp",
-		Category:    "Utility",
-		Examples:    []string{"<leader>sp - Check spelling and highlight errors"},
-	})
-
-	registry.Register(leader+"su", (*Editor).spellSuggest, CommandInfo{
-		Name:        keyToDisplayName(leader + "su"),
-		Description: "Show spelling suggestions for current word",
-		Usage:       "<leader>su",
-		Category:    "Utility",
-		Examples:    []string{"<leader>su - Get spelling suggestions"},
+		Examples:    []string{"Ctrl-I - Toggle italic formatting on current word", ":italic - same, and works on a visual selection"},
 	})
 
 	// Store registry in editor for help command access
 	editor.normalCommandRegistry = registry
 
 	return registry.GetFunctionMap()
-}
-
-func (e *Editor) changeHSplit(flag int) {
-	var width int
-	if flag == '>' {
-		width = e.Screen.screenCols - e.Screen.divider + 1
-		app.moveDividerAbs(width)
-	} else if flag == '<' {
-		width = e.Screen.screenCols - e.Screen.divider - 1
-		app.moveDividerAbs(width)
-	} else {
-		e.ShowMessage(BL, "flag = %v", flag)
-		return
-	}
 }
 
 func (e *Editor) moveLeft(_ int) {
@@ -303,118 +160,169 @@ func (e *Editor) moveRight(_ int) {
 	return
 }
 
-// for VISUAL mode
+// splitExRange peels a leading ex range off a command line, returning the range
+// (empty if there is none) and the remainder. vim writes "'<,'>" itself when
+// ':' is pressed from VISUAL mode; "%" is the only other range vimango is
+// likely to meet.
+func splitExRange(line string) (rng, rest string) {
+	const visual = "'<,'>"
+	switch {
+	case strings.HasPrefix(line, visual):
+		return visual, line[len(visual):]
+	case strings.HasPrefix(line, "%"):
+		return "%", line[1:]
+	}
+	return "", line
+}
+
+// visualMarks reconstructs the last visual selection from vim's '< and '>
+// marks, in the same [line col][line col] shape vim.GetVisualRange returns
+// (line 1-based, col 0-based). The marks outlive the <esc> that
+// ExModeKeyHandler sends to cancel vim's cmdline, which is what lets a ranged
+// ex command still find its operand.
+func visualMarks() ([2][2]int, bool) {
+	num := func(expr string) (int, bool) {
+		n, err := strconv.Atoi(vim.EvaluateExpression(expr))
+		return n, err == nil
+	}
+	l1, ok1 := num(`line("'<")`)
+	c1, ok2 := num(`col("'<")`)
+	l2, ok3 := num(`line("'>")`)
+	c2, ok4 := num(`col("'>")`)
+	if !ok1 || !ok2 || !ok3 || !ok4 || l1 == 0 || l2 == 0 {
+		return [2][2]int{}, false
+	}
+	return [2][2]int{{l1, c1 - 1}, {l2, c2 - 1}}, true
+}
+
+// Markdown decoration markers, keyed by the Ctrl key that applies them.
+const (
+	markerBold   = "**"
+	markerItalic = "*"
+	markerCode   = "`"
+)
+
+// markerForKey maps the Ctrl-B/I/E shortcuts to a marker.
+func markerForKey(c int) string {
+	switch c {
+	case ctrlKey('b'), 'b':
+		return markerBold
+	case ctrlKey('i'), 'i':
+		return markerItalic
+	case ctrlKey('e'), 'e':
+		return markerCode
+	}
+	return ""
+}
+
+// currentMarker reports which markdown decoration s already carries, if any.
+func currentMarker(s string) string {
+	switch {
+	case strings.HasPrefix(s, markerBold):
+		return markerBold
+	case strings.HasPrefix(s, markerItalic):
+		return markerItalic
+	case strings.HasPrefix(s, markerCode):
+		return markerCode
+	}
+	return ""
+}
+
+// decorateText wraps s in marker, or strips the decoration if s already carries
+// that marker -- so applying the same style twice toggles it off. A different
+// existing marker is replaced, which is how Ctrl-B over *word* yields **word**.
+func decorateText(s, marker string) string {
+	had := currentMarker(s)
+	s = strings.Trim(s, "*`")
+	if had == marker {
+		return s
+	}
+	return marker + s + marker
+}
+
+// decorateWord is the NORMAL mode entry point (Ctrl-B/I/E): it decorates the
+// word under the cursor.
+func (e *Editor) decorateWord(c int) {
+	e.decorateCword(markerForKey(c))
+}
+
+// decorateWordVisual is the VISUAL mode entry point (Ctrl-B/I/E): it decorates
+// the current selection. The caller must have left VISUAL mode first -- see
+// decorateSpan.
 func (e *Editor) decorateWordVisual(c int) {
-	if len(e.ss) == 0 {
+	e.decorateRange(markerForKey(c), e.highlight)
+}
+
+// decorateCword decorates the word under the cursor -- what :bold and friends
+// do when given no range.
+func (e *Editor) decorateCword(marker string) {
+	if marker == "" || e.fr >= len(e.ss) {
 		return
 	}
+	row := e.ss[e.fr]
+	_, beg, end := GetWordAtIndex(row, e.fc)
+	if beg < 0 {
+		return // on whitespace or punctuation: nothing to decorate
+	}
+	e.decorateSpan(e.fr+1, beg, end+1, marker)
+}
 
-	if e.highlight[0][0] != e.highlight[1][0] {
+// decorateRange decorates a charwise selection given as [line col][line col],
+// line 1-based and col 0-based -- the shape vim.GetVisualRange returns and that
+// visualMarks reconstructs from vim's '< and '> marks.
+func (e *Editor) decorateRange(marker string, rng [2][2]int) {
+	if marker == "" {
+		return
+	}
+	if rng[0][0] != rng[1][0] {
 		e.ShowMessage(BR, "The text must all be in the same row")
 		return
 	}
-
-	row := e.ss[e.highlight[0][0]-1]
-	beg, end := e.highlight[0][1], e.highlight[1][1]
-
-	var undo bool
-	var s string
-	// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
-	if len(row) == end {
-		s = row[beg:end]
-	} else {
-		s = row[beg : end+1]
-	}
-	e.ShowMessage(BR, "end = %d", end)
-	if strings.HasPrefix(s, "**") {
-		if c == ctrlKey('b') {
-			undo = true
-		}
-	} else if s[0] == '*' {
-		if c == ctrlKey('i') {
-			undo = true
-		}
-	} else if s[0] == '`' {
-		if c == ctrlKey('e') {
-			undo = true
-		}
-	}
-	s = strings.Trim(s, "*`")
-	if undo {
-		/*
-			v.SetBufferText(e.vbuf, e.fr, beg, e.fr, end, [][]byte{word})
-			v.SetWindowCursor(w, [2]int{e.fr + 1, beg}) //set screen cx and cy from pos
-		*/
-		vim.SendMultiInput("xi" + s + "\x1b")
-		return
-	}
-
-	// Definitely weird and needs to be looked at again but lose space at end of row
-	var space string
-	if len(row) >= end-1 {
-		space = " "
-	}
-	switch c {
-	case ctrlKey('b'):
-		s = fmt.Sprintf("%s**%s**", space, s)
-	case ctrlKey('i'):
-		s = fmt.Sprintf("%s*%s*", space, s)
-	case ctrlKey('e'):
-		s = fmt.Sprintf("%s`%s`", space, s)
-	}
-
-	vim.SendMultiInput("xi" + s + "\x1b")
-	/*
-		v.SetBufferText(e.vbuf, e.fr, beg, e.fr, end, [][]byte{[]byte(newText)})
-		v.SetWindowCursor(w, [2]int{e.fr + 1, beg}) //set screen cx and cy from pos
-	*/
+	e.decorateSpan(rng[0][0], rng[0][1], rng[1][1]+1, marker)
 }
 
-func (e *Editor) decorateWord(c int) {
-	if len(e.ss) == 0 {
+// decorateSpan toggles marker on row lnum's bytes [beg,end).
+//
+// The replacement is done with vim's counted "s" rather than "ciw" or a visual
+// "x": "<n>s" substitutes exactly n characters from the cursor, so the span
+// vimango computed is the span vim edits. ciw was the old mechanism and it
+// disagreed with expand('<cword>') whenever the cursor sat on a marker --
+// <cword> skips ahead to the next word while ciw takes the punctuation run
+// under the cursor -- which is why toggling a decoration back off never worked.
+// vim must be in NORMAL mode: in VISUAL, "s" substitutes the selection instead.
+func (e *Editor) decorateSpan(lnum, beg, end int, marker string) {
+	lines := e.vbuf.Lines()
+	if lnum < 1 || lnum > len(lines) {
 		return
 	}
-
-	if e.ss[e.fr][e.fc] == ' ' {
+	row := lines[lnum-1]
+	if beg < 0 || beg >= len(row) || end <= beg {
 		return
 	}
-
-	vim.ExecuteCommand("let cword = expand('<cword>')")
-	w := vim.EvaluateExpression("cword")
-
-	if w == "" {
-		return
+	if end > len(row) {
+		end = len(row) // in VISUAL the cursor can sit past the end of the row
 	}
 
-	var undo bool
-	if strings.HasPrefix(w, "**") {
-		if c == ctrlKey('b') || c == 'b' {
-			undo = true
-		}
-	} else if w[0] == '*' {
-		if c == ctrlKey('i') || c == 'i' {
-			undo = true
-		}
-	} else if w[0] == '`' {
-		if c == ctrlKey('e') || c == 'e' {
-			undo = true
-		}
-	}
-	w = strings.Trim(w, "*`")
-	if undo {
-		vim.SendMultiInput("ciw" + w + "\x1b")
-		return
-	}
+	beg, end = expandOverMarkers(row, beg, end)
+	replacement := decorateText(row[beg:end], marker)
 
-	switch c {
-	case ctrlKey('b'), 'b':
-		w = fmt.Sprintf("**%s**", w)
-	case ctrlKey('i'), 'i':
-		w = fmt.Sprintf("*%s*", w)
-	case ctrlKey('e'), 'e':
-		w = fmt.Sprintf("`%s`", w)
+	vim.SetCursorPosition(lnum, beg)
+	vim.SendInput(fmt.Sprintf("%ds%s\x1b", end-beg, replacement))
+
+	// park the cursor on the text rather than on a trailing marker, so the
+	// same command applied again finds the word and toggles the decoration off
+	vim.SetCursorPosition(lnum, beg+len(currentMarker(replacement)))
+}
+
+// expandOverMarkers widens [beg,end) outward across a balanced run of markdown
+// markers, so a word selected or found without its decoration still toggles.
+func expandOverMarkers(row string, beg, end int) (int, int) {
+	isMarker := func(b byte) bool { return b == '*' || b == '`' }
+	for beg > 0 && end < len(row) && isMarker(row[beg-1]) && isMarker(row[end]) {
+		beg--
+		end++
 	}
-	vim.SendInput("ciw" + w + "\x1b")
+	return beg, end
 }
 
 func (e *Editor) showMarkdownPreview(_ int) {
@@ -532,3 +440,32 @@ func (e *Editor) spellSuggest(_ int) {
 	suggestions := GetSpellingSuggestions(w)
 	e.ShowMessage(BR, "%q -> %s", w, strings.Join(suggestions, "|"))
 }
+
+// Ex-command forms of the normal-mode shortcuts. The registry wants
+// func(*Editor); the normal-mode table wants func(*Editor, int).
+
+// decorateEx is the :bold / :italic / :code body: with a range it acts on the
+// visual selection, without one on the word under the cursor.
+func (e *Editor) decorateEx(marker string) {
+	if !e.exRange {
+		e.decorateCword(marker)
+		return
+	}
+	rng, ok := visualMarks()
+	if !ok {
+		e.ShowMessage(BR, "No visual selection to decorate")
+		return
+	}
+	e.decorateRange(marker, rng)
+}
+
+func (e *Editor) boldCmd()   { e.decorateEx(markerBold) }
+func (e *Editor) italicCmd() { e.decorateEx(markerItalic) }
+func (e *Editor) codeCmd()   { e.decorateEx(markerCode) }
+
+func (e *Editor) previewCmd()  { e.showMarkdownPreview(0) }
+func (e *Editor) webviewCmd()  { e.showWebView(0) }
+func (e *Editor) styleCmd()    { e.nextStyle(0) }
+func (e *Editor) templateCmd() { e.readGoTemplate(0) }
+func (e *Editor) spellCmd()    { e.spellingCheck(0) }
+func (e *Editor) suggestCmd()  { e.spellSuggest(0) }
