@@ -513,3 +513,7 @@ The sync system now supports full UUID synchronization between SQLite and Postgr
 - `cmd/migrate_local/main.go` - Standalone local database migration utility
 - `cmd/create_dbs/postgres_migrate_uuid.sql` - PostgreSQL migration script
 - `cmd/create_dbs/postgres_init4.sql` - New PostgreSQL schema with UUID support
+
+## Pending Follow-ups
+
+- **mdtopdf renamed upstream (noted 2026-10-04).** `github.com/mandolyte/mdtopdf/v2` is held at v2.2.17: from v2.2.18 the module declares itself `github.com/solworktech/md2pdf/v2`, so `go get -u` cannot move past it under the old path. Upgrading means switching the import path in `editor_cmd_line.go` and `organizer_cmd_line.go` (editor `:pdf` → `createPDF`, organizer `:print` → `printDocument`) and checking what changed in the API between 2.2.17 and the current md2pdf release. Not yet investigated.
