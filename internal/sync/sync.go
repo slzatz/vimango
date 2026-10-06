@@ -364,9 +364,12 @@ func (s *Syncer) fetchServerContainers(ct containerType, serverTime string, dele
 		var c container
 		var uuid sql.NullString
 		if deleted {
-			rows.Scan(&c.tid, &uuid, &c.title)
+			err = rows.Scan(&c.tid, &uuid, &c.title)
 		} else {
-			rows.Scan(&c.tid, &uuid, &c.title, &c.star, &c.modified)
+			err = rows.Scan(&c.tid, &uuid, &c.title, &c.star, &c.modified)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("Error scanning server_%s: %v", ct, err)
 		}
 		c.uuid = uuid.String
 		containers = append(containers, c)
@@ -392,9 +395,12 @@ func (s *Syncer) fetchClientContainers(ct containerType, clientTime string, dele
 		var c container
 		var tid sql.NullInt64
 		if deleted {
-			rows.Scan(&c.id, &tid, &c.uuid, &c.title)
+			err = rows.Scan(&c.id, &tid, &c.uuid, &c.title)
 		} else {
-			rows.Scan(&c.id, &tid, &c.uuid, &c.title, &c.star, &c.modified)
+			err = rows.Scan(&c.id, &tid, &c.uuid, &c.title, &c.star, &c.modified)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("Error scanning client_%s: %v", ct, err)
 		}
 		c.tid = int(tid.Int64)
 		containers = append(containers, c)
@@ -443,7 +449,10 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	for rows.Next() {
 		var e EntryPlusTag
 		var contextUUID, folderUUID sql.NullString
-		rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &contextUUID, &folderUUID)
+		if err = rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &contextUUID, &folderUUID); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("Error scanning server_updated_entries: %v", err)
+		}
 		e.context_uuid = contextUUID.String
 		e.folder_uuid = folderUUID.String
 		changes.serverUpdatedEntries = append(changes.serverUpdatedEntries, e)
@@ -456,7 +465,10 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	}
 	for rows.Next() {
 		var e entry
-		rows.Scan(&e.tid, &e.title)
+		if err = rows.Scan(&e.tid, &e.title); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("Error scanning server_deleted_entries: %v", err)
+		}
 		changes.serverDeletedEntries = append(changes.serverDeletedEntries, e)
 	}
 	rows.Close()
@@ -496,9 +508,17 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	}
 	for rows.Next() {
 		var e newEntry
-		var tid sql.NullInt64
-		rows.Scan(&e.id, &tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &e.context_uuid, &e.folder_uuid)
+		// context_tid/folder_tid are deprecated and NULL on databases whose
+		// schema has no DEFAULT for them; the uuids are authoritative and
+		// syncEntriesToServer resolves a tid < 1 from them.
+		var tid, contextTid, folderTid sql.NullInt64
+		if err = rows.Scan(&e.id, &tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &contextTid, &folderTid, &e.context_uuid, &e.folder_uuid); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("Error scanning client_updated_entries: %v", err)
+		}
 		e.tid = int(tid.Int64)
+		e.context_tid = int(contextTid.Int64)
+		e.folder_tid = int(folderTid.Int64)
 		changes.clientUpdatedEntries = append(changes.clientUpdatedEntries, e)
 	}
 	rows.Close()
@@ -510,7 +530,10 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	for rows.Next() {
 		var e entry
 		var tid sql.NullInt64
-		rows.Scan(&e.id, &tid, &e.title)
+		if err = rows.Scan(&e.id, &tid, &e.title); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("Error scanning client_deleted_entries: %v", err)
+		}
 		e.tid = int(tid.Int64)
 		changes.clientDeletedEntries = append(changes.clientDeletedEntries, e)
 	}
@@ -917,6 +940,9 @@ func (s *Syncer) deleteServerEntriesFromClient(entries []entry, lg io.Writer) {
 			fmt.Fprintf(lg, "Error deleting client entry %q with tid %d: %v\n", tc(e.title, 15, true), e.tid, err)
 			continue
 		}
+		if _, err = s.FtsDB.Exec("DELETE FROM fts WHERE tid=?;", e.tid); err != nil {
+			fmt.Fprintf(lg, "Error deleting fts row for tid %d: %v\n", e.tid, err)
+		}
 		fmt.Fprintf(lg, "Deleted client entry %q with tid %d\n", truncate(e.title, 15), e.tid)
 		fmt.Fprintf(lg, "and on client deleted task_tid %d from task_keyword\n", e.tid)
 	}
@@ -943,6 +969,11 @@ func (s *Syncer) deleteClientEntriesFromServer(entries []entry, lg io.Writer) {
 		if e.tid < 1 {
 			fmt.Fprintf(lg, "There is no server entry to delete for client id %d\n", e.id)
 			continue
+		}
+
+		// FTS rows are keyed by tid, so an unsynced task has none to remove.
+		if _, err = s.FtsDB.Exec("DELETE FROM fts WHERE tid=?;", e.tid); err != nil {
+			fmt.Fprintf(lg, "Error deleting fts row for tid %d: %v\n", e.tid, err)
 		}
 
 		_, err = s.PG.Exec("UPDATE task SET deleted=true, modified=now() WHERE tid=$1", e.tid)
@@ -1060,7 +1091,7 @@ func (s *Syncer) deleteKeywordFromBoth(c container, isServerDeleted bool, lg io.
 		}
 	} else {
 		// Mark as deleted on server, delete from client
-		_, err = s.PG.Exec("UPDATE keyword SET deleted=true WHERE tid=$1", c.tid)
+		_, err = s.PG.Exec("UPDATE keyword SET deleted=true, modified=now() WHERE tid=$1", c.tid)
 		if err != nil {
 			fmt.Fprintf(lg, "Error setting server keyword %q with tid %d to deleted: %v\n", c.title, c.tid, err)
 		}

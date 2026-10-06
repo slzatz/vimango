@@ -8,6 +8,22 @@ fixing it here fixes both.
 
 Ordered roughly by how likely each is to lose data.
 
+Two more found on review (2026-10-06), to be fixed together with 1-3:
+
+- **The client watermark has the same race as issue 1.** `client` is set to
+  `datetime('now')` at the end of the run, so a local write that lands
+  mid-sync is skipped for good. Examples: a hybrid GRDB star or title change,
+  or an `--editor` `:w`. Timestamps have one-second precision and the
+  comparison is a strict `>`, so an edit in the same second the sync ends is
+  lost too.
+- **Issue 2 cannot be fixed alone.** A watermark that doesn't advance re-pulls
+  the client's own pushes. Under the current rule those count as server
+  edits and discard newer local ones. A single permanently failing row would
+  also stop the watermark forever, so failures need to be tracked per row.
+
+Issue 8 is the likely source of the dangling uuids in the data finding. When a
+container push fails, its tasks are still pushed carrying its uuid.
+
 ## 1. Server watermark is taken at the end of the run
 
 `sync.go:1222-1229` stores `SELECT now()` as the `server` watermark *after*
@@ -76,6 +92,8 @@ local rows dirty for the retry.
 
 ## 4. Keyword deletes pushed to the server don't bump `modified`
 
+**Fixed 2026-10-06.**
+
 `deleteKeywordFromBoth`, at `sync.go:1063`:
 
 ```go
@@ -88,6 +106,8 @@ the delete. Every other tombstone sets `modified=now()`.
 **Fix:** `UPDATE keyword SET deleted=true, modified=now() WHERE tid=$1`.
 
 ## 5. Keywords added to a task that has never synced are orphaned
+
+**Guarded 2026-10-06:** `addTaskKeywordByUUID` now refuses, with a message, when the task or keyword has no tid yet. Keying `task_keyword` on uuid is still open.
 
 `entryTidFromId` (`dbfunc.go:21-25`) ignores its `Scan` error, so a task with
 a NULL tid returns 0. `addTaskKeywordByUUID` (`dbfunc.go:690-708`) then
@@ -107,6 +127,8 @@ refuse to add keywords until the task has synced.
 
 ## 6. Deletes never clean the FTS index
 
+**Fixed 2026-10-06** for future deletes. The existing orphans (74 rows, plus one tid with a duplicate row) still need the one-off cleanup.
+
 The local delete paths (`sync.go:907-962`) remove `task_keyword` and `task`
 rows but never touch `fts5_vimango.db`. Orphaned FTS rows build up: about
 5,923 FTS rows against 5,849 tasks as of 2026-10-04. FTS rows are also keyed by
@@ -116,6 +138,8 @@ tid, so a task has no FTS row until its first sync (`~/vimango_hybrid/HISTORY.md
 a one-off cleanup of the existing orphans.
 
 ## 7. The `--init` schema breaks pushing new tasks
+
+**Fixed 2026-10-06:** `DEFAULT 1` restored, NULL tids scan as 0 and resolve from the uuids, and `fetchAllChanges` fails on any scan error.
 
 In `init.go`, the canonical schema gives `folder_tid` and `context_tid` no
 DEFAULT. Production databases were created earlier and have `DEFAULT 1`.

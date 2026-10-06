@@ -687,41 +687,46 @@ func (db *Database) getContainerInfo(id int, view View) Container {
 	return c
 }
 
-func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, update_fts bool) {
+// addTaskKeywordByUUID attaches a keyword to a task. task_keyword is keyed
+// by server tids, so both the task and the keyword must have synced first:
+// a NULL tid would be stored as 0 and the association silently lost on the
+// next sync (SYNC_ISSUES.md #5).
+func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, update_fts bool) error {
 	entry_tid := db.entryTidFromId(entry_id)
+	if entry_tid < 1 {
+		return fmt.Errorf("entry %d has not been synced yet - sync before adding keywords", entry_id)
+	}
 
-	// Look up keyword_tid from uuid (needed because task_keyword.keyword_tid is NOT NULL)
-	var keyword_tid int
+	var keyword_tid sql.NullInt64
 	err := db.MainDB.QueryRow("SELECT tid FROM keyword WHERE uuid=?;", keyword_uuid).Scan(&keyword_tid)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - looking up keyword tid: %v", err)
-		return
+		return fmt.Errorf("looking up keyword tid: %v", err)
+	}
+	if !keyword_tid.Valid || keyword_tid.Int64 < 1 {
+		return fmt.Errorf("keyword has not been synced yet - sync before using it")
 	}
 
 	_, err = db.MainDB.Exec("INSERT OR IGNORE INTO task_keyword (task_tid, keyword_tid, keyword_uuid) VALUES (?, ?, ?);",
-		entry_tid, keyword_tid, keyword_uuid)
-
+		entry_tid, keyword_tid.Int64, keyword_uuid)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - INSERT or IGNORE INTO task_keyword: %v", err)
-		return
+		return fmt.Errorf("INSERT OR IGNORE INTO task_keyword: %v", err)
 	}
 
 	_, err = db.MainDB.Exec("UPDATE task SET modified = datetime('now') WHERE id=?;", entry_id)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - Update task modified: %v", err)
-		return
+		return fmt.Errorf("updating task modified: %v", err)
 	}
 
 	// *************fts virtual table update**********************
 	if !update_fts {
-		return
+		return nil
 	}
 	s := db.getTaskKeywords(entry_id)
-	//_, err = fts_db.Exec("UPDATE fts SET tag=? WHERE lm_id=?;", s, entry_id)
 	_, err = db.FtsDB.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in addTaskKeywordByUUID - fts Update: %v", err)
+		return fmt.Errorf("fts update: %v", err)
 	}
+	return nil
 }
 
 /*
