@@ -822,7 +822,8 @@ type run struct {
 	nextServer, nextClient string       // saved at the end of the run
 	resolved               map[int]bool // local task ids the pull settled; not pushed
 	resolvedContainers     map[containerType]map[int]bool
-	copies                 []newEntry // conflict copies, pushed in this run
+	remap                  map[containerType]map[string]string // container uuids merged away this run -> their replacement
+	copies                 []newEntry                          // conflict copies, pushed in this run
 	conflicts              int
 	deferred               int // pushes the server refused because it had moved on
 	pullFailures           int
@@ -887,43 +888,223 @@ func (s *Syncer) markPushed(table string, id int, fetchedModified, serverModifie
 	return err
 }
 
+// Containers are matched by tid, but their titles are unique on both sides
+// too, and that is what users go by (SYNC_ISSUES.md 8). Three cases would
+// otherwise fail on every run:
+//
+//   - The same title created on two clients before either synced. They mean
+//     the same container, so the second client adopts the server's row and
+//     moves its own references (tasks, task_keyword) onto it.
+//   - A title still held by a server tombstone (titles stay UNIQUE across
+//     deleted rows). The tombstone's title is freed — renamed to
+//     "deleted-<tid>" without bumping modified, so no client sees a change.
+//   - A local rename onto a title a different live container has. Merging
+//     two real containers is not what a rename means, so the rename is
+//     undone and the server's title restored.
+
+// localContainer is a client container row looked up by tid, uuid or title.
+type localContainer struct {
+	id             int
+	tid            sql.NullInt64
+	uuid           string
+	title          string
+	modified       sql.NullString
+	serverModified sql.NullString
+}
+
+func (s *Syncer) localContainerWhere(ct containerType, where string, arg interface{}) (*localContainer, error) {
+	var lc localContainer
+	err := s.MainDB.QueryRow(fmt.Sprintf("SELECT id, tid, uuid, title, modified, server_modified FROM %s WHERE %s;", ct, where), arg).
+		Scan(&lc.id, &lc.tid, &lc.uuid, &lc.title, &lc.modified, &lc.serverModified)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("looking up local %s by %s: %v", ct, where, err)
+	}
+	return &lc, nil
+}
+
 // syncContainersToClient applies containers the server changed.
 func (s *Syncer) syncContainersToClient(ct containerType, containers []container, r *run, lg io.Writer) {
 	for _, c := range containers {
-		var id int
-		var modified, serverModified sql.NullString
-		query := fmt.Sprintf("SELECT id, modified, server_modified FROM %s WHERE tid=?;", ct)
-		err := s.MainDB.QueryRow(query, c.tid).Scan(&id, &modified, &serverModified)
-		switch {
-		case err == sql.ErrNoRows:
-			query = fmt.Sprintf("INSERT INTO %s (tid, uuid, title, star, modified, server_modified, deleted) VALUES (?, ?, ?, ?, ?, ?, false);", ct)
-			if _, err = s.MainDB.Exec(query, c.tid, c.uuid, c.title, c.star, r.nextClient, c.modified); err != nil {
-				r.pullFailures++
-				fmt.Fprintf(lg, "**Error** inserting new %s %q into sqlite: %v\n", ct, c.title, err)
-				continue
-			}
-			fmt.Fprintf(lg, "Inserted local %s: %q with tid: %v uuid: %s\n", ct, c.title, c.tid, c.uuid)
-		case err != nil:
+		if err := s.applyServerContainer(ct, c, r, lg); err != nil {
 			r.pullFailures++
-			fmt.Fprintf(lg, "**Error** looking up local %s with tid %d: %v\n", ct, c.tid, err)
-		case serverModified.Valid && serverModified.String == c.modified:
-			// Our own push coming back.
-		default:
-			query = fmt.Sprintf("UPDATE %s SET title=?, star=?, uuid=?, modified=?, server_modified=? WHERE id=?;", ct)
-			if _, err = s.MainDB.Exec(query, c.title, c.star, c.uuid, r.nextClient, c.modified, id); err != nil {
-				r.pullFailures++
-				fmt.Fprintf(lg, "**Error** updating sqlite for %s with tid: %v: %v\n", ct, c.tid, err)
-				continue
-			}
-			// The server wins a container both sides changed; pushing the
-			// local version afterwards would leave the two sides disagreeing.
-			if r.isDirty(modified.String) {
-				r.resolvedContainers[ct][id] = true
-				fmt.Fprintf(lg, "Server won: local %s %q (tid %d) was also changed on the server\n", ct, c.title, c.tid)
-			}
-			fmt.Fprintf(lg, "Updated local %s: %q with tid: %v uuid: %s\n", ct, c.title, c.tid, c.uuid)
+			fmt.Fprintf(lg, "**Error** applying server %s %q (tid %d): %v\n", ct, c.title, c.tid, err)
 		}
 	}
+}
+
+func (s *Syncer) applyServerContainer(ct containerType, c container, r *run, lg io.Writer) error {
+	local, err := s.localContainerWhere(ct, "tid=?", c.tid)
+	if err != nil {
+		return err
+	}
+	if local == nil {
+		// Our own insert, from a run that failed before recording the tid.
+		if local, err = s.localContainerWhere(ct, "uuid=? AND tid IS NULL", c.uuid); err != nil {
+			return err
+		}
+		if local != nil {
+			if _, err = s.MainDB.Exec(fmt.Sprintf("UPDATE %s SET tid=? WHERE id=?;", ct), c.tid, local.id); err != nil {
+				return err
+			}
+		}
+	}
+	if local != nil && local.serverModified.Valid && local.serverModified.String == c.modified {
+		return nil // our own push coming back
+	}
+
+	// Another local row holding this title has to give it up first.
+	holder, err := s.localContainerWhere(ct, "title=?", c.title)
+	if err != nil {
+		return err
+	}
+	if holder != nil && (local == nil || holder.id != local.id) {
+		if holder.tid.Valid && holder.tid.Int64 > 0 {
+			if err := s.revertRename(ct, holder, r, lg); err != nil {
+				return err
+			}
+		} else {
+			if err := s.adoptServerContainer(ct, holder, c, r, lg); err != nil {
+				return err
+			}
+			if local == nil {
+				return nil // the holder became this container's row
+			}
+		}
+	}
+
+	if local == nil {
+		query := fmt.Sprintf("INSERT INTO %s (tid, uuid, title, star, modified, server_modified, deleted) VALUES (?, ?, ?, ?, ?, ?, false);", ct)
+		if _, err = s.MainDB.Exec(query, c.tid, c.uuid, c.title, c.star, r.nextClient, c.modified); err != nil {
+			return fmt.Errorf("inserting into sqlite: %v", err)
+		}
+		fmt.Fprintf(lg, "Inserted local %s: %q with tid: %v uuid: %s\n", ct, c.title, c.tid, c.uuid)
+		return nil
+	}
+
+	query := fmt.Sprintf("UPDATE %s SET title=?, star=?, uuid=?, modified=?, server_modified=? WHERE id=?;", ct)
+	if _, err = s.MainDB.Exec(query, c.title, c.star, c.uuid, r.nextClient, c.modified, local.id); err != nil {
+		return fmt.Errorf("updating sqlite: %v", err)
+	}
+	// The server wins a container both sides changed; pushing the local
+	// version afterwards would leave the two sides disagreeing.
+	if r.isDirty(local.modified.String) {
+		r.resolvedContainers[ct][local.id] = true
+		fmt.Fprintf(lg, "Server won: local %s %q (tid %d) was also changed on the server\n", ct, c.title, c.tid)
+	}
+	fmt.Fprintf(lg, "Updated local %s: %q with tid: %v uuid: %s\n", ct, c.title, c.tid, c.uuid)
+	return nil
+}
+
+// revertRename gives a local container back the title the server has for
+// it, because its local title belongs to a different container.
+func (s *Syncer) revertRename(ct containerType, lc *localContainer, r *run, lg io.Writer) error {
+	var title, serverModified string
+	var star bool
+	err := s.PG.QueryRow(fmt.Sprintf("SELECT title, star, modified::text FROM %s WHERE tid=$1;", ct), lc.tid.Int64).
+		Scan(&title, &star, &serverModified)
+	if err != nil {
+		return fmt.Errorf("reading server title of %s tid %d: %v", ct, lc.tid.Int64, err)
+	}
+	if title == lc.title {
+		return fmt.Errorf("%s title %q is held by two server rows", ct, title)
+	}
+	_, err = s.MainDB.Exec(fmt.Sprintf("UPDATE %s SET title=?, star=?, modified=?, server_modified=? WHERE id=?;", ct),
+		title, star, r.nextClient, serverModified, lc.id)
+	if err != nil {
+		return fmt.Errorf("restoring local %s title %q: %v", ct, title, err)
+	}
+	r.resolvedContainers[ct][lc.id] = true
+	if r.isDirty(lc.modified.String) {
+		fmt.Fprintf(lg, "Server won: renaming %s %q to %q was undone; another %s already has that title\n", ct, title, lc.title, ct)
+	} else {
+		fmt.Fprintf(lg, "Renamed local %s %q to %q to match the server\n", ct, lc.title, title)
+	}
+	return nil
+}
+
+// adoptServerContainer folds a local container that never reached the
+// server into the server's container with the same title: the local row
+// becomes it (or is merged into the local copy of it), and every task and
+// task_keyword reference moves over. Moved tasks are touched so the new
+// reference is pushed.
+func (s *Syncer) adoptServerContainer(ct containerType, lc *localContainer, sc container, r *run, lg io.Writer) error {
+	var target string
+	merged := false
+	_, err := s.withTx(func(tx *sql.Tx) (bool, error) {
+		// References move after the uuid they point at changes.
+		if _, err := tx.Exec("PRAGMA defer_foreign_keys=ON;"); err != nil {
+			return false, err
+		}
+		var existingID int
+		err := tx.QueryRow(fmt.Sprintf("SELECT id, uuid FROM %s WHERE tid=?;", ct), sc.tid).Scan(&existingID, &target)
+		switch {
+		case err == sql.ErrNoRows:
+			target = sc.uuid
+			_, err = tx.Exec(fmt.Sprintf("UPDATE %s SET tid=?, uuid=?, title=?, star=?, modified=?, server_modified=? WHERE id=?;", ct),
+				sc.tid, sc.uuid, sc.title, sc.star, r.nextClient, sc.modified, lc.id)
+			if err != nil {
+				return false, err
+			}
+		case err != nil:
+			return false, err
+		default:
+			merged = true
+		}
+
+		if lc.uuid != target {
+			if ct == containerTypeKeyword {
+				if _, err := tx.Exec("UPDATE task SET modified=datetime('now') WHERE tid IN "+
+					"(SELECT task_tid FROM task_keyword WHERE keyword_uuid=?);", lc.uuid); err != nil {
+					return false, err
+				}
+				if _, err := tx.Exec("UPDATE OR IGNORE task_keyword SET keyword_uuid=?, keyword_tid=? WHERE keyword_uuid=?;",
+					target, sc.tid, lc.uuid); err != nil {
+					return false, err
+				}
+				if _, err := tx.Exec("DELETE FROM task_keyword WHERE keyword_uuid=?;", lc.uuid); err != nil {
+					return false, err
+				}
+			} else {
+				field := "context_uuid"
+				if ct == containerTypeFolder {
+					field = "folder_uuid"
+				}
+				if _, err := tx.Exec(fmt.Sprintf("UPDATE task SET %[1]s=?, modified=datetime('now') WHERE %[1]s=?;", field),
+					target, lc.uuid); err != nil {
+					return false, err
+				}
+			}
+		}
+		if merged {
+			if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE id=?;", ct), lc.id); err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("adopting server %s %q (tid %d): %v", ct, sc.title, sc.tid, err)
+	}
+	if lc.uuid != target {
+		r.remap[ct][lc.uuid] = target
+	}
+	r.resolvedContainers[ct][lc.id] = true
+	fmt.Fprintf(lg, "%s %q was created here and on another client; merged into the server's (tid %d)\n", ct, sc.title, sc.tid)
+	return nil
+}
+
+// freeTitle renames a server tombstone out of the way so its title can be
+// used again. modified is left alone: no client has the row or needs it.
+func (s *Syncer) freeTitle(ct containerType, tid int, title string, lg io.Writer) error {
+	_, err := s.PG.Exec(fmt.Sprintf("UPDATE %s SET title='deleted-' || tid WHERE tid=$1 AND deleted;", ct), tid)
+	if err != nil {
+		return fmt.Errorf("freeing %s title %q held by deleted tid %d: %v", ct, title, tid, err)
+	}
+	fmt.Fprintf(lg, "Freed %s title %q, held by deleted tid %d\n", ct, title, tid)
+	return nil
 }
 
 // syncContainersToServer pushes containers the client changed.
@@ -947,8 +1128,29 @@ func (s *Syncer) pushContainer(ct containerType, c container, r *run, lg io.Writ
 		return fmt.Errorf("SELECT EXISTS: %v", err)
 	}
 
+	// Does a different server row already hold this title?
+	var holder container
+	var holderDeleted bool
+	query = fmt.Sprintf("SELECT tid, uuid, title, star, deleted, modified::text FROM %s WHERE title=$1 AND tid<>$2;", ct)
+	err := s.PG.QueryRow(query, c.title, c.tid).Scan(&holder.tid, &holder.uuid, &holder.title, &holder.star, &holderDeleted, &holder.modified)
+	clash := err == nil
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("checking server for title %q: %v", c.title, err)
+	}
+	if clash && holderDeleted {
+		if err := s.freeTitle(ct, holder.tid, holder.title, lg); err != nil {
+			return err
+		}
+		clash = false
+	}
+
 	var serverModified string
 	if exists {
+		if clash {
+			lc := &localContainer{id: c.id, tid: sql.NullInt64{Int64: int64(c.tid), Valid: true}, uuid: c.uuid, title: c.title,
+				modified: sql.NullString{String: c.modified, Valid: true}}
+			return s.revertRename(ct, lc, r, lg)
+		}
 		query = fmt.Sprintf("UPDATE %s SET title=$1, star=$2, uuid=$3, modified=now() WHERE tid=$4 RETURNING modified::text;", ct)
 		if err := s.PG.QueryRow(query, c.title, c.star, c.uuid, c.tid).Scan(&serverModified); err != nil {
 			return fmt.Errorf("updating postgres: %v", err)
@@ -958,6 +1160,10 @@ func (s *Syncer) pushContainer(ct containerType, c container, r *run, lg io.Writ
 		}
 		fmt.Fprintf(lg, "Updated server %s: %q with tid: %v uuid: %s\n", ct, c.title, c.tid, c.uuid)
 		return nil
+	}
+
+	if clash {
+		return s.adoptServerContainer(ct, &localContainer{id: c.id, uuid: c.uuid, title: c.title}, holder, r, lg)
 	}
 
 	var tid int
@@ -1282,6 +1488,13 @@ func (s *Syncer) pushEntry(e newEntry, r *run, lg io.Writer) (deferred bool, err
 	}
 	if e.folder_uuid == "" {
 		e.folder_uuid = DefaultFolderUUID
+	}
+	// The local rows were re-pointed already; this copy was fetched before.
+	if u, ok := r.remap[containerTypeContext][e.context_uuid]; ok {
+		e.context_uuid = u
+	}
+	if u, ok := r.remap[containerTypeFolder][e.folder_uuid]; ok {
+		e.folder_uuid = u
 	}
 	contextTid, err := s.containerTid(containerTypeContext, e.context_uuid)
 	if err == errNoContainer {
@@ -1739,6 +1952,9 @@ func (s *Syncer) Synchronize(reportOnly bool) (log string, err error) {
 		prevClient: clientTime,
 		resolved:   map[int]bool{},
 		resolvedContainers: map[containerType]map[int]bool{
+			containerTypeContext: {}, containerTypeFolder: {}, containerTypeKeyword: {},
+		},
+		remap: map[containerType]map[string]string{
 			containerTypeContext: {}, containerTypeFolder: {}, containerTypeKeyword: {},
 		},
 	}

@@ -537,3 +537,188 @@ func TestMissingContainerFallsBackToNone(t *testing.T) {
 		t.Errorf("server context_uuid for the local orphan = %q, want 'none'", ctx)
 	}
 }
+
+// hideServerChanges moves a client's server watermark to now, so its next
+// pull misses everything already on the server and a clash surfaces on the
+// push side instead — what a create racing another client's sync sees.
+func (c *testClient) hideServerChanges() {
+	c.t.Helper()
+	var now string
+	if err := c.s.PG.QueryRow("SELECT localtimestamp::text;").Scan(&now); err != nil {
+		c.t.Fatal(err)
+	}
+	c.exec("UPDATE sync SET timestamp=? WHERE machine='server';", now)
+}
+
+func (c *testClient) contextUUIDOf(title string) string {
+	c.t.Helper()
+	var uuid string
+	if err := c.s.MainDB.QueryRow("SELECT context_uuid FROM task WHERE title=?;", title).Scan(&uuid); err != nil {
+		c.t.Fatalf("%s: context of %q: %v", c.name, title, err)
+	}
+	return uuid
+}
+
+func serverContexts(t *testing.T, pg *sql.DB) map[string]string {
+	t.Helper()
+	rows, err := pg.Query("SELECT title, uuid FROM context WHERE deleted=false;")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	m := map[string]string{}
+	for rows.Next() {
+		var title, uuid string
+		rows.Scan(&title, &uuid)
+		m[title] = uuid
+	}
+	return m
+}
+
+// Issue 8: the same title created on two clients is one container. Both
+// the pull side (B sees A's container first) and the push side (B's insert
+// collides) must merge, and B's notes must follow.
+func TestSameTitleCreatedOnTwoClientsMerges(t *testing.T) {
+	for _, side := range []string{"pull", "push"} {
+		t.Run(side, func(t *testing.T) {
+			pg := newServer(t)
+			a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+			b.sync()
+
+			a.exec("INSERT INTO context (title, uuid) VALUES ('work', 'work-from-A');")
+			a.exec("INSERT INTO task (title, added, context_uuid) VALUES ('A note', datetime('now'), 'work-from-A');")
+			a.sync()
+
+			if side == "push" {
+				b.hideServerChanges()
+			}
+			b.exec("INSERT INTO context (title, uuid) VALUES ('work', 'work-from-B');")
+			b.exec("INSERT INTO task (title, added, context_uuid) VALUES ('B note', datetime('now'), 'work-from-B');")
+			log := b.sync()
+			if strings.Contains(log, "**Error**") || strings.Contains(log, "not advanced") {
+				t.Fatalf("B's sync failed on the clash:\n%s", log)
+			}
+
+			if got := b.contextUUIDOf("B note"); got != "work-from-A" {
+				t.Errorf("B's note is in context %q, want A's 'work'\n%s", got, log)
+			}
+			if n := b.count(b.s.MainDB, "SELECT COUNT(*) FROM context WHERE title='work';"); n != 1 {
+				t.Errorf("B has %d 'work' contexts", n)
+			}
+			if got := serverContexts(t, pg)["work"]; got != "work-from-A" {
+				t.Errorf("server 'work' uuid = %q", got)
+			}
+
+			a.sync()
+			if got := a.contextUUIDOf("B note"); got != "work-from-A" {
+				t.Errorf("on A, B's note is in context %q", got)
+			}
+			if log := b.sync(); strings.Contains(log, "**Error**") {
+				t.Errorf("the merge left something failing:\n%s", log)
+			}
+		})
+	}
+}
+
+// Keywords merge the same way, carrying their task_keyword rows along.
+func TestSameKeywordCreatedOnTwoClientsMerges(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	id := b.addNote("tagged", "x")
+	b.sync()
+	tid := b.tidOf(id)
+	a.sync()
+
+	a.exec("INSERT INTO keyword (title, uuid) VALUES ('urgent', 'kw-A');")
+	a.sync()
+	b.hideServerChanges()
+	b.exec("INSERT INTO keyword (title, uuid, tid) VALUES ('urgent', 'kw-B', NULL);")
+	// What addTaskKeywordByUUID would have refused; written directly to
+	// exercise moving an existing association.
+	b.exec("INSERT INTO task_keyword (task_tid, keyword_tid, keyword_uuid) VALUES (?, NULL, 'kw-B');", tid)
+	b.exec("UPDATE task SET modified=datetime('now') WHERE id=?;", id)
+	if log := b.sync(); strings.Contains(log, "**Error**") {
+		t.Fatalf("B's sync failed on the keyword clash:\n%s", log)
+	}
+	b.sync()
+
+	var n int
+	pg.QueryRow("SELECT COUNT(*) FROM task_keyword tk JOIN keyword k ON k.tid=tk.keyword_tid WHERE tk.task_tid=$1 AND k.title='urgent';", tid).Scan(&n)
+	if n != 1 {
+		t.Errorf("the keyword association did not reach the server under the merged keyword (rows: %d)", n)
+	}
+	if n := b.count(b.s.MainDB, "SELECT COUNT(*) FROM task_keyword WHERE keyword_uuid='kw-B';"); n != 0 {
+		t.Errorf("B still has %d task_keyword rows on the merged-away keyword", n)
+	}
+}
+
+// Issue 8, tombstones: a deleted container's title can be used again,
+// whether by creating a container or by renaming one.
+func TestDeletedTitleCanBeReused(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	a.exec("INSERT INTO context (title, uuid) VALUES ('cpp', 'cpp-1'), ('rust', 'rust-1'), ('home', 'home-1');")
+	a.sync()
+	a.exec("UPDATE context SET deleted=true, modified=datetime('now') WHERE title IN ('cpp', 'rust');")
+	a.sync()
+
+	a.exec("INSERT INTO context (title, uuid) VALUES ('cpp', 'cpp-2');")
+	a.exec("INSERT INTO task (title, added, context_uuid) VALUES ('new cpp note', datetime('now'), 'cpp-2');")
+	a.exec("UPDATE context SET title='rust', modified=datetime('now') WHERE title='home';")
+	if log := a.sync(); strings.Contains(log, "**Error**") {
+		t.Fatalf("reusing deleted titles failed:\n%s", log)
+	}
+
+	ctx := serverContexts(t, pg)
+	if ctx["cpp"] != "cpp-2" {
+		t.Errorf("server 'cpp' = %q, want the new container", ctx["cpp"])
+	}
+	if ctx["rust"] != "home-1" {
+		t.Errorf("server 'rust' = %q, want the renamed 'home'", ctx["rust"])
+	}
+	b.sync()
+	if got := b.contextUUIDOf("new cpp note"); got != "cpp-2" {
+		t.Errorf("on B the note is in %q", got)
+	}
+}
+
+// Issue 8, renames: renaming onto a title another live container has is
+// undone, on whichever side the clash shows up.
+func TestRenameOntoExistingTitleIsRejected(t *testing.T) {
+	for _, side := range []string{"pull", "push"} {
+		t.Run(side, func(t *testing.T) {
+			pg := newServer(t)
+			a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+			a.exec("INSERT INTO context (title, uuid) VALUES ('home', 'home-1');")
+			a.sync()
+			b.sync()
+			a.exec("INSERT INTO context (title, uuid) VALUES ('work', 'work-1');")
+			a.sync()
+
+			if side == "push" {
+				b.hideServerChanges()
+			}
+			b.exec("UPDATE context SET title='work', modified=datetime('now') WHERE uuid='home-1';")
+			log := b.sync()
+			if !strings.Contains(log, "Server won:") {
+				t.Errorf("the rejected rename was not reported with the marker hybrid looks for:\n%s", log)
+			}
+			if strings.Contains(log, "**Error**") || strings.Contains(log, "not advanced") {
+				t.Errorf("the clash failed the sync:\n%s", log)
+			}
+
+			var title string
+			b.s.MainDB.QueryRow("SELECT title FROM context WHERE uuid='home-1';").Scan(&title)
+			if title != "home" {
+				t.Errorf("B's renamed context is %q, want it back to 'home'", title)
+			}
+			ctx := serverContexts(t, pg)
+			if ctx["home"] != "home-1" || ctx["work"] != "work-1" {
+				t.Errorf("server contexts changed: %v", ctx)
+			}
+		})
+	}
+}

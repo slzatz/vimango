@@ -165,7 +165,13 @@ On a freshly `--init`'d database:
 
 ## 8. Containers match by tid only; title collisions fail
 
-Still open. Until it is fixed, a title clash on pull fails that row, which holds the server watermark back until the clash is resolved.
+**Fixed 2026-10-07.** Three cases, all handled on both pull and push:
+
+- **The same title created on two clients:** the second client adopts the server's container and moves its tasks and `task_keyword` rows onto it.
+- **A title held by a server tombstone** (titles stay UNIQUE across deleted rows; the server had three, `populus`, `how-to` and `cpp`): the tombstone is renamed `deleted-<tid>` without bumping `modified`, and the create or rename then goes through.
+- **A rename onto a title another live container has:** the rename is undone and logged as `Server won:`.
+
+A check on 2026-10-07 found no tid/uuid disagreements between this machine's containers and the server's.
 
 Pull (`sync.go:675-703`) and push (`706-741`) match contexts, folders and
 keywords by tid alone, but titles are UNIQUE on both sides. Two clients that
