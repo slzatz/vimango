@@ -8,7 +8,7 @@ fixing it here fixes both.
 
 Ordered roughly by how likely each is to lose data.
 
-Two more found on review (2026-10-06), to be fixed together with 1-3:
+Two more found on review (2026-10-06), both fixed together with 1-3:
 
 - **The client watermark has the same race as issue 1.** `client` is set to
   `datetime('now')` at the end of the run, so a local write that lands
@@ -25,6 +25,8 @@ Issue 8 is the likely source of the dangling uuids in the data finding. When a
 container push fails, its tasks are still pushed carrying its uuid.
 
 ## 1. Server watermark is taken at the end of the run
+
+**Fixed 2026-10-06** together with 2, 3 and the two review findings below. The design notes are in the comment above `run` in `sync.go`.
 
 `sync.go:1222-1229` stores `SELECT now()` as the `server` watermark *after*
 everything has been pulled and pushed. A row another client commits while the
@@ -58,6 +60,8 @@ Two things have to change with it:
 
 ## 2. Watermarks advance even when rows failed
 
+**Fixed 2026-10-06.** A row that fails or is refused on push is touched, so it stays dirty and is retried. The server watermark only advances when every pulled row applied.
+
 Every step logs its errors and carries on: `syncEntriesToServer`,
 `syncContainersToServer`, the delete loops and others return nothing.
 `sync.go:1222-1240` then moves both watermarks forward regardless. A row whose
@@ -70,6 +74,8 @@ Pushing per row and stopping at the first failure also leaves the remaining
 local rows dirty for the retry.
 
 ## 3. "Server wins" only covers edits from the same run; the losing edit is dropped
+
+**Fixed 2026-10-06:** `server_modified` per row, guarded pushes and `"(conflict YYYY-MM-DD)"` copies, matching iOS. Rows that predate the column fall back to "the server hasn't changed since the previous pull". A local delete that loses to a server edit restores the note. A local edit to a note deleted elsewhere is kept as a conflict copy.
 
 `sync.go:823-826` skips a client push if the same tid was pulled earlier in
 *this* run, and logs `Server won:`. Two consequences:
@@ -159,6 +165,8 @@ On a freshly `--init`'d database:
 
 ## 8. Containers match by tid only; title collisions fail
 
+Still open. Until it is fixed, a title clash on pull fails that row, which holds the server watermark back until the clash is resolved.
+
 Pull (`sync.go:675-703`) and push (`706-741`) match contexts, folders and
 keywords by tid alone, but titles are UNIQUE on both sides. Two clients that
 both create a container with the same title before syncing get a constraint
@@ -168,6 +176,8 @@ error on one side. Because of issue 2 the error is not retried.
 re-point local rows to it.
 
 ## Data finding (server, not code)
+
+**Client side handled 2026-10-06:** sync now files a task whose container uuid has no row under "none", on push and on pull, instead of failing. The server rows still need the cleanup below.
 
 46 live tasks reference a `context_uuid` that has **no row at all** in
 `context`, not even a deleted one:

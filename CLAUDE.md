@@ -101,6 +101,13 @@ NOTE: Generally we have not been running tests but have tested key functionality
 - Test: `go test ./...`
 - Test single package: `go test ./path/to/package`
 - Test single function: `go test -run TestFunctionName`
+- Sync integration tests (`internal/sync/sync_integration_test.go`) simulate several clients against a throwaway Postgres and are skipped unless `VIMANGO_TEST_PG` is set to a DSN (no `dbname`) for a server they may create databases on — each test makes and drops its own. With Homebrew's `postgresql@17`:
+  ```bash
+  initdb -D /tmp/vtpg -U postgres --auth=trust
+  pg_ctl -D /tmp/vtpg -o "-p 54329 -k '' -c listen_addresses=127.0.0.1 -c TimeZone=UTC" -l /tmp/vtpg.log start
+  VIMANGO_TEST_PG='host=127.0.0.1 port=54329 user=postgres sslmode=disable' CGO_ENABLED=1 go test --tags=fts5 ./internal/sync/
+  ```
+  `-k ''` because the socket path under a long `$TMPDIR` exceeds the 103-byte limit. Never point it at the real server.
 
 ## Runtime Options
 - `--help`, `-h`: Display help message with all available options and exit
@@ -425,11 +432,11 @@ Startup performs no network I/O even when PostgreSQL is configured: `InitDatabas
 
 ### `vimango-sync` modes
 Three, in ascending cost — pick the cheapest that answers the question:
-- `--probe`: "how many changes is the server ahead by?" One watermark read from SQLite (`sync` table, `machine='server'`) plus one Postgres `SELECT` of four `COUNT(*)`s. Prints a single integer, applies nothing, writes to neither database, never opens the FTS db. Cheap enough to run unattended — vimango_hybrid probes on window activation.
-- `--report-only`: the full engine, reporting without applying. Use when you need the *breakdown*, not a count — it costs a dozen-plus round trips and pulls full note bodies over the wire.
+- `--probe`: "how many changes would a sync apply?" One watermark read from SQLite (`sync` table, `machine='server'`), one Postgres `SELECT` of `(table, tid, modified, deleted)` stamps since it, and a point lookup per stamp in SQLite. Prints a single integer, applies nothing, writes to neither database, never opens the FTS db. Cheap enough to run unattended — vimango_hybrid probes on window activation.
+- `--report-only`: the full engine, reporting without applying. Use when you need the *breakdown*, not a count — it costs a dozen-plus round trips and pulls full note bodies over the wire. Its one write: adding the `server_modified` columns to an older client database.
 - (no flag): sync and apply.
 
-`Probe` deliberately omits the `deleted` filter: deletions bump `modified`, and `fetchAllChanges` counts both updated and deleted rows, so an unfiltered count matches what a real sync would find. Cross-checked against `--report-only` on a rewound watermark — 57 updated + 3 deleted = 60, and `Probe` returned 60.
+The server watermark is taken two minutes *before* each sync (see the comment above `run` in `internal/sync/sync.go`), so a bare `modified > watermark` count would include this client's own recent pushes. `Probe` instead compares each stamp with the `server_modified` the local row holds and skips matches, as the iOS client's probe does. Tombstones still count, since deletions bump `modified`, except for rows this client doesn't have, because applying those is a no-op. `fetchAllChanges` drops the same rows (`dropSeen`), so "Number of changes" in the sync log — which hybrid shows as "· N changes" — agrees with `Probe`.
 
 ### How It Works
 - **Containers** (contexts, folders, keywords) are identified by UUID rather than PostgreSQL-assigned `tid` values
