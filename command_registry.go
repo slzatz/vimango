@@ -258,16 +258,6 @@ func levenshteinDistance(s1, s2 string) int {
 	return matrix[len(s1)][len(s2)]
 }
 
-func min(a, b, c int) int {
-	if a < b && a < c {
-		return a
-	}
-	if b < c {
-		return b
-	}
-	return c
-}
-
 // keyToDisplayName converts key sequences to human-readable format for help display
 func keyToDisplayName(key string) string {
 	var representation []string

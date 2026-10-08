@@ -194,9 +194,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 	}
 	o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
 	if o.mode == VISUAL {
-		pos := vim.GetVisualRange()
-		o.highlight[1] = pos[1][1] + 1
-		o.highlight[0] = pos[0][1]
+		o.setVisualHighlight(s, vim.GetVisualRange())
 		redraw = RedrawPartial
 	}
 	o.ShowMessage(BL, "%s", s)
@@ -235,10 +233,20 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 	mode := vim.GetCurrentMode() // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
 	o.mode = modeMap[mode]       //note that 8 => SEARCH (8 is also COMMAND)
 	o.command = ""
-	visPos := vim.GetVisualRange()
-	o.highlight[1] = visPos[1][1] + 1
-	o.highlight[0] = visPos[0][1]
+	o.setVisualHighlight(s, vim.GetVisualRange())
 	o.showMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])
+}
+
+// setVisualHighlight records the selection on title as a byte range [lo, hi).
+// vim reports the anchor and the cursor, in either order, each as the byte
+// offset of a character the selection includes, so the end steps over the whole
+// rune rather than one byte.
+func (o *Organizer) setVisualHighlight(title string, pos [2][2]int) {
+	lo, hi := pos[0][1], pos[1][1]
+	if hi < lo {
+		lo, hi = hi, lo
+	}
+	o.highlight = [2]int{min(lo, len(title)), inclusiveEnd(title, hi)}
 }
 
 func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {

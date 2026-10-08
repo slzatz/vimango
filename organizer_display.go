@@ -13,9 +13,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
+	"github.com/mattn/go-runewidth"
 	"github.com/slzatz/vimango/auth"
 )
 
@@ -160,43 +162,73 @@ func (o *Organizer) refreshScreen() {
 func (o *Organizer) drawActiveRow(ab *strings.Builder) {
 	// When drawing the current row there are only two things
 	// we need to deal with: 1) horizontal scrolling and 2) visual mode highlighting
+	if o.coloff == 0 && o.mode != VISUAL {
+		return
+	}
 
 	titlecols := o.titleColumnWidth()
 	y := o.fr - o.rowoff
-	row := &o.rows[o.fr]
+	title := o.rows[o.fr].title
 
-	if o.coloff > 0 {
-		fmt.Fprintf(ab, "\x1b[%d;%dH\x1b[1K\x1b[%dG", y+TOP_MARGIN+1, titlecols+LEFT_MARGIN+1, LEFT_MARGIN+1)
-		length := len(row.title) - o.coloff
-		if length > titlecols {
-			length = titlecols
-		}
-		if length < 0 {
-			length = 0
-		}
-		beg := o.coloff
-		if len(row.title[beg:]) > length {
-			ab.WriteString(row.title[beg : beg+length])
-		} else {
-			ab.WriteString(row.title[beg:])
-		}
-	}
-
+	// coloff and the title window are display columns; the highlight is a byte
+	// range, so measure it before comparing
+	end := o.coloff + titlecols
+	lo, hi := o.coloff, o.coloff
 	if o.mode == VISUAL {
-		var j, k int
-		if o.highlight[1] > o.highlight[0] {
-			j, k = 0, 1
-		} else {
-			k, j = 0, 1
-		}
-
-		fmt.Fprintf(ab, "\x1b[%d;%dH\x1b[1K\x1b[%dG", y+TOP_MARGIN+1, titlecols+LEFT_MARGIN+1, LEFT_MARGIN+1)
-		ab.WriteString(row.title[o.coloff : o.highlight[j]-o.coloff])
-		ab.WriteString(LIGHT_GRAY_BG)
-		ab.WriteString(row.title[o.highlight[j] : o.highlight[k]-o.coloff])
-		ab.WriteString(RESET)
-		ab.WriteString(row.title[o.highlight[k]:])
+		lo = min(max(runewidth.StringWidth(title[:min(o.highlight[0], len(title))]), o.coloff), end)
+		hi = min(max(runewidth.StringWidth(title[:min(o.highlight[1], len(title))]), lo), end)
 	}
+
+	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
+	before, n1 := clipColumns(title, o.coloff, lo-o.coloff)
+	selected, n2 := clipColumns(title, lo, hi-lo)
+	after, n3 := clipColumns(title, hi, end-hi)
+	ab.WriteString(before)
+	if selected != "" {
+		ab.WriteString(LIGHT_GRAY_BG)
+		ab.WriteString(selected)
+		ab.WriteString(RESET)
+	}
+	ab.WriteString(after)
+	ab.WriteString(strings.Repeat(" ", titlecols-n1-n2-n3))
+}
+
+// clipColumns returns the part of s that falls in display columns
+// [from, from+width) and how many columns it fills. Titles are measured in
+// display columns on screen but stored as UTF-8, so slicing them by titlecols
+// cut multi-byte characters in half. CSI escapes (the fts highlight markers)
+// take no columns and are all kept, so a highlight the clip cuts off is still
+// closed. A wide rune straddling an edge becomes spaces for its visible part.
+func clipColumns(s string, from, width int) (string, int) {
+	var b strings.Builder
+	end := from + width
+	w, cols := 0, 0
+	for i := 0; i < len(s); {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			j := i + 2
+			for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
+				j++
+			}
+			j = min(j+1, len(s))
+			b.WriteString(s[i:j])
+			i = j
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		rw := runewidth.RuneWidth(r)
+		switch {
+		case w >= from && w+rw <= end:
+			b.WriteString(s[i : i+size])
+			cols += rw
+		case w < end && w+rw > from:
+			n := min(w+rw, end) - max(w, from)
+			b.WriteString(strings.Repeat(" ", n))
+			cols += n
+		}
+		w += rw
+		i += size
+	}
+	return b.String(), cols
 }
 
 func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int) {
@@ -228,12 +260,9 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 		ab.WriteString(BLACK + YELLOW_BG)
 	}
 
-	if len(row.title) > titlecols {
-		ab.WriteString(row.title[:titlecols])
-	} else {
-		ab.WriteString(row.title)
-		ab.WriteString(strings.Repeat(" ", titlecols-len(row.title)))
-	}
+	title, cols := clipColumns(row.title, 0, titlecols)
+	ab.WriteString(title)
+	ab.WriteString(strings.Repeat(" ", titlecols-cols))
 
 	ab.WriteString(RESET)
 	o.writeImageMarker(ab, y, row.hasImage)
@@ -282,24 +311,9 @@ func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 		ab.WriteString(BLACK + YELLOW_BG)
 	}
 
-	if len(row.title) <= titlecols {
-		ab.WriteString(row.ftsTitle)
-	} else {
-		pos := strings.Index(row.ftsTitle, "\x1b[49m")
-		if pos > 0 && pos < titlecols+11 && len(row.ftsTitle) >= titlecols+15 {
-			ab.WriteString(row.ftsTitle[:titlecols+15])
-		} else {
-			ab.WriteString(row.title[:titlecols])
-		}
-	}
-
-	length := len(row.title)
-	if length > titlecols {
-		length = titlecols
-	}
-	if spaces := titlecols - length; spaces > 0 {
-		ab.WriteString(strings.Repeat(" ", spaces))
-	}
+	title, cols := clipColumns(row.ftsTitle, 0, titlecols)
+	ab.WriteString(title)
+	ab.WriteString(strings.Repeat(" ", titlecols-cols))
 	ab.WriteString(RESET)
 	o.writeImageMarker(ab, y, row.hasImage)
 

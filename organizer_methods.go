@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 func (o *Organizer) moveAltCursor(key int) {
@@ -79,15 +82,26 @@ func (o *Organizer) scroll() (offset_changed bool) {
 		o.rowoff = o.fr
 	}
 
-	if o.fc > titlecols+o.coloff-1 {
-		o.coloff = o.fc - titlecols + 1
+	// o.fc is a byte offset, as libvim reports it; coloff and cx are display
+	// columns, so measure the title up to the cursor and the glyph under it
+	title := o.rows[o.fr].title
+	fc := runeStart(title, o.fc)
+	col := runewidth.StringWidth(title[:fc])
+	w := 1 // in INSERT the cursor can sit just past the last character
+	if fc < len(title) {
+		r, _ := utf8.DecodeRuneInString(title[fc:])
+		w = max(runewidth.RuneWidth(r), 1)
 	}
 
-	if o.fc < o.coloff {
-		o.coloff = o.fc
+	if col+w > titlecols+o.coloff {
+		o.coloff = col + w - titlecols
 	}
 
-	o.cx = o.fc - o.coloff
+	if col < o.coloff {
+		o.coloff = col
+	}
+
+	o.cx = col - o.coloff
 	o.cy = o.fr - o.rowoff
 
 	return prev_offset != o.rowoff

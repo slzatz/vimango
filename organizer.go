@@ -25,7 +25,7 @@ type Organizer struct {
 	fc, fr    int // file x and y position
 	rowoff    int //the number of rows scrolled (aka number of top rows now off-screen
 	altRowoff int //the number of rows scrolled in the right window (aka number of top rows now off-screen)
-	coloff    int //the number of columns scrolled (aka number of left rows now off-screen
+	coloff    int //the number of display columns of the current title scrolled off the left
 
 	rows            []Row
 	altRows         []AltRow
