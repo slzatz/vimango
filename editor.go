@@ -10,7 +10,7 @@ import (
 
 type Editor struct {
 	cx, cy             int //screen cursor x and y position
-	fc, fr             int // file cursor x and y position
+	fc, fr             int // file cursor: fc is a byte offset into ss[fr], as libvim reports it; fr is the 0-based row
 	lineOffset         int //first row based on user scroll
 	screenlines        int //number of lines for this Editor
 	screencols         int //number of columns for this Editor

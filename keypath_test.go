@@ -278,3 +278,30 @@ func TestNoLeaderCommandsRemain(t *testing.T) {
 		}
 	}
 }
+
+// libvim reports the cursor column as a byte offset, and the screen-position
+// code takes one. e.fc used to be converted to a rune count in between, so on a
+// line of three-byte smart quotes the drawn cursor fell behind vim's and edits
+// landed to the right of it.
+func TestCursorColumnOnMultiByteLine(t *testing.T) {
+	e := newTestEditor(t, "‘x“y’") // each quote is 3 bytes, 1 column
+
+	e.editorProcessKey('$')
+	e.scroll()
+	if e.fc != 8 || e.cx != 4 {
+		t.Errorf("after $: fc=%d cx=%d, want fc=8 cx=4", e.fc, e.cx)
+	}
+
+	e.editorProcessKey('0')
+	e.sendKeys("ll")
+	e.scroll()
+	if e.fc != 4 || e.cx != 2 {
+		t.Errorf("after 0ll: fc=%d cx=%d, want fc=4 cx=2", e.fc, e.cx)
+	}
+
+	// x deletes the glyph the cursor is drawn on
+	e.editorProcessKey('x')
+	if got, want := e.line(0), "‘xy’"; got != want {
+		t.Errorf("after x: %q, want %q", got, want)
+	}
+}

@@ -6,7 +6,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/slzatz/vimango/vim"
 )
@@ -26,7 +25,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.command_line = ""
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
-		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+		e.fc = pos[1]
 		// vim clears the message line on <esc>; it does not announce NORMAL
 		e.ShowMessage(BR, "")
 		//return false
@@ -148,7 +147,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		pos[1] = len(e.ss[e.fr])
 	}
 
-	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+	e.fc = pos[1]
 
 	return
 }
@@ -226,7 +225,7 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 	e.ss = e.vbuf.Lines()
 	pos := vim.GetCursorPosition() //set screen cx and cy from pos
 	e.fr = pos[0] - 1
-	e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+	e.fc = pos[1]
 	return e.mode != PREVIEW, true
 }
 
@@ -242,7 +241,7 @@ func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 		e.ss = e.vbuf.Lines()
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
-		e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+		e.fc = pos[1]
 		return true, true
 	}
 	return false, false
@@ -300,7 +299,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 				e.ss = e.vbuf.Lines()
 				pos := vim.GetCursorPosition() //set screen cx and cy from pos
 				e.fr = pos[0] - 1
-				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+				e.fc = pos[1]
 				e.ShowMessage(BL, "search and replace: %s", fullLine)
 				return true, true
 			}
@@ -355,7 +354,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 				if pos[1] > len(e.ss[e.fr]) {
 					pos[1] = len(e.ss[e.fr])
 				}
-				e.fc = utf8.RuneCountInString(e.ss[e.fr][:pos[1]])
+				e.fc = pos[1]
 				return true, true
 			}
 			return false, true
