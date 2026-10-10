@@ -722,3 +722,79 @@ func TestRenameOntoExistingTitleIsRejected(t *testing.T) {
 		})
 	}
 }
+
+// legacyTidForeignKeys rebuilds the client's (empty) task table with the
+// foreign keys on the deprecated tid columns that databases created before
+// the uuid migration still carry.
+func (c *testClient) legacyTidForeignKeys() {
+	c.t.Helper()
+	c.exec("PRAGMA foreign_keys=OFF;")
+	c.exec("DROP TABLE task;")
+	c.exec(`CREATE TABLE task (
+	id INTEGER PRIMARY KEY, tid INTEGER UNIQUE, star BOOLEAN DEFAULT FALSE, title TEXT NOT NULL,
+	folder_tid INTEGER DEFAULT 1, context_tid INTEGER DEFAULT 1,
+	folder_uuid TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000002',
+	context_uuid TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
+	note TEXT, archived BOOLEAN DEFAULT FALSE, deleted BOOLEAN DEFAULT FALSE, added TEXT NOT NULL,
+	modified TEXT DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY(folder_tid) REFERENCES folder (tid), FOREIGN KEY(context_tid) REFERENCES context (tid),
+	FOREIGN KEY(folder_uuid) REFERENCES folder (uuid), FOREIGN KEY(context_uuid) REFERENCES context (uuid));`)
+	c.exec("PRAGMA foreign_keys=ON;")
+}
+
+// A container delete must not be blocked by a task whose stale context_tid
+// still names the container after the task moved out of it by uuid — on a
+// client schema with the legacy tid foreign key, the local DELETE failed
+// and the delete was retried, and failed, on every sync.
+func TestContainerDeleteWithStaleTidReference(t *testing.T) {
+	for _, side := range []string{"server", "client"} {
+		t.Run(side, func(t *testing.T) {
+			pg := newServer(t)
+			a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+			a.legacyTidForeignKeys()
+			b.legacyTidForeignKeys()
+
+			a.exec("INSERT INTO context (title, uuid) VALUES ('old', 'old-1'), ('other', 'other-1');")
+			a.exec("INSERT INTO task (title, added, context_uuid) VALUES ('moved', datetime('now'), 'other-1');")
+			a.sync()
+			b.sync()
+
+			// The deleting side is the one holding the stale tid.
+			deleter, stale := a, a
+			if side == "server" {
+				stale = b
+			}
+			var oldTid, otherTid int
+			stale.s.MainDB.QueryRow("SELECT tid FROM context WHERE uuid='old-1';").Scan(&oldTid)
+			stale.s.MainDB.QueryRow("SELECT tid FROM context WHERE uuid='other-1';").Scan(&otherTid)
+			stale.exec("UPDATE task SET context_tid=? WHERE title='moved';", oldTid)
+
+			deleter.exec("UPDATE context SET deleted=true, modified=datetime('now') WHERE uuid='old-1';")
+			log := deleter.sync()
+			if side == "server" {
+				log = stale.sync()
+			}
+			if strings.Contains(log, "**Error**") || strings.Contains(log, "not advanced") {
+				t.Fatalf("the delete failed on the stale tid:\n%s", log)
+			}
+
+			if n := stale.count(stale.s.MainDB, "SELECT COUNT(*) FROM context WHERE uuid='old-1';"); n != 0 {
+				t.Errorf("the deleted context is still on the client")
+			}
+			var ctxTid int
+			var ctxUUID string
+			stale.s.MainDB.QueryRow("SELECT context_tid, context_uuid FROM task WHERE title='moved';").Scan(&ctxTid, &ctxUUID)
+			if ctxUUID != "other-1" || ctxTid != otherTid {
+				t.Errorf("the note is in context %q (tid %d), want 'other-1' (tid %d)", ctxUUID, ctxTid, otherTid)
+			}
+			var deleted bool
+			pg.QueryRow("SELECT deleted FROM context WHERE uuid='old-1';").Scan(&deleted)
+			if !deleted {
+				t.Errorf("the server context was not marked deleted")
+			}
+			if log := stale.sync(); strings.Contains(log, "**Error**") {
+				t.Errorf("a later sync still fails:\n%s", log)
+			}
+		})
+	}
+}

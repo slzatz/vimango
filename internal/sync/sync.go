@@ -1749,6 +1749,24 @@ func (s *Syncer) deleteContainerFromBoth(ct containerType, c container, isServer
 		fmt.Fprintf(lg, "The number of client entries that were changed to 'none': **%d**\n", rowsAffected)
 	}
 
+	// Older client schemas still have a foreign key on the deprecated tid
+	// column (task.context_tid REFERENCES context(tid)), and the uuid match
+	// above skips a task whose stale tid still names this container — one
+	// moved out of it by uuid, which never touched the tid. That row would
+	// fail the DELETE below. Re-derive its tid from its own uuid; modified
+	// is left alone, since the task itself has not changed.
+	if c.tid > 0 {
+		query = fmt.Sprintf("UPDATE task SET %[1]s=(SELECT tid FROM %[2]s WHERE uuid=task.%[3]s) WHERE %[1]s=?;",
+			taskField, ct, uuidField)
+		res, err = s.MainDB.Exec(query, c.tid)
+		if err != nil {
+			return fmt.Errorf("clearing stale client entry %s references to a deleted %s: %v", taskField, ct, err)
+		}
+		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
+			fmt.Fprintf(lg, "Re-derived a stale %s from %s for %d client entries\n", taskField, uuidField, rowsAffected)
+		}
+	}
+
 	if isServerDeleted {
 		// Delete from client only
 		query = fmt.Sprintf("DELETE FROM %s WHERE tid=?", ct)
