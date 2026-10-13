@@ -22,9 +22,16 @@ func TestWikiLinkRendering(t *testing.T) {
 			`see <span class="wikilink" data-target="other-note">other-note</span> there`,
 		},
 		{
-			"relabeled",
-			"see [[other-note|that one]]",
-			`<span class="wikilink" data-target="other-note">that one</span>`,
+			// No "|label" form: a bar is just part of the title, which
+			// is what makes a title like "dmesg | grep ttyUSB" linkable.
+			"a bar is part of the title",
+			"see [[dmesg | grep ttyUSB]]",
+			`<span class="wikilink" data-target="dmesg | grep ttyUSB">dmesg | grep ttyUSB</span>`,
+		},
+		{
+			"so is a bracket",
+			"[[a[b]]",
+			`<span class="wikilink" data-target="a[b">a[b</span>`,
 		},
 		{
 			"underscores are not emphasis",
@@ -32,14 +39,14 @@ func TestWikiLinkRendering(t *testing.T) {
 			`<span class="wikilink" data-target="feedback_skill_scope">feedback_skill_scope</span>`,
 		},
 		{
-			"empty label falls back to target",
-			"[[a-note|]]",
+			"surrounding space is trimmed",
+			"[[ a-note ]]",
 			`<span class="wikilink" data-target="a-note">a-note</span>`,
 		},
 		{
 			"escaped",
-			"[[a<b|x & y]]",
-			`<span class="wikilink" data-target="a&lt;b">x &amp; y</span>`,
+			"[[a<b & c]]",
+			`<span class="wikilink" data-target="a&lt;b &amp; c">a&lt;b &amp; c</span>`,
 		},
 	}
 	for _, tc := range cases {
@@ -79,7 +86,7 @@ func TestWikiLinkNonMatches(t *testing.T) {
 		"single bracket":  "[name]",
 		"empty":           "[[]]",
 		"whitespace only": "[[ ]]",
-		"nested bracket":  "[[a[b]]",
+		"split by a line": "[[a\nb]]",
 	}
 	for name, src := range cases {
 		got := convertMarkdownToHTML(src, false)
@@ -125,9 +132,9 @@ func TestWikiLinkAnchors(t *testing.T) {
 			`<a class="wikilink" href="vimango://note/other-note" data-target="other-note">other-note</a>`,
 		},
 		{
-			"relabeled keeps the target in the href and the attribute",
-			"[[other-note|that one]]",
-			`<a class="wikilink" href="vimango://note/other-note" data-target="other-note">that one</a>`,
+			"a bar in the title is escaped in the href",
+			"[[a|b]]",
+			`<a class="wikilink" href="vimango://note/a%7Cb" data-target="a|b">a|b</a>`,
 		},
 		{
 			// A title is arbitrary user text. Each of these means
@@ -216,24 +223,9 @@ func TestWikiLinkTID(t *testing.T) {
 		want    string
 	}{
 		{
-			"bare shows the current title",
+			"shows the current title",
 			"[[tid:6546]]", true,
 			`<a class="wikilink" href="vimango://tid/6546" data-tid="6546" data-target="tid:6546">Sync &lt;topology&gt;</a>`,
-		},
-		{
-			"a label wins over the title",
-			"[[tid:6546|the topology note]]", true,
-			`data-target="tid:6546">the topology note</a>`,
-		},
-		{
-			"a label that is just the target is no label",
-			"[[tid:6546|tid:6546]]", true,
-			`>Sync &lt;topology&gt;</a>`,
-		},
-		{
-			"an empty label is no label",
-			"[[tid:6546|]]", true,
-			`>Sync &lt;topology&gt;</a>`,
 		},
 		{
 			"span form carries the tid too",
@@ -244,11 +236,6 @@ func TestWikiLinkTID(t *testing.T) {
 			"gone is marked missing but stays clickable",
 			"[[tid:42]]", true,
 			`<a class="wikilink missing" href="vimango://tid/42" data-tid="42" data-target="tid:42">tid:42</a>`,
-		},
-		{
-			"gone keeps its label",
-			"[[tid:42|old note]]", true,
-			`<a class="wikilink missing" href="vimango://tid/42" data-tid="42" data-target="tid:42">old note</a>`,
 		},
 		{
 			"a lookup that failed claims nothing",
@@ -276,9 +263,26 @@ func TestWikiLinkTIDWithoutResolver(t *testing.T) {
 	}
 }
 
-// Anything that is not "tid:" and digits is a title, as it always was.
-func TestWikiLinkTIDNonMatches(t *testing.T) {
-	for _, src := range []string{"[[tid:]]", "[[tid:abc]]", "[[tid:+5]]", "[[tid:-5]]", "[[tid:0]]", "[[tid:12x]]", "[[TID:5]]", "[[6546]]"} {
+// "tid:" is reserved: digits after it, or no reference at all -- never a
+// quiet fall back to a title link. The text stays on screen as typed.
+func TestWikiLinkTIDMalformed(t *testing.T) {
+	for _, src := range []string{
+		"[[tid:]]", "[[tid:abc]]", "[[tid:+5]]", "[[tid:-5]]", "[[tid:0]]",
+		"[[tid:12x]]", "[[tid:6546|label]]", "[[tid: 6546]]",
+	} {
+		got := renderWikiOnly(t, src, true, fakeTitles(map[int64]string{6546: "t"}))
+		if strings.Contains(got, "wikilink") {
+			t.Errorf("%q should not be a reference: %s", src, got)
+		}
+		if !strings.Contains(got, "[[tid:") {
+			t.Errorf("%q lost its text: %s", src, got)
+		}
+	}
+}
+
+// Anything not starting with exactly "tid:" is a title, digits and all.
+func TestWikiLinkTIDLookalikesAreTitles(t *testing.T) {
+	for _, src := range []string{"[[TID:5]]", "[[6546]]", "[[tids:5]]"} {
 		got := renderWikiOnly(t, src, true, fakeTitles(nil))
 		if strings.Contains(got, "data-tid") || !strings.Contains(got, `href="vimango://note/`) {
 			t.Errorf("%q should be a title reference: %s", src, got)

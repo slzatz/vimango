@@ -15,10 +15,10 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// Wiki-style cross references:
+// Wiki-style cross references, in exactly two forms:
 //
-//	see [[some-other-note]]
-//	see [[some-other-note|what to call it here]]
+//	see [[some-other-note]]   a note by title
+//	see [[tid:6546]]          a note by its server id
 //
 // The memory docs use these to point at each other. Plain CommonMark has
 // no such syntax, so they used to survive to the screen as literal
@@ -39,17 +39,25 @@ import (
 // peek window renders without it, so a peeked note's own references stay
 // inert and one click can never become a pile of windows.
 //
-// The target rides in data-target either way -- it is the only place the
-// target survives when a [[target|label]] renames it.
+// The target rides in data-target either way, so a host or a script can
+// read what was written without parsing the href back apart.
 //
-// A reference can also name a note by its tid -- [[tid:6546]] or
-// [[tid:6546|what to call it]] -- the server id every vimango client
+// A tid reference names the note by the server id every vimango client
 // shares and that a rename never touches. A title reference breaks the
 // moment its note is renamed, and cannot say which of several notes with
-// the same title it meant; a tid reference does neither. Without a label
-// it shows the note's title as of this render, looked up through
-// titleForTID, so even the displayed name follows a rename. The prefix is
-// there because a title can be all digits.
+// the same title it meant; a tid reference does neither. It shows the
+// note's title as of this render, looked up through titleForTID, so even
+// the displayed name follows a rename.
+//
+// There is no third form, and no "|label": the note's title is its name,
+// and words about why a link is there go in the sentence around it. So
+// everything between the brackets is the title -- "|", "[" and anything
+// else included -- except that "tid:" is reserved. "tid:" with anything
+// but digits after it is no reference at all and stays on screen as
+// typed, where the mistake can be seen, rather than turning quietly into
+// a link to a title nobody has. The prefix exists because a title can be
+// all digits. The one thing a title reference cannot hold is "]]", which
+// ends it, or a line break.
 //
 // An inline parser rather than a regex over the source, which is the
 // whole reason this is worth writing: goldmark never runs inline parsers
@@ -61,13 +69,8 @@ var kindWikiLink = ast.NewNodeKind("WikiLink")
 
 type wikiLinkNode struct {
 	ast.BaseInline
-	// Target is what was written before any "|"; Label is what to show.
-	// Equal unless the reference was relabeled.
+	// Target is everything between the brackets, trimmed.
 	Target []byte
-	Label  []byte
-	// Labeled is whether a non-empty "|label" was written. A tid
-	// reference without one shows the note's current title instead.
-	Labeled bool
 	// TID is the note's server id when Target is "tid:<digits>", else 0.
 	TID int64
 }
@@ -77,7 +80,6 @@ func (n *wikiLinkNode) Kind() ast.NodeKind { return kindWikiLink }
 func (n *wikiLinkNode) Dump(source []byte, level int) {
 	ast.DumpHelper(n, source, level, map[string]string{
 		"Target": string(n.Target),
-		"Label":  string(n.Label),
 	}, nil)
 }
 
@@ -100,42 +102,28 @@ func (wikiLinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Contex
 		// what happens today.
 		return nil
 	}
-	inner := line[2 : 2+end]
-	// A stray bracket inside means this is not one reference, and
-	// guessing which one it is would be inventing syntax.
-	if bytes.ContainsAny(inner, "[]") {
-		return nil
-	}
-
-	target, label := inner, inner
-	if i := bytes.IndexByte(inner, '|'); i >= 0 {
-		target, label = inner[:i], inner[i+1:]
-	}
-	target = bytes.TrimSpace(target)
-	label = bytes.TrimSpace(label)
+	target := bytes.TrimSpace(line[2 : 2+end])
 	if len(target) == 0 {
 		return nil
 	}
-	// Labeled is about what was written, not what shows: "[[t|t]]" and
-	// "[[t|]]" both said nothing beyond the target.
-	labeled := len(label) > 0 && !bytes.Equal(label, target)
-	if len(label) == 0 {
-		// "[[target|]]" -- a relabel that named nothing. The target is
-		// still a perfectly good thing to show.
-		label = target
+	var tid int64
+	if digits, ok := bytes.CutPrefix(target, []byte("tid:")); ok {
+		// Reserved: a tid reference or nothing. Returning nil leaves the
+		// brackets on screen as typed.
+		if tid = parseTID(digits); tid == 0 {
+			return nil
+		}
 	}
 
 	block.Advance(2 + end + 2)
-	return &wikiLinkNode{Target: target, Label: label, Labeled: labeled, TID: parseTIDTarget(target)}
+	return &wikiLinkNode{Target: target, TID: tid}
 }
 
-// parseTIDTarget returns the tid in a "tid:<digits>" target, or 0 for
-// anything else -- which then stays an ordinary title reference. Digits
-// only: ParseInt alone would also take "+5" and "-5", and neither is an
-// id anyone wrote on purpose.
-func parseTIDTarget(target []byte) int64 {
-	digits, ok := bytes.CutPrefix(target, []byte("tid:"))
-	if !ok || len(digits) == 0 {
+// parseTID returns the id in the digits after "tid:", or 0 if they are not
+// a positive id. Digits only: ParseInt alone would also take "+5" and
+// "-5", and neither is an id anyone wrote on purpose.
+func parseTID(digits []byte) int64 {
+	if len(digits) == 0 {
 		return 0
 	}
 	for _, c := range digits {
@@ -169,7 +157,7 @@ type titleForTID func(tid int64) (string, error)
 
 // dbTitleForTID resolves against the open main database, or is nil when
 // there is none (tests, or a render before InitDatabases). A nil resolver
-// shows "tid:N" for an unlabeled reference and never marks one missing.
+// shows "tid:N" and never marks a reference missing.
 func dbTitleForTID() titleForTID {
 	if app == nil || app.Database == nil || app.Database.MainDB == nil {
 		return nil
@@ -214,31 +202,30 @@ func (r wikiLinkRenderer) render(w util.BufWriter, source []byte, node ast.Node,
 	}
 	_, _ = w.Write(util.EscapeHTML(n.Target))
 	_, _ = w.WriteString(`">`)
-	_, _ = w.Write(util.EscapeHTML(n.Label))
+	_, _ = w.Write(util.EscapeHTML(n.Target))
 	if r.anchors {
 		_, _ = w.WriteString(`</a>`)
 	} else {
 		_, _ = w.WriteString(`</span>`)
 	}
-	// The node has no children -- the label is not re-parsed as markdown,
+	// The node has no children -- the title is not re-parsed as markdown,
 	// because a reference is a name and not a place to put emphasis.
 	return ast.WalkSkipChildren, nil
 }
 
-// renderTID writes a tid reference. Same markup as a title reference, plus
+// renderTID writes a tid reference: the note's current title, or "tid:N"
+// when there is none to show. Same markup as a title reference, plus
 // data-tid, and a "missing" class when the resolver says the note is gone
 // -- still an anchor then, so a click reaches the host and it can say so,
 // the same as a title that names nothing.
 func (r wikiLinkRenderer) renderTID(w util.BufWriter, n *wikiLinkNode) {
 	tid := strconv.FormatInt(n.TID, 10)
-	label, missing := n.Label, false
+	label, missing := n.Target, false
 	if r.titleForTID != nil {
 		title, err := r.titleForTID(n.TID)
 		switch {
-		case err == nil:
-			if !n.Labeled {
-				label = []byte(title)
-			}
+		case err == nil && title != "":
+			label = []byte(title)
 		case errors.Is(err, sql.ErrNoRows):
 			missing = true
 		}
