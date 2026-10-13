@@ -537,6 +537,13 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
                baseline, and these names are full of g, y and p. */
             text-underline-offset: 2px;
         }
+        /* A [[tid:N]] whose note is gone -- deleted, or never synced
+           here. Struck through rather than hidden: the reference is
+           still what the author wrote, it just leads nowhere now. */
+        .wikilink.missing {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
         img {
             max-width: 100%;
             height: auto;
@@ -865,7 +872,9 @@ func convertMarkdownToHTML(markdown string, linkNotes bool) string {
 			// [[note-name]] cross references (wikilink.go). Anchors only
 			// when the caller is a host that will intercept the click --
 			// see the note there on why that is the caller's to say.
-			wikiLinkExtension{anchors: linkNotes},
+			// [[tid:N]] references resolve their current title
+			// through the open database, when there is one.
+			wikiLinkExtension{anchors: linkNotes, titleForTID: dbTitleForTID()},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs

@@ -2,7 +2,10 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
+	"errors"
 	"net/url"
+	"strconv"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -39,6 +42,15 @@ import (
 // The target rides in data-target either way -- it is the only place the
 // target survives when a [[target|label]] renames it.
 //
+// A reference can also name a note by its tid -- [[tid:6546]] or
+// [[tid:6546|what to call it]] -- the server id every vimango client
+// shares and that a rename never touches. A title reference breaks the
+// moment its note is renamed, and cannot say which of several notes with
+// the same title it meant; a tid reference does neither. Without a label
+// it shows the note's title as of this render, looked up through
+// titleForTID, so even the displayed name follows a rename. The prefix is
+// there because a title can be all digits.
+//
 // An inline parser rather than a regex over the source, which is the
 // whole reason this is worth writing: goldmark never runs inline parsers
 // inside a code span or a fenced block, so a note that *documents* this
@@ -53,6 +65,11 @@ type wikiLinkNode struct {
 	// Equal unless the reference was relabeled.
 	Target []byte
 	Label  []byte
+	// Labeled is whether a non-empty "|label" was written. A tid
+	// reference without one shows the note's current title instead.
+	Labeled bool
+	// TID is the note's server id when Target is "tid:<digits>", else 0.
+	TID int64
 }
 
 func (n *wikiLinkNode) Kind() ast.NodeKind { return kindWikiLink }
@@ -99,6 +116,9 @@ func (wikiLinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Contex
 	if len(target) == 0 {
 		return nil
 	}
+	// Labeled is about what was written, not what shows: "[[t|t]]" and
+	// "[[t|]]" both said nothing beyond the target.
+	labeled := len(label) > 0 && !bytes.Equal(label, target)
 	if len(label) == 0 {
 		// "[[target|]]" -- a relabel that named nothing. The target is
 		// still a perfectly good thing to show.
@@ -106,7 +126,28 @@ func (wikiLinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Contex
 	}
 
 	block.Advance(2 + end + 2)
-	return &wikiLinkNode{Target: target, Label: label}
+	return &wikiLinkNode{Target: target, Label: label, Labeled: labeled, TID: parseTIDTarget(target)}
+}
+
+// parseTIDTarget returns the tid in a "tid:<digits>" target, or 0 for
+// anything else -- which then stays an ordinary title reference. Digits
+// only: ParseInt alone would also take "+5" and "-5", and neither is an
+// id anyone wrote on purpose.
+func parseTIDTarget(target []byte) int64 {
+	digits, ok := bytes.CutPrefix(target, []byte("tid:"))
+	if !ok || len(digits) == 0 {
+		return 0
+	}
+	for _, c := range digits {
+		if c < '0' || c > '9' {
+			return 0
+		}
+	}
+	tid, err := strconv.ParseInt(string(digits), 10, 64)
+	if err != nil || tid <= 0 {
+		return 0
+	}
+	return tid
 }
 
 // wikiLinkScheme is the URL scheme a host intercepts. Deliberately not a
@@ -115,7 +156,36 @@ func (wikiLinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Contex
 // same URL parser it would use for any other link.
 const wikiLinkScheme = "vimango://note/"
 
-type wikiLinkRenderer struct{ anchors bool }
+// wikiLinkTIDScheme is the same thing for a tid reference. Its own host
+// component, so the receiver never has to guess whether "6546" is an id or
+// a note that happens to be titled with digits.
+const wikiLinkTIDScheme = "vimango://tid/"
+
+// titleForTID resolves a tid reference to the note's current title. It
+// returns sql.ErrNoRows when there is no such live note -- the reference
+// is then marked missing -- and any other error when it could not tell,
+// in which case nothing is claimed either way.
+type titleForTID func(tid int64) (string, error)
+
+// dbTitleForTID resolves against the open main database, or is nil when
+// there is none (tests, or a render before InitDatabases). A nil resolver
+// shows "tid:N" for an unlabeled reference and never marks one missing.
+func dbTitleForTID() titleForTID {
+	if app == nil || app.Database == nil || app.Database.MainDB == nil {
+		return nil
+	}
+	db := app.Database.MainDB
+	return func(tid int64) (string, error) {
+		var title string
+		err := db.QueryRow("SELECT title FROM task WHERE tid=? AND deleted=0;", tid).Scan(&title)
+		return title, err
+	}
+}
+
+type wikiLinkRenderer struct {
+	anchors     bool
+	titleForTID titleForTID
+}
 
 func (r wikiLinkRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(kindWikiLink, r.render)
@@ -127,6 +197,10 @@ func (r wikiLinkRenderer) render(w util.BufWriter, source []byte, node ast.Node,
 		return ast.WalkContinue, nil
 	}
 	n := node.(*wikiLinkNode)
+	if n.TID != 0 {
+		r.renderTID(w, n)
+		return ast.WalkSkipChildren, nil
+	}
 	if r.anchors {
 		// PathEscape, not EscapeHTML, for the href: a title may hold a
 		// slash, a question mark or a hash, and each of those means
@@ -151,11 +225,51 @@ func (r wikiLinkRenderer) render(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkSkipChildren, nil
 }
 
+// renderTID writes a tid reference. Same markup as a title reference, plus
+// data-tid, and a "missing" class when the resolver says the note is gone
+// -- still an anchor then, so a click reaches the host and it can say so,
+// the same as a title that names nothing.
+func (r wikiLinkRenderer) renderTID(w util.BufWriter, n *wikiLinkNode) {
+	tid := strconv.FormatInt(n.TID, 10)
+	label, missing := n.Label, false
+	if r.titleForTID != nil {
+		title, err := r.titleForTID(n.TID)
+		switch {
+		case err == nil:
+			if !n.Labeled {
+				label = []byte(title)
+			}
+		case errors.Is(err, sql.ErrNoRows):
+			missing = true
+		}
+	}
+	class := "wikilink"
+	if missing {
+		class = "wikilink missing"
+	}
+	if r.anchors {
+		_, _ = w.WriteString(`<a class="` + class + `" href="` + wikiLinkTIDScheme + tid + `" data-tid="` + tid + `" data-target="`)
+	} else {
+		_, _ = w.WriteString(`<span class="` + class + `" data-tid="` + tid + `" data-target="`)
+	}
+	_, _ = w.Write(util.EscapeHTML(n.Target))
+	_, _ = w.WriteString(`">`)
+	_, _ = w.Write(util.EscapeHTML(label))
+	if r.anchors {
+		_, _ = w.WriteString(`</a>`)
+	} else {
+		_, _ = w.WriteString(`</span>`)
+	}
+}
+
 // wikiLinkExtension bundles the two halves so the call site registers one
 // thing, the way the goldmark extensions beside it do. anchors is the
 // caller saying "I am a host and I will handle a click"; see the note at
 // the top of this file for why that is the caller's to say.
-type wikiLinkExtension struct{ anchors bool }
+type wikiLinkExtension struct {
+	anchors     bool
+	titleForTID titleForTID
+}
 
 func (e wikiLinkExtension) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(parser.WithInlineParsers(
@@ -166,6 +280,6 @@ func (e wikiLinkExtension) Extend(m goldmark.Markdown) {
 		util.Prioritized(wikiLinkParser{}, 150),
 	))
 	m.Renderer().AddOptions(renderer.WithNodeRenderers(
-		util.Prioritized(wikiLinkRenderer{anchors: e.anchors}, 500),
+		util.Prioritized(wikiLinkRenderer{anchors: e.anchors, titleForTID: e.titleForTID}, 500),
 	))
 }

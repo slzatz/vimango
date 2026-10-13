@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"database/sql"
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/yuin/goldmark"
 )
 
 func TestWikiLinkRendering(t *testing.T) {
@@ -175,5 +180,112 @@ func TestDetermineWikiLinks(t *testing.T) {
 	}
 	if !DetermineWikiLinks([]string{"vimango", "--render-html", "5", "--wiki-links"}) {
 		t.Error("present flag reported absent")
+	}
+}
+
+// renderWikiOnly renders src with only the wiki-link extension, so a test
+// can hand it a resolver; convertMarkdownToHTML takes the database's.
+func renderWikiOnly(t *testing.T, src string, anchors bool, resolve titleForTID) string {
+	t.Helper()
+	md := goldmark.New(goldmark.WithExtensions(wikiLinkExtension{anchors: anchors, titleForTID: resolve}))
+	var buf bytes.Buffer
+	if err := md.Convert([]byte(src), &buf); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
+func fakeTitles(titles map[int64]string) titleForTID {
+	return func(tid int64) (string, error) {
+		if tid == 999 {
+			return "", errors.New("database is locked")
+		}
+		if title, ok := titles[tid]; ok {
+			return title, nil
+		}
+		return "", sql.ErrNoRows
+	}
+}
+
+func TestWikiLinkTID(t *testing.T) {
+	resolve := fakeTitles(map[int64]string{6546: "Sync <topology>"})
+	cases := []struct {
+		name    string
+		in      string
+		anchors bool
+		want    string
+	}{
+		{
+			"bare shows the current title",
+			"[[tid:6546]]", true,
+			`<a class="wikilink" href="vimango://tid/6546" data-tid="6546" data-target="tid:6546">Sync &lt;topology&gt;</a>`,
+		},
+		{
+			"a label wins over the title",
+			"[[tid:6546|the topology note]]", true,
+			`data-target="tid:6546">the topology note</a>`,
+		},
+		{
+			"a label that is just the target is no label",
+			"[[tid:6546|tid:6546]]", true,
+			`>Sync &lt;topology&gt;</a>`,
+		},
+		{
+			"an empty label is no label",
+			"[[tid:6546|]]", true,
+			`>Sync &lt;topology&gt;</a>`,
+		},
+		{
+			"span form carries the tid too",
+			"[[tid:6546]]", false,
+			`<span class="wikilink" data-tid="6546" data-target="tid:6546">Sync &lt;topology&gt;</span>`,
+		},
+		{
+			"gone is marked missing but stays clickable",
+			"[[tid:42]]", true,
+			`<a class="wikilink missing" href="vimango://tid/42" data-tid="42" data-target="tid:42">tid:42</a>`,
+		},
+		{
+			"gone keeps its label",
+			"[[tid:42|old note]]", true,
+			`<a class="wikilink missing" href="vimango://tid/42" data-tid="42" data-target="tid:42">old note</a>`,
+		},
+		{
+			"a lookup that failed claims nothing",
+			"[[tid:999]]", true,
+			`<a class="wikilink" href="vimango://tid/999" data-tid="999" data-target="tid:999">tid:999</a>`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := renderWikiOnly(t, tc.in, tc.anchors, resolve)
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("got %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// Without a database there is no title to show and no way to know a note
+// is gone, so the reference shows what was written and claims nothing.
+func TestWikiLinkTIDWithoutResolver(t *testing.T) {
+	got := renderWikiOnly(t, "[[tid:6546]]", true, nil)
+	want := `<a class="wikilink" href="vimango://tid/6546" data-tid="6546" data-target="tid:6546">tid:6546</a>`
+	if !strings.Contains(got, want) {
+		t.Errorf("got %q, want it to contain %q", got, want)
+	}
+}
+
+// Anything that is not "tid:" and digits is a title, as it always was.
+func TestWikiLinkTIDNonMatches(t *testing.T) {
+	for _, src := range []string{"[[tid:]]", "[[tid:abc]]", "[[tid:+5]]", "[[tid:-5]]", "[[tid:0]]", "[[tid:12x]]", "[[TID:5]]", "[[6546]]"} {
+		got := renderWikiOnly(t, src, true, fakeTitles(nil))
+		if strings.Contains(got, "data-tid") || !strings.Contains(got, `href="vimango://note/`) {
+			t.Errorf("%q should be a title reference: %s", src, got)
+		}
+	}
+	got := renderWikiOnly(t, "use `[[tid:6546]]` to refer", true, fakeTitles(nil))
+	if !strings.Contains(got, "<code>[[tid:6546]]</code>") {
+		t.Errorf("code span lost its brackets: %s", got)
 	}
 }
