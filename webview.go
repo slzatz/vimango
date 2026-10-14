@@ -155,7 +155,12 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
             color: #333;
-            max-width: 800px;
+            /* The 800px reading column is the standalone window's: it
+               centers, so the slack splits evenly. The embedded pane is
+               left-aligned, where a cap piles all of it into a dead
+               strip on the right -- there the window is the measure,
+               and tables and code get the width too. */
+            {{if .Standalone}}max-width: 800px;{{end}}
             margin: {{if .Standalone}}0 auto{{else}}0{{end}};
             padding: {{if .Standalone}}20px{{else}}4px 20px 20px{{end}};
             background-color: #fff;
@@ -490,7 +495,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
                grow a second tone for the same idea. */
             --fm-bg: rgba(27, 31, 36, 0.06);
             /* Metadata is scanned, not read. body's 1.6 is leading for
-               800px prose lines and buys a two-word value nothing, and
+               long prose lines and buys a two-word value nothing, and
                the step below body size keeps the card subordinate to the
                note it labels -- it is about the note, not the note. */
             line-height: 1.4;
@@ -560,7 +565,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
         }
         /* Tables are scanned, not read: the eye tracks across a row and
            down a column, and the borders already mark where each cell
-           begins. body's 1.6 is leading sized for 800px-wide prose
+           begins. body's 1.6 is leading sized for long prose
            lines and buys a table nothing -- it made every row tall and
            charged again for each line of a cell that wrapped, which is
            the line that sets the row's height. Setting line-height here
