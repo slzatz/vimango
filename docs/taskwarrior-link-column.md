@@ -25,7 +25,9 @@ Taskchamp and taskwarrior_macos keep sending `vimango://task-note?uuid=…`, and
   match). **Step 1 done**: the production column and index were added 2026-10-16, after backup
   `vimango-20261016-0752.dump`. **Step 2 done** (Go sync + desktop SQLite, with integration tests). **Step 3
   done** (vimango_ios, including its CLAUDE.md). **Step 4 done** (vimango_hybrid, including its
-  CLAUDE.md and HISTORY.md). Next is step 5: upgrade the Macs and the phone first. Last related commits:
+  CLAUDE.md and HISTORY.md). **Step 5 command written**: `cmd/migrate_taskwarrior_links`. Its dry run
+  against production lists 9 notes, 8 to link plus conflict copy 6613, which is cleaned but not linked. It has
+  not been applied yet; first upgrade the Macs and the phone, sync every client, and take a fresh backup. Last related commits:
   vimango_ios `7bbcdeb` (dropped `project:` from new task notes' frontmatter) and `64303b8` (hyphen follow-up).
   vimango_hybrid's port (`TaskNote.swift` `body`) still writes `project:`. That doesn't matter, since this plan
   removes the body entirely.
