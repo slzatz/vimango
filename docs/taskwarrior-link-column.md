@@ -22,7 +22,8 @@ Taskchamp and taskwarrior_macos keep sending `vimango://task-note?uuid=…`, and
 
 - **Status (2026-10-16):** design approved in discussion and reviewed against the code (the review's changes
   are folded in below: pull-side link rule, backfill placement, fresh schemas, ALTER race, hybrid's title
-  match). Step 1 in progress. Last related commits:
+  match). **Step 1 done**: the production column and index were added 2026-10-16, after backup
+  `vimango-20261016-0752.dump`. Next is step 2. Last related commits:
   vimango_ios `7bbcdeb` (dropped `project:` from new task notes' frontmatter) and `64303b8` (hyphen follow-up).
   vimango_hybrid's port (`TaskNote.swift` `body`) still writes `project:`. That doesn't matter, since this plan
   removes the body entirely.
