@@ -59,8 +59,17 @@ CREATE TABLE task (
     archived boolean DEFAULT FALSE,
     deleted boolean DEFAULT FALSE,
     added timestamp without time zone NOT NULL,
-    modified timestamp without time zone DEFAULT now()
+    modified timestamp without time zone DEFAULT now(),
+    -- The Taskwarrior task this note is linked to, lowercased. Set once, when
+    -- a note is created for (or linked to) a task, and never cleared: pushes
+    -- write COALESCE(new, taskwarrior_uuid). Not unique -- two offline devices
+    -- can each create a note for the same task; lookups take the newest.
+    -- See docs/taskwarrior-link-column.md.
+    taskwarrior_uuid TEXT
 );
+
+CREATE INDEX task_taskwarrior_uuid_idx ON task (taskwarrior_uuid)
+    WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;
 
 -- ============================================================================
 -- Task-Keyword Junction Table
