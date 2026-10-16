@@ -53,6 +53,7 @@ Backups so far:
 |---|---|---|---|---|---|---|
 | `vimango-20261004-1825.dump` | 2026-10-04, before the iOS app's first two-way sync | 5,935 | 32 | 18 | 139 | 852 |
 | `vimango-20261016-0752.dump` | 2026-10-16, before adding `task.taskwarrior_uuid` | 5,954 | 33 | 19 | 139 | 849 |
+| `vimango-20261016-0847.dump` | 2026-10-16, before migrating task links into the column | 5,954 | 33 | 19 | 139 | 849 |
 
 ## Restore
 
