@@ -23,8 +23,8 @@ Taskchamp and taskwarrior_macos keep sending `vimango://task-note?uuid=…`, and
 - **Status (2026-10-16):** design approved in discussion and reviewed against the code (the review's changes
   are folded in below: pull-side link rule, backfill placement, fresh schemas, ALTER race, hybrid's title
   match). **Step 1 done**: the production column and index were added 2026-10-16, after backup
-  `vimango-20261016-0752.dump`. **Step 2 done** (Go sync + desktop SQLite, with integration tests). Next is
-  step 3. Last related commits:
+  `vimango-20261016-0752.dump`. **Step 2 done** (Go sync + desktop SQLite, with integration tests). **Step 3
+  done** (vimango_ios, including its CLAUDE.md). Next is step 4. Last related commits:
   vimango_ios `7bbcdeb` (dropped `project:` from new task notes' frontmatter) and `64303b8` (hyphen follow-up).
   vimango_hybrid's port (`TaskNote.swift` `body`) still writes `project:`. That doesn't matter, since this plan
   removes the body entirely.
@@ -156,6 +156,11 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
    - `openTaskNote` creates the note with an empty body and the column set.
    - `linkTask` sets the column and moves the folder, with no body edit.
    - `NoteDetailView` and `NoteRowView` are unchanged, since they already read `note.taskUUID`.
+   - As built: `openTaskNote`'s title-match fallback links the note it finds (keeping its folder), the same rule
+     as hybrid's. The link methods (`fetchNote(taskUUID:)`, `linkTask`, `backfillTaskLinks`) live in
+     `TaskNoteLink.swift`, and the schema moved to `LocalStore+Schema.swift` to stay inside SwiftLint's length
+     limits. Unlike Go, iOS reads its dirty rows after the pull, so a link kept by the pull goes up in the
+     same sync.
 4. **vimango_hybrid:**
    - `Repository.entry(forTaskUUID:)` (~313) becomes an equality query.
    - Note creation (`OrganizerViewModel` ~779, which inserts `request.body`; see also the comment at
@@ -185,7 +190,7 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
    - Use `--dry-run` to print the diffs first.
    - Every client then pulls the cleaned rows on its next sync. There are probably only a handful.
 6. **Docs:**
-   - The "Taskchamp task notes" sections in vimango_ios and vimango_hybrid `CLAUDE.md`.
+   - The "Taskchamp task notes" sections in vimango_ios (done in step 3) and vimango_hybrid `CLAUDE.md`.
    - The Taskchamp `CLAUDE.md` bullet that says VimNotes "finds the note by a `taskwarrior: <uuid>` frontmatter line".
    - The doc comment in `taskwarrior_macos/Sources/TaskwarriorCore/VimangoLink.swift`.
    - The vimango_ios follow-up about the checkbox button in `NoteRowView` still applies, but it now reads the column.
