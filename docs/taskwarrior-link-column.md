@@ -20,7 +20,9 @@ Taskchamp and taskwarrior_macos keep sending `vimango://task-note?uuid=…`, and
 
 ## Handoff notes (read first in a new session)
 
-- **Status (2026-10-16):** design approved in discussion; nothing implemented. Last related commits:
+- **Status (2026-10-16):** design approved in discussion and reviewed against the code (the review's changes
+  are folded in below: pull-side link rule, backfill placement, fresh schemas, ALTER race, hybrid's title
+  match). Step 1 in progress. Last related commits:
   vimango_ios `7bbcdeb` (dropped `project:` from new task notes' frontmatter) and `64303b8` (hyphen follow-up).
   vimango_hybrid's port (`TaskNote.swift` `body`) still writes `project:`. That doesn't matter, since this plan
   removes the body entirely.
@@ -62,6 +64,19 @@ overwrites it. That makes the rollout order flexible.
   `modified = server_modified` guard is not enough on its own. A machine upgraded after the migration
   pulled the cleaned body while it was still running the old build, so its row matches `server_modified` but
   has no link locally. Without COALESCE, its next edit would push NULL over the server's link.
+- **A pull never clears a local link either.** The case: a client links an existing note (iOS `linkTask`,
+  hybrid's title match) while another device edits the same note. The pull takes the server row, which has no
+  link, and the conflict copy doesn't inherit one, so the link is lost. So pull UPDATEs also write
+  `COALESCE(server, local)`, and when the local row has a link the server lacks, the row stays dirty so the
+  link goes up:
+  - iOS: `dirty = 1`.
+  - Go: stamp `modified = datetime('now')` instead of `r.nextClient`. The row then pushes on the *next* run.
+    It isn't pushed in this one, because the copy fetched before the pull is stale and its push guard would
+    refuse it.
+- **No unlink, ever.** Because a NULL never overwrites a link, nothing can remove one. To relink, delete the note
+  or edit the database by hand. Accepted.
+- **Lowercase at every write site.** Not enforced by a CHECK constraint: a client that wrote an uppercase uuid
+  would then fail its push forever, which is the same problem as the unique index.
 - **`sameContent`** (Go, sync.go:1216) and its iOS counterpart include the column, so a link-only change
   isn't treated as "no change".
 - **A new task note's body starts empty.** It no longer gets a frontmatter block or the "Open task" line. This
@@ -90,7 +105,14 @@ watermark, so links already on the server would never come down. So every sync, 
 `modified` or dirty state.
 - Linked notes number in the dozens at most, so running it on every sync is cheap.
 - It needs no "backfill pending" flag, and it repairs a machine whenever it was upgraded.
-- It makes it safe to upgrade a machine before or after the server migration.
+- It makes the local data correct whether a machine is upgraded before or after the step 5 data migration.
+  It does not relax the hard ordering above: a new build still can't sync until step 1 is done.
+
+**Fresh databases.** `ensureSyncColumns` only runs at sync time, on existing databases. So the column also goes
+into `init.go`'s `CREATE TABLE task` (`--init`) and into the integration test's `clientSchema`.
+
+**Concurrent ALTER.** hybrid and `vimango-sync` may both find the column missing and add it at the same moment.
+Treat SQLite's "duplicate column name" error as success, and create the index with `IF NOT EXISTS`.
 
 **What each machine has to do** is rebuild and run the new vimango (and hybrid, on the Macs) and install the
 new VimNotes build. Machines that are never upgraded stay harmless: an old build neither reads nor writes
@@ -100,23 +122,31 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
 ## Steps (each lands and is tested before the next)
 
 1. **Back up the server** (`~/vimango/BACKUP_RESTORE.md`), then on Postgres:
-   `ALTER TABLE task ADD COLUMN taskwarrior_uuid TEXT;` plus the partial index. Add it to
-   `cmd/create_dbs/postgres_init4.sql` and `DATABASE_SCHEMA.md`.
+   `ALTER TABLE task ADD COLUMN taskwarrior_uuid TEXT;` plus the partial index. Add both to
+   `cmd/create_dbs/postgres_init4.sql`. The integration tests load that file, so step 2's tests depend on it.
 2. **Go sync + desktop SQLite:**
    - Add the column and index in `Syncer.ensureSyncColumns()` (sync.go:846, which already adds
      `server_modified`). Both the CLI's sync and `cmd/vimango-sync` go through `internal/sync`. The CLI itself
      never reads the column.
-   - Add the backfill at the start of a sync run, as described above.
-   - Extend `internal/sync/sync_integration_test.go` (see how it's run in `~/vimango/CLAUDE.md`).
-   - Add the column to the pull SELECT, local INSERT/UPDATE (~1360/1385), push INSERT (1517), push UPDATE
+   - Add it to `init.go`'s `CREATE TABLE task` and the test `clientSchema` too (see "Fresh databases").
+   - Add the backfill to `Synchronize`, after the `reportOnly` return and before the pull. That keeps
+     `--report-only` nearly read-only and leaves `Probe` untouched.
+   - Extend `internal/sync/sync_integration_test.go` (see how it's run in `~/vimango/CLAUDE.md`). Include the
+     lost-link case: link a row locally while the server changes it, then sync twice; the server must end up linked.
+   - Add the column to the pull SELECT, `localTask`/`localTaskByTid`, local INSERT/UPDATE (~1360/1385, UPDATE
+     with COALESCE plus the keep-dirty rule), the client-changes SELECT (~518), push INSERT (1517), push UPDATE
      (1547, with COALESCE) and `sameContent`.
    - `saveConflictCopy` stays as it is, because its explicit list already leaves the column out.
+   - Update `DATABASE_SCHEMA.md` (it documents the local SQLite only, and is already missing `uuid`/`server_modified`).
 3. **vimango_ios:**
    - `LocalStore` migration `"v2"`: add the column and index. Today there is only `"v1"` (LocalStore.swift:50).
    - `SyncEngine` runs the backfill each sync, and the push UPDATE uses COALESCE.
    - `noteColumns` and `Note` get a stored `taskUUID`, replacing the computed property in `Models/Note.swift:28`.
    - `RemoteStore` pull (`DatabaseService.swift` ~120) and push (~145/164) include the column.
-   - `applyPulled` sets the column on its own rows and leaves it off conflict copies.
+   - `applyPulled` sets the column on its own rows (COALESCE plus keep-dirty, see design decisions) and leaves it
+     off conflict copies. The FTS trigger is `AFTER UPDATE OF title, body`, so neither this nor the backfill fires it.
+   - `saveEdit` carries the column through rather than rewriting it, and `dirtyNotes()`/`DirtyNote` include it for
+     the push. `insertNote`/`updateNote` in `DatabaseService.swift` send it (update with COALESCE).
    - `fetchNote(taskUUID:)` becomes a plain equality query.
    - `openTaskNote` creates the note with an empty body and the column set.
    - `linkTask` sets the column and moves the folder, with no body edit.
@@ -125,6 +155,10 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
    - `Repository.entry(forTaskUUID:)` (~313) becomes an equality query.
    - Note creation (`OrganizerViewModel` ~779, which inserts `request.body`; see also the comment at
      `Repository.swift` ~554) sets the column with an empty body.
+   - `taskNoteEntry`'s title-match fallback (`entryID(forTitle:)`) now links the note it finds: it sets the column
+     and bumps `modified` so the link syncs. Leaving that note unlinked was only to avoid a content write behind
+     the editor. The editor never writes this column, so that reason no longer applies. Update the doc comment
+     above `taskNoteEntry` to match.
    - Add an "Open Task" menu item and ex command that opens `taskchampdev://task/<uuid>` (taskwarrior_macos claims
      the scheme), replacing the body link. Follow hybrid's existing menu/ex-command pattern. It's disabled when
      the note has no link.
@@ -140,6 +174,9 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
      - remove that line, plus any leftover `project:` line Taskchamp wrote, and the whole block if it's then empty;
      - remove the `[Open task in Taskchamp](taskchampdev://task/<uuid>)` line;
      - bump `modified = now()`.
+   - `splitFrontmatter` lives in the root `package main` and can't be imported from `cmd/`. Copy it into the
+     command (it's a one-off), with a comment pointing at the original.
+   - Don't leave a stray blank line where the "Open task" line was, or at the top once the block is gone.
    - Use `--dry-run` to print the diffs first.
    - Every client then pulls the cleaned rows on its next sync. There are probably only a handful.
 6. **Docs:**
@@ -153,7 +190,6 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
 - **Clients updated at different times.** Old builds ignore the column (explicit column lists). A note an old
   build creates for a task won't be found by uuid, so a new client would create a second one. Update all three
   before running the migration.
-- **The vimango MCP connector** (if it writes notes) is another Postgres client to check; it would only ignore the column.
 - **The Go terminal client loses all sign of the link.** It never had a working action for it.
 
 ## Verification
