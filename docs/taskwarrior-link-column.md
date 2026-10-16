@@ -23,7 +23,8 @@ Taskchamp and taskwarrior_macos keep sending `vimango://task-note?uuid=…`, and
 - **Status (2026-10-16):** design approved in discussion and reviewed against the code (the review's changes
   are folded in below: pull-side link rule, backfill placement, fresh schemas, ALTER race, hybrid's title
   match). **Step 1 done**: the production column and index were added 2026-10-16, after backup
-  `vimango-20261016-0752.dump`. Next is step 2. Last related commits:
+  `vimango-20261016-0752.dump`. **Step 2 done** (Go sync + desktop SQLite, with integration tests). Next is
+  step 3. Last related commits:
   vimango_ios `7bbcdeb` (dropped `project:` from new task notes' frontmatter) and `64303b8` (hyphen follow-up).
   vimango_hybrid's port (`TaskNote.swift` `body`) still writes `project:`. That doesn't matter, since this plan
   removes the body entirely.
@@ -78,8 +79,10 @@ overwrites it. That makes the rollout order flexible.
   or edit the database by hand. Accepted.
 - **Lowercase at every write site.** Not enforced by a CHECK constraint: a client that wrote an uppercase uuid
   would then fail its push forever, which is the same problem as the unique index.
-- **`sameContent`** (Go, sync.go:1216) and its iOS counterpart include the column, so a link-only change
-  isn't treated as "no change".
+- **`sameContent`** (Go) leaves the link *out*. This reverses the original plan. The pull merges links
+  (COALESCE plus keep-dirty) instead of picking a winner, so a link-only difference is already handled without
+  treating the row as a conflict. Including the link would only produce a conflict copy with identical text.
+  iOS `applyPulled` has no `sameContent`: a dirty row the server changed is always a conflict there.
 - **A new task note's body starts empty.** It no longer gets a frontmatter block or the "Open task" line. This
   also removes `TaskNoteRequest.body`, `body(_:linkedTo:)`, `frontmatterLine` and `frontmatter(of:linksTo:)` in
   both Swift ports. `taskUUID(inFrontmatterOf:)` survives only in the migration.
@@ -110,7 +113,8 @@ watermark, so links already on the server would never come down. So every sync, 
   It does not relax the hard ordering above: a new build still can't sync until step 1 is done.
 
 **Fresh databases.** `ensureSyncColumns` only runs at sync time, on existing databases. So the column also goes
-into `init.go`'s `CREATE TABLE task` (`--init`) and into the integration test's `clientSchema`.
+into `init.go`'s `CREATE TABLE task` (`--init`). The integration test's `clientSchema` deliberately leaves it out,
+as it already does `server_modified`, so every test also exercises `ensureSyncColumns`.
 
 **Concurrent ALTER.** hybrid and `vimango-sync` may both find the column missing and add it at the same moment.
 Treat SQLite's "duplicate column name" error as success, and create the index with `IF NOT EXISTS`.
@@ -129,14 +133,14 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
    - Add the column and index in `Syncer.ensureSyncColumns()` (sync.go:846, which already adds
      `server_modified`). Both the CLI's sync and `cmd/vimango-sync` go through `internal/sync`. The CLI itself
      never reads the column.
-   - Add it to `init.go`'s `CREATE TABLE task` and the test `clientSchema` too (see "Fresh databases").
+   - Add it to `init.go`'s `CREATE TABLE task` (see "Fresh databases").
    - Add the backfill to `Synchronize`, after the `reportOnly` return and before the pull. That keeps
      `--report-only` nearly read-only and leaves `Probe` untouched.
    - Extend `internal/sync/sync_integration_test.go` (see how it's run in `~/vimango/CLAUDE.md`). Include the
      lost-link case: link a row locally while the server changes it, then sync twice; the server must end up linked.
    - Add the column to the pull SELECT, `localTask`/`localTaskByTid`, local INSERT/UPDATE (~1360/1385, UPDATE
      with COALESCE plus the keep-dirty rule), the client-changes SELECT (~518), push INSERT (1517), push UPDATE
-     (1547, with COALESCE) and `sameContent`.
+     (1547, with COALESCE). `sameContent` leaves it out (see design decisions).
    - `saveConflictCopy` stays as it is, because its explicit list already leaves the column out.
    - Update `DATABASE_SCHEMA.md` (it documents the local SQLite only, and is already missing `uuid`/`server_modified`).
 3. **vimango_ios:**
@@ -195,7 +199,9 @@ machines anyway. Upgrade the Macs and the phone before running step 5.
 
 ## Verification
 
-- Go: unit tests for the sync's pull/push carrying the column and for `sameContent`. Check the migration
+- Go (done for step 2): integration tests `TestLinkRoundTrips`, `TestPushNeverClearsLink`,
+  `TestBackfillFillsLinkWithoutPushing`, `TestPullKeepsLocalLink` and `TestLinkOnlyDifferenceIsNotAConflict`.
+  Each was checked to fail when its fix is removed. Check the migration
   command's `--dry-run` against a restored copy of the dump.
 - iOS: `/verify`, with `TaskNoteLinkTests` rewritten around the column, plus a migration test (v1 database becomes v2).
 - End to end:

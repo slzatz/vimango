@@ -21,37 +21,48 @@ CREATE TABLE task (
     title TEXT NOT NULL,
     folder_tid INTEGER DEFAULT 1,
     context_tid INTEGER DEFAULT 1,
+    folder_uuid TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000002',
+    context_uuid TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
     note TEXT,
     archived BOOLEAN DEFAULT FALSE,
     deleted BOOLEAN DEFAULT FALSE,
     added TEXT NOT NULL,
     modified TEXT DEFAULT CURRENT_TIMESTAMP,
+    server_modified TEXT,
+    taskwarrior_uuid TEXT,
     PRIMARY KEY (id),
-    FOREIGN KEY(folder_tid) REFERENCES folder (tid),
-    FOREIGN KEY(context_tid) REFERENCES context (tid),
+    FOREIGN KEY(folder_uuid) REFERENCES folder (uuid),
+    FOREIGN KEY(context_uuid) REFERENCES context (uuid),
     UNIQUE (tid),
     CHECK (star IN (0, 1)),
     CHECK (archived IN (0, 1)),
     CHECK (deleted IN (0, 1))
 );
+CREATE INDEX task_taskwarrior_uuid_idx ON task (taskwarrior_uuid)
+    WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;
 ```
+
+This is `sqliteSchema` in `init.go`. Older databases get `server_modified`,
+`taskwarrior_uuid` and the index added by `ensureSyncColumns` in
+`internal/sync` on their first sync.
 
 **Columns:**
 - `id` - Internal auto-increment primary key
-- `tid` - Task ID used for synchronization (**UNIQUE** constraint)
+- `tid` - Task ID used for synchronization (**UNIQUE** constraint); NULL until the row first reaches the server
 - `star` - Boolean flag for starred/favorite items
 - `title` - Note/task title (required)
-- `folder_tid` - Foreign key to folder.tid (defaults to 1 = "none")
-- `context_tid` - Foreign key to context.tid (defaults to 1 = "none")
+- `folder_tid`, `context_tid` - Deprecated server ids of the folder and context; the uuids are authoritative
+- `folder_uuid`, `context_uuid` - The folder and context (default to the "none" containers)
 - `note` - Main content of the note (markdown text)
 - `archived` - Boolean flag for archived items
 - `deleted` - Soft delete flag (items are marked deleted, not removed)
 - `added` - Timestamp when task was created
 - `modified` - Timestamp of last modification
+- `server_modified` - The server's `modified` as this client last saw it; how sync recognizes its own pushes and detects conflicts
+- `taskwarrior_uuid` - The Taskwarrior task the note is linked to, lowercased, or NULL. Set once and never cleared by sync; see `docs/taskwarrior-link-column.md`
 
 **Important Notes:**
 - The `tid` column is **UNIQUE** (not shown in some init SQL files)
-- Has an `archived` column (not present in some init SQL files)
 - Missing columns that appear in some init SQL files: `tag`, `duetime`, `completed`, `duedate`, `created`, `startdate`
 
 ### Table: context

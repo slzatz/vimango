@@ -77,6 +77,7 @@ CREATE TABLE task (
 	added TEXT NOT NULL,
 	modified TEXT DEFAULT CURRENT_TIMESTAMP,
 	server_modified TEXT, -- the server's modified as last seen; see internal/sync
+	taskwarrior_uuid TEXT, -- linked Taskwarrior task; see docs/taskwarrior-link-column.md
 	PRIMARY KEY (id),
 	FOREIGN KEY(folder_uuid) REFERENCES folder (uuid),
 	FOREIGN KEY(context_uuid) REFERENCES context (uuid),
@@ -85,6 +86,8 @@ CREATE TABLE task (
 	CHECK (archived IN (0, 1)),
 	CHECK (deleted IN (0, 1))
 );
+CREATE INDEX task_taskwarrior_uuid_idx ON task (taskwarrior_uuid)
+	WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;
 CREATE TABLE sync (
 	id INTEGER NOT NULL,
 	machine TEXT NOT NULL,

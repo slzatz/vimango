@@ -102,6 +102,9 @@ type newEntry struct {
 	modified     string
 	// The server's modified as this client last saw it (client rows only).
 	serverModified sql.NullString
+	// The Taskwarrior task the note is linked to. Written once and never
+	// cleared: a NULL from either side never overwrites a link.
+	taskwarriorUUID sql.NullString
 }
 
 // EntryPlusTag represents an entry with associated tag information
@@ -448,14 +451,14 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	}
 
 	// Fetch server entries
-	rows, err := s.PG.Query("SELECT tid, title, star, note, modified::text, added, archived, context_tid, folder_tid, context_uuid, folder_uuid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", serverTime, false)
+	rows, err := s.PG.Query("SELECT tid, title, star, note, modified::text, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, taskwarrior_uuid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", serverTime, false)
 	if err != nil {
 		return nil, fmt.Errorf("Error in SELECT for server_updated_entries: %v", err)
 	}
 	for rows.Next() {
 		var e EntryPlusTag
 		var contextUUID, folderUUID sql.NullString
-		if err = rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &contextUUID, &folderUUID); err != nil {
+		if err = rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &contextUUID, &folderUUID, &e.taskwarriorUUID); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("Error scanning server_updated_entries: %v", err)
 		}
@@ -515,7 +518,7 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	}
 
 	// Fetch client entries
-	rows, err = s.MainDB.Query("SELECT id, tid, title, star, note, modified, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, server_modified FROM task WHERE substr(modified, 1, 19)  > ? AND deleted = ?;", clientTime, false)
+	rows, err = s.MainDB.Query("SELECT id, tid, title, star, note, modified, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, server_modified, taskwarrior_uuid FROM task WHERE substr(modified, 1, 19)  > ? AND deleted = ?;", clientTime, false)
 	if err != nil {
 		return nil, fmt.Errorf("Error in SELECT for client_updated_entries: %v", err)
 	}
@@ -525,7 +528,7 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 		// schema has no DEFAULT for them; the uuids are authoritative and
 		// syncEntriesToServer resolves a tid < 1 from them.
 		var tid, contextTid, folderTid sql.NullInt64
-		if err = rows.Scan(&e.id, &tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &contextTid, &folderTid, &e.context_uuid, &e.folder_uuid, &e.serverModified); err != nil {
+		if err = rows.Scan(&e.id, &tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &contextTid, &folderTid, &e.context_uuid, &e.folder_uuid, &e.serverModified, &e.taskwarriorUUID); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("Error scanning client_updated_entries: %v", err)
 		}
@@ -840,32 +843,103 @@ type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
-// ensureSyncColumns adds server_modified to the client tables that predate
-// it. Idempotent; run by Synchronize because vimango-sync (hybrid's path)
-// never goes through the TUI's startup migrations.
+// ensureSyncColumns adds the columns sync needs to client tables that
+// predate them: server_modified everywhere, and task.taskwarrior_uuid
+// (docs/taskwarrior-link-column.md). Idempotent; run by Synchronize because
+// vimango-sync (hybrid's path) never goes through the TUI's startup
+// migrations.
 func (s *Syncer) ensureSyncColumns() error {
 	for _, t := range []string{"task", "context", "folder", "keyword"} {
-		has, err := s.hasServerModified(t)
-		if err != nil {
+		if err := s.ensureColumn(t, "server_modified"); err != nil {
 			return err
 		}
-		if has {
-			continue
-		}
-		if _, err := s.MainDB.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN server_modified TEXT;", t)); err != nil {
-			return fmt.Errorf("adding server_modified to %s: %v", t, err)
-		}
+	}
+	if err := s.ensureColumn("task", "taskwarrior_uuid"); err != nil {
+		return err
+	}
+	_, err := s.MainDB.Exec("CREATE INDEX IF NOT EXISTS task_taskwarrior_uuid_idx ON task (taskwarrior_uuid) " +
+		"WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;")
+	if err != nil {
+		return fmt.Errorf("indexing task.taskwarrior_uuid: %v", err)
 	}
 	return nil
 }
 
-func (s *Syncer) hasServerModified(table string) (bool, error) {
+// ensureColumn adds a nullable TEXT column if the table lacks it. hybrid
+// adds taskwarrior_uuid too, when it opens the database, so the two can
+// race; losing that race is success.
+func (s *Syncer) ensureColumn(table, column string) error {
+	has, err := s.hasColumn(table, column)
+	if err != nil || has {
+		return err
+	}
+	_, err = s.MainDB.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s TEXT;", table, column))
+	if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return fmt.Errorf("adding %s to %s: %v", column, table, err)
+	}
+	return nil
+}
+
+func (s *Syncer) hasColumn(table, column string) (bool, error) {
 	var n int
-	err := s.MainDB.QueryRow("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name='server_modified';", table).Scan(&n)
+	err := s.MainDB.QueryRow("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?;", table, column).Scan(&n)
 	if err != nil {
-		return false, fmt.Errorf("checking %s for server_modified: %v", table, err)
+		return false, fmt.Errorf("checking %s for %s: %v", table, column, err)
 	}
 	return n > 0, nil
+}
+
+// backfillLinks copies the server's Taskwarrior links onto local rows that
+// lack one. A pull only brings rows modified since the watermark, so links
+// already on the server when this client gained the column would otherwise
+// never arrive. Linked notes number in the dozens, so it runs every sync,
+// which also repairs a machine whenever it is upgraded. It leaves modified
+// alone: the row is not a local change and must not be pushed.
+func (s *Syncer) backfillLinks(lg io.Writer) error {
+	rows, err := s.PG.Query("SELECT tid, taskwarrior_uuid FROM task WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;")
+	if err != nil {
+		return fmt.Errorf("fetching server Taskwarrior links: %v", err)
+	}
+	type link struct {
+		tid  int
+		uuid string
+	}
+	var links []link
+	for rows.Next() {
+		var l link
+		if err := rows.Scan(&l.tid, &l.uuid); err != nil {
+			rows.Close()
+			return fmt.Errorf("scanning server Taskwarrior links: %v", err)
+		}
+		links = append(links, l)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("fetching server Taskwarrior links: %v", err)
+	}
+
+	var filled int64
+	_, err = s.withTx(func(tx *sql.Tx) (bool, error) {
+		for _, l := range links {
+			res, err := tx.Exec("UPDATE task SET taskwarrior_uuid=? WHERE tid=? AND taskwarrior_uuid IS NULL;", l.uuid, l.tid)
+			if err != nil {
+				return false, err
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return false, err
+			}
+			filled += n
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("backfilling Taskwarrior links: %v", err)
+	}
+	if filled > 0 {
+		fmt.Fprintf(lg, "Backfilled the Taskwarrior link on %d local entries\n", filled)
+	}
+	return nil
 }
 
 // touch marks a local row changed so the next sync retries it.
@@ -1184,24 +1258,25 @@ func (s *Syncer) pushContainer(ct containerType, c container, r *run, lg io.Writ
 
 // localTask is the client row a pulled or server-deleted entry lands on.
 type localTask struct {
-	id             int
-	modified       sql.NullString
-	serverModified sql.NullString
-	deleted        bool
-	title          string
-	note           sql.NullString
-	star           bool
-	archived       bool
-	contextUUID    string
-	folderUUID     string
+	id              int
+	modified        sql.NullString
+	serverModified  sql.NullString
+	deleted         bool
+	title           string
+	note            sql.NullString
+	star            bool
+	archived        bool
+	contextUUID     string
+	folderUUID      string
+	taskwarriorUUID sql.NullString
 }
 
 func (s *Syncer) localTaskByTid(tid int) (*localTask, error) {
 	var t localTask
 	err := s.MainDB.QueryRow("SELECT id, modified, server_modified, deleted, title, note, star, archived, "+
-		"context_uuid, folder_uuid FROM task WHERE tid=?;", tid).
+		"context_uuid, folder_uuid, taskwarrior_uuid FROM task WHERE tid=?;", tid).
 		Scan(&t.id, &t.modified, &t.serverModified, &t.deleted, &t.title, &t.note, &t.star, &t.archived,
-			&t.contextUUID, &t.folderUUID)
+			&t.contextUUID, &t.folderUUID, &t.taskwarriorUUID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1212,7 +1287,10 @@ func (s *Syncer) localTaskByTid(tid int) (*localTask, error) {
 }
 
 // sameContent reports whether a local row already says what the server
-// says, in which case both sides changing it is not a conflict.
+// says, in which case both sides changing it is not a conflict. The
+// Taskwarrior link is left out on purpose: the pull merges links instead of
+// picking a winner (see applyServerEntry), so a row differing only in its
+// link needs no conflict copy, which would just duplicate the text.
 func sameContent(t *localTask, e EntryPlusTag) bool {
 	return t.title == e.title && t.note.String == e.note.String && t.star == e.star &&
 		t.archived == e.archived && t.contextUUID == e.context_uuid && t.folderUUID == e.folder_uuid
@@ -1358,9 +1436,9 @@ func (s *Syncer) applyServerEntry(e EntryPlusTag, r *run, lg io.Writer) (bool, e
 
 		if t == nil {
 			_, err = s.MainDB.Exec("INSERT INTO task (tid, title, star, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, "+
-				"note, modified, server_modified, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false);",
+				"note, taskwarrior_uuid, modified, server_modified, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false);",
 				e.tid, e.title, e.star, e.added, e.archived, e.context_tid, e.folder_tid, e.context_uuid, e.folder_uuid,
-				e.note, r.nextClient, e.modified)
+				e.note, e.taskwarriorUUID, r.nextClient, e.modified)
 			if err != nil {
 				return false, err
 			}
@@ -1374,6 +1452,16 @@ func (s *Syncer) applyServerEntry(e EntryPlusTag, r *run, lg io.Writer) (bool, e
 
 		dirty := r.isDirty(t.modified.String)
 		conflict := dirty && !t.deleted && !sameContent(t, e)
+		// A pull never clears a link. When this row was linked here and the
+		// server's version has no link (it was edited elsewhere before the
+		// link went up), keep the link and leave the row dirty so it is
+		// pushed next run. Not this run: the copy of the row fetched for
+		// the push predates the pull, and its push guard would refuse it.
+		stamp := r.nextClient
+		keepLink := t.taskwarriorUUID.Valid && !e.taskwarriorUUID.Valid
+		if keepLink {
+			stamp = time.Now().UTC().Format("2006-01-02 15:04:05")
+		}
 		var cp newEntry
 		ok, err := s.withTx(func(tx *sql.Tx) (bool, error) {
 			if conflict {
@@ -1383,9 +1471,10 @@ func (s *Syncer) applyServerEntry(e EntryPlusTag, r *run, lg io.Writer) (bool, e
 				}
 			}
 			res, err := tx.Exec("UPDATE task SET title=?, star=?, archived=?, context_tid=?, folder_tid=?, context_uuid=?, folder_uuid=?, "+
-				"note=?, deleted=false, modified=?, server_modified=? WHERE id=? AND modified IS ?;",
+				"note=?, taskwarrior_uuid=COALESCE(?, taskwarrior_uuid), deleted=false, modified=?, server_modified=? "+
+				"WHERE id=? AND modified IS ?;",
 				e.title, e.star, e.archived, e.context_tid, e.folder_tid, e.context_uuid, e.folder_uuid,
-				e.note, r.nextClient, e.modified, t.id, t.modified)
+				e.note, e.taskwarriorUUID, stamp, e.modified, t.id, t.modified)
 			if err != nil {
 				return false, err
 			}
@@ -1408,6 +1497,9 @@ func (s *Syncer) applyServerEntry(e EntryPlusTag, r *run, lg io.Writer) (bool, e
 			fmt.Fprintf(lg, "Server won: tid %d was changed here and on the server; the local version was saved as %q\n", e.tid, cp.title)
 		} else if dirty && t.deleted {
 			fmt.Fprintf(lg, "Server won: entry %q (tid %d) deleted here was changed on the server and has been restored\n", truncate(e.title, 15), e.tid)
+		}
+		if keepLink {
+			fmt.Fprintf(lg, "Kept the local Taskwarrior link on tid %d, which the server's version lacks; it is pushed next sync\n", e.tid)
 		}
 		fmt.Fprintf(lg, "Updated client entry %q with tid **%d** context_uuid: %s folder_uuid: %s\n", e.title, e.tid, e.context_uuid, e.folder_uuid)
 		return true, nil
@@ -1514,9 +1606,9 @@ func (s *Syncer) pushEntry(e newEntry, r *run, lg io.Writer) (deferred bool, err
 	var tid int
 	var serverModified string
 	if e.tid < 1 {
-		err := s.PG.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, note, modified, deleted) "+
-			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), false) RETURNING tid, modified::text",
-			e.title, e.star, e.added, e.archived, contextTid, folderTid, e.context_uuid, e.folder_uuid, e.note).Scan(&tid, &serverModified)
+		err := s.PG.QueryRow("INSERT INTO task (title, star, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, note, taskwarrior_uuid, modified, deleted) "+
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), false) RETURNING tid, modified::text",
+			e.title, e.star, e.added, e.archived, contextTid, folderTid, e.context_uuid, e.folder_uuid, e.note, e.taskwarriorUUID).Scan(&tid, &serverModified)
 		if err != nil {
 			return false, fmt.Errorf("inserting server entry: %v", err)
 		}
@@ -1544,13 +1636,17 @@ func (s *Syncer) pushEntry(e newEntry, r *run, lg io.Writer) (deferred bool, err
 		// Only overwrite the version this client last saw. Rows synced
 		// before server_modified existed have none; for those the server
 		// must not have changed since the previous run's pull.
+		//
+		// The link is COALESCEd, not just guarded: a machine that pulled a
+		// linked row while still running a build without the column holds
+		// a matching server_modified but no link.
 		err := s.PG.QueryRow("UPDATE task SET title=$1, star=$2, context_tid=$3, folder_tid=$4, context_uuid=$5, folder_uuid=$6, "+
-			"note=$7, archived=$8, modified=now() WHERE tid=$9 AND deleted=false AND "+
+			"note=$7, archived=$8, taskwarrior_uuid=COALESCE($12, taskwarrior_uuid), modified=now() WHERE tid=$9 AND deleted=false AND "+
 			"(COALESCE(modified, '1970-01-01') = $10::timestamp OR "+
 			"($10::timestamp IS NULL AND COALESCE(modified, '1970-01-01') <= $11::timestamp)) "+
 			"RETURNING modified::text;",
 			e.title, e.star, contextTid, folderTid, e.context_uuid, e.folder_uuid, e.note, e.archived, e.tid,
-			e.serverModified, r.prevServer).Scan(&serverModified)
+			e.serverModified, r.prevServer, e.taskwarriorUUID).Scan(&serverModified)
 		if err == sql.ErrNoRows {
 			return true, nil
 		}
@@ -1889,7 +1985,7 @@ func (s *Syncer) Probe() (int, error) {
 	for _, st := range stamps {
 		has, seen := hasColumn[st.table]
 		if !seen {
-			if has, err = s.hasServerModified(st.table); err != nil {
+			if has, err = s.hasColumn(st.table, "server_modified"); err != nil {
 				return 0, err
 			}
 			hasColumn[st.table] = has
@@ -2010,6 +2106,13 @@ func (s *Syncer) Synchronize(reportOnly bool) (log string, err error) {
 	}
 
 	/**************** Apply changes *****************/
+
+	// Here rather than with ensureSyncColumns, so --report-only writes
+	// nothing it doesn't have to.
+	if err = s.backfillLinks(&lg); err != nil {
+		fmt.Fprintf(&lg, "Error: %v", err)
+		return
+	}
 
 	// Pull: server -> client. Conflicts are settled here, so the push
 	// below only sends what the pull left dirty, plus conflict copies.

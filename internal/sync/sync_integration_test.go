@@ -26,7 +26,8 @@ import (
 )
 
 // clientSchema mirrors sqliteSchema in ~/vimango/init.go, minus
-// server_modified, so every test also exercises ensureSyncColumns.
+// server_modified and taskwarrior_uuid, so every test also exercises
+// ensureSyncColumns.
 const clientSchema = `
 CREATE TABLE context (id INTEGER PRIMARY KEY, tid INTEGER UNIQUE, uuid TEXT NOT NULL UNIQUE, title TEXT NOT NULL UNIQUE,
 	star BOOLEAN DEFAULT FALSE, deleted BOOLEAN DEFAULT FALSE, modified TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -796,5 +797,218 @@ func TestContainerDeleteWithStaleTidReference(t *testing.T) {
 				t.Errorf("a later sync still fails:\n%s", log)
 			}
 		})
+	}
+}
+
+// link sets a note's Taskwarrior link the way hybrid and VimNotes do: as a
+// local change, so it is pushed.
+func (c *testClient) link(id int, uuid string) {
+	c.t.Helper()
+	c.exec("UPDATE task SET taskwarrior_uuid=?, modified=datetime('now') WHERE id=?;", uuid, id)
+}
+
+// linkOf returns a local note's link, "" for none.
+func (c *testClient) linkOf(id int) string {
+	c.t.Helper()
+	var uuid sql.NullString
+	if err := c.s.MainDB.QueryRow("SELECT taskwarrior_uuid FROM task WHERE id=?;", id).Scan(&uuid); err != nil {
+		c.t.Fatalf("%s: link of id %d: %v", c.name, id, err)
+	}
+	return uuid.String
+}
+
+func serverLink(t *testing.T, pg *sql.DB, tid int) string {
+	t.Helper()
+	var uuid sql.NullString
+	if err := pg.QueryRow("SELECT taskwarrior_uuid FROM task WHERE tid=$1;", tid).Scan(&uuid); err != nil {
+		t.Fatalf("server link of tid %d: %v", tid, err)
+	}
+	return uuid.String
+}
+
+const twUUID = "0f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a"
+
+// A note created with a link carries it to the server and to other
+// clients, and editing the body elsewhere leaves it alone.
+func TestLinkRoundTrips(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	a.sync() // adds the column
+	id := a.addNote("task note", "")
+	a.link(id, twUUID)
+	a.sync()
+	tid := a.tidOf(id)
+	if got := serverLink(t, pg, tid); got != twUUID {
+		t.Fatalf("server link = %q, want %q", got, twUUID)
+	}
+
+	b.sync()
+	bid := b.idOf(tid)
+	if got := b.linkOf(bid); got != twUUID {
+		t.Fatalf("B link = %q, want %q", got, twUUID)
+	}
+
+	b.edit(bid, "some notes")
+	b.sync()
+	a.sync()
+	if got := a.notes()["task note"]; got != "some notes" {
+		t.Fatalf("A has %q after B's edit", got)
+	}
+	if got, sl := a.linkOf(id), serverLink(t, pg, tid); got != twUUID || sl != twUUID {
+		t.Errorf("after B's edit: A link %q, server link %q, want %q", got, sl, twUUID)
+	}
+
+	_, _, before := serverNote(t, pg, tid)
+	for i := 0; i < 2; i++ {
+		a.sync()
+		b.sync()
+	}
+	if _, _, after := serverNote(t, pg, tid); after != before {
+		t.Errorf("idle syncs re-pushed the linked note: server modified %s -> %s", before, after)
+	}
+}
+
+// A push without a link must not clear the server's. The edit is made on a
+// row that lacks the link locally, as on a machine that pulled the row while
+// still running a build without the column. The pushed copy is read before
+// the backfill runs, so only the push's COALESCE protects the link.
+func TestPushNeverClearsLink(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	a.sync()
+	id := a.addNote("task note", "")
+	a.link(id, twUUID)
+	a.sync()
+	tid := a.tidOf(id)
+	b.sync()
+	bid := b.idOf(tid)
+
+	b.exec("UPDATE task SET taskwarrior_uuid=NULL WHERE id=?;", bid)
+	b.edit(bid, "edited without the link")
+	b.sync()
+
+	if got := serverLink(t, pg, tid); got != twUUID {
+		t.Fatalf("B's push cleared the server link: %q", got)
+	}
+	if note, _, _ := serverNote(t, pg, tid); note != "edited without the link" {
+		t.Errorf("B's edit did not reach the server: %q", note)
+	}
+	if got := b.linkOf(bid); got != twUUID {
+		t.Errorf("backfill did not restore B's link: %q", got)
+	}
+}
+
+// A link already on the server when a client gains the column reaches it
+// through the backfill (a pull alone would never bring an unmodified row),
+// without making the row a local change. --report-only doesn't backfill.
+func TestBackfillFillsLinkWithoutPushing(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	id := a.addNote("task note", "body")
+	a.sync()
+	tid := a.tidOf(id)
+	b.sync()
+	bid := b.idOf(tid)
+
+	// As step 1's ALTER plus a link set without touching modified.
+	if _, err := pg.Exec("UPDATE task SET taskwarrior_uuid=$1 WHERE tid=$2;", twUUID, tid); err != nil {
+		t.Fatal(err)
+	}
+	_, _, before := serverNote(t, pg, tid)
+
+	if _, err := b.s.Synchronize(true); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.linkOf(bid); got != "" {
+		t.Errorf("--report-only backfilled the link: %q", got)
+	}
+
+	log := b.sync()
+	if got := b.linkOf(bid); got != twUUID {
+		t.Fatalf("B link after sync = %q, want %q\n%s", got, twUUID, log)
+	}
+	if !strings.Contains(log, "Backfilled the Taskwarrior link on 1 local entries") {
+		t.Errorf("backfill not logged:\n%s", log)
+	}
+	if log := b.sync(); !strings.Contains(log, "is: **0**") {
+		t.Errorf("the backfilled row became a local change:\n%s", log)
+	}
+	if _, _, after := serverNote(t, pg, tid); after != before {
+		t.Errorf("backfill pushed the row: server modified %s -> %s", before, after)
+	}
+}
+
+// A note linked here while it was edited elsewhere: the server's version
+// (no link) wins the body, but the link is kept and goes up a sync later.
+// The conflict copy doesn't inherit it.
+func TestPullKeepsLocalLink(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	id := a.addNote("plan", "v1")
+	a.sync()
+	tid := a.tidOf(id)
+	b.sync()
+	bid := b.idOf(tid)
+
+	b.link(bid, twUUID)
+	b.edit(bid, "B's edit")
+	a.edit(id, "A's edit")
+	a.sync()
+
+	log := b.sync()
+	if !strings.Contains(log, "Kept the local Taskwarrior link") {
+		t.Errorf("kept link not logged:\n%s", log)
+	}
+	notes := b.notes()
+	if notes["plan"] != "A's edit" || notes[conflictTitle("plan")] != "B's edit" {
+		t.Fatalf("conflict not resolved as usual: %v\n%s", notes, log)
+	}
+	if got := b.linkOf(bid); got != twUUID {
+		t.Fatalf("the pull dropped B's link: %q\n%s", got, log)
+	}
+	if b.count(b.s.MainDB, "SELECT COUNT(*) FROM task WHERE title=? AND taskwarrior_uuid IS NOT NULL;", conflictTitle("plan")) != 0 {
+		t.Errorf("the conflict copy inherited the link")
+	}
+
+	b.sync()
+	if got := serverLink(t, pg, tid); got != twUUID {
+		t.Fatalf("B's kept link never reached the server: %q", got)
+	}
+	a.sync()
+	if got := a.linkOf(id); got != twUUID {
+		t.Errorf("A link = %q, want %q", got, twUUID)
+	}
+	if got := a.notes()["plan"]; got != "A's edit" {
+		t.Errorf("pushing the link changed the body: %q", got)
+	}
+}
+
+// A row whose only difference from the server is the link isn't a
+// conflict: no copy, and the link still goes up.
+func TestLinkOnlyDifferenceIsNotAConflict(t *testing.T) {
+	pg := newServer(t)
+	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
+
+	id := a.addNote("plan", "v1")
+	a.sync()
+	tid := a.tidOf(id)
+	b.sync()
+	bid := b.idOf(tid)
+
+	b.link(bid, twUUID)
+	a.edit(id, "v1") // a new server version with the same content
+	a.sync()
+
+	b.sync()
+	if n := len(b.notes()); n != 1 {
+		t.Fatalf("a link-only difference made a conflict copy: %v", b.notes())
+	}
+	b.sync()
+	if got := serverLink(t, pg, tid); got != twUUID {
+		t.Errorf("server link = %q, want %q", got, twUUID)
 	}
 }
