@@ -28,8 +28,8 @@ Taskchamp and taskwarrior_macos keep sending `vimango://task-note?uuid=…`, and
   CLAUDE.md and HISTORY.md). **Step 5 done** 2026-10-16, after backup `vimango-20261016-0847.dump`:
   `cmd/migrate_taskwarrior_links` linked 8 notes and cleaned 9. Conflict copy 6613 was cleaned but not linked.
   The Mac (hybrid, vimango) and the phone were upgraded and synced first; the Linux machines are still on old
-  builds, which is harmless. Next is step 6, the remaining docs (Taskchamp, taskwarrior_macos, and this repo's
-  CLAUDE.md follow-up). Last related commits:
+  builds, which is harmless. **Step 6 done** (docs in taskchamp, taskwarrior_macos and this repo's CLAUDE.md).
+  **The plan is complete.** The only thing left is rebuilding vimango on the Linux machines. Last related commits:
   vimango_ios `7bbcdeb` (dropped `project:` from new task notes' frontmatter) and `64303b8` (hyphen follow-up).
   vimango_hybrid's port (`TaskNote.swift` `body`) still writes `project:`. That doesn't matter, since this plan
   removes the body entirely.
