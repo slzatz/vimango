@@ -433,10 +433,12 @@ Startup performs no network I/O even when PostgreSQL is configured: `InitDatabas
 ### `vimango-sync` modes
 Three, in ascending cost — pick the cheapest that answers the question:
 - `--probe`: "how many changes would a sync apply?" One watermark read from SQLite (`sync` table, `machine='server'`), one Postgres `SELECT` of `(table, tid, modified, deleted)` stamps since it, and a point lookup per stamp in SQLite. Prints a single integer, applies nothing, writes to neither database, never opens the FTS db. Cheap enough to run unattended — vimango_hybrid probes on window activation.
-- `--report-only`: the full engine, reporting without applying. Use when you need the *breakdown*, not a count — it costs a dozen-plus round trips and pulls full note bodies over the wire. Its one write: adding the `server_modified` columns to an older client database.
+- `--report-only`: the full engine, reporting without applying. Use when you need the *breakdown*, not a count — it costs a dozen-plus round trips and pulls full note bodies over the wire. Its writes are client-database upkeep, not changes: adding the `server_modified` and `taskwarrior_uuid` columns to an older database, and `normalizeAdded` (below).
 - (no flag): sync and apply.
 
 The server watermark is taken two minutes *before* each sync (see the comment above `run` in `internal/sync/sync.go`), so a bare `modified > watermark` count would include this client's own recent pushes. `Probe` instead compares each stamp with the `server_modified` the local row holds and skips matches, as the iOS client's probe does. Tombstones still count, since deletions bump `modified`, except for rows this client doesn't have, because applying those is a no-op. `fetchAllChanges` drops the same rows (`dropSeen`), so "Number of changes" in the sync log — which hybrid shows as "· N changes" — agrees with `Probe`.
+
+**Every local timestamp is SQLite's format, `yyyy-MM-dd HH:mm:ss` UTC** — `datetime('now')`/`CURRENT_TIMESTAMP` in every writer, and `to_char(added, 'YYYY-MM-DD HH24:MI:SS')` in the pull, because `ORDER BY added` and every `modified > watermark` compare the *text*. Until 2026-10-17 the pull selected a bare `added`, which database/sql turns into RFC 3339 (`…T…Z`, variable fraction); the space-vs-`T` at position 11 then sorted every pulled note after every local note from the same UTC day. `normalizeAdded`, run by every sync, rewrites those old values in place — `modified` untouched, so nothing pushes — and skips anything `strftime` can't parse, since `added` is NOT NULL and a failed UPDATE would stop every sync.
 
 ### How It Works
 - **Containers** (contexts, folders, keywords) are identified by UUID rather than PostgreSQL-assigned `tid` values

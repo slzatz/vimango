@@ -1012,3 +1012,72 @@ func TestLinkOnlyDifferenceIsNotAConflict(t *testing.T) {
 		t.Errorf("server link = %q, want %q", got, twUUID)
 	}
 }
+
+func (c *testClient) addedOf(id int) string {
+	c.t.Helper()
+	var added string
+	if err := c.s.MainDB.QueryRow("SELECT added FROM task WHERE id=?;", id).Scan(&added); err != nil {
+		c.t.Fatalf("%s: added of id %d: %v", c.name, id, err)
+	}
+	return added
+}
+
+// A pulled note's added is stored in SQLite's format, the one local writers
+// use, not the RFC 3339 database/sql makes of a scanned timestamp — mixed,
+// ORDER BY added sorted pulled notes after same-day local ones.
+func TestPulledAddedUsesSQLiteFormat(t *testing.T) {
+	pg := newServer(t)
+	a := newClient(t, "A", pg, "DEFAULT 1")
+	a.sync()
+
+	var tid int
+	if err := pg.QueryRow("INSERT INTO task (title, note, added, modified) " +
+		"VALUES ('from server', 'x', '2026-08-26 21:53:09.03212', now()) RETURNING tid;").Scan(&tid); err != nil {
+		t.Fatal(err)
+	}
+	a.sync()
+	if got := a.addedOf(a.idOf(tid)); got != "2026-08-26 21:53:09" {
+		t.Errorf("pulled added = %q, want %q", got, "2026-08-26 21:53:09")
+	}
+}
+
+// Values pulled before that fix are rewritten by the next sync, without
+// touching modified (nothing to push) or a value strftime can't parse
+// (added is NOT NULL; nulling it would fail every sync).
+func TestSyncNormalizesISOAdded(t *testing.T) {
+	pg := newServer(t)
+	a := newClient(t, "A", pg, "DEFAULT 1")
+	ids := map[string]int{}
+	for _, raw := range []string{"2021-03-14T00:00:00Z", "2026-08-26T21:53:10.006246Z",
+		"2026-08-18T10:30:37.0671Z", "2026-13-45T99:99:99Z", "2022-01-28 01:15:33"} {
+		ids[raw] = a.addNote(raw, "x")
+	}
+	a.sync()
+	for raw, id := range ids {
+		a.exec("UPDATE task SET added=? WHERE id=?;", raw, id)
+	}
+	var before string
+	if err := a.s.MainDB.QueryRow("SELECT group_concat(modified) FROM task ORDER BY id;").Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+
+	a.sync()
+	for raw, want := range map[string]string{
+		"2021-03-14T00:00:00Z":        "2021-03-14 00:00:00",
+		"2026-08-26T21:53:10.006246Z": "2026-08-26 21:53:10",
+		"2026-08-18T10:30:37.0671Z":   "2026-08-18 10:30:37",
+		"2026-13-45T99:99:99Z":        "2026-13-45T99:99:99Z",
+		"2022-01-28 01:15:33":         "2022-01-28 01:15:33",
+	} {
+		if got := a.addedOf(ids[raw]); got != want {
+			t.Errorf("added %q after sync = %q, want %q", raw, got, want)
+		}
+	}
+	var after string
+	if err := a.s.MainDB.QueryRow("SELECT group_concat(modified) FROM task ORDER BY id;").Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if after != before {
+		t.Errorf("normalizing added changed modified:\nbefore %s\nafter  %s", before, after)
+	}
+}

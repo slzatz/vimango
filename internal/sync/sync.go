@@ -451,7 +451,10 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 	}
 
 	// Fetch server entries
-	rows, err := s.PG.Query("SELECT tid, title, star, note, modified::text, added, archived, context_tid, folder_tid, context_uuid, folder_uuid, taskwarrior_uuid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", serverTime, false)
+	// added as SQLite's format, the one every local writer uses: scanned
+	// as a time, database/sql would turn it into RFC 3339 ("…T…Z", with a
+	// variable fraction), and ORDER BY added compares the text.
+	rows, err := s.PG.Query("SELECT tid, title, star, note, modified::text, to_char(added, 'YYYY-MM-DD HH24:MI:SS'), archived, context_tid, folder_tid, context_uuid, folder_uuid, taskwarrior_uuid FROM task WHERE modified > $1 AND deleted = $2 ORDER BY tid;", serverTime, false)
 	if err != nil {
 		return nil, fmt.Errorf("Error in SELECT for server_updated_entries: %v", err)
 	}
@@ -861,6 +864,23 @@ func (s *Syncer) ensureSyncColumns() error {
 		"WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;")
 	if err != nil {
 		return fmt.Errorf("indexing task.taskwarrior_uuid: %v", err)
+	}
+	return nil
+}
+
+// normalizeAdded rewrites task.added values pulled before the fetch above
+// selected them in SQLite's format: RFC 3339, from database/sql, which
+// sorted every pulled note after every local one created the same UTC day.
+// Run on every sync so each client cleans its own database; it matches
+// nothing once that is done. modified is left alone: the instant is
+// unchanged, so there is nothing to push. A value strftime cannot parse is
+// skipped rather than nulled, since added is NOT NULL and a failed UPDATE
+// would stop every sync.
+func (s *Syncer) normalizeAdded() error {
+	_, err := s.MainDB.Exec("UPDATE task SET added = strftime('%Y-%m-%d %H:%M:%S', added) " +
+		"WHERE added GLOB '????-??-??T*' AND strftime('%Y-%m-%d %H:%M:%S', added) IS NOT NULL;")
+	if err != nil {
+		return fmt.Errorf("normalizing task.added: %v", err)
 	}
 	return nil
 }
@@ -2057,6 +2077,10 @@ func (s *Syncer) Synchronize(reportOnly bool) (log string, err error) {
 	}
 
 	if err = s.ensureSyncColumns(); err != nil {
+		fmt.Fprintf(&lg, "Error preparing the client database: %v", err)
+		return
+	}
+	if err = s.normalizeAdded(); err != nil {
 		fmt.Fprintf(&lg, "Error preparing the client database: %v", err)
 		return
 	}
