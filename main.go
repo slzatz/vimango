@@ -194,6 +194,11 @@ func main() {
 			fmt.Println("Error: no note to open (database has no saved entries)")
 			os.Exit(1)
 		}
+		// editNote's draw ends wherever its last cell was — the bottom
+		// of the right border — and nothing places the cursor until the
+		// first key or resize. A host that spawns an editor and shows it
+		// at once (a VimangoHybrid pop-out) would show it there.
+		app.returnCursor()
 	}
 
 	app.Run = true
