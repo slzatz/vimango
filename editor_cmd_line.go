@@ -74,14 +74,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":save backup.txt", ":savefile /tmp/note.md"},
 	})
 
-	registry.Register("open", (*Editor).openNote, CommandInfo{
-		Aliases:     []string{"open!"},
-		Description: "Switch this editor to the note with the given database id (open! discards unsaved changes)",
-		Usage:       "open <id>",
-		Category:    "File Operations",
-		Examples:    []string{":open 5", ":open! 5"},
-	})
-
 	registry.Register("checkstale", (*Editor).checkStale, CommandInfo{
 		Description: "Reload this note if the database changed underneath it (a clean buffer only; " +
 			"warns instead when you have unsaved changes). Injected by the host app after a sync",
@@ -925,69 +917,6 @@ func (e *Editor) quitAll() {
 		app.Organizer.displayNote()
 		app.returnCursor()
 	}
-}
-
-// openNote implements :open <id> / :open! <id> — switch this editor window
-// to another note in place. This is the host→editor control channel when
-// vimango runs as an embedded editor pane (--editor): the host injects
-// "\x1b:open <id>\r" into the pty. Follows editNote's buffer setup; unsaved
-// changes are refused exactly like :q unless open! is used.
-//
-// Opening the note that is already open is a no-op (unless forced, which
-// keeps :e!-style revert-from-DB semantics). This is contract: the host
-// injects :open on every edit intent without tracking which note the
-// editor is on — the editor is the single source of truth for its own
-// note + dirty state, so the "already open" check must live here.
-func (e *Editor) openNote() {
-	force := strings.HasPrefix(e.command_line, "open!")
-
-	pos := strings.Index(e.command_line, " ")
-	if pos == -1 {
-		e.ShowMessage(BR, "Usage: open <note id>")
-		return
-	}
-	arg := strings.TrimSpace(e.command_line[pos+1:])
-	id, err := strconv.Atoi(arg)
-	if err != nil {
-		e.ShowMessage(BR, "open: %q is not a note id", arg)
-		return
-	}
-	if id == e.id && !force {
-		return
-	}
-	if !force && e.isModified() {
-		e.ShowMessage(BR, "No write since last change (:w first or :open! %d)", id)
-		return
-	}
-	if !e.Database.entryExists(id) {
-		e.ShowMessage(BR, "No note with id %d", id)
-		return
-	}
-
-	vim.ExecuteCommand("bw") // wipe the old note's buffer
-
-	note := e.Database.readNoteIntoString(id)
-	e.id = id
-	e.title = e.Database.getTitle(id)
-	e.dbText = note
-	e.ss = strings.Split(note, "\n")
-	if len(e.ss) == 0 {
-		e.ss = []string{""}
-	}
-	e.vbuf = vim.NewBuffer(0)
-	vim.SetCurrentBuffer(e.vbuf)
-	e.vbuf.SetLines(0, -1, e.ss)
-	e.bufferTick = e.vbuf.GetLastChangedTick()
-	e.saveTick = e.bufferTick
-	e.fr, e.fc, e.cy, e.cx = 0, 0, 0, 0
-	e.lineOffset = 0
-	e.firstVisibleRow = 0
-	vim.SetCursorPosition(1, 0)
-
-	e.Screen.positionWindows()
-	e.Screen.eraseRightScreen()
-	e.Screen.drawRightScreen()
-	e.ShowMessage(BR, "Opened note %d", id)
 }
 
 // checkStale asks whether this note's row changed in the database since

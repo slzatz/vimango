@@ -111,7 +111,7 @@ NOTE: Generally we have not been running tests but have tested key functionality
 
 ## Runtime Options
 - `--help`, `-h`: Display help message with all available options and exit
-- `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer and drive the editor over the pty (`:open <id>` / `:open! <id>` ex commands).
+- `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer. One note per process, chosen by `--open <id>` at boot: there is no ex command to switch notes (the `:open <id>` the host once injected was removed 2026-11-07, once every host editor became a one-session cold spawn). The host drives the editor over the pty with ex commands such as `:checkstale`, `:q` and `:x`.
 - `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
 - `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
 - Spell check: via hunspell (CGO) — requires the `spell` build tag, which is not in the default build command; see "Build Commands"

@@ -105,8 +105,8 @@ OPTIONS:
     --editor
         Boot directly into the editor, full-width; the organizer is never
         rendered. Intended for host applications embedding vimango as an
-        editor pane, but works in any terminal. Use :open <id> to switch
-        notes; :q quits the application.
+        editor pane, but works in any terminal. One note per process:
+        --open <id> picks it, and :q quits the application.
 
     --open <id>
         With --editor, load the note with the given database id into the

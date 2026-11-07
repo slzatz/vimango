@@ -251,7 +251,7 @@ func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
 // vim sits in cmdline mode acting purely as a line editor: keys are forwarded
 // and the line + cursor are mirrored from vim's cmdline buffer. vim executes
 // nothing until it sees a CR, and Enter is intercepted below, so dispatch
-// stays vimango's and custom commands like :open never collide with vim's.
+// stays vimango's and custom commands like :checkstale never collide with vim's.
 func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	if c == '\r' {
 		// vim's cmdline buffer is authoritative; read it, then cancel vim's
