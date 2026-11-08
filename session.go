@@ -12,8 +12,6 @@ type Session struct {
 	imagePreview     bool
 	imgSizeY         int
 	fts_search_terms string
-	style            [8]string
 	markdown_style   *chroma.Style
-	styleIndex       int
 	googleDrive      *drive.Service // Google Drive service for file operations
 }

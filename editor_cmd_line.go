@@ -1,11 +1,8 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"image/color"
-	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -32,13 +29,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":write", ":w"},
 	})
 
-	registry.Register("compile", (*Editor).compile, CommandInfo{
-		Aliases:     []string{"compile", "run"},
-		Description: "Compile current code file",
-		Usage:       "compile",
-		Category:    "File Operations",
-		Examples:    []string{":compile"},
-	})
 	registry.Register("sync", (*Editor).synchronize, CommandInfo{
 		Aliases:     []string{"test", "sync?"},
 		Description: "Synchronize with remote server (test or sync? for dry-run)",
@@ -102,25 +92,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Category:    "Editing",
 		Examples:    []string{":nopaste"},
 	})
-	/*
-		registry.Register("fmt", (*Editor).goFormat, CommandInfo{
-			Name:        "fmt",
-			Description: "Format Go code using gofmt",
-			Usage:       "fmt",
-			Category:    "Editing",
-			Examples:    []string{":fmt"},
-		})
-
-			registry.Register("run", (*Editor).run, CommandInfo{
-				Name:        "run",
-				Aliases:     []string{"r"},
-				Description: "Execute current note as code",
-				Usage:       "run",
-				Category:    "Editing",
-				Examples:    []string{":run", ":r"},
-			})
-	*/
-
 	// Output commands
 	registry.Register("ha", (*Editor).printNote, CommandInfo{
 		Description: "Print current note using vim hardcopy",
@@ -151,20 +122,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	// Utility commands
-	registry.Register("style", (*Editor).styleCmd, CommandInfo{
-		Description: "Cycle through available glamour styles",
-		Usage:       "style",
-		Category:    "Utility",
-		Examples:    []string{":style"},
-	})
-
-	registry.Register("template", (*Editor).templateCmd, CommandInfo{
-		Description: "Replace the note with the Go template (go.template)",
-		Usage:       "template",
-		Category:    "Utility",
-		Examples:    []string{":template"},
-	})
-
 	registry.Register("spell", (*Editor).spellCmd, CommandInfo{
 		Description: "Highlight misspelled words",
 		Usage:       "spell",
@@ -285,10 +242,6 @@ func (e *Editor) saveNoteToFile() {
 func (e *Editor) writeNote() {
 	text := e.bufferToString()
 
-	if e.Database.taskFolder(e.id) == "code" {
-		go e.Database.updateCodeFile(e.id, text)
-	}
-
 	err := e.Database.updateNote(e.id, text)
 	if err != nil {
 		e.ShowMessage(BL, "Error in updating note (updateNote) for entry with id %d: %v", e.id, err)
@@ -335,197 +288,6 @@ func (e *Editor) readFile_() {
 	}
 	e.ShowMessage(BR, "Note generated from file: %s", filename)
 }
-
-func (e *Editor) compile() {
-
-	var dir, filePath string
-	var args []string
-	var cmd *exec.Cmd
-	var cmd0 *exec.Cmd
-	lang := Languages[e.Database.taskContext(e.id)]
-	dir = "/home/slzatz/vimango_" + lang + "_code/"
-	filePath = dir + "main.go"
-	// Recursively create directories
-	err := os.MkdirAll(dir, os.ModePerm) // os.ModePerm is 0777
-	if err != nil {
-		e.ShowMessage(BR, "Error creating directory %s: %v", dir, err)
-		return
-	}
-	f, err := os.Create(filePath)
-	if err != nil {
-		e.ShowMessage(BR, "Error creating file %s: %v", filePath, err)
-		return
-	}
-	defer f.Close()
-	_, err = f.WriteString(strings.Join(e.ss, "\n"))
-	if err != nil {
-		e.ShowMessage(BR, "Error writing file %s: %v", filePath, err)
-		return
-	}
-	e.ShowMessage(BR, "Code file written to %s", filePath)
-	if lang == "cpp" {
-		dir = "/home/slzatz/clangd_examples/"
-		cmd = exec.Command("make")
-	} else if lang == "go" {
-		cmd0 = exec.Command("go", "mod", "tidy")
-
-		// 2. Set the working directory to where your main.go and go.mod live
-		cmd0.Dir = dir
-
-		// 3. Execute and capture both Standard Output and Standard Error
-		// This is helpful because 'go mod tidy' prints its progress to Stderr
-		output, err := cmd0.CombinedOutput()
-		if err != nil {
-			e.ShowMessage(BR, "go mod tidy failed: %v\nOutput: %s", err, string(output))
-			return
-		}
-		//cmd = exec.Command("go", "run", "main.go")
-		pos := strings.Index(e.command_line, " ")
-		if pos != -1 {
-			args = strings.Split(e.command_line[pos+1:], " ")
-		}
-		args = append([]string{"run", "main.go"}, args...)
-		cmd = exec.Command("go", args...)
-	} else if lang == "python" {
-		e.ShowMessage(BR, "You don't have to compile python")
-		return
-	} else {
-		e.ShowMessage(BR, "I don't recognize %q", e.Database.taskContext(e.id))
-		return
-	}
-	cmd.Dir = dir
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		e.ShowMessage(BR, "Error in compile creating stdout pipe: %v", err)
-		return
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		e.ShowMessage(BR, "Error in compile creating stderr pipe: %v", err)
-		return
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		e.ShowMessage(BR, "Error in compile starting command: %v", err)
-		return
-	}
-
-	buffer_out := bufio.NewReader(stdout)
-	buffer_err := bufio.NewReader(stderr)
-
-	var rows []string
-	rows = append(rows, "## output")
-
-	for {
-		bytes, _, err := buffer_out.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		rows = append(rows, string(bytes))
-	}
-
-	for {
-		bytes, _, err := buffer_err.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		rows = append(rows, string(bytes))
-	}
-	if len(rows) == 1 {
-		rows = append(rows, "The code compiled successfully")
-	}
-
-	//rows = append(rows, "------------------------")
-
-	e.mode = NORMAL //HELP //RUN //// revist this
-	result := strings.Join(rows, "\n")
-	app.Screen.altRowoff = 0
-	app.Screen.drawNotice(result, false, TL) // isMarkdown = false
-	e.command_line = ""
-}
-
-/*
-func (e *Editor) run() {
-
-	var args []string
-	//var combinedArgs []string
-	var name string
-	var dir string
-	var cmd *exec.Cmd
-
-	pos := strings.Index(e.command_line, " ")
-	if pos != -1 {
-		args = strings.Split(e.command_line[pos+1:], " ")
-	}
-
-	lang := Languages[e.Database.taskContext(e.id)]
-	if lang == "go" {
-		dir = "/home/slzatz/vmgo_go_code/"
-		name = "go"
-		args = append([]string{"run", "main.go"}, args...)
-	} else if lang == "python" {
-		dir = "/home/slzatz/vmgo_python_code/"
-		name = "python"
-		args = append([]string{"main.py"}, args...)
-	} else {
-		e.ShowMessage(BR, "I don't recognize %q", e.Database.taskContext(e.id))
-		return
-	}
-	cmd = exec.Command(name, args...)
-	cmd.Dir = dir
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		e.ShowMessage(BR, "Error in run creating stdout pipe: %v", err)
-		return
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		e.ShowMessage(BR, "Error in run creating stderr pipe: %v", err)
-		return
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		e.ShowMessage(BR, "Error in run starting command: %v", err)
-		return
-	}
-
-	buffer_out := bufio.NewReader(stdout)
-	buffer_err := bufio.NewReader(stderr)
-
-	var rows []string
-	rows = append(rows, "------------------------")
-
-	for {
-		bytes, _, err := buffer_out.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		rows = append(rows, string(bytes))
-	}
-
-	for {
-		bytes, _, err := buffer_err.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		rows = append(rows, string(bytes))
-	}
-
-	rows = append(rows, "------------------------")
-
-	op := e.output
-	op.rowOffset = 0
-	op.rows = rows
-	op.drawText()
-	// no need to call drawFrame or drawStatusBar
-}
-*/
 
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax
@@ -656,59 +418,6 @@ func (e *Editor) number() {
 	e.ShowMessage(BR, "Line numbering is %t", e.numberLines)
 }
 
-/*
-	func (e *Editor) goFormat() {
-		ss := []string{}
-		//cmd := exec.Command("gofmt")
-		cmd := exec.Command("goimports")
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			e.ShowMessage(BR, "Problem in goimports stdout: %v", err)
-			return
-		}
-		buf_out := bufio.NewReader(stdout)
-
-		stdin, err := cmd.StdinPipe()
-		if err != nil {
-			e.ShowMessage(BR, "Problem in goimports stdin: %v", err)
-			return
-		}
-		err = cmd.Start()
-		if err != nil {
-			e.ShowMessage(BR, "Problem in cmd.Start (goimports) stdin: %v", err)
-			return
-		}
-
-		for _, row := range e.ss {
-			io.WriteString(stdin, row+"\n")
-		}
-		stdin.Close()
-
-		for {
-			s, err := buf_out.ReadString('\n')
-			if err == io.EOF {
-				break
-			}
-			ss = append(ss, s[:len(s)-1])
-		}
-		if len(ss) == 0 {
-			e.ShowMessage(BL, "Return from goimports has length zero - likely code errors")
-			return
-		}
-
-		e.ss = ss
-
-		e.vbuf.SetLines(0, -1, e.ss)
-		lines := e.vbuf.GetLineCount()
-		e.ShowMessage(BL, "Number of lines in the formatted text = %d", lines)
-		vim.SetCursorPosition(1, 0)
-		e.fr = 0
-		e.fc = 0
-		e.scroll()
-		e.drawText()
-		app.returnCursor()
-	}
-*/
 func (e *Editor) createPDF() {
 	pos := strings.Index(e.command_line, " ")
 	if pos == -1 {
@@ -822,63 +531,30 @@ func (e *Editor) createPDFGoldmark() {
 }
 
 func (e *Editor) printDocument() {
-	if e.Database.taskFolder(e.id) == "code" {
-		c := e.Database.taskContext(e.id)
-		var ok bool
-		var lang string
-		if lang, ok = Languages[c]; !ok {
-			e.ShowMessage(BR, "I don't recognize the language")
-			return
-		}
-		note := e.Database.readNoteIntoString(e.id)
-		var buf bytes.Buffer
-		// github seems to work pretty well for printer output
-		_ = Highlight(&buf, note, lang, "html", "github")
+	content := strings.Join(e.ss, "\n")
 
-		f, err := os.Create("output.html")
-		if err != nil {
-			e.ShowMessage(BR, "Error creating output.html: %v", err)
-			return
-		}
-		defer f.Close()
+	params := mdtopdf.PdfRendererParams{
+		Orientation: "",
+		Papersz:     "",
+		PdfFile:     "output.pdf",
+		TracerFile:  "trace.log",
+		Opts:        nil,
+		Theme:       mdtopdf.LIGHT,
+	}
 
-		_, err = f.WriteString(buf.String())
-		if err != nil {
-			e.ShowMessage(BR, "Error writing output.html: %v", err)
-			return
-		}
-		cmd := exec.Command("wkhtmltopdf", "--enable-local-file-access",
-			"--no-background", "--minimum-font-size", "16", "output.html", "output.pdf")
-		err = cmd.Run()
-		if err != nil {
-			e.ShowMessage(BR, "Error creating pdf from code: %v", err)
-		}
-	} else {
-		content := strings.Join(e.ss, "\n")
+	pf := mdtopdf.NewPdfRenderer(params)
 
-		params := mdtopdf.PdfRendererParams{
-			Orientation: "",
-			Papersz:     "",
-			PdfFile:     "output.pdf",
-			TracerFile:  "trace.log",
-			Opts:        nil,
-			Theme:       mdtopdf.LIGHT,
-		}
+	//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
+	pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
+		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
+		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
 
-		pf := mdtopdf.NewPdfRenderer(params)
-
-		//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
-		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
-			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
-
-		err := pf.Process([]byte(content))
-		if err != nil {
-			e.ShowMessage(BR, "pdf error:%v", err)
-		}
+	err := pf.Process([]byte(content))
+	if err != nil {
+		e.ShowMessage(BR, "pdf error:%v", err)
 	}
 	cmd := exec.Command("lpr", "output.pdf")
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		e.ShowMessage(BR, "Error printing document: %v", err)
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
-	"github.com/alecthomas/chroma/v2/styles"
 )
 
 // MDFormatter is the formatter name to hand Highlight2 for markdown. It is
@@ -55,7 +54,7 @@ func clearStyleBackground(style *chroma.Style) *chroma.Style {
 }
 
 // writeStyledToken resets at the end of every line and re-applies formatting
-// on the next one, as chroma's terminal16m does. drawCodeRows splits this
+// on the next one, as chroma's terminal16m does. drawHighlightedRows splits this
 // output on "\n" and draws each line with its own cursor positioning, so no
 // line may depend on styling left open by the line above it.
 func writeStyledToken(w io.Writer, formatting, text string) {
@@ -147,24 +146,6 @@ func selectMDStyle(style string) (*chroma.Style, error) {
 	}
 	defer r.Close()
 	return chroma.NewXMLStyle(r)
-}
-
-func Highlight(w io.Writer, source, lexer, formatter, style string) error {
-	l := lexers.Get(lexer)
-
-	// Commenting this out did not fix multiline comments enclosed by
-	/* ... */
-	l = chroma.Coalesce(l)
-
-	f := formatters.Get(formatter)
-
-	s := styles.Get(style)
-
-	it, err := l.Tokenise(nil, source)
-	if err != nil {
-		return err
-	}
-	return f.Format(w, s, it)
 }
 
 func Highlight2(w io.Writer, source string, lexer string, formatter string, style *chroma.Style) error {

@@ -124,6 +124,7 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 - The application operates in two main modes: an editor mode for editing notes and an organizer mode for managing and viewing notes. On the terminal screen the Organizer with the titles of notes is on the left and the Editor for editing notes is on the right.
 - **One note at a time.** The TUI once let several notes be open side by side (Ctrl-H/Ctrl-L moved between them and back to the organizer); that was removed 2026-11-08. `Session.editor` is the open note's editor or nil; `:x`/`:q` close it and return to the organizer, and in `--editor` mode end the process. The TUI is kept deliberately simple — for emergencies and ssh — and vimango_hybrid is the daily driver. Removed from the TUI on the same day for the same reason: the webview window (organizer `:webview`/`:closewebview`, Ctrl-W/Ctrl-Q; editor `:webview`), the editor's in-terminal `:preview` (and the never-entered VIEW_LOG mode that shared its scrolling), and `:vertical resize` in both panes. The divider still follows terminal resizes (`moveDividerPct`) and `preferences.json`'s `edPct`.
 - The application supports markdown rendering of notes to enhance the readability of the content.
+- **Every note is markdown.** Notes in the folder named `code` used to be treated as source in the language their context named (`Languages`): chroma-highlighted in the editor and organizer, mirrored to a hard-coded file on `:w` (`updateCodeFile`), with `:compile`/`:run`, `:style` (the chroma theme) and `:template` (`go.template`). All removed 2026-11-08; old code notes still in the database render and highlight as markdown, and fenced code blocks inside a note are still highlighted as part of markdown.
 - The ability to manage and display images is an important feature of the application.
 - SQLite driver: `mattn/go-sqlite3` (CGO) everywhere — the modernc.org/sqlite
   pure-Go driver and the `--go-sqlite`/`--cgo-sqlite` selection layer were
@@ -183,11 +184,11 @@ The command system is loosely based on the vim command system and the existence 
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
-**Editor Ex Commands (24 commands in 7 categories):**
-- **File Operations**: write, compile, read, save, checkstale
+**Editor Ex Commands (18 commands in 7 categories):**
+- **File Operations**: write, read, save, checkstale
 - **Data Management**: sync
-- **Editing**: syntax, number, fmt, run, paste, nopaste
-- **Utility**: style, template, spell, suggest
+- **Editing**: syntax, number, paste, nopaste
+- **Utility**: spell, suggest
 - **Output**: ha, print, pdf, pdf-goldmark
 - **System**: quit, exit
 - **Help**: help

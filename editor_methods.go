@@ -185,7 +185,7 @@ func (e *Editor) drawText() {
 		ab.WriteString(lf_ret)
 	}
 	if e.highlightSyntax { //includes markdown
-		e.drawCodeRows(&ab)
+		e.drawHighlightedRows(&ab)
 	} else {
 		e.drawPlainRows(&ab)
 	}
@@ -326,26 +326,13 @@ func (e *Editor) drawPlainRows(pab *strings.Builder) {
 	}
 }
 
-func (e *Editor) drawCodeRows(pab *strings.Builder) {
-	//note := e.generateWWStringFromBuffer()
-	var lang string
-	if e.Database.taskFolder(e.id) == "code" {
-		c := e.Database.taskContext(e.id)
-		var ok bool
-		if lang, ok = Languages[c]; !ok {
-			lang = "markdown"
-		}
-	} else {
-		lang = "markdown"
-	}
-
+// drawHighlightedRows draws the note with markdown syntax highlighting. Every
+// note is markdown: the per-language "code" notes (folder "code", context
+// naming the language) were dropped 2026-11-08.
+func (e *Editor) drawHighlightedRows(pab *strings.Builder) {
 	note := e.generateWWStringFromBuffer()
 	var buf bytes.Buffer
-	if lang == "markdown" {
-		_ = Highlight2(&buf, note, lang, MDFormatter, e.Session.markdown_style)
-	} else {
-		_ = Highlight(&buf, note, lang, "terminal16m", e.Session.style[e.Session.styleIndex])
-	}
+	_ = Highlight2(&buf, note, "markdown", MDFormatter, e.Session.markdown_style)
 	note = buf.String()
 	nnote := strings.Split(note, "\n")
 

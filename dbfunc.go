@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -987,30 +986,4 @@ func (db *Database) copyEntry(sourceID int) (int, error) {
 	}
 
 	return newID, nil
-}
-
-func (db *Database) updateCodeFile(id int, text string) {
-	var filePath string
-	lang := Languages[db.taskContext(id)]
-	if lang == "cpp" {
-		filePath = "/home/slzatz/clangd_examples/test.cpp"
-	} else if lang == "go" {
-		filePath = "/home/slzatz/vmgo_go_code/main.go"
-	} else if lang == "python" {
-		filePath = "/home/slzatz/python_fragments/main.py"
-	} else {
-		app.Organizer.ShowMessage(BL, "I don't recognize %q", db.taskContext(id))
-		return
-	}
-
-	f, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "error opening file %s: %v", filePath, err)
-		return
-	}
-	defer f.Close()
-
-	f.Truncate(0)
-	f.WriteString(text)
-	f.Sync()
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"maps"
 	"os"
@@ -1447,62 +1446,28 @@ func (o *Organizer) save(pos int) {
 func (o *Organizer) printDocument(_ int) {
 	id := o.rows[o.fr].id
 	note := o.Database.readNoteIntoString(id)
-	if o.Database.taskFolder(id) == "code" {
-		c := o.Database.taskContext(id)
-		var ok bool
-		var lang string
-		if lang, ok = Languages[c]; !ok {
-			o.ShowMessage(BL, "I don't recognize the language")
-			return
-		}
-		//note := readNoteIntoString(id)
-		var buf bytes.Buffer
-		// github seems to work pretty well for printer output
-		_ = Highlight(&buf, note, lang, "html", "github")
+	params := mdtopdf.PdfRendererParams{
+		Orientation: "",
+		Papersz:     "",
+		PdfFile:     "output.pdf",
+		TracerFile:  "trace.log",
+		Opts:        nil,
+		Theme:       mdtopdf.LIGHT,
+	}
 
-		f, err := os.Create("output.html")
-		if err != nil {
-			o.ShowMessage(BL, "Error creating output.html: %v", err)
-			return
-		}
-		defer f.Close()
+	pf := mdtopdf.NewPdfRenderer(params)
 
-		_, err = f.WriteString(buf.String())
-		if err != nil {
-			o.ShowMessage(BL, "Error writing output.html: %v", err)
-			return
-		}
-		cmd := exec.Command("wkhtmltopdf", "--enable-local-file-access",
-			"--no-background", "--minimum-font-size", "16", "output.html", "output.pdf")
-		err = cmd.Run()
-		if err != nil {
-			o.ShowMessage(BL, "Error creating pdf from code: %v", err)
-		}
-	} else {
+	//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
+	pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
+		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
+		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
 
-		params := mdtopdf.PdfRendererParams{
-			Orientation: "",
-			Papersz:     "",
-			PdfFile:     "output.pdf",
-			TracerFile:  "trace.log",
-			Opts:        nil,
-			Theme:       mdtopdf.LIGHT,
-		}
-
-		pf := mdtopdf.NewPdfRenderer(params)
-
-		//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
-		pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
-			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-			FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
-
-		err := pf.Process([]byte(note))
-		if err != nil {
-			o.ShowMessage(BL, "pdf error:%v", err)
-		}
+	err := pf.Process([]byte(note))
+	if err != nil {
+		o.ShowMessage(BL, "pdf error:%v", err)
 	}
 	cmd := exec.Command("lpr", "output.pdf")
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		o.ShowMessage(BL, "Error printing document: %v", err)
 	}

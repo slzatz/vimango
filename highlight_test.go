@@ -76,7 +76,7 @@ func TestMarkdownFormatterMatchesTerminal16mWithoutStrikethrough(t *testing.T) {
 	}
 }
 
-// Strikethrough must not leak across a line boundary: drawCodeRows splits the
+// Strikethrough must not leak across a line boundary: drawHighlightedRows splits the
 // formatted note on "\n" and draws each line with its own cursor positioning,
 // so an unclosed SGR 9 would strike the rest of the screen.
 func TestMarkdownFormatterClosesStrikeOnEveryLine(t *testing.T) {

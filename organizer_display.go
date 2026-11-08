@@ -728,34 +728,11 @@ func (o *Organizer) displayNote() {
 	}
 	o.Screen.eraseRightScreen()
 
-	if o.Database.taskFolder(id) == "code" {
-		c := o.Database.taskContext(id)
-		if lang, ok := Languages[c]; ok {
-			o.renderCode(note, lang)
-			o.drawRenderedNote()
-		} else {
-			app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
-		}
-	} else {
-		// Always use RenderManager for markdown- it handles all cases internally
-		// (kitty/no-kitty, images/no-images, cached/uncached)
-		app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
-	}
+	// Every note is markdown. RenderManager handles all cases internally
+	// (kitty/no-kitty, images/no-images, cached/uncached).
+	app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
 }
 
-func (o *Organizer) renderCode(s string, lang string) {
-	var buf bytes.Buffer
-	_ = Highlight(&buf, s, lang, "terminal16m", o.Session.style[o.Session.styleIndex])
-	note := buf.String()
-
-	if o.taskview == BY_FIND {
-		// could use strings.Count to make sure they are balanced
-		note = strings.ReplaceAll(note, "qx", "\x1b[48;5;31m") //^^
-		note = strings.ReplaceAll(note, "qy", "\x1b[0m")       // %%
-	}
-	note = WordWrap(note, o.Screen.totaleditorcols, 0)
-	o.note = strings.Split(note, "\n")
-}
 func (o *Organizer) drawRenderedNote_() {
 	if len(o.note) == 0 {
 		return

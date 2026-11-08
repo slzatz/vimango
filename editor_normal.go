@@ -26,18 +26,6 @@ func splitExRange(line string) (rng, rest string) {
 	return "", line
 }
 
-func (e *Editor) nextStyle(_ int) {
-	e.Session.styleIndex++
-	if e.Session.styleIndex > len(e.Session.style)-1 {
-		e.Session.styleIndex = 0
-	}
-	e.ShowMessage(BR, "New style is %q", e.Session.style[e.Session.styleIndex])
-}
-
-func (e *Editor) readGoTemplate(_ int) {
-	e.readFileIntoNote("go.template")
-}
-
 func (e *Editor) spellingCheck(_ int) {
 	/* Really need to look at this and decide if there will be a spellcheck flag in NORMAL mode */
 	if !IsSpellCheckAvailable() {
@@ -74,7 +62,5 @@ func (e *Editor) spellSuggest(_ int) {
 // Ex-command forms of the normal-mode shortcuts. The registry wants
 // func(*Editor); the normal-mode table wants func(*Editor, int).
 
-func (e *Editor) styleCmd()    { e.nextStyle(0) }
-func (e *Editor) templateCmd() { e.readGoTemplate(0) }
-func (e *Editor) spellCmd()    { e.spellingCheck(0) }
-func (e *Editor) suggestCmd()  { e.spellSuggest(0) }
+func (e *Editor) spellCmd()   { e.spellingCheck(0) }
+func (e *Editor) suggestCmd() { e.spellSuggest(0) }

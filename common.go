@@ -145,14 +145,6 @@ func getGlamourStylePath() string {
 
 var z0 = struct{}{}
 
-var Languages = map[string]string{
-	"golang": "go",
-	"go":     "go",
-	"cpp":    "cpp",
-	"c++":    "cpp",
-	"python": "python",
-}
-
 var sortColumns = map[string]struct{}{
 	"added":    z0,
 	"modified": z0,
@@ -169,12 +161,6 @@ var termcodes = map[int]string{
 	DEL_KEY:     "<del>",
 	PAGE_UP:     "<pageup>",
 	PAGE_DOWN:   "<pagedown>",
-}
-
-var Lsps = map[string]string{
-	"go":  "gopls",
-	"cpp": "clangd",
-	"py":  "python-language-server",
 }
 
 type Mode int
