@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"unicode"
 )
 
 // Special keys
@@ -69,58 +72,143 @@ var bufr = bufio.NewReader(os.Stdin)
 // ReadKey reads a key from Stdin processing it for VT100 sequences.
 // Stdin should be put in raw mode with
 // VT100 processing enabled prior to using RawReadKey. If terminal read is set to
-// timeout mode and no key is pressed, then ErrNoInput will be returned
+// timeout mode and no key is pressed, then ErrNoInput will be returned.
+// ErrNoInput is also returned for an escape sequence that was read whole but
+// means nothing here; callers skip it like any other non-key.
 func ReadKey() (Key, error) {
+	return readKey(bufr)
+}
 
-  //slz: not clear to me when bufr.ReadRune(0 returns error
-  // since it appears to return something even when invalid
-	r, n, err := bufr.ReadRune()
+// maxSeqLen bounds how far readKey reads looking for a sequence's final byte,
+// so a stray ESC [ followed by junk cannot swallow input indefinitely.
+const maxSeqLen = 64
+
+func readKey(r *bufio.Reader) (Key, error) {
+	ch, n, err := r.ReadRune()
 	if err != nil {
 		return Key{}, err
 	}
 
 	// this code handles situation where a timeout has been set
 	// but no key was pressed
-	if n == 0 && err == nil {
+	if n == 0 {
 		return Key{}, ErrNoInput
 	}
 
-  //ascii escape is decimal 27
-	if r != 27 {
-		return Key{r, KeyNoSpl}, nil
+	//ascii escape is decimal 27
+	if ch != 27 {
+		return Key{ch, KeyNoSpl}, nil
 	}
 
 	// nothing has been buffered, probably plain escape
-	if bufr.Buffered() == 0 {
+	if r.Buffered() == 0 {
 		return Key{27, KeyNoSpl}, nil
 	}
 
-	// Every escape sequence we recognize (specialKeys) is introduced by
-	// '[' (CSI) or 'O' (SS3). Anything else buffered behind ESC is
-	// independent input that happened to arrive in the same read — e.g.
-	// a host app injecting "\x1b:checkstale\r" through the pty in one
-	// write. Return the bare ESC and leave those bytes for later reads;
-	// without this peek they would be swallowed by the sequence matcher.
-	if next, err := bufr.Peek(1); err == nil && next[0] != '[' && next[0] != 'O' {
+	// Every escape sequence we recognize is introduced by '[' (CSI) or 'O'
+	// (SS3). Anything else buffered behind ESC is independent input that
+	// happened to arrive in the same read -- e.g. a host app injecting
+	// "\x1b:checkstale\r" through the pty in one write. Return the bare ESC
+	// and leave those bytes for later reads.
+	next, err := r.Peek(1)
+	if err != nil || (next[0] != '[' && next[0] != 'O') {
 		return Key{27, KeyNoSpl}, nil
 	}
 
-	stack := [4]byte{}
-	for j := 0; j < 4; j++ {
-		b, err := bufr.ReadByte() // could these just be bufr.Readbyte
-		if err != nil {
-			return Key{}, err
-		}
-		//stack = append(stack, r)
-		stack[j] = b
+	seq, err := readSequence(r)
+	if err != nil {
+		return Key{}, err
+	}
 
-		//if match, key := matchSplKeys(stack); match {
+	if seq[len(seq)-1] == 'u' && seq[0] == '[' {
+		return csiUKey(seq[1 : len(seq)-1])
+	}
+	if len(seq) <= 4 {
+		var stack [4]byte
+		copy(stack[:], seq)
 		if key, found := specialKeys[stack]; found {
 			return Key{0, key}, nil
 		}
 	}
-	// we couldn't make out the special key, let's just return escape
-	// this is probably wrong but unless we have a custom bufio.Reader,
-	// we can't do better
-	return Key{27, KeyNoSpl}, nil
+	// A sequence we don't know, consumed whole and dropped. The reader used
+	// to return ESC and leave the unread tail to be typed as keys: Ghostty's
+	// Ctrl-I, ESC [105;5u, reached vim as <esc> ; 5 u -- "undo five times".
+	return Key{}, ErrNoInput
+}
+
+// readSequence reads the bytes after ESC through the sequence's final byte.
+// SS3 (ESC O x) is always one byte after the O. CSI (ESC [ ...) is parameter
+// bytes 0x30-0x3F, intermediate bytes 0x20-0x2F, then one final byte
+// 0x40-0x7E (ECMA-48 5.4).
+func readSequence(r *bufio.Reader) ([]byte, error) {
+	intro, err := r.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	seq := []byte{intro}
+	if intro == 'O' {
+		b, err := r.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		return append(seq, b), nil
+	}
+	for len(seq) < maxSeqLen {
+		b, err := r.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		seq = append(seq, b)
+		if b >= 0x40 && b <= 0x7e {
+			return seq, nil
+		}
+	}
+	return seq, nil // no final byte in reach: dropped by the caller
+}
+
+// csiUKey decodes the kitty keyboard protocol's ESC [ code ; mods u, which
+// Ghostty (and kitty) send for keys the legacy encoding can't tell apart --
+// Ctrl-I from Tab, Ctrl-[ from Esc. params is the text between '[' and 'u'.
+// Ctrl plus a letter or one of @[\]^_ becomes its control byte, the key it
+// stands for everywhere else; a plain or shifted key becomes its character.
+// Anything else (Alt, Super, the protocol's private-use function keys) has no
+// meaning here and is dropped.
+func csiUKey(params []byte) (Key, error) {
+	fields := strings.Split(string(params), ";")
+	field := func(i, def int) (int, bool) {
+		if i >= len(fields) || fields[i] == "" {
+			return def, true
+		}
+		v, err := strconv.Atoi(strings.SplitN(fields[i], ":", 2)[0])
+		return v, err == nil
+	}
+	code, ok1 := field(0, -1)
+	mods, ok2 := field(1, 1)
+	if !ok1 || !ok2 || code < 0 || mods < 1 {
+		return Key{}, ErrNoInput
+	}
+
+	const (
+		shift = 1
+		ctrl  = 4
+		locks = 64 | 128 // caps lock, num lock: not modifiers for our purposes
+	)
+	m := (mods - 1) &^ locks
+
+	switch {
+	case code >= 0xE000 && code <= 0xF8FF: // functional keys live in private use
+		return Key{}, ErrNoInput
+	case m == 0:
+		return Key{rune(code), KeyNoSpl}, nil
+	case m == shift:
+		return Key{unicode.ToUpper(rune(code)), KeyNoSpl}, nil
+	case m&^shift == ctrl:
+		switch {
+		case code >= 'a' && code <= 'z':
+			return Key{rune(code - 'a' + 1), KeyNoSpl}, nil
+		case code >= '@' && code <= '_' && code != '@': // A-Z [ \ ] ^ _
+			return Key{rune(code - '@'), KeyNoSpl}, nil
+		}
+	}
+	return Key{}, ErrNoInput
 }
