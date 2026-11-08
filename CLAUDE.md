@@ -227,8 +227,9 @@ New key bindings belong in `vimango.vim` (project root, cwd-relative like
 `config.json`), not in `normalCmds`. It is sourced once at startup
 (`sourceVimrc`, `vimrc.go`), so `--editor` processes get it too; a missing file
 is fine and errors in it are silenced. It holds ordinary vimscript — `xnoremap`,
-functions — and currently just the visual-mode `-` that toggles the selected
-lines as a markdown list (`VimangoToggleBullets`).
+functions — and currently just visual-mode `-` and `#`, which toggle the
+selected lines as a bulleted or numbered (`1. ` on every line) markdown list and
+switch a list of one kind to the other (`VimangoToggleList`).
 
 Until 2026-11-08 `:map` did nothing here: upstream libvim's `vimInit` raised
 `no_mapping` because Onivim 2 owned keybindings itself, so mappings were stored

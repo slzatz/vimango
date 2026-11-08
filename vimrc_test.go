@@ -84,6 +84,56 @@ func TestVimrcBulletMappingToggles(t *testing.T) {
 	assertLines(t, e4, "- alpha", "- bravo")
 }
 
+// # is the numbered twin of -: every line gets "1. " (markdown numbers them
+// when rendering), and pressing it again takes them off.
+func TestVimrcNumberMappingToggles(t *testing.T) {
+	e := newVimrcEditor(t, "alpha", "  bravo", "", "charlie")
+	e.sendKeys("Vjjj#")
+	assertLines(t, e, "1. alpha", "  1. bravo", "", "1. charlie")
+
+	e.sendKeys("gv#")
+	assertLines(t, e, "alpha", "  bravo", "", "charlie")
+
+	// any existing number marker counts, not just "1."; mixed is completed
+	e2 := newVimrcEditor(t, "3. alpha", "bravo", "12) charlie")
+	e2.sendKeys("Vjj#")
+	assertLines(t, e2, "3. alpha", "1. bravo", "12) charlie")
+	e2.sendKeys("gv#")
+	assertLines(t, e2, "alpha", "bravo", "charlie")
+
+	e3 := newVimrcEditor(t, "alpha", "bravo")
+	e3.sendKeys("\x16j#") // Ctrl-V
+	assertLines(t, e3, "1. alpha", "1. bravo")
+	e3.sendKeys("u")
+	assertLines(t, e3, "alpha", "bravo")
+}
+
+// Each key on a list of the other kind switches it rather than nesting
+// markers, and a selection mixing plain, bulleted and numbered lines all ends
+// up the requested kind.
+func TestVimrcListKindSwitching(t *testing.T) {
+	e := newVimrcEditor(t, "- alpha", "  - bravo", "", "- charlie")
+	e.sendKeys("Vjjj#")
+	assertLines(t, e, "1. alpha", "  1. bravo", "", "1. charlie")
+
+	e.sendKeys("gv-")
+	assertLines(t, e, "- alpha", "  - bravo", "", "- charlie")
+
+	// "*" and "+" are bullets too; *italic* at the start of a line is not
+	e2 := newVimrcEditor(t, "* alpha", "+ bravo", "*charlie* here", "2. delta")
+	e2.sendKeys("Vjjj#")
+	assertLines(t, e2, "1. alpha", "1. bravo", "1. *charlie* here", "2. delta")
+
+	e3 := newVimrcEditor(t, "* alpha", "1. bravo", "charlie")
+	e3.sendKeys("Vjj-")
+	assertLines(t, e3, "* alpha", "- bravo", "- charlie")
+
+	// task items keep their checkbox across a switch
+	e4 := newVimrcEditor(t, "- [ ] alpha", "- [x] bravo")
+	e4.sendKeys("Vj#")
+	assertLines(t, e4, "1. [ ] alpha", "1. [x] bravo")
+}
+
 // bulleting must not replace the pattern n searches for.
 func TestVimrcBulletMappingKeepsSearchPattern(t *testing.T) {
 	e := newVimrcEditor(t, "alpha", "bravo")
