@@ -46,8 +46,12 @@ func initSpell() {
 	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 	vim.ExecuteCommand("let &runtimepath = " + quote(root) + " . ',' . &runtimepath")
 	vim.ExecuteCommand("let &spellfile = " + quote(filepath.Join(root, spellDir, spellAddFile)))
-	// 9 suggestions: each is picked with a single digit in SPELLING mode
-	vim.ExecuteCommand("set spelllang=en spellsuggest=best,9")
+	// 9 suggestions: each is picked with a single digit in SPELLING mode.
+	// timeout:1000 caps the search at about a second: it is exponential in
+	// the word's length, so z= on "llllllllllll" would otherwise freeze the
+	// editor for minutes. libvim makes the cap an amount of work, so the
+	// list z= shows and the one "{n}z=" applies are the same.
+	vim.ExecuteCommand("set spelllang=en spellsuggest=best,9,timeout:1000")
 }
 
 func spellUnavailableMessage() string {

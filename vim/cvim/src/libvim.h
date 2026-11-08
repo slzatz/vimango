@@ -443,6 +443,14 @@ void vimSpellGetErrors(buf_T *buf, linenr_T start_lnum, linenr_T end_lnum,
  *
  * At most 'spellsuggest''s number (e.g. "set spellsuggest=best,9") or the
  * window height minus 2 suggestions are returned, as for "z=".
+ *
+ * The search grows exponentially with the length of the word ("llllllllllll"
+ * takes minutes uncapped), so it is capped by 'spellsuggest''s
+ * "timeout:{msec}" (default 5000; 0 for no cap). Unlike vim's, the cap is an
+ * amount of work, roughly that many milliseconds on an Apple M-series Mac,
+ * not a deadline: the same word always gets the same list, so "{n}z=" applies
+ * the suggestion that was shown. "timeout:1000" keeps the result for real
+ * misspellings and bounds the wait to about a second.
  */
 int vimSpellGetSuggestions(char_u **badWord, int *num_suggestions, char_u ***suggestions);
 

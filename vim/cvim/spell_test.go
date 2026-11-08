@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // spellSetup starts a fresh vim with "lines" in the current buffer and spell
@@ -29,7 +30,7 @@ func spellSetup(t *testing.T, lines []string) Buffer {
 	CBufferSetLines(vbuf, 0, -1, lines, len(lines))
 	Execute("let &runtimepath = '" + strings.ReplaceAll(root, "'", "''") + ",' . &runtimepath")
 	Execute("let &spellfile = tempname() . '.utf-8.add'")
-	Execute("set spelllang=en spellsuggest=best,9 spell")
+	Execute("set spelllang=en spellsuggest=best,9,timeout:1000 spell")
 	TakeSpellSuggestRequest() // clear anything left by an earlier test
 	return vbuf
 }
@@ -119,4 +120,30 @@ func TestSpellNormalCommands(t *testing.T) {
 	if errs := SpellGetErrors(vbuf, 1, 2); len(errs) != 2 {
 		t.Errorf("after zuG got %+v, want 2 errors", errs)
 	}
+}
+
+// z= on a long run of one letter used to freeze the editor: the suggestion
+// search is exponential in the word's length (12 l's took over two minutes).
+// timeout:1000 bounds it, and asking twice must give the same list, since the
+// digit chosen from the list is applied by "{n}z=", which searches again.
+func TestSpellSuggestionsAreBounded(t *testing.T) {
+	spellSetup(t, []string{"Hello " + strings.Repeat("l", 14) + " here."})
+	CursorSetPosition(1, 6)
+
+	start := time.Now()
+	_, first, ok1 := SpellGetSuggestions()
+	_, second, ok2 := SpellGetSuggestions()
+	elapsed := time.Since(start)
+
+	if !ok1 || !ok2 {
+		t.Fatal("no suggestions")
+	}
+	if strings.Join(first, "|") != strings.Join(second, "|") {
+		t.Errorf("repeated search differs:\n %v\n %v", first, second)
+	}
+	// about 2 x 1s on an Apple M-series Mac; generous for slower machines
+	if elapsed > 30*time.Second {
+		t.Errorf("two searches took %v", elapsed)
+	}
+	t.Logf("two searches: %v", elapsed)
 }
