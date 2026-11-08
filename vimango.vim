@@ -165,3 +165,11 @@ nnoremap <C-e> :<C-u>call VimangoDecorate('`', 'n')<CR>
 xnoremap <C-b> :<C-u>call VimangoDecorate('**', visualmode())<CR>
 xnoremap <C-i> :<C-u>call VimangoDecorate('*', visualmode())<CR>
 xnoremap <C-e> :<C-u>call VimangoDecorate('`', visualmode())<CR>
+
+" ---------------------------------------------------------------------------
+" Spell checking (:spell toggles it; see spellcheck.go).
+"
+" No capital check: vim otherwise flags a lowercase first word after a blank
+" line or a sentence end, which notes are full of. Misspellings are still
+" highlighted.
+set spellcapcheck=
