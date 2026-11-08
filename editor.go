@@ -50,13 +50,11 @@ type Editor struct {
 		list  []string
 		index int
 	}
-	normalCmds            map[string]func(*Editor, int) // map of normal commands
-	exCmds                map[string]func(*Editor)      // map of ex commands
-	commandRegistry       *CommandRegistry[func(*Editor)]
-	normalCommandRegistry *CommandRegistry[func(*Editor, int)]
-	Database              *Database // pointer to the database
-	Session               *Session  // pointer to the session
-	Screen                *Screen   // pointer to the screen
+	exCmds          map[string]func(*Editor) // map of ex commands
+	commandRegistry *CommandRegistry[func(*Editor)]
+	Database        *Database // pointer to the database
+	Session         *Session  // pointer to the session
+	Screen          *Screen   // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct

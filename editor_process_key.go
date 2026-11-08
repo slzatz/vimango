@@ -43,11 +43,10 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	//	skip := false
 	var exit bool
 
-	// the switch is basically pre-processing before sending key to vim
-	// Below don't  handle NORMAL_BUSY because just want that to drop through
+	// the switch is pre-processing before sending the key to vim. NORMAL,
+	// VISUAL and INSERT have none: vimango intercepts no keys there, so they
+	// go straight to vim (and through vimango.vim's mappings)
 	switch e.mode {
-	case NORMAL, NORMAL_BUSY: //NORMAL only occurs after INSERT is escaped
-		redraw, exit = e.NormalModeKeyHandler(c)
 	case EX_COMMAND:
 		redraw, exit = e.ExModeKeyHandler(c)
 	case SEARCH:
@@ -205,35 +204,6 @@ func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
 		e.command_line += string(rune(c))
 	}
 	return false, true
-}
-
-// case NORMAL, OTHER (257):
-// A single-byte lookup, nothing more: no prefix accumulation, no leader. Any
-// key not in the table is handed to vim, which is what keeps <space> working as
-// the motion vim defines it to be. Note that Ctrl-A and Ctrl-X pass through and
-// perform their usual weird function of incrementing and decrementing the
-// number under the cursor, and Ctrl-R also works to redo. All other vim
-// built-in Ctrl commands appear to do nothing.
-func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
-	cmd, found := e.normalCmds[string(rune(c))]
-	if !found {
-		return false, false // have vim process the key
-	}
-
-	cmd(e, c)
-
-	// moveLeft/moveRight make a different editor current, so the resync below
-	// would read the wrong buffer -- and the <esc> would land in it.
-	if c == '\x08' || c == '\x0c' {
-		return true, true
-	}
-
-	vim.SendKey("<esc>")
-	e.ss = e.vbuf.Lines()
-	pos := vim.GetCursorPosition() //set screen cx and cy from pos
-	e.fr = pos[0] - 1
-	e.fc = pos[1]
-	return e.mode != PREVIEW, true
 }
 
 // case EX_COMMAND:

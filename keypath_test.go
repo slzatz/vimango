@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/slzatz/vimango/terminal"
@@ -20,7 +19,6 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	e := &Editor{Session: sess, Screen: scr}
 	e.screencols = 50
 	e.screenlines = 30
-	e.normalCmds = a.setEditorNormalCmds(e)
 	e.exCmds = a.setEditorExCmds(e)
 	// vim is a process-wide singleton, so a previous test may have left it in
 	// INSERT or VISUAL; start every editor from NORMAL
@@ -175,19 +173,6 @@ func TestSplitExRange(t *testing.T) {
 		rng, rest := splitExRange(tc.in)
 		if rng != tc.rng || rest != tc.rest {
 			t.Errorf("splitExRange(%q) = (%q, %q), want (%q, %q)", tc.in, rng, rest, tc.rng, tc.rest)
-		}
-	}
-}
-
-// the ex table and the normal table must not both claim a key/name
-func TestNoLeaderCommandsRemain(t *testing.T) {
-	e := newTestEditor(t, "x")
-	for k := range e.normalCmds {
-		if strings.HasPrefix(k, " ") {
-			t.Errorf("normalCmds still has a leader-prefixed key: %q", k)
-		}
-		if len(k) != 1 {
-			t.Errorf("normalCmds key %q is not a single byte", k)
 		}
 	}
 }

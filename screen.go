@@ -116,23 +116,20 @@ func (s *Screen) eraseRightScreen() {
 }
 
 func (s *Screen) drawRightScreen() {
-	for _, w := range s.Session.Editors {
-		w.drawText()
-		w.drawFrame()
-		w.drawStatusBar()
+	if e := s.Session.editor; e != nil {
+		e.drawText()
+		e.drawFrame()
+		e.drawStatusBar()
 	}
 }
 
-func (s *Screen) positionWindows() {
-	windowSlots := len(s.Session.Editors)
-
-	cols := -1 + (s.screenCols-s.divider)/windowSlots
-	i := -1 //i = number of columns of windows -1
-	for _, w := range s.Session.Editors {
-		i++
-		w.left_margin = s.divider + i*cols + i
-		w.screencols = cols
-		w.setLinesMargins()
+// positionEditor fits the open editor to the right pane, from the divider to
+// the right edge.
+func (s *Screen) positionEditor() {
+	if e := s.Session.editor; e != nil {
+		e.left_margin = s.divider
+		e.screencols = s.screenCols - s.divider - 1
+		e.setLinesMargins()
 	}
 }
 
@@ -200,7 +197,7 @@ func (s *Screen) renderNotice(str string, loc Location) {
 	note = strings.TrimSpace(note)
 	// Decode any Kitty text sizing markers (OSC 66)
 	note = ansi.DecodeKittyTextSizeMarkers(note)
-	if app.Organizer.mode == HELP || (app.Session.activeEditor != nil && app.Session.activeEditor.mode == HELP) {
+	if app.Organizer.mode == HELP || (app.Session.editor != nil && app.Session.editor.mode == HELP) {
 		offset = 16
 	}
 	// width = s.screenCols - s.divider - width

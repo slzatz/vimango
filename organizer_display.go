@@ -1355,7 +1355,7 @@ func (o *Organizer) renderNotice(s string) {
 	note = strings.TrimSpace(note)
 	// Decode any Kitty text sizing markers (OSC 66)
 	note = ansi.DecodeKittyTextSizeMarkers(note)
-	if o.mode == HELP || (o.Session.activeEditor != nil && o.Session.activeEditor.mode == HELP) {
+	if o.mode == HELP || (o.Session.editor != nil && o.Session.editor.mode == HELP) {
 		offset = 16
 	}
 	note = WordWrap(note, o.Screen.totaleditorcols-NOTICE_RIGHT_PADDING, offset)

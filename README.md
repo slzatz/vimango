@@ -229,9 +229,9 @@ The main runtime options are:
 If you actually manage to get the application running there is a help system:
 
  - `:help` - Show all available ex commands organized by category
- - `:help normal` - Show all normal mode commands organized by category
+ - `:help normal` - In the organizer, all normal mode commands by category; in the editor, the vimango.vim mappings (normal mode there is plain vim)
  - `:help <command>` - Show detailed help for specific ex command with usage and examples
- - `:help <key>` - Show detailed help for specific normal mode command (e.g., `:help Ctrl-H`)
+ - `:help <key>` - In the organizer, detailed help for a normal mode command (e.g., `:help Ctrl-D`)
  - `:help <category>` - Show all commands in a specific category (e.g., `:help Navigation`)              
 
 ## Google Drive Setup (Optional)

@@ -138,6 +138,7 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 - The application is written in Go.
 - The vimango application is a note taking application that stores notes and their titles in a local SQLite database.
 - The application operates in two main modes: an editor mode for editing notes and an organizer mode for managing and viewing notes. On the terminal screen the Organizer with the titles of notes is on the left and the Editor for editing notes is on the right.
+- **One note at a time.** The TUI once let several notes be open side by side (Ctrl-H/Ctrl-L moved between them and back to the organizer); that was removed 2026-11-08. `Session.editor` is the open note's editor or nil; `:x`/`:q` close it and return to the organizer, and in `--editor` mode end the process. The TUI is kept deliberately simple — for emergencies and ssh — and vimango_hybrid is the daily driver.
 - The application supports markdown rendering of notes to enhance the readability of the content.
 - The ability to manage and display images is an important feature of the application.
 - SQLite driver: `mattn/go-sqlite3` (CGO) everywhere — the modernc.org/sqlite
@@ -182,7 +183,7 @@ The command system is loosely based on the vim command system and the existence 
 - `:help` - Show all available ex commands organized by category
 - `:help normal` - Show all normal mode commands organized by category
 - `:help <command>` - Show detailed help for specific ex command with usage and examples
-- `:help <key>` - Show detailed help for specific normal mode command (e.g., `:help Ctrl-H`)
+- `:help <key>` - Organizer only: detailed help for a normal mode command (e.g., `:help Ctrl-D`). In the editor, `:help normal` describes the `vimango.vim` mappings instead — normal mode there is plain vim
 - `:help <category>` - Show all commands in a specific category (e.g., `:help Navigation`)
 - `:h` - Short alias for help command
 
@@ -198,23 +199,25 @@ The command system is loosely based on the vim command system and the existence 
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
-**Editor Ex Commands (30 commands in 7 categories):**
-- **File Operations**: write, writeall, read, save, open, checkstale
+**Editor Ex Commands (27 commands in 9 categories):**
+- **File Operations**: write, compile, read, save, checkstale
+- **Data Management**: sync
 - **Editing**: syntax, number, fmt, run, paste, nopaste
 - **Preview**: preview, webview
 - **Utility**: style, template, spell, suggest
 - **Layout**: vertical resize, resize
 - **Output**: ha, print, pdf, pdf-goldmark
-- **System**: quit, exit, quitall, help
+- **System**: quit, exit
+- **Help**: help
 
 ### Key Interception
 
-Normal mode intercepts **single bytes only** — no prefixes, no multi-key
-sequences, no leader (the `<leader>` prefix matcher and the `<C-w>>`/`<C-w><`
-pair were removed 2026-09-13). A key registered in `normalCmds` never reaches
-vim, so the table is confined to what vim cannot know about: which editor has
-focus (Ctrl-H/Ctrl-L). Editing shortcuts are vim mappings in `vimango.vim`
-(below); anything wanting an argument or a name is an ex command.
+The editor intercepts **no** normal-mode keys: every key reaches vim. Editing
+shortcuts are vim mappings in `vimango.vim` (below); anything wanting an
+argument or a name is an ex command. The organizer keeps its own single-byte
+`normalCmds` table (no prefixes, no multi-key sequences, no leader — the
+`<leader>` prefix matcher and the `<C-w>>`/`<C-w><` pair were removed
+2026-09-13).
 
 This matters because `<Space>` is a real vim motion (`l`): the old leader
 swallowed it, and swallowed the following key too when the pair didn't match a
@@ -260,7 +263,7 @@ never expands mappings. Limits, from libvim:
 - **single-key left-hand sides only** — a two-key lhs (`jk`, `,b`) swallows its
   first key, because libvim inserts later keys ahead of the waiting one
 - no `<C-r>` in an insert-mode rhs (inserts `^R`); call a function instead
-- keys Go intercepts first (Ctrl-H/L, `<esc>`) never reach a mapping
+- `<esc>` never reaches a mapping: vimango sends it to vim itself
 - vim 8.1 wants a modifier before the range: `:<C-u>keeppatterns '<,'>s/…`,
   not `:keeppatterns s/…` from VISUAL (E488)
 
@@ -270,15 +273,13 @@ Ctrl-B/E/I were Go intercepts with `:bold`/`:italic`/`:code` ex forms until
 command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
 
 ### Normal Mode Command Organization
-**Editor Normal Mode Commands (2 commands in 1 category):**
-- **Editor Selection**: Ctrl-H (previous editor / back to organizer), Ctrl-L (next editor)
-- Markup and list shortcuts are vim mappings in `vimango.vim` (see above), so `:help normal` does not list them
+**Editor:** none. The editor intercepts no normal-mode keys (`normalCmds`, `NormalModeKeyHandler` and the editor's normal-command registry were removed with Ctrl-H/Ctrl-L on 2026-11-08); every key goes to vim. Markup and list shortcuts are vim mappings in `vimango.vim`, and the editor's `:help normal` lists them (`editorNormalModeHelp` — keep it in step with that file).
 
 **Organizer Normal Mode Commands (11+ commands in 5 categories):**
 - **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive)
 - **Navigation**: Ctrl-J (scroll preview down), Ctrl-K (scroll preview up)
 - **Information**: Ctrl-I (show entry info)
-- **Mode Switching**: : (ex command mode), Ctrl-L (switch to editor)
+- **Mode Switching**: : (ex command mode)
 - **Preview**: Ctrl-W (web view), Ctrl-Q (close web view)
 
 ### Enhanced Error Messages
@@ -288,12 +289,12 @@ command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
 
 ### Implementation Details
 - **File**: `command_registry.go` - Core command registry system with metadata and key display helpers
-- **Files**: `editor_normal.go`, `organizer_normal.go` - Normal mode command registration
+- **File**: `organizer_normal.go` - Organizer normal mode command registration (the editor has none)
 - **Files**: `editor_cmd_line.go`, `organizer_cmd_line.go` - Enhanced help system integration
 - **Backward Compatible**: All existing commands and key bindings work unchanged
 - **Type Safe**: Uses Go generics for type-safe command function signatures
 - **Self-Documenting**: Help text is co-located with command definitions for both ex and normal commands
-- **Key Display**: Human-readable key representations in help (e.g., `\x08` displayed as `Ctrl-H`)
+- **Key Display**: Human-readable key representations in help (e.g., `\x04` displayed as `Ctrl-D`)
 - **Extensible**: New commands require help metadata, ensuring documentation stays current
 
 ## Deep Research System

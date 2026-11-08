@@ -18,8 +18,7 @@ import (
 //   - single-key left-hand sides only: a partially matched multi-key mapping
 //     ("jk", ",b") waits in the typeahead buffer and swallows keys
 //   - no <C-r> in the insert-mode part of a right-hand side; call a function
-//   - keys vimango intercepts before vim (Ctrl-H, Ctrl-L, and
-//     <esc>, which it sends itself) never reach a mapping
+//   - <esc> never reaches a mapping: vimango sends it to vim itself
 const vimrcFile = "vimango.vim"
 
 // sourceVimrc sources vimrcFile if it exists. A missing file is normal, and a

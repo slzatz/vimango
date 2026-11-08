@@ -6,7 +6,7 @@ import (
 )
 
 type Session struct {
-	activeEditor     *Editor
+	editor           *Editor // the open note's editor; nil when none is open. One note at a time
 	editorMode       bool
 	editorOnly       bool // --editor boot mode: set once at startup, never cleared
 	imagePreview     bool
@@ -15,6 +15,5 @@ type Session struct {
 	style            [8]string
 	markdown_style   *chroma.Style
 	styleIndex       int
-	Editors          []*Editor      //slice of all active Editor
 	googleDrive      *drive.Service // Google Drive service for file operations
 }

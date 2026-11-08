@@ -6,8 +6,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-
-	"github.com/slzatz/vimango/vim"
 	//	"github.com/charmbracelet/glamour"
 )
 
@@ -79,13 +77,6 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 		Category:    "Information",
 	})
 
-	// Mode Switching commands
-	registry.Register(string(rune(ctrlKey('l'))), (*Organizer).switchToEditorMode, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('l')))),
-		Description: "Switch to editor (if one is active)",
-		Category:    "Mode Switching",
-	})
-
 	// Preview commands
 	registry.Register(string(rune(ctrlKey('w'))), (*Organizer).showWebView_n, CommandInfo{
 		Name:        keyToDisplayName(string(rune(ctrlKey('w')))),
@@ -96,12 +87,6 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	registry.Register(string(rune(ctrlKey('q'))), (*Organizer).closeWebView_n, CommandInfo{
 		Name:        keyToDisplayName(string(rune(ctrlKey('q')))),
 		Description: "Close webkit webview window",
-		Category:    "Preview",
-	})
-
-	registry.Register(string(rune(ctrlKey('y'))), (*Organizer).showEditorWindows, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('y')))),
-		Description: "Show open editor windows",
 		Category:    "Preview",
 	})
 
@@ -170,25 +155,6 @@ func (o *Organizer) info() {
 	o.drawNotice(info)
 	o.altRowoff = 0
 	o.mode = NAVIGATE_NOTICE
-}
-
-func (o *Organizer) showEditorWindows() {
-	o.Screen.eraseRightScreen()
-	o.Screen.drawRightScreen()
-}
-
-func (o *Organizer) switchToEditorMode() {
-	if len(o.Session.Editors) == 0 {
-		o.ShowMessage(BL, "%sThere are no active editors%s", RED_BG, RESET)
-		return
-	}
-	o.Session.editorMode = true
-	ae := app.Session.activeEditor
-	vim.SetCurrentBuffer(ae.vbuf)
-	// below necessary because libvim does not set cursor column correctly
-	vim.SetCursorPosition(ae.fr+1, ae.fc) //ae.fr is 0-based, vim expects 1-based
-	o.Screen.eraseRightScreen()
-	o.Screen.drawRightScreen()
 }
 
 // for scrolling terminal markdown rendered note

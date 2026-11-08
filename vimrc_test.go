@@ -277,14 +277,22 @@ func TestVimrcDecorateUndo(t *testing.T) {
 	assertLines(t, e, "alpha bravo")
 }
 
-// The Go intercepts are gone: nothing in normalCmds claims Ctrl-B/E/I, so
-// they reach vim and its mappings.
-func TestDecorationKeysAreNotInterceptedInGo(t *testing.T) {
-	e := newTestEditor(t, "x")
-	for _, k := range []int{ctrlKey('b'), ctrlKey('e'), ctrlKey('i')} {
-		if _, found := e.normalCmds[string(rune(k))]; found {
-			t.Errorf("normalCmds still intercepts %s", keyToDisplayName(string(rune(k))))
-		}
+// The editor intercepts no normal-mode keys. Ctrl-H and Ctrl-L were the last
+// two (previous/next editor, from when several notes could be open); now they
+// reach vim, where Ctrl-H moves left like h and Ctrl-L changes nothing.
+func TestEditorInterceptsNoNormalKeys(t *testing.T) {
+	e := newTestEditor(t, "alpha bravo")
+	e.Session.editorMode = true
+	vim.SetCursorPosition(1, 3)
+
+	e.editorProcessKey(ctrlKey('h'))
+	if got := vim.GetCursorPosition(); got != [2]int{1, 2} {
+		t.Errorf("after Ctrl-H: cursor = %v, want [1 2] (vim's ^H is h)", got)
+	}
+	e.editorProcessKey(ctrlKey('l'))
+	assertLines(t, e, "alpha bravo")
+	if !e.Session.editorMode {
+		t.Error("a key in the editor left editor mode")
 	}
 }
 

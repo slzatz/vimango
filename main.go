@@ -191,7 +191,7 @@ func main() {
 	if editorOnly {
 		// openId == -1 opens the current (most recently modified) row
 		app.Organizer.editNote(openId)
-		if app.Session.activeEditor == nil {
+		if app.Session.editor == nil {
 			// e.g. empty database: nothing to edit
 			rawmode.Restore(app.origTermCfg)
 			fmt.Println("Error: no note to open (database has no saved entries)")

@@ -846,7 +846,6 @@ func (o *Organizer) quitApp(_ int) {
 }
 
 func (o *Organizer) editNote(id int) {
-	var ae *Editor
 	if o.view != TASK {
 		o.command = ""
 		//o.mode = o.last_mode
@@ -869,48 +868,37 @@ func (o *Organizer) editNote(id int) {
 
 	o.Session.editorMode = true
 
-	active := false
-	for _, w := range o.Session.Editors {
-		if w.id == id {
-			active = true
-			ae = w
-			break
-		}
+	// One note at a time: the organizer is only reachable once the previous
+	// editor has been closed (:q/:x), so there is never one to reuse.
+	ae := app.NewEditor()
+	ae.id = id
+	// an explicit id (e.g. --editor --open <id>) may not match the
+	// current row, whose title may also carry unsaved edits
+	if o.fr < len(o.rows) && o.rows[o.fr].id == id {
+		ae.title = o.rows[o.fr].title
+	} else {
+		ae.title = o.Database.getTitle(id)
 	}
-
-	if !active {
-		ae = app.NewEditor()
-		o.Session.Editors = append(o.Session.Editors, ae)
-		ae.id = id
-		// an explicit id (e.g. --editor --open <id>) may not match the
-		// current row, whose title may also carry unsaved edits
-		if o.fr < len(o.rows) && o.rows[o.fr].id == id {
-			ae.title = o.rows[o.fr].title
-		} else {
-			ae.title = o.Database.getTitle(id)
-		}
-		ae.top_margin = TOP_MARGIN + 1
-		note := o.Database.readNoteIntoString(id)
-		ae.dbText = note
-		ae.ss = strings.Split(note, "\n")
-		// Make sure we have at least one line, even if the note was empty
-		if len(ae.ss) == 0 {
-			ae.ss = []string{""}
-		}
-		ae.vbuf = vim.NewBuffer(0)
-		vim.SetCurrentBuffer(ae.vbuf)
-		ae.vbuf.SetLines(0, -1, ae.ss)
-		//////// need to look at whether we need both buffer and save tick 10/01/2025
-		ae.bufferTick = ae.vbuf.GetLastChangedTick()
-		ae.saveTick = ae.vbuf.GetLastChangedTick()
-		o.Session.activeEditor = ae
+	ae.top_margin = TOP_MARGIN + 1
+	note := o.Database.readNoteIntoString(id)
+	ae.dbText = note
+	ae.ss = strings.Split(note, "\n")
+	// Make sure we have at least one line, even if the note was empty
+	if len(ae.ss) == 0 {
+		ae.ss = []string{""}
 	}
+	ae.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(ae.vbuf)
+	ae.vbuf.SetLines(0, -1, ae.ss)
+	//////// need to look at whether we need both buffer and save tick 10/01/2025
+	ae.bufferTick = ae.vbuf.GetLastChangedTick()
+	ae.saveTick = ae.vbuf.GetLastChangedTick()
+	ae.mode = NORMAL
+	o.Session.editor = ae
 
-	o.Screen.positionWindows()
+	o.Screen.positionEditor()
 	o.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 	o.Screen.drawRightScreen()
-	ae.mode = NORMAL
-	o.Session.activeEditor = ae
 	o.command = ""
 	o.mode = NORMAL
 }
@@ -1667,8 +1655,8 @@ func (o *Organizer) printList(_ int) {
 	vim.SetCurrentBuffer(tempBuf)
 	vim.ExecuteCommand("ha")
 
-	if o.Session.activeEditor != nil {
-		vim.SetCurrentBuffer(o.Session.activeEditor.vbuf)
+	if o.Session.editor != nil {
+		vim.SetCurrentBuffer(o.Session.editor.vbuf)
 	}
 	//o.mode = o.last_mode
 	o.mode = NORMAL

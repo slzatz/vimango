@@ -9,8 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -42,14 +40,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Category:    "File Operations",
 		Examples:    []string{":compile"},
 	})
-	registry.Register("writeall", (*Editor).writeAll, CommandInfo{
-		Aliases:     []string{"wa"},
-		Description: "Save all open notes",
-		Usage:       "writeall",
-		Category:    "File Operations",
-		Examples:    []string{":writeall", ":wa"},
-	})
-
 	registry.Register("sync", (*Editor).synchronize, CommandInfo{
 		Aliases:     []string{"test", "sync?"},
 		Description: "Synchronize with remote server (test or sync? for dry-run)",
@@ -241,14 +231,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":exit", ":x"},
 	})
 
-	registry.Register("quitall", (*Editor).quitAll, CommandInfo{
-		Aliases:     []string{"qa"},
-		Description: "Close all editors",
-		Usage:       "quitall",
-		Category:    "System",
-		Examples:    []string{":quitall", ":qa"},
-	})
-
 	// Help command
 	registry.Register("help", (*Editor).help, CommandInfo{
 		Aliases:     []string{"h"},
@@ -278,67 +260,18 @@ func (e *Editor) help() {
 		// No arguments - show all ex commands
 		helpText = e.commandRegistry.FormatAllHelp()
 	} else {
-		// Get the argument after "help "
 		arg := e.command_line[pos+1:]
-
-		// Check if it's request for normal mode help
+		categories := e.commandRegistry.GetAllCommands()
 		if arg == "normal" {
-			if e.normalCommandRegistry != nil {
-				helpText = e.formatNormalModeHelp()
-			} else {
-				helpText = "Normal mode help not available"
-			}
+			helpText = editorNormalModeHelp
 		} else if _, exists := e.commandRegistry.GetCommandInfo(arg); exists {
-			// Check if it's a specific ex command
 			helpText = e.commandRegistry.FormatCommandHelp(arg)
-		} else if e.normalCommandRegistry != nil {
-			// Check if it's a normal mode command (by display name)
-			if normalInfo, exists := e.findNormalCommandByDisplayName(arg); exists {
-				helpText = e.normalCommandRegistry.FormatCommandHelp(normalInfo.Name)
-			} else {
-				// Check if it's a category (ex commands first, then normal)
-				exCategories := e.commandRegistry.GetAllCommands()
-				if _, exists := exCategories[arg]; exists {
-					helpText = e.commandRegistry.FormatCategoryHelp(arg)
-				} else if e.normalCommandRegistry != nil {
-					normalCategories := e.normalCommandRegistry.GetAllCommands()
-					if _, exists := normalCategories[arg]; exists {
-						helpText = e.normalCommandRegistry.FormatCategoryHelp(arg)
-					} else {
-						// Not found - suggest similar commands from both registries
-						exSuggestions := e.commandRegistry.SuggestCommand(arg)
-						normalSuggestions := e.normalCommandRegistry.SuggestCommand(arg)
-						allSuggestions := append(exSuggestions, normalSuggestions...)
-						if len(allSuggestions) > 0 {
-							helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(allSuggestions, ", "))
-						} else {
-							helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' for ex commands or ':help normal' for normal mode commands.", arg)
-						}
-					}
-				} else {
-					// Normal command registry not available
-					suggestions := e.commandRegistry.SuggestCommand(arg)
-					if len(suggestions) > 0 {
-						helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
-					} else {
-						helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
-					}
-				}
-			}
+		} else if _, exists := categories[arg]; exists {
+			helpText = e.commandRegistry.FormatCategoryHelp(arg)
+		} else if suggestions := e.commandRegistry.SuggestCommand(arg); len(suggestions) > 0 {
+			helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
 		} else {
-			// Check if it's a category
-			categories := e.commandRegistry.GetAllCommands()
-			if _, exists := categories[arg]; exists {
-				helpText = e.commandRegistry.FormatCategoryHelp(arg)
-			} else {
-				// Not found - suggest similar commands
-				suggestions := e.commandRegistry.SuggestCommand(arg)
-				if len(suggestions) > 0 {
-					helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
-				} else {
-					helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
-				}
-			}
+			helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' for ex commands or ':help normal' for normal mode.", arg)
 		}
 	}
 	e.mode = HELP
@@ -347,66 +280,20 @@ func (e *Editor) help() {
 	e.command_line = ""
 }
 
-// formatNormalModeHelp returns formatted help for all normal mode commands
-func (e *Editor) formatNormalModeHelp() string {
-	if e.normalCommandRegistry == nil {
-		return "Normal mode help not available"
-	}
-
-	var help strings.Builder
-	help.WriteString("Normal Mode Commands:\n\n")
-
-	categories := e.normalCommandRegistry.GetAllCommands()
-
-	// Sort categories for consistent output
-	var categoryNames []string
-	for category := range categories {
-		categoryNames = append(categoryNames, category)
-	}
-	sort.Strings(categoryNames)
-
-	for _, category := range categoryNames {
-		commands := categories[category]
-		help.WriteString(fmt.Sprintf("## %s:\n", category))
-
-		for _, cmd := range commands {
-			help.WriteString(fmt.Sprintf("`  %-15s` - %s", cmd.Name, cmd.Description))
-			if len(cmd.Aliases) > 0 {
-				translatedName := make([]string, len(cmd.Aliases))
-				for i, alias := range cmd.Aliases {
-					translatedName[i] = keyToDisplayName(alias)
-				}
-				// need backticks because markdown converter will think <> are html tags
-				help.WriteString(fmt.Sprintf(" aliases: ` %-15s`\n", strings.Join(translatedName, ", ")))
-			} else {
-				help.WriteString("\n")
-			}
-		}
-		help.WriteString("\n")
-	}
-
-	help.WriteString("Use ':help <key>' for detailed help on a specific normal mode command.\n")
-	help.WriteString("Use ':help <category>' for commands in a specific category.\n")
-
-	return help.String()
-}
-
-// findNormalCommandByDisplayName finds a normal command by its display name
-func (e *Editor) findNormalCommandByDisplayName(displayName string) (CommandInfo, bool) {
-	if e.normalCommandRegistry == nil {
-		return CommandInfo{}, false
-	}
-
-	allCommands := e.normalCommandRegistry.GetAllCommands()
-	for _, commands := range allCommands {
-		for _, cmd := range commands {
-			if cmd.Name == displayName {
-				return cmd, true
-			}
-		}
-	}
-	return CommandInfo{}, false
-}
+// editorNormalModeHelp is ":help normal" in the editor. The editor intercepts
+// no normal-mode keys, so there is no registry to list: normal mode is vim's,
+// plus the mappings in vimango.vim -- keep this list in step with that file.
+const editorNormalModeHelp = "Normal Mode:\n\n" +
+	"Normal and visual mode are vim's own: vimango intercepts no keys, so vim's\n" +
+	"commands work as they do in vim.\n\n" +
+	"## vimango.vim mappings:\n" +
+	"`  Ctrl-B         ` - bold (**): the word under the cursor, or the selection\n" +
+	"`  Ctrl-I         ` - italic (*); also Tab, the same key to a terminal\n" +
+	"`  Ctrl-E         ` - code (`)\n" +
+	"`  - (visual)     ` - toggle the selected lines as a bulleted list\n" +
+	"`  # (visual)     ` - toggle the selected lines as a numbered list\n\n" +
+	"The same key again removes a decoration or list; the other one swaps it.\n" +
+	"Mappings live in vimango.vim, next to config.json.\n"
 
 func (e *Editor) saveNoteToFile() {
 	pos := strings.Index(e.command_line, " ")
@@ -792,123 +679,23 @@ func (e *Editor) quitActions() {
 		return
 	}
 
-	if e.Session.editorOnly && len(e.Session.Editors) == 1 {
-		// no organizer to return to: quitting the last editor exits the app
+	if e.Session.editorOnly {
+		// no organizer to return to: quitting the editor exits the app
 		// (leave the buffer intact; the main loop finishes this iteration
 		// before a.Run is checked)
 		app.Run = false
 		return
 	}
 
-	vim.ExecuteCommand("bw") // wipout the buffer
-
-	if len(e.Session.Editors) == 1 {
-		e.Session.Editors = e.Session.Editors[:0]
-		e.Session.editorMode = false
-		e.Session.activeEditor = nil
-		vim.SetCurrentBuffer(app.Organizer.vbuf)
-		e.Screen.eraseRightScreen()
-		app.Organizer.displayNote()
-		app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
-		return
-	}
-
-	// below is for more than one editor open
-	//index = slices.Index(e.Session.Editors, e)
-	//e.Session.Editors = slices.Delete(e.Session.Editors, index, index+1)
-	e.Session.Editors = slices.DeleteFunc(e.Session.Editors, func(ed *Editor) bool { return ed == e })
-	e.Session.activeEditor = e.Session.Editors[0]
-	vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
-	e.Screen.positionWindows()
+	vim.ExecuteCommand("bw") // wipe out the buffer
+	e.Session.editor = nil
+	e.Session.editorMode = false
+	vim.SetCurrentBuffer(app.Organizer.vbuf)
 	e.Screen.eraseRightScreen()
-	e.Screen.drawRightScreen()
+	app.Organizer.displayNote()
+	app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
 }
 
-func (e *Editor) writeAll() {
-	for _, w := range e.Session.Editors {
-		//if ed, ok := w.(*Editor); ok {
-		vim.SetCurrentBuffer(w.vbuf)
-		w.writeNote()
-		//}
-	}
-	vim.SetCurrentBuffer(e.vbuf)
-	e.command_line = ""
-	e.mode = NORMAL
-}
-
-func (e *Editor) quitAll() {
-	if e.Session.editorOnly {
-		// no organizer to return to: quitting all editors exits the app,
-		// respecting unsaved changes (buffers left intact — see quitActions)
-		for _, ed := range e.Session.Editors {
-			if ed.isModified() {
-				e.ShowMessage(BR, "Some editors had no write since the last change")
-				return
-			}
-		}
-		app.Run = false
-		return
-	}
-
-	var editorsToKeep []*Editor
-
-	// First pass: identify which editors to keep and clean up those we're closing
-	for _, ed := range e.Session.Editors {
-		if ed.isModified() {
-			editorsToKeep = append(editorsToKeep, ed)
-		} else {
-			// Clean up the vim buffer for editors we're closing
-			vim.SetCurrentBuffer(ed.vbuf)
-			vim.ExecuteCommand("bw") // wipeout buffer
-		}
-	}
-
-	// Replace the windows slice with only the editors we're keeping
-	var newWindows []*Editor
-	for _, ed := range editorsToKeep {
-		newWindows = append(newWindows, ed)
-	}
-	e.Session.Editors = newWindows
-
-	// Handle the result
-	if len(editorsToKeep) > 0 {
-		// Some editors had unsaved changes - set the first one as active
-		e.Session.activeEditor = editorsToKeep[0]
-		vim.SetCurrentBuffer(e.Session.activeEditor.vbuf)
-		e.Screen.positionWindows()
-		e.Screen.eraseRightScreen()
-		e.Screen.drawRightScreen()
-		e.ShowMessage(BR, "Some editors had no write since the last change")
-	} else {
-		// All editors were closed successfully
-		e.Session.editorMode = false
-		vim.SetCurrentBuffer(app.Organizer.vbuf)
-		e.Screen.eraseRightScreen()
-
-		if e.Screen.divider < 10 {
-			e.Screen.edPct = 80
-			app.moveDividerPct(80)
-		}
-
-		app.Organizer.displayNote()
-		app.returnCursor()
-	}
-}
-
-// checkStale asks whether this note's row changed in the database since
-// the editor last read or wrote it, and reloads a clean buffer when it
-// did — vim's 'autoread', for a row instead of a file.
-//
-// It exists because a sync writes the database from a *separate* process
-// (vimango-sync), so the editor has no way to notice: its buffer is
-// process memory, and `:w` is an unconditional UPDATE that would push
-// the pre-sync text back over the synced version, locally and then to
-// the server. The host injects this after every sync.
-//
-// The comparison is against dbText, not against the buffer, so unsaved
-// edits of your own are never mistaken for the database moving — and a
-// buffer that is clean is byte-identical to what was saved, which is
-// what makes reloading it safe rather than destructive.
 func (e *Editor) checkStale() {
 	if !e.Database.entryExists(e.id) {
 		e.ShowMessage(BR, "Note %d was deleted elsewhere — :w will not bring it back", e.id)

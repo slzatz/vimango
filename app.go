@@ -21,7 +21,6 @@ type App struct {
 	Session   *Session   // Session handles terminal and screen management
 	Screen    *Screen    // Screen handles screen management
 	Organizer *Organizer // Organizer manages tasks and their display
-	Editor    *Editor    // Editor manages text editing - there can be multiple editors
 	Database  *Database  // Database handles database connections and queries
 
 	// Research system
@@ -56,7 +55,6 @@ func CreateApp() *App {
 	db := &Database{}
 	sess := &Session{}
 	screen := &Screen{Session: sess}
-	sess.Editors = make([]*Editor, 0)
 	kitty := IsTermKitty()
 	return &App{
 		Session:  sess,
@@ -101,7 +99,6 @@ func (a *App) NewEditor() *Editor {
 
 	// Set up commands after editor creation so help can access registry
 	editor.exCmds = a.setEditorExCmds(editor)
-	editor.normalCmds = a.setEditorNormalCmds(editor)
 
 	return editor
 }
@@ -239,7 +236,7 @@ func (a *App) moveDividerPct(pct int) {
 	}
 
 	if a.Session.editorMode {
-		a.Screen.positionWindows()
+		a.Screen.positionEditor()
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 		a.Screen.drawRightScreen()
 	} else if a.Organizer.view == TASK {
@@ -270,7 +267,7 @@ func (a *App) moveDividerAbs(num int) {
 		a.Organizer.drawStatusBar()
 	}
 	if a.Session.editorMode {
-		a.Screen.positionWindows()
+		a.Screen.positionEditor()
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 		a.Screen.drawRightScreen()
 	} else if a.Organizer.view == TASK {
@@ -645,7 +642,7 @@ func (a *App) LoadInitialData() {
 func (a *App) returnCursor() {
 	var ab strings.Builder
 	if a.Session.editorMode {
-		ae := a.Session.activeEditor
+		ae := a.Session.editor
 		switch ae.mode {
 		case PREVIEW, SPELLING, VIEW_LOG:
 			// we don't need to position cursor and don't want cursor visible
@@ -761,11 +758,11 @@ func (a *App) MainLoop() {
 			}
 			// editor-only mode: focus can never leave the editor. Safety
 			// net in case some unguarded path clears the focus flag.
-			if a.Session.editorOnly && a.Session.activeEditor != nil {
+			if a.Session.editorOnly && a.Session.editor != nil {
 				a.Session.editorMode = true
 			}
 			if a.Session.editorMode {
-				ae := a.Session.activeEditor
+				ae := a.Session.editor
 				redraw := ae.editorProcessKey(k)
 
 				if !a.Session.editorMode {
