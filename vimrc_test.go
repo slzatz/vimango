@@ -55,7 +55,36 @@ func TestVimrcBulletMappingBlockwise(t *testing.T) {
 	assertLines(t, e, "- alpha", "- bravo", "- charlie")
 }
 
-// keeppatterns: bulleting must not replace the pattern n searches for.
+// Pressing - again on an all-bulleted selection takes the bullets off; a
+// mixed selection is completed rather than double-bulleted.
+func TestVimrcBulletMappingToggles(t *testing.T) {
+	e := newVimrcEditor(t, "alpha", "  bravo", "", "charlie")
+
+	e.sendKeys("Vjjj-")
+	assertLines(t, e, "- alpha", "  - bravo", "", "- charlie")
+
+	e.sendKeys("gv-")
+	assertLines(t, e, "alpha", "  bravo", "", "charlie")
+
+	// mixed: some lines already bulleted -> bullet the rest, nest nothing
+	e2 := newVimrcEditor(t, "- alpha", "bravo", "  - charlie")
+	e2.sendKeys("Vjj-")
+	assertLines(t, e2, "- alpha", "- bravo", "  - charlie")
+
+	// all blank: nothing to do
+	e3 := newVimrcEditor(t, "", "  ", "alpha")
+	e3.sendKeys("Vj-")
+	assertLines(t, e3, "", "  ", "alpha")
+
+	// a toggle off is one undo step too
+	e4 := newVimrcEditor(t, "- alpha", "- bravo")
+	e4.sendKeys("Vj-")
+	assertLines(t, e4, "alpha", "bravo")
+	e4.sendKeys("u")
+	assertLines(t, e4, "- alpha", "- bravo")
+}
+
+// bulleting must not replace the pattern n searches for.
 func TestVimrcBulletMappingKeepsSearchPattern(t *testing.T) {
 	e := newVimrcEditor(t, "alpha", "bravo")
 	vim.ExecuteCommand("let @/ = 'bravo'")
