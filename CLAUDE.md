@@ -8,6 +8,18 @@ NOTE: When updating, fixing or adding to the code, the CGO build is the most com
 NOTE: `fts5` is the only tag this build needs. Do **not** add `cgo` to the tag list — `cgo` is one of Go's automatic build constraints, set by the toolchain whenever cgo is in use, so `CGO_ENABLED=1` already satisfies every `//go:build cgo` file. Passing `-tags=cgo` selects an identical file set (verified with `go list`) and is only misleading: with `CGO_ENABLED=0` it does not enable cgo, it just pulls in `//go:build cgo` files that don't import `"C"`.
 NOTE: hunspell spell check is opt-in behind a second tag: `CGO_ENABLED=1 go build --tags="fts5,spell"`. Without it `spellcheck_nocgo.go` (the stub) is compiled instead of `spellcheck_cgo.go`, so `:spell`, `:suggest` and `z=` degrade to the "spell check unavailable" messages. Left out of the default build deliberately — spelling has not been exercised in a while and needs testing before it goes back in by default.
 NOTE: CGO builds require `libvim.a` in the project root. See "Building libvim.a" below.
+NOTE: Every build requires a `go.work` pointing at the glamour fork. See "Glamour fork (go.work)" below.
+
+### Glamour fork (go.work)
+
+vimango builds against **[slzatz/glamour](https://github.com/slzatz/glamour)**, not upstream `charmbracelet/glamour`; the fork adds kitty image and text-sizing support (`glamour.WithKittyImages`, `ansi.DecodeKittyTextSizeMarkers`, `ansi.SetKittyTextSizingEnabled`). `go.mod` still names `github.com/charmbracelet/glamour`, and the redirect to the fork lives in a per-machine `go.work`, which is gitignored so no local path is committed (it replaced a `replace` directive in 54ccf51). On a new machine, clone the fork next to vimango and create the workspace:
+
+```bash
+git clone https://github.com/slzatz/glamour ../glamour
+go work init . ../glamour
+```
+
+Without a `go.work`, the build quietly resolves upstream glamour from the module cache and fails with `undefined: ansi.DecodeKittyTextSizeMarkers` / `undefined: glamour.WithKittyImages`. `go env GOWORK` shows whether a workspace is active. The `cmd/*` builds (e.g. `heic_worker`) pick up the workspace too.
 
 ### Building libvim.a (CGO Prerequisite)
 
@@ -40,23 +52,24 @@ cp libvim.a /path/to/vimango/
 
 `-Wno-error=implicit-int-float-conversion` is required on current clang; without it the build stops at `evalfunc.c:3751` on `VARNUM_MAX` (`-Werror,-Wimplicit-const-int-float-conversion`). Verified by configuring and building a fresh clone from scratch — an existing checkout may already carry the flag in `auto/config.mk` and so not show the failure.
 
-**Linux (Debian/Ubuntu):**
+**Linux:** use the fork's build script, which configures with the right flags and builds `src/libvim.a`:
 ```bash
-sudo apt-get install libtinfo-dev libacl1-dev
-cd /path/to/libvim/src
-./configure --disable-selinux CFLAGS=-fPIC
-make libvim.a
-cp libvim.a /path/to/vimango/
+sudo apt-get install make libtinfo-dev libacl1-dev   # Debian/Ubuntu
+sudo pacman -S --needed make ncurses acl             # Arch
+cd /path/to/libvim
+./build-linux.sh            # --clean to rebuild from scratch, --tests to run the API tests
+cp src/libvim.a /path/to/vimango/
 ```
 
-**Linux (Arch Linux):**
+By hand, the equivalent is:
 ```bash
-sudo pacman -S ncurses acl
 cd /path/to/libvim/src
-./configure --disable-selinux CFLAGS=-fPIC
+./configure --disable-selinux \
+  CFLAGS="-fPIC -Wno-error=implicit-int -Wno-error=implicit-function-declaration"
 make libvim.a
-cp libvim.a /path/to/vimango/
 ```
+
+The two `-Wno-error` flags are needed on GCC 14+ (verified on GCC 16.2, Arch, 2026-10-10). They are for `./configure`'s probe programs, which use implicit int and implicit declarations. With plain `CFLAGS=-fPIC`, configure stops at `checking for tgetent()... NOT FOUND!` even with ncurses installed. Builds from libvim older than the GCC 16 fixes (see its `PATCHES.md`) also fail to compile `ex_cmds.c` under the Makefile's `-Werror` and race under `make -j`, so update the checkout first. If configure complains that `CFLAGS` has changed since the previous run, `rm src/auto/config.cache` and re-run; the script does this itself.
 
 **Notes:**
 - The CGO linkage flags in `vim/cvim/cvim.go` reference `libvim.a` as a bare filename resolved from the build working directory (project root).
@@ -67,9 +80,9 @@ cp libvim.a /path/to/vimango/
 
 The CGO HEIC decoder shells out to a separate `heic_worker` subprocess (built from `cmd/heic_worker/main.go`) so libheif crashes can't take down vimango. Like `libvim.a`, this binary differs per platform and is excluded from version control via `.gitignore`.
 
-Requires `libheif`:
-- **Arch Linux:** `sudo pacman -S libheif`
-- **Debian/Ubuntu:** `sudo apt-get install libheif-dev`
+Requires `libheif`, plus `pkg-config` to locate it (the build fails with `exec: "pkg-config": executable file not found` without it):
+- **Arch Linux:** `sudo pacman -S libheif pkgconf`
+- **Debian/Ubuntu:** `sudo apt-get install libheif-dev pkg-config`
 - **macOS:** `brew install libheif`
 
 Build:
