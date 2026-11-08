@@ -22,8 +22,8 @@ import (
 // rendered as one giant <hr> + <h2>, auto-heading-id and all. The editor
 // meanwhile has always been right about it: chroma's markdown lexer peels
 // the block off and hands it to the YAML lexer, which is why the keys come
-// up colored on the terminal side. This file closes that gap for the
-// webview.
+// up colored on the terminal side. This file closes that gap for the HTML
+// renderer (note_html.go).
 //
 // Not a goldmark hook, unlike the callouts next door: frontmatter is not a
 // paragraph inside anything, and by the time the earliest hook runs the

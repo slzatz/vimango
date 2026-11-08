@@ -78,10 +78,10 @@ func RunRenderHTML(id int, linkNotes bool) int {
 		return 1
 	}
 
-	// Embedded-pane style (standalone=false): no <h1> — the host app
+	// Embedded-pane style: no <h1> — the host app
 	// shows the title in its own native header — and left-aligned
 	// content instead of a centered reading column.
-	html, err := RenderNoteAsHTML(title, note.String, false, linkNotes)
+	html, err := RenderNoteAsHTML(title, note.String, linkNotes)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)
 		return 1

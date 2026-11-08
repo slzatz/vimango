@@ -74,6 +74,9 @@ type dbConfig struct {
 		Style string `json:"style"`
 	} `json:"glamour"`
 
+	// "webview" is historical: the TUI's webview window is gone (2026-11-08),
+	// and these now style only --render-html, the hybrid preview pane. The
+	// key keeps its name so existing config.json files still apply.
 	Webview struct {
 		// Accent colors the blockquote bar and list markers in rendered
 		// HTML previews. "" → default blue, "none"/"off" → no accent
@@ -187,8 +190,6 @@ const (
 	VISUAL_BLOCK // only editor mode
 	SEARCH       // only editor mode
 	//FIND            // only organizer mode
-	PREVIEW         // only editor mode - for previewing markdown
-	VIEW_LOG        // only in editor mode - for debug viewing of vim message hx
 	SPELLING        // this mode recognizes 'z='
 	NAVIGATE_NOTICE // only in organizer mode
 	HELP            // organizer and editor mode
@@ -422,8 +423,6 @@ func (m Mode) String() string {
 		"VISUAL BLOCK",
 		"SEARCH",
 		//"FIND",
-		"PREVIEW",
-		"VIEW LOG",
 		"SPELLING",
 		"NAVIGATE_NOTICE",
 		"HELP",

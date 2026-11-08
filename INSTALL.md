@@ -14,7 +14,7 @@ path because several artifacts are deliberately *not* checked into the repo
 > 1. Clone the **glamour fork** and create a **`go.work`** file (both untracked).
 > 2. Install **hunspell** via Homebrew.
 > 3. Build **`libvim.a`** locally (`scripts/build-libvim.sh`).
-> 4. Build the **`heic_worker`** and **`webview_worker`** helper binaries.
+> 4. Build the **`heic_worker`** helper binary.
 >
 > None of these come with the clone because they're `.gitignore`d or live in a
 > separate repo.
@@ -187,11 +187,11 @@ cp libvim.a /path/to/vimango/
 
 ---
 
-## 5. Helper worker binaries
+## 5. Helper worker binary
 
-These run as subprocesses (so native-library crashes can't take down vimango).
-Both are `.gitignore`d and must be built locally. They're looked up next to the
-main executable, then in the current directory.
+`heic_worker` runs as a subprocess (so a native-library crash can't take down
+vimango). It is `.gitignore`d and must be built locally, and is looked up next
+to the main executable, then in the current directory.
 
 ### heic_worker (HEIC/HEIF image decoding — libheif)
 
@@ -231,17 +231,6 @@ machine, keep it in sync with Homebrew's libheif (bump it after a
 `brew upgrade libheif` if the cgo type errors reappear). A benign
 `ld: warning: ignoring duplicate libraries: '-lheif'` during the build is
 expected and harmless.
-
-### webview_worker (native WebKit note preview)
-
-```bash
-cd cmd/webview_worker
-CGO_ENABLED=1 go build -o ../../webview_worker
-cd ../..
-```
-
-If missing, `OpenNoteInWebview` falls back to opening rendered HTML in the system
-browser (`open`). Not fatal. Worker logs: `$TMPDIR/vimango_webview_worker.log`.
 
 ---
 
@@ -316,5 +305,4 @@ Run it:
 | `Package libheif was not found in the pkg-config search path` | libheif not actually installed (despite `brew --prefix` printing a path) | `brew install libheif`; verify with `brew list libheif` (§5) |
 | `cannot use uint32(...) as _Ctype_heif_*` when building `heic_worker` | strukturag/libheif binding version ≠ installed libheif | `go get github.com/strukturag/libheif@<installed-version>` (§5) |
 | HEIC images don't render | `heic_worker` missing/wrong arch | §5 (non-fatal) |
-| Web view opens in browser instead of window | `webview_worker` missing | §5 (non-fatal) |
 | `config.json` / database errors on first run | never initialized | `./vimango --init` (§8) |

@@ -30,7 +30,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.ShowMessage(BR, "")
 		//return false
 		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
-		if prevMode == VISUAL || prevMode == PREVIEW || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving preview
+		if prevMode == VISUAL || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving help
 			//app.Organizer.refreshScreen()
 			return true
 		} else {
@@ -51,10 +51,8 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		redraw, exit = e.ExModeKeyHandler(c)
 	case SEARCH:
 		redraw, exit = e.SearchModeKeyHandler(c)
-	case PREVIEW, HELP: // RUN:
-		redraw, exit = e.PreviewModeKeyHandler(c)
-	case VIEW_LOG:
-		redraw, exit = e.ViewLogModeKeyHandler(c)
+	case HELP:
+		redraw, exit = e.HelpModeKeyHandler(c)
 	}
 
 	// if exit true, don't process key any further
@@ -158,8 +156,9 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	return
 }
 
-// case PREVIEW:
-func (e *Editor) PreviewModeKeyHandler(c int) (redraw, exit bool) {
+// case HELP: the :help text is drawn as an organizer notice over the editor
+// pane; these keys scroll it, and ':' starts a new command line.
+func (e *Editor) HelpModeKeyHandler(c int) (redraw, exit bool) {
 	switch c {
 	case PAGE_DOWN, ctrlKey('j'):
 		app.Organizer.scrollNoticeDown()
@@ -176,32 +175,6 @@ func (e *Editor) PreviewModeKeyHandler(c int) (redraw, exit bool) {
 		e.mode = EX_COMMAND
 		e.tabCompletion.index = 0
 		e.tabCompletion.list = nil
-	}
-	return false, true
-}
-
-// case VIEW_LOG:
-func (e *Editor) ViewLogModeKeyHandler(c int) (redraw, skip bool) {
-	switch c {
-	case PAGE_DOWN, ARROW_DOWN, 'j':
-		e.previewLineOffset++
-		e.drawOverlay()
-		return false, true
-	case PAGE_UP, ARROW_UP, 'k':
-		if e.previewLineOffset > 0 {
-			e.previewLineOffset--
-			e.drawOverlay()
-			redraw = false
-			skip = true
-			return false, true
-		}
-	}
-	if c == DEL_KEY || c == BACKSPACE {
-		if len(e.command_line) > 0 {
-			e.command_line = e.command_line[:len(e.command_line)-1]
-		}
-	} else if !isSyntheticKey(c) {
-		e.command_line += string(rune(c))
 	}
 	return false, true
 }
@@ -233,10 +206,6 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		fullLine := e.command_line
 		_, e.command_line = splitExRange(e.command_line)
 
-		// Index doesn't work for vert resize
-		// and LastIndex doesn't work for run
-		// so total kluge below
-
 		// we want libvim to handle the following Ex-Commands:
 		use_vim := []string{"s/", "%s/", "g/", "g!/", "v/"}
 		for _, p := range use_vim {
@@ -260,13 +229,8 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 			}
 		}
 
-		var pos int
 		var cmd string
-		if strings.HasPrefix(e.command_line, "vert") {
-			pos = strings.LastIndex(e.command_line, " ")
-		} else {
-			pos = strings.Index(e.command_line, " ")
-		}
+		pos := strings.Index(e.command_line, " ")
 		if pos != -1 {
 			cmd = e.command_line[:pos]
 		} else {
@@ -277,9 +241,9 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		if cmd0, found := e.exCmds[cmd]; found {
 			cmd0(e)
 			e.command_line = ""
-			// a command that put up its own screen (:help, :preview) owns the
+			// a command that put up its own screen (:help) owns the
 			// mode from here; everything else lands back in NORMAL
-			if e.mode != HELP && e.mode != PREVIEW {
+			if e.mode != HELP {
 				e.mode = NORMAL
 			}
 			e.tabCompletion.index = 0
@@ -292,7 +256,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 			// the keystroke, so otherwise the edit sits invisible until the
 			// next key happens to trip the tick check in editorProcessKey --
 			// which is what the old :bold looked like: correct text, blank screen.
-			if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != PREVIEW {
+			if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != HELP {
 				e.bufferTick = tick
 				e.ss = e.vbuf.Lines()
 				if len(e.ss) == 0 {

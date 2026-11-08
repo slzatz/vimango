@@ -255,22 +255,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		})
 	*/
 
-	registry.Register("webview", (*Organizer).showWebView, CommandInfo{
-		Aliases:     []string{"wv"},
-		Description: "Show current note in web browser",
-		Usage:       "webview",
-		Category:    "HTML View",
-		Examples:    []string{":webview", ":wv"},
-	})
-
-	registry.Register("closewebview", (*Organizer).closeWebView, CommandInfo{
-		Aliases:     []string{"close"},
-		Description: "Close webkit webview window",
-		Usage:       "closewebview",
-		Category:    "HTML View",
-		Examples:    []string{":closewebview", ":cwv"},
-	})
-
 	registry.Register("toggleimages", (*Organizer).toggleImages, CommandInfo{
 		Aliases:     []string{"ti"},
 		Description: "Toggle inline image display on/off",
@@ -325,14 +309,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Usage:       "imagereset",
 		Category:    "Images",
 		Examples:    []string{":imagereset", ":ir"},
-	})
-
-	registry.Register("vertical resize", (*Organizer).verticalResize, CommandInfo{
-		Aliases:     []string{"vert res", "divider"},
-		Description: "Resize vertical divider",
-		Usage:       "vertical resize <width>",
-		Category:    "View Management",
-		Examples:    []string{":vertical resize 80", ":vert res +10", ":divider -5"},
 	})
 
 	// Entry Management commands
@@ -902,46 +878,6 @@ func (o *Organizer) editNote(id int) {
 	o.command = ""
 	o.mode = NORMAL
 }
-
-func (o *Organizer) verticalResize(pos int) {
-	var newWidth int
-	opt := o.command_line[pos+1:]
-	width, err := strconv.Atoi(opt)
-	if err != nil {
-		o.ShowMessage(BL, "You need to provide a number")
-		return
-	}
-	if opt[0] == '+' || opt[0] == '-' {
-		newWidth = o.Screen.screenCols - o.Screen.divider - width
-	} else {
-		newWidth = o.Screen.screenCols - width
-		if newWidth < 20 || newWidth > o.Screen.screenCols-20 {
-			o.ShowMessage(BL, "Width must be between 20 and %d", o.Screen.screenCols-20)
-			return
-		}
-	}
-	app.moveDividerAbs(newWidth)
-	o.mode = NORMAL
-}
-
-/*
-func (o *Organizer) verticalResize__(pos int) {
-	if pos == -1 {
-		sess.showOrgMessage("You need to provide a number 0 - 100")
-		return
-	}
-	pct, err := strconv.Atoi(o.command_line[pos+1:])
-	if err != nil {
-		sess.showOrgMessage("You need to provide a number 0 - 100")
-		//o.mode = NORMAL
-		o.mode = o.last_mode
-		return
-	}
-	moveDividerPct(pct)
-	//o.mode = NORMAL
-	o.mode = o.last_mode
-}
-*/
 
 func (o *Organizer) newEntry(_ int) {
 	row := Row{
@@ -1571,76 +1507,6 @@ func (o *Organizer) printDocument(_ int) {
 		o.ShowMessage(BL, "Error printing document: %v", err)
 	}
 	//o.mode = o.last_mode
-	o.mode = NORMAL
-	o.command_line = ""
-}
-
-func (o *Organizer) showWebView(_ int) {
-
-	if len(o.note) == 0 {
-		return
-	}
-
-	// Get current note content
-	id := o.rows[o.fr].id
-	note := o.Database.readNoteIntoString(id)
-	//note := strings.Join(e.vbuf.Lines(), "\n")
-
-	// Get note title from the editor
-	title := o.rows[o.fr].title
-	if title == "" {
-		title = "Untitled Note"
-	}
-
-	// Convert to HTML
-	htmlContent, err := RenderNoteAsHTML(title, note, true, false)
-	if err != nil {
-		o.ShowMessage(BL, "Error rendering HTML: %v", err)
-		return
-	}
-
-	// Check if webview is available
-	if !IsWebviewAvailable() {
-		o.ShowMessage(BL, "%s", ShowWebviewNotAvailableMessage())
-		// Fall back to opening in browser
-		err = OpenNoteInWebview(title, htmlContent)
-		if err != nil {
-			o.ShowMessage(BL, "Error opening note: %v", err)
-		}
-		return
-	}
-
-	// Open in webview in a goroutine since it blocks
-	// This will either create a new webview or update the existing one
-	go func() {
-		err := OpenNoteInWebview(title, htmlContent)
-		if err != nil {
-			// Note: Can't directly show message from goroutine
-			// Could implement a channel-based message system if needed
-		}
-	}()
-
-	if IsWebviewRunning() {
-		o.ShowMessage(BL, "Updated webview content")
-	} else {
-		o.ShowMessage(BL, "Launched webview")
-	}
-	o.mode = NORMAL
-}
-
-func (o *Organizer) closeWebView(_ int) {
-	if !IsWebviewRunning() {
-		o.ShowMessage(BL, "No webview window is currently open")
-		o.mode = NORMAL
-		return
-	}
-
-	err := CloseWebview()
-	if err != nil {
-		o.ShowMessage(BL, "Error closing webview: %v", err)
-	} else {
-		o.ShowMessage(BL, "Closed webview window")
-	}
 	o.mode = NORMAL
 	o.command_line = ""
 }

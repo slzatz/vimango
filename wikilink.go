@@ -24,18 +24,17 @@ import (
 // no such syntax, so they used to survive to the screen as literal
 // brackets -- readable, but noise rather than a reference.
 //
-// A span by default, not an anchor, because the two programs that render
-// this HTML disagree about whether there is a host at all: the TUI's own
-// webview window has none, and an <a> there would be a click target that
-// does nothing, or worse, a custom scheme handed to an unhandled
-// navigation. So the default markup says what is true -- this is a named
+// A span by default, not an anchor, because not every caller of
+// --render-html has a host that handles the click: without one an <a>
+// would be a click target that does nothing, or worse, a custom scheme
+// handed to an unhandled navigation. So the default markup says what is true -- this is a named
 // reference -- and the dotted rule rather than a link's solid one says it
 // in CSS too.
 //
 // A caller that *is* a host says so, and only then does the reference
 // become an anchor (anchors below). That is not a preference: it is what
-// keeps the promise structural rather than remembered. The TUI cannot
-// emit a link it has no way to handle, and the hybrid app's read-only
+// keeps the promise structural rather than remembered. Nothing can emit a
+// link it has no way to handle, and the hybrid app's read-only
 // peek window renders without it, so a peeked note's own references stay
 // inert and one click can never become a pile of windows.
 //

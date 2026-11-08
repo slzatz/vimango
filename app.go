@@ -250,39 +250,6 @@ func (a *App) moveDividerPct(pct int) {
 	a.returnCursor()
 }
 
-func (a *App) moveDividerAbs(num int) {
-	if num >= a.Screen.screenCols {
-		a.Screen.divider = 1
-	} else if num < 20 {
-		a.Screen.divider = a.Screen.screenCols - 20
-	} else {
-		a.Screen.divider = a.Screen.screenCols - num
-	}
-	a.Screen.edPct = 100 - 100*a.Screen.divider/a.Screen.screenCols
-	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 2
-	a.Screen.eraseScreenRedrawLines()
-
-	if a.Screen.divider > 10 {
-		a.Organizer.refreshScreen()
-		a.Organizer.drawStatusBar()
-	}
-	if a.Session.editorMode {
-		a.Screen.positionEditor()
-		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
-		a.Screen.drawRightScreen()
-	} else if a.Organizer.view == TASK {
-		a.Organizer.displayNote()
-	}
-
-	// Save preferences after divider move
-	if err := a.SavePreferences(); err != nil {
-		// Silently ignore save errors (preferences not critical)
-	}
-
-	a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d edPct: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider, a.Screen.edPct)
-	a.returnCursor()
-}
-
 // ErrDatabaseNotFound is returned when SQLite database files don't exist
 var ErrDatabaseNotFound = fmt.Errorf("database files not found")
 
@@ -644,7 +611,7 @@ func (a *App) returnCursor() {
 	if a.Session.editorMode {
 		ae := a.Session.editor
 		switch ae.mode {
-		case PREVIEW, SPELLING, VIEW_LOG:
+		case SPELLING:
 			// we don't need to position cursor and don't want cursor visible
 			fmt.Print(ab.String())
 			return

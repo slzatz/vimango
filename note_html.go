@@ -19,9 +19,6 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// Default implementation that will be overridden by build-specific files
-var isWebviewAvailableDefault = false
-
 // Global image cache instance
 var globalImageCache *ImageCache
 
@@ -35,28 +32,6 @@ func initImageCache() {
 			globalImageCache = nil
 		}
 	}
-}
-
-// IsWebviewAvailable returns true if webview is available
-func IsWebviewAvailable() bool {
-	return isWebviewAvailableDefault
-}
-
-// IsWebviewRunning returns true if a webview is currently running
-// This is a stub that will be overridden by build-specific files
-// Only declare this for non-CGO builds
-var isWebviewRunning = false
-
-// OpenNoteInWebview opens a note in a webview window or falls back to browser
-// This function signature will be implemented by build-specific files
-func openNoteInWebview(title, htmlContent string) error {
-	if isWebviewAvailableDefault {
-		return OpenNoteInWebview(title, htmlContent)
-	}
-
-	// Fallback - should not be reached due to build-specific implementations
-	ShowWebviewUnavailableMessage()
-	return fmt.Errorf("webview not available")
 }
 
 // defaultAccent is the blue used for the blockquote bar and list markers
@@ -108,14 +83,13 @@ func resolveAccent(configured, key, fallback string) string {
 	return fallback
 }
 
-// RenderNoteAsHTML converts a note's markdown content to HTML for webview display.
-// standalone selects the document style. The TUI webview window is a
-// standalone document: <h1> title (the window has no other title chrome)
-// and a centered reading column. The hybrid app's --render-html preview is
-// an embedded pane: no <h1> (the host shows the title natively — it is
-// metadata, not part of the note) and left-aligned content, since
-// auto-centering inside a pane reads as a large wasted indent.
-func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool) (string, error) {
+// RenderNoteAsHTML renders a note's markdown as a standalone HTML document for
+// --render-html, which drives vimango_hybrid's preview pane. The document is
+// styled for an embedded pane: no <h1> (the host shows the title natively --
+// it is metadata, not part of the note) and left-aligned content, since
+// auto-centering inside a pane reads as a large wasted indent. title fills
+// only <title>.
+func RenderNoteAsHTML(title, markdownContent string, linkNotes bool) (string, error) {
 	// Peel off a YAML frontmatter block, if the note opens with one, and
 	// render it as its own metadata card (frontmatter.go). Ahead of the
 	// image pass and of goldmark both: goldmark has no notion of
@@ -155,22 +129,18 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
             color: #333;
-            /* The 800px reading column is the standalone window's: it
-               centers, so the slack splits evenly. The embedded pane is
-               left-aligned, where a cap piles all of it into a dead
-               strip on the right -- there the window is the measure,
-               and tables and code get the width too. */
-            {{if .Standalone}}max-width: 800px;{{end}}
-            margin: {{if .Standalone}}0 auto{{else}}0{{end}};
-            padding: {{if .Standalone}}20px{{else}}4px 20px 20px{{end}};
+            /* No max-width: the pane is left-aligned, where a cap piles
+               the slack into a dead strip on the right -- the window is
+               the measure, and tables and code get the width too. */
+            margin: 0;
+            padding: 4px 20px 20px;
             background-color: #fff;
         }
-        {{if not .Standalone}}/* Embedded pane: the host's native title bar sits directly
-           above, so drop the first element's default top margin too. */
+        /* The host's native title bar sits directly above, so drop the
+           first element's default top margin too. */
         #content > :first-child {
             margin-top: 0;
         }
-        {{end}}
         h1, h2, h3, h4, h5, h6 {
             color: #2c3e50;
             /* Headings are large; body's 1.6 leading makes wrapped
@@ -292,9 +262,8 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
                (1px was tried first. It is real in the box model and
                invisible on screen: one column of a 12% wash differs
                from the ground by too little to resolve.)
-               The bleed is safe because both the standalone and the
-               embedded body carry 20px of horizontal padding for it to
-               grow into, at every width -- the padding does not shrink
+               The bleed is safe because the body carries 20px of
+               horizontal padding for it to grow into, at every width -- the padding does not shrink
                with the viewport, so this cannot reach the edge and
                raise a horizontal scrollbar. Symmetric, so a line long
                enough to reach the right edge clears it the same way. */
@@ -483,9 +452,8 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
                the keys on the body's own left edge while the tint starts
                outside the content column, so the first glyph is not
                crushed against the edge of the color. Safe at every width
-               because both the standalone and the embedded body carry
-               20px of horizontal padding, which does not shrink with the
-               viewport. */
+               because the body carries 20px of horizontal padding, which
+               does not shrink with the viewport. */
             margin: 0 -4px 16px;
             padding: 8px 4px;
             border-radius: 4px;
@@ -685,8 +653,7 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
     </style>
 </head>
 <body>
-    {{if .Standalone}}<h1>{{.Title}}</h1>
-    {{end}}<div id="content">
+    <div id="content">
         {{.Content}}
     </div>
 </body>
@@ -701,13 +668,11 @@ func RenderNoteAsHTML(title, markdownContent string, standalone, linkNotes bool)
 	err = tmpl.Execute(&buf, struct {
 		Title      string
 		Content    template.HTML
-		Standalone bool
 		Accent     template.CSS
 		CodeAccent template.CSS
 	}{
-		Title:      title,
-		Content:    template.HTML(htmlContent),
-		Standalone: standalone,
+		Title:   title,
+		Content: template.HTML(htmlContent),
 		// template.CSS is safe here: both resolvers only return
 		// regex-validated hex or fixed keywords.
 		Accent:     template.CSS(previewAccent()),
@@ -902,9 +867,4 @@ func convertMarkdownToHTML(markdown string, linkNotes bool) string {
 	}
 
 	return buf.String()
-}
-
-// ShowWebviewNotAvailableMessage displays a user-friendly message
-func ShowWebviewNotAvailableMessage() string {
-	return fmt.Sprintf("%sWebview not available - opening in default browser%s", YELLOW_BG, RESET)
 }

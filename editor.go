@@ -31,9 +31,6 @@ type Editor struct {
 	vbuf               interfaces.VimBuffer
 	ss                 []string
 	searchPrefix       string
-	renderedNote       string
-	previewLineOffset  int
-	overlay            []string // for suggest, showVimMessageLog
 	highlightPositions []Position
 	suggestions        []string //spelling suggestions
 	bufferTick         int

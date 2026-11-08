@@ -711,59 +711,6 @@ func (e *Editor) readFileIntoNote(filename string) error {
 	return nil
 }
 
-func (e *Editor) drawPreview() {
-	rows := strings.Split(e.renderedNote, "\n")
-	fmt.Printf("\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
-
-	// erase specific editors 'window'
-	erase_chars := fmt.Sprintf("\x1b[%dX", e.screencols)
-	for i := 0; i < e.screenlines; i++ {
-		fmt.Printf("%s%s", erase_chars, lf_ret)
-	}
-
-	fmt.Printf("\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-
-	fr := e.previewLineOffset - 1
-	y := 0
-	for {
-		fr++
-		if fr > len(rows)-1 || y > e.screenlines-1 {
-			break
-		}
-		fmt.Printf("%s%s", rows[fr], lf_ret)
-		y++
-	}
-}
-
-func (e *Editor) drawOverlay() {
-	fmt.Print("\x1b_Ga=d\x1b\\") //delete any images
-
-	//rows := strings.Split(s, "\n")
-	fmt.Printf("\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
-
-	// erase specific editors 'window'
-	erase_chars := fmt.Sprintf("\x1b[%dX", e.screencols)
-	for i := 0; i < e.screenlines; i++ {
-		fmt.Printf("%s%s", erase_chars, lf_ret)
-	}
-
-	fmt.Printf("\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-
-	fr := e.previewLineOffset - 1
-	y := 0
-	rows := e.overlay
-	for {
-		fr++
-		if fr > len(rows)-1 || y > e.screenlines-1 {
-			break
-		}
-		fmt.Printf("%s%s", rows[fr], lf_ret)
-		y++
-	}
-}
-
 // this func is reason that we are writing notes to file
 // allows easy testing if a file is modified with BufferOption
 func (e *Editor) isModified() bool {

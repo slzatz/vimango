@@ -383,14 +383,14 @@ func (c *ImageCache) GetCacheStats() (int, int64) {
 	return len(c.index.Entries), totalSize
 }
 
-// GetCachedImage retrieves cached data by URL (for webview data URIs)
+// GetCachedImage retrieves cached data by URL (for --render-html data URIs)
 // Returns (base64Data, true) if found, ("", false) if not found
 func (c *ImageCache) GetCachedImage(url string) (string, bool) {
 	data, _, _, found := c.GetCachedImageData(url)
 	return data, found
 }
 
-// StoreCachedImage stores base64 data in cache (for webview data URIs without dimensions)
+// StoreCachedImage stores base64 data in cache (for --render-html data URIs without dimensions)
 func (c *ImageCache) StoreCachedImage(url, base64Data string) error {
 	return c.StoreCachedImageData(url, base64Data, 0, 0)
 }

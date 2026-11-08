@@ -11,7 +11,7 @@ There are a few semi-notable features:
      - Images are cached both in-memory (via kitty) and on disk (as Base64 PNG files)
      - See [Google Drive Setup](#google-drive-setup-optional) below for configuration
 - Terminal Markdown rendering supports kitty's text sizing protocol
-- For HTML rendering, there is a built-in webviewer that uses the go bindings to the webview library
+- `vimango --render-html <id>` renders a note as a standalone HTML document (it drives vimango_hybrid's preview pane)
 - Syncing of notes to a remote PostgreSQL database (optional)
 - Note editing supports full vim keybindings via libvim, which was originally develeped to support the Onivim 2 editor
 - There is full-text search via sqlite's fts5 extension
@@ -24,7 +24,6 @@ This wasn't developed thinking anyone else would use it so there isn't an instal
  - SQLite3 development files
  - Hunspell development files
  - libvim.a (must be built from source — see [Building libvim.a](#building-libvima) below)
- - webkit2gtk 4.1 and GTK 3 (Linux only, for the built-in webviewer — see [Webview dependencies](#webview-dependencies) below)
 
 ## Building libvim.a
 
@@ -113,34 +112,6 @@ CGO_ENABLED=1 go build -o ../../heic_worker
 
 If `heic_worker` is missing or built for the wrong architecture, vimango will silently fall through HEIC images (the placeholder will not render). HEIC support is optional — non-HEIC images are unaffected, and pure Go builds use a `pillow-heif` Python fallback when `.venv` is set up (see "HEIC Image Support" below).
 
-## Webview dependencies
-
-The built-in HTML webviewer uses `github.com/webview/webview_go`, which on Linux/BSD links against GTK 3 and webkit2gtk 4.1. These must be installed before building:
-
-- **Arch Linux:** `sudo pacman -S gtk3 webkit2gtk-4.1`
-- **Debian/Ubuntu:** `sudo apt-get install libgtk-3-dev libwebkit2gtk-4.1-dev`
-- **macOS:** no install needed — uses the native WebKit framework
-- **Windows:** no install needed — uses the bundled Edge WebView2
-
-The webview import is unconditional, so these libraries are required for any CGO build (the pure-Go cross-compiled Windows build does not need them on the build host).
-
-A patched fork of `webview_go` lives under `third_party/webview_go` (referenced via a `replace` directive in `go.mod`) to pin the pkg-config target to `webkit2gtk-4.1`, since upstream still references the deprecated `webkit2gtk-4.0`.
-
-## Building webview_worker
-
-**Required on both Linux and macOS for CGO builds.** The webviewer runs in a separate `webview_worker` subprocess so its event loop can own the process's main thread (mandatory on macOS for AppKit/WebKit; correct and harmless on Linux). Like `heic_worker`, the binary differs per platform and is excluded from version control via `.gitignore`.
-
-Install the webview platform dependencies first (see [Webview dependencies](#webview-dependencies) above), then build the worker:
-
-```bash
-cd cmd/webview_worker
-CGO_ENABLED=1 go build -o ../../webview_worker
-```
-
-The worker must sit next to the main `vimango` executable (or in the current working directory). If it's missing or built for the wrong architecture, `Ctrl-W` falls back to opening the rendered note in the system browser (`open` on macOS, `xdg-open` on Linux) — graceful, but you lose the in-app live-update behavior. Worker errors are logged to `$TMPDIR/vimango_webview_worker.log`.
-
-Builds without the worker binary always use the browser fallback.
-
 ## Quick Start
 
 **First-time setup (recommended):**
@@ -154,16 +125,13 @@ cd vimango
 # 3. Build heic_worker (only if you want CGO HEIC support — see "Building heic_worker" above)
 cd cmd/heic_worker && CGO_ENABLED=1 go build -o ../../heic_worker && cd ../..
 
-# 4. Build webview_worker (required on Linux and macOS for the in-app HTML viewer — see "Building webview_worker" above)
-cd cmd/webview_worker && CGO_ENABLED=1 go build -o ../../webview_worker && cd ../..
-
-# 5. Build the application
+# 4. Build the application
 CGO_ENABLED=1 go build --tags=fts5
 
-# 6. Run first-time setup (creates config.json and databases)
+# 5. Run first-time setup (creates config.json and databases)
 ./vimango --init
 
-# 7. Run the application
+# 6. Run the application
 ./vimango
 ```
 

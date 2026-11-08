@@ -80,20 +80,6 @@ CGO_ENABLED=1 go build -o ../../heic_worker
 
 `heic_cgo.go` looks for `heic_worker` next to the main executable, then in the current directory. If it's missing or built for the wrong architecture, `IsHEICAvailable()` returns false and HEIC images silently fail to render. The pure Go pillow-heif fallback (see "HEIC Image Support" below) is unaffected.
 
-### Building webview_worker (CGO Webview Prerequisite)
-
-**Required on both Linux and macOS for CGO builds.** The CGO webview opens notes in a native window via WebKit. On macOS this requires running the WebKit/Cocoa event loop on the process's main thread, which conflicts with the terminal main loop already pinned there; on Linux the same architecture is correct and harmless. Vimango therefore shells out to a separate `webview_worker` subprocess (built from `cmd/webview_worker/main.go`) that owns its own main thread; the parent drives it over stdin with line-delimited JSON. Like `heic_worker` and `libvim.a`, this binary differs per platform and is excluded from version control via `.gitignore`.
-
-Requires the same webview platform dependencies as the main app (GTK 3 + webkit2gtk 4.1 on Linux; native WebKit framework on macOS — no extra install).
-
-Build (same on Linux and macOS):
-```bash
-cd cmd/webview_worker
-CGO_ENABLED=1 go build -o ../../webview_worker
-```
-
-`webview_cgo.go` looks for `webview_worker` next to the main executable, then in the current directory. If the binary is missing, `IsWebviewAvailable()` returns false and `OpenNoteInWebview` falls back to opening the rendered HTML in the system browser (`open` on macOS, `xdg-open` on Linux). The fallback is silent and graceful — the application never crashes due to a missing worker. Worker errors are logged to `$TMPDIR/vimango_webview_worker.log`.
-
 - Run: `go run main.go`
 
 ### Tests
@@ -117,9 +103,7 @@ NOTE: Generally we have not been running tests but have tested key functionality
 - Spell check: via hunspell (CGO) — requires the `spell` build tag, which is not in the default build command; see "Build Commands"
 
 ### Host App Integration (vimango_hybrid)
-`RenderNoteAsHTML(title, markdown, standalone)` renders two document styles:
-- **standalone=true** (TUI `:v` webview window): `<h1>` title heading + centered 800px reading column — the window has no other title chrome.
-- **standalone=false** (`--render-html`, embedded host pane): no `<h1>` and left-aligned content — the host shows the title in its own native header (the title is metadata, not part of the note), and auto-centering inside a pane reads as a large wasted indent.
+`RenderNoteAsHTML(title, markdown, linkNotes)` (`note_html.go`) renders one document style, for `--render-html` in an embedded host pane: no `<h1>` and left-aligned content — the host shows the title in its own native header (the title is metadata, not part of the note), and auto-centering inside a pane reads as a large wasted indent. The TUI's webview window, which wanted an `<h1>` and a centered column instead, was removed 2026-11-08 along with `webview_worker`, `third_party/webview_go` and the GTK/webkit2gtk build dependency on Linux. config.json's `webview.accent` / `webview.code_accent` keep their historical names and still style this output.
 
 ## Help System
 The application supports standard `--help` and `-h` flags to display comprehensive usage information:
@@ -138,7 +122,7 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 - The application is written in Go.
 - The vimango application is a note taking application that stores notes and their titles in a local SQLite database.
 - The application operates in two main modes: an editor mode for editing notes and an organizer mode for managing and viewing notes. On the terminal screen the Organizer with the titles of notes is on the left and the Editor for editing notes is on the right.
-- **One note at a time.** The TUI once let several notes be open side by side (Ctrl-H/Ctrl-L moved between them and back to the organizer); that was removed 2026-11-08. `Session.editor` is the open note's editor or nil; `:x`/`:q` close it and return to the organizer, and in `--editor` mode end the process. The TUI is kept deliberately simple — for emergencies and ssh — and vimango_hybrid is the daily driver.
+- **One note at a time.** The TUI once let several notes be open side by side (Ctrl-H/Ctrl-L moved between them and back to the organizer); that was removed 2026-11-08. `Session.editor` is the open note's editor or nil; `:x`/`:q` close it and return to the organizer, and in `--editor` mode end the process. The TUI is kept deliberately simple — for emergencies and ssh — and vimango_hybrid is the daily driver. Removed from the TUI on the same day for the same reason: the webview window (organizer `:webview`/`:closewebview`, Ctrl-W/Ctrl-Q; editor `:webview`), the editor's in-terminal `:preview` (and the never-entered VIEW_LOG mode that shared its scrolling), and `:vertical resize` in both panes. The divider still follows terminal resizes (`moveDividerPct`) and `preferences.json`'s `edPct`.
 - The application supports markdown rendering of notes to enhance the readability of the content.
 - The ability to manage and display images is an important feature of the application.
 - SQLite driver: `mattn/go-sqlite3` (CGO) everywhere — the modernc.org/sqlite
@@ -192,20 +176,18 @@ The command system is loosely based on the vim command system and the existence 
 - **Navigation**: open, opencontext, openfolder, openkeyword
 - **Data Management**: sync
 - **Search & Filter**: find, contexts, folders, keywords, recent, log
-- **View Control**: sort, showall, image, webview, closewebview, vertical resize
+- **View Control**: sort, showall, image
 - **Entry Management**: new, e (edit), copy, set context, set folder, deletekeywords, deletemarks
 - **Container Management**: cc (context), ff (folder), kk (keyword)
 - **Research**: research, researchdebug (rd)
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
-**Editor Ex Commands (27 commands in 9 categories):**
+**Editor Ex Commands (24 commands in 7 categories):**
 - **File Operations**: write, compile, read, save, checkstale
 - **Data Management**: sync
 - **Editing**: syntax, number, fmt, run, paste, nopaste
-- **Preview**: preview, webview
 - **Utility**: style, template, spell, suggest
-- **Layout**: vertical resize, resize
 - **Output**: ha, print, pdf, pdf-goldmark
 - **System**: quit, exit
 - **Help**: help
@@ -275,12 +257,11 @@ command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
 ### Normal Mode Command Organization
 **Editor:** none. The editor intercepts no normal-mode keys (`normalCmds`, `NormalModeKeyHandler` and the editor's normal-command registry were removed with Ctrl-H/Ctrl-L on 2026-11-08); every key goes to vim. Markup and list shortcuts are vim mappings in `vimango.vim`, and the editor's `:help normal` lists them (`editorNormalModeHelp` — keep it in step with that file).
 
-**Organizer Normal Mode Commands (11+ commands in 5 categories):**
-- **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive)
-- **Navigation**: Ctrl-J (scroll preview down), Ctrl-K (scroll preview up)
+**Organizer Normal Mode Commands (10 commands in 3 categories, plus `:`):**
+- **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive), Ctrl-F (new folder), Ctrl-C (new context)
+- **Navigation**: Ctrl-J / Ctrl-K (scroll the rendered note down / up), Home (back to its top)
 - **Information**: Ctrl-I (show entry info)
-- **Mode Switching**: : (ex command mode)
-- **Preview**: Ctrl-W (web view), Ctrl-Q (close web view)
+- `:` opens the ex command line
 
 ### Enhanced Error Messages
 - Smart command suggestions for typos using fuzzy matching from both ex and normal command registries

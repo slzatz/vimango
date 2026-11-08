@@ -3,8 +3,6 @@ package main
 import (
 	"strings"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -26,77 +24,6 @@ func splitExRange(line string) (rng, rest string) {
 		return "%", line[1:]
 	}
 	return "", line
-}
-
-func (e *Editor) showMarkdownPreview(_ int) {
-	if len(e.ss) == 0 {
-		return
-	}
-	//note := e.generateWWStringFromBuffer2()
-	note := strings.Join(e.vbuf.Lines(), "\n")
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath(getGlamourStylePath()),
-		glamour.WithWordWrap(0),
-	)
-	note, _ = r.Render(note)
-	// Decode any Kitty text sizing markers (OSC 66)
-	note = ansi.DecodeKittyTextSizeMarkers(note)
-	//note = WordWrap(note, e.Screen.totaleditorcols)
-	note = WordWrap(note, e.screencols, 0)
-	note = strings.TrimSpace(note)
-	e.renderedNote = note
-	e.mode = PREVIEW
-	e.previewLineOffset = 0
-	e.drawPreview()
-}
-
-func (e *Editor) showWebView(_ int) {
-	if len(e.ss) == 0 {
-		return
-	}
-
-	// Get current note content
-	note := strings.Join(e.vbuf.Lines(), "\n")
-
-	// Get note title from the editor
-	title := e.title
-	if title == "" {
-		title = "Untitled Note"
-	}
-
-	// Convert to HTML
-	htmlContent, err := RenderNoteAsHTML(title, note, true, false)
-	if err != nil {
-		e.ShowMessage(BR, "Error rendering HTML: %v", err)
-		return
-	}
-
-	// Check if webview is available
-	if !IsWebviewAvailable() {
-		e.ShowMessage(BR, "%s", ShowWebviewNotAvailableMessage())
-		// Fall back to opening in browser
-		err = OpenNoteInWebview(title, htmlContent)
-		if err != nil {
-			e.ShowMessage(BR, "Error opening note: %v", err)
-		}
-		return
-	}
-
-	// Open in webview in a goroutine since it blocks
-	// This will either create a new webview or update the existing one
-	go func() {
-		err := OpenNoteInWebview(title, htmlContent)
-		if err != nil {
-			// Note: Can't directly show message from goroutine
-			// Could implement a channel-based message system if needed
-		}
-	}()
-
-	if IsWebviewRunning() {
-		e.ShowMessage(BR, "Updating webview content...")
-	} else {
-		e.ShowMessage(BR, "Opening note in webview...")
-	}
 }
 
 func (e *Editor) nextStyle(_ int) {
@@ -147,8 +74,6 @@ func (e *Editor) spellSuggest(_ int) {
 // Ex-command forms of the normal-mode shortcuts. The registry wants
 // func(*Editor); the normal-mode table wants func(*Editor, int).
 
-func (e *Editor) previewCmd()  { e.showMarkdownPreview(0) }
-func (e *Editor) webviewCmd()  { e.showWebView(0) }
 func (e *Editor) styleCmd()    { e.nextStyle(0) }
 func (e *Editor) templateCmd() { e.readGoTemplate(0) }
 func (e *Editor) spellCmd()    { e.spellingCheck(0) }

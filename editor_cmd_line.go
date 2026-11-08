@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/mandolyte/mdtopdf/v2"
@@ -122,25 +121,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 			})
 	*/
 
-	// Layout commands
-	registry.Register("vertical resize", (*Editor).verticalResize, CommandInfo{
-		Aliases:     []string{"vert res"},
-		Description: "Resize vertical divider",
-		Usage:       "vertical resize <width>",
-		Category:    "Layout",
-		Examples:    []string{":vertical resize 80", ":vert res +10", ":vert res -5"},
-	})
-
-	/*
-		registry.Register("resize", (*Editor).resize, CommandInfo{
-			Aliases:     []string{"res"},
-			Description: "Resize editor window",
-			Usage:       "resize <height>",
-			Category:    "Layout",
-			Examples:    []string{":resize 20", ":res +5", ":res -3"},
-		})
-	*/
-
 	// Output commands
 	registry.Register("ha", (*Editor).printNote, CommandInfo{
 		Description: "Print current note using vim hardcopy",
@@ -164,25 +144,10 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 	})
 
 	registry.Register("pdf-goldmark", (*Editor).createPDFGoldmark, CommandInfo{
-		Description: "Create PDF from current note using goldmark-pdf (consistent with webview rendering)",
+		Description: "Create PDF from current note using goldmark-pdf",
 		Usage:       "pdf-goldmark <filename>",
 		Category:    "Output",
 		Examples:    []string{":pdf-goldmark output.pdf", ":pdf-goldmark /tmp/note.pdf"},
-	})
-
-	// Preview commands
-	registry.Register("preview", (*Editor).previewCmd, CommandInfo{
-		Description: "Show markdown preview of current note",
-		Usage:       "preview",
-		Category:    "Preview",
-		Examples:    []string{":preview"},
-	})
-
-	registry.Register("webview", (*Editor).webviewCmd, CommandInfo{
-		Description: "Show current note in a webview window",
-		Usage:       "webview",
-		Category:    "Preview",
-		Examples:    []string{":webview"},
 	})
 
 	// Utility commands
@@ -370,71 +335,6 @@ func (e *Editor) readFile_() {
 	}
 	e.ShowMessage(BR, "Note generated from file: %s", filename)
 }
-
-// testing abs move but may revert to this one
-func (e *Editor) verticalResize__() {
-	pos := strings.LastIndex(e.command_line, " ")
-	if pos == -1 {
-		e.ShowMessage(BR, "You need to provide a a number 0 - 100")
-		return
-	}
-	pct, err := strconv.Atoi(e.command_line[pos+1:])
-	if err != nil {
-		e.ShowMessage(BR, "You need to provide a number 0 - 100")
-		return
-	}
-	app.moveDividerPct(pct)
-}
-
-func (e *Editor) verticalResize() {
-	pos := strings.LastIndex(e.command_line, " ")
-	opt := e.command_line[pos+1:]
-	width, err := strconv.Atoi(opt)
-
-	if opt[0] == '+' || opt[0] == '-' {
-		width = e.Screen.screenCols - e.Screen.divider + width
-	}
-
-	if err != nil {
-		e.ShowMessage(BR, "The format is :vert[ical] res[ize] N")
-		return
-	}
-	app.moveDividerAbs(width)
-}
-
-/*
-func (e *Editor) resize() {
-	pos := strings.Index(e.command_line, " ")
-	opt := e.command_line[pos+1:]
-	if opt[0] == '+' || opt[0] == '-' {
-		num, err := strconv.Atoi(opt[1:])
-		if err != nil {
-			e.ShowMessage(BR, "The format is [+/-]N")
-			return
-		}
-		for i := 0; i < num; i++ {
-			e.changeSplit(int(opt[0]))
-		}
-	} else {
-		num, err := strconv.Atoi(opt)
-		if err != nil {
-			e.ShowMessage(BR, "The format is [+/-]N")
-			return
-		}
-
-		if e.Screen.textLines-num < 3 || num < 2 {
-			return
-		}
-
-		e.screenlines = num
-			op := e.output
-			op.screenlines = e.Screen.textLines - num - 1
-			op.top_margin = num + 3
-		e.Screen.eraseRightScreen()
-		e.Screen.drawRightScreen()
-	}
-}
-*/
 
 func (e *Editor) compile() {
 
@@ -875,7 +775,7 @@ func (e *Editor) createPDFGoldmark() {
 	// Remove image description text to prevent it from appearing as visible text in PDF
 	processedMarkdown = preprocessImageDescriptions(processedMarkdown)
 
-	// Configure goldmark with same extensions as webview for consistency
+	// Configure goldmark with the same extensions as the HTML renderer (note_html.go)
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,           // GitHub Flavored Markdown

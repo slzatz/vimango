@@ -13,14 +13,12 @@ require (
 	github.com/mandolyte/mdtopdf/v2 v2.2.17
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/stephenafamo/goldmark-pdf v0.4.2
-	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.46.0
 	google.golang.org/api v0.300.0
 )
 
-replace github.com/webview/webview_go => ./third_party/webview_go
 
 require (
 	cloud.google.com/go/auth v0.24.0 // indirect

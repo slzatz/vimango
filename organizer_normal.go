@@ -77,19 +77,6 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 		Category:    "Information",
 	})
 
-	// Preview commands
-	registry.Register(string(rune(ctrlKey('w'))), (*Organizer).showWebView_n, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('w')))),
-		Description: "Show current note in web browser",
-		Category:    "Preview",
-	})
-
-	registry.Register(string(rune(ctrlKey('q'))), (*Organizer).closeWebView_n, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('q')))),
-		Description: "Close webkit webview window",
-		Category:    "Preview",
-	})
-
 	// Store registry in organizer for help command access
 	organizer.normalCommandRegistry = registry
 
@@ -218,14 +205,6 @@ func (o *Organizer) scrollNoticeUp() {
 		o.drawNoticeLayer()
 		o.drawNoticeText()
 	}
-}
-
-func (o *Organizer) showWebView_n() {
-	o.showWebView(0)
-}
-
-func (o *Organizer) closeWebView_n() {
-	o.closeWebView(0)
 }
 
 func (o *Organizer) displayEntryInfo(e *NewEntry) string {

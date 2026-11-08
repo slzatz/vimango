@@ -2,8 +2,8 @@
 
 This guide takes a **completely fresh macOS machine** — no developer tools, no
 Homebrew, no Go, no git — to a fully working vimango with spell checking
-(hunspell), inline images in the terminal (including HEIC), the native
-WebKit preview window, and full-text search.
+(hunspell), inline images in the terminal (including HEIC), and full-text
+search.
 
 Every step includes a verification command so you can confirm it worked before
 moving on. Follow the steps **in order** — later steps assume earlier ones.
@@ -233,10 +233,10 @@ ls -la libvim.a         # sits in the vimango root, next to go.mod
 
 ---
 
-## 9. Build the two helper binaries
+## 9. Build the helper binary
 
-These run as subprocesses so that crashes in native image/WebKit libraries
-can't take down vimango. Both are optional-but-recommended; both land in the
+`heic_worker` runs as a subprocess so that a crash in the native image library
+can't take down vimango. It is optional but recommended, and lands in the
 vimango root.
 
 ### heic_worker — HEIC/HEIF image decoding
@@ -254,23 +254,14 @@ cd ../..
 > `pkg-config --modversion libheif` prints, then rebuild. A warning about
 > `duplicate libraries: '-lheif'` is harmless.
 
-### webview_worker — native WebKit preview window
-
-```bash
-cd cmd/webview_worker
-CGO_ENABLED=1 go build -o ../../webview_worker
-cd ../..
-```
-
 **Verify:**
 
 ```bash
-ls -la heic_worker webview_worker
+ls -la heic_worker
 ```
 
-If either is missing vimango still works: HEIC images fall back to a Python
-path (step 10) or don't render; the web preview opens in your browser instead
-of its own window.
+If it is missing vimango still works: HEIC images fall back to a Python path
+(step 10) or don't render.
 
 ---
 
@@ -338,7 +329,7 @@ right. Basics to try:
 and view it — the image should render inline in the terminal.
 
 > **Always run vimango from its own directory.** It resolves `config.json`,
-> the style files, both databases, `.venv`, and the worker binaries relative
+> the style files, both databases, `.venv`, and the worker binary relative
 > to the current directory. A shell alias keeps that convenient:
 >
 > ```bash
@@ -394,5 +385,4 @@ see step 9).
 | `no such module: fts5` when saving a note | built without `--tags="fts5,cgo"` | step 11 |
 | Images don't render, notes otherwise fine | terminal lacks kitty graphics (e.g. Terminal.app) | step 3 |
 | HEIC images specifically don't render | `heic_worker` missing/wrong arch | step 9 (non-fatal) |
-| Web preview opens in browser, not a window | `webview_worker` missing | step 9 (non-fatal) |
 | `config.json` / database errors at startup | first-run init never done, or wrong CWD | step 12 |
