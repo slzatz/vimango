@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image"
 	_ "image/jpeg"
-	"image/png"
 	_ "image/png"
 	"io"
 	"net/http"
@@ -177,29 +176,6 @@ func loadWebImage(URL string) (img image.Image, imgFmt string, err error) {
 		img = imaging.Resize(img, 0, app.Session.imgSizeY, imaging.Lanczos)
 	}
 	return
-}
-
-func displayImage(img image.Image) {
-
-	buf := new(bytes.Buffer)
-	err := png.Encode(buf, img)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error encoding image: %v", err)
-		return
-	}
-
-	err = KittyCopyPNGInline(os.Stdout, buf, int64(buf.Len()))
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in KittyCopyPNG...: %v", err)
-	}
-}
-
-// transforms given open/close terminal escapes to pass through tmux to parent terminal
-func TmuxOscOpenClose(opn, cls string) (string, string) {
-
-	opn = "\x1bPtmux;" + strings.ReplaceAll(opn, "\x1b", "\x1b\x1b")
-	cls = strings.ReplaceAll(cls, "\x1b", "\x1b\x1b") + "\x1b\\"
-	return opn, cls
 }
 
 func IsTmuxScreen() bool {

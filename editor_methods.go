@@ -4,7 +4,6 @@ import (
 	//"bufio"
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 
 	//	"time"
@@ -680,22 +679,6 @@ func (e *Editor) adjustFirstVisibleRow() {
 		}
 	}
 	e.firstVisibleRow = rowNum
-}
-
-func (e *Editor) readFileIntoNote(filename string) error {
-
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return fmt.Errorf("Error opening file %s: %w", filename, err)
-	}
-	e.ss = strings.Split(string(b), "\n")
-	e.vbuf.SetLines(0, -1, e.ss)
-
-	e.fr, e.fc, e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0, 0, 0
-
-	e.drawText()
-	e.drawStatusBar() // not sure what state of isModified would be so not sure need to draw statubBar
-	return nil
 }
 
 // this func is reason that we are writing notes to file

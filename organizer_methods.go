@@ -7,26 +7,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-func (o *Organizer) moveAltCursor(key int) {
-
-	if len(o.altRows) == 0 {
-		return
-	}
-
-	switch key {
-
-	case ARROW_UP, 'k':
-		if o.altFr > 0 {
-			o.altFr--
-		}
-
-	case ARROW_DOWN, 'j':
-		if o.altFr < len(o.altRows)-1 {
-			o.altFr++
-		}
-	}
-}
-
 /*
 func (o *Organizer) changeCase() {
 	t := &o.rows[o.fr].title
@@ -105,26 +85,6 @@ func (o *Organizer) scroll() (offset_changed bool) {
 	o.cy = o.fr - o.rowoff
 
 	return prev_offset != o.rowoff
-}
-
-func (o *Organizer) altScroll() {
-
-	if len(o.altRows) == 0 {
-		return
-	}
-	prevRowoff := o.altRowoff
-
-	if o.altFr > o.Screen.textLines+o.altRowoff-1 {
-		o.altRowoff = o.altFr - o.Screen.textLines + 1
-	}
-
-	if o.altFr < o.altRowoff {
-		o.altRowoff = o.altFr
-	}
-
-	if prevRowoff != o.altRowoff {
-		o.Screen.eraseRightScreen()
-	}
 }
 
 func (o *Organizer) writeTitle() {

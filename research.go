@@ -789,56 +789,6 @@ func (rm *ResearchManager) StartResearch(title, prompt string, sourceEntryID int
 	}
 }
 
-func (rm *ResearchManager) GetRunningTasks() []*ResearchTask {
-	rm.mutex.RLock()
-	defer rm.mutex.RUnlock()
-
-	tasks := make([]*ResearchTask, 0, len(rm.running))
-	for _, task := range rm.running {
-		tasks = append(tasks, task)
-	}
-	return tasks
-}
-
 func (rm *ResearchManager) Stop() {
 	close(rm.done)
-}
-
-// testAPIConnection performs a simple API test to validate key and permissions
-func (rm *ResearchManager) testAPIConnection() {
-	rm.logDebug("Testing Claude API connection and web search permissions...")
-
-	// Simple test request with web search tool
-	testRequest := ClaudeRequest{
-		Model:     "claude-3-5-sonnet-20241022",
-		MaxTokens: 100,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: "Hello, can you perform a web search? Just respond with a brief acknowledgment.",
-			},
-		},
-		Tools: []Tool{
-			{
-				Type:    "web_search_20250305",
-				Name:    "web_search",
-				MaxUses: 1,
-			},
-		},
-	}
-
-	result, err := rm.callClaudeAPI(testRequest, true) // Enable debug mode for connection test
-	if err != nil {
-		rm.logDebug("API connection test FAILED: %v", err)
-		if strings.Contains(err.Error(), "permission") || strings.Contains(err.Error(), "unauthorized") {
-			rm.app.addNotification("⚠️ Research: API key may not have web search permissions")
-		} else if strings.Contains(err.Error(), "invalid") {
-			rm.app.addNotification("⚠️ Research: Invalid API key configuration")
-		} else {
-			rm.app.addNotification("⚠️ Research: API connection test failed - check network/config")
-		}
-	} else {
-		rm.logDebug("API connection test PASSED: %d characters returned", len(result))
-		rm.app.addNotification("✅ Research: API connection and web search permissions verified")
-	}
 }

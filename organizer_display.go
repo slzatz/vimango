@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -387,45 +386,6 @@ func (o *Organizer) drawRows() {
 	fmt.Print(ab.String())
 }
 
-// for drawing containers when making a selection
-func (o *Organizer) drawAltRows() {
-
-	if len(o.altRows) == 0 {
-		return
-	}
-
-	var ab strings.Builder
-	fmt.Fprintf(&ab, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+2)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+1)
-
-	for y := 0; y < o.Screen.textLines; y++ {
-
-		fr := y + o.altRowoff
-		if fr > len(o.altRows)-1 {
-			break
-		}
-
-		length := len(o.altRows[fr].title)
-		if length > o.Screen.totaleditorcols {
-			length = o.Screen.totaleditorcols
-		}
-
-		if o.altRows[fr].star {
-			ab.WriteString("\x1b[1m") //bold
-			ab.WriteString("\x1b[1;36m")
-		}
-
-		if fr == o.altFr {
-			ab.WriteString("\x1b[48;5;236m") // 236 is a grey
-		}
-
-		ab.WriteString(o.altRows[fr].title[:length])
-		ab.WriteString("\x1b[0m") // return background to normal
-		ab.WriteString(lf_ret)
-	}
-	fmt.Print(ab.String())
-}
-
 func (o *Organizer) drawRenderedNote() {
 	if len(o.note) == 0 {
 		return
@@ -451,95 +411,6 @@ func (o *Organizer) drawRenderedNote() {
 	// Note: With Unicode placeholders (U+10EEEE), we don't need separate placements
 	// The placeholders are embedded directly in the text and reference the transmitted images
 	// Calling createImagePlacementsAtPositions() would delete the images!
-}
-
-// deleteAllKittyPlacements deletes all kitty image placements
-func deleteAllKittyPlacements() {
-	if !app.kitty {
-		return
-	}
-
-	oscOpen, oscClose := "\x1b_G", "\x1b\\"
-	if IsTmuxScreen() {
-		oscOpen = "\x1bPtmux;\x1b\x1b_G"
-		oscClose = "\x1b\x1b\\\\\x1b\\"
-	}
-
-	// Delete all placements: a=d (delete), d=A (all placements)
-	cmd := oscOpen + "a=d,d=A,q=1" + oscClose
-	fmt.Fprint(os.Stdout, cmd)
-	os.Stdout.Sync()
-}
-
-// createKittyPlacement creates a placement at the current cursor position
-func createKittyPlacement(imageID uint32, cols, rows int) error {
-	if !app.kitty {
-		return errors.New("kitty terminal not detected")
-	}
-
-	oscOpen, oscClose := "\x1b_G", "\x1b\\"
-	if IsTmuxScreen() {
-		oscOpen = "\x1bPtmux;\x1b\x1b_G"
-		oscClose = "\x1b\x1b\\\\\x1b\\"
-	}
-
-	// Create placement at current cursor position: a=p (place), i=imageID, c=cols, r=rows
-	args := []string{
-		"a=p",
-		"q=1", // show errors
-		fmt.Sprintf("i=%d", imageID),
-	}
-	if cols > 0 {
-		args = append(args, fmt.Sprintf("c=%d", cols))
-	}
-	if rows > 0 {
-		args = append(args, fmt.Sprintf("r=%d", rows))
-	}
-
-	cmd := oscOpen + strings.Join(args, ",") + oscClose
-	_, err := fmt.Fprint(os.Stdout, cmd)
-	return err
-}
-
-// createImagePlacementsAtPositions creates kitty image placements at the correct screen positions
-func (o *Organizer) createImagePlacementsAtPositions(startLine, endLine int) {
-	if !app.kitty {
-		return
-	}
-
-	// First, delete all existing placements
-	deleteAllKittyPlacements()
-
-	// Parse each visible line for image markers
-	imageMarkerRegex := regexp.MustCompile(`\[KITTY_IMAGE:id=(\d+),cols=(\d+),rows=(\d+)\]`)
-
-	for lineIdx := startLine; lineIdx < endLine && lineIdx < len(o.note); lineIdx++ {
-		line := o.note[lineIdx]
-		matches := imageMarkerRegex.FindAllStringSubmatch(line, -1)
-
-		for _, match := range matches {
-			if len(match) != 4 {
-				continue
-			}
-
-			imageID, _ := strconv.ParseUint(match[1], 10, 32)
-			cols, _ := strconv.Atoi(match[2])
-			rows, _ := strconv.Atoi(match[3])
-
-			// Calculate screen position
-			screenRow := TOP_MARGIN + 1 + (lineIdx - startLine)
-			screenCol := o.Screen.divider + 1
-
-			// Move cursor to position
-			fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", screenRow, screenCol)
-
-			// Create placement at current cursor position
-			_ = createKittyPlacement(uint32(imageID), cols, rows)
-		}
-	}
-
-	// Flush output
-	os.Stdout.Sync()
 }
 
 func (o *Organizer) drawStatusBar() {
@@ -660,25 +531,6 @@ func (o *Organizer) drawSearchRows() {
 	fmt.Print(ab.String())
 }
 
-// should be removed after more testing
-func (o *Organizer) drawRowAt(fr int) {
-	if fr < 0 || fr >= len(o.rows) {
-		return
-	}
-	if fr < o.rowoff || fr >= o.rowoff+o.Screen.textLines {
-		return
-	}
-	titlecols := o.titleColumnWidth()
-	y := fr - o.rowoff
-	var ab strings.Builder
-	if o.taskview == BY_FIND {
-		o.appendSearchRow(&ab, fr, y, titlecols)
-	} else {
-		o.appendStandardRow(&ab, fr, y, titlecols)
-	}
-	fmt.Print(ab.String())
-}
-
 func (o *Organizer) drawActive() {
 	// When doing a partial redraw, we first draw the standard row, then
 	// address horizontal scrolling and visual mode highlighting
@@ -731,25 +583,6 @@ func (o *Organizer) displayNote() {
 	// Every note is markdown. RenderManager handles all cases internally
 	// (kitty/no-kitty, images/no-images, cached/uncached).
 	app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
-}
-
-func (o *Organizer) drawRenderedNote_() {
-	if len(o.note) == 0 {
-		return
-	}
-	start := o.altRowoff
-	var end int
-	// check if there are more lines than can fit on the screen
-	if len(o.note)-start > o.Screen.textLines-1 {
-		end = o.Screen.textLines + start
-	} else {
-		//end = len(o.note) - 1
-		end = len(o.note)
-	}
-	fmt.Fprintf(os.Stdout, "\x1b[%d;%dH", TOP_MARGIN+1, o.Screen.divider+1)
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", o.Screen.divider+0)
-	fmt.Print(strings.Join(o.note[start:end], lf_ret))
-	fmt.Print(RESET) //sometimes there is an unclosed escape sequence
 }
 
 // extractImageURLs extracts all image URLs from markdown
@@ -897,136 +730,6 @@ func transmitPreparedKittyImage(prep *preparedImage, maxCols int) (uint32, int, 
 }
 
 // replaceImagesWithPlaceholders replaces glamour's image output with kitty placeholders
-
-// kittyTransmitImageToStdout transmits image data directly to stdout using kitty protocol
-func kittyTransmitImageToStdout(data []byte, imageID uint32, cols, rows int, isTmux bool) error {
-	oscOpen, oscClose := "\x1b_G", "\x1b\\"
-	if isTmux {
-		oscOpen = "\x1bPtmux;\x1b\x1b_G"
-		oscClose = "\x1b\x1b\\\\\x1b\\"
-	}
-
-	// Single-step: transmit with U=1 for Unicode placeholders (like Yazi)
-	header := []string{"a=T", "f=100", fmt.Sprintf("q=%s", kittyQFlag()), "U=1"} // a=T (transmit), U=1 (Unicode placeholders)
-	if imageID != 0 {
-		header = append(header, fmt.Sprintf("i=%d", imageID))
-	}
-	header = append(header, fmt.Sprintf("S=%d", len(data)))
-	// Include size for proper virtual placement
-	if cols > 0 {
-		header = append(header, fmt.Sprintf("c=%d", cols))
-	}
-	if rows > 0 {
-		header = append(header, fmt.Sprintf("r=%d", rows))
-	}
-	bsHdr := []byte(strings.Join(header, ",") + ",")
-
-	// Chunk and transmit
-	chunkSize := 4096
-	encoded := base64.StdEncoding.EncodeToString(data)
-
-	for i := 0; i < len(encoded); i += chunkSize {
-		end := i + chunkSize
-		if end > len(encoded) {
-			end = len(encoded)
-		}
-		chunk := encoded[i:end]
-
-		parts := [][]byte{[]byte(oscOpen)}
-		if bsHdr != nil {
-			parts = append(parts, bsHdr)
-			bsHdr = nil
-		}
-		parts = append(parts, []byte("m=1;"), []byte(chunk), []byte(oscClose))
-
-		if _, err := os.Stdout.Write(bytes.Join(parts, nil)); err != nil {
-			return err
-		}
-	}
-
-	// Final chunk marker
-	_, err := os.Stdout.WriteString(oscOpen + "m=0;" + oscClose)
-	return err
-}
-
-// createTransparentPNG creates a 1x1 transparent PNG
-func createTransparentPNG() []byte {
-	// 1x1 transparent PNG (67 bytes)
-	// This is the minimal valid PNG with full transparency
-	transparentPNG := []byte{
-		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-		0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 size
-		0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, // RGBA mode
-		0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, // IDAT chunk
-		0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, // Compressed data
-		0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-		0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, // IEND chunk
-		0x42, 0x60, 0x82,
-	}
-	return transparentPNG
-}
-
-// transmitTransparentPlaceholder transmits the 1x1 transparent placeholder image once
-func transmitTransparentPlaceholder() error {
-	if transparentPlaceholderTransmitted {
-		return nil
-	}
-
-	pngData := createTransparentPNG()
-	isTmux := IsTmuxScreen()
-
-	oscOpen, oscClose := "\x1b_G", "\x1b\\"
-	if isTmux {
-		oscOpen = "\x1bPtmux;\x1b\x1b_G"
-		oscClose = "\x1b\x1b\\\\\x1b\\"
-	}
-
-	// STEP 1: Transmit transparent image data (a=T to transmit and display)
-	header1 := []string{
-		"a=T",
-		"f=100",
-		"q=1", // q=1 to see errors
-		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID), // image ID = 1
-		fmt.Sprintf("S=%d", len(pngData)),               // data size
-	}
-
-	bsHdr := []byte(strings.Join(header1, ",") + ",")
-
-	// Transmit in one chunk (it's tiny)
-	encoded := base64.StdEncoding.EncodeToString(pngData)
-	parts := [][]byte{
-		[]byte(oscOpen),
-		bsHdr,
-		[]byte("m=0;"), // single chunk
-		[]byte(encoded),
-		[]byte(oscClose),
-	}
-
-	if _, err := os.Stdout.Write(bytes.Join(parts, nil)); err != nil {
-		return err
-	}
-
-	// STEP 2: Create virtual placement (a=p with U=1) - SEPARATE command!
-	header2 := []string{
-		"a=p", // create placement
-		"U=1", // virtual placement
-		fmt.Sprintf("i=%d", KITTY_PLACEHOLDER_IMAGE_ID),     // image ID = 1
-		fmt.Sprintf("p=%d", KITTY_PLACEHOLDER_PLACEMENT_ID), // placement ID = 1
-		"c=1", // 1 column
-		"r=1", // 1 row
-		"q=1", // q=1 to see errors
-	}
-
-	cmd2 := oscOpen + strings.Join(header2, ",") + oscClose
-	if _, err := os.Stdout.WriteString(cmd2); err != nil {
-		return err
-	}
-
-	transparentPlaceholderTransmitted = true
-
-	return nil
-}
 
 // kittyTransmitActualImage transmits actual image data and creates a placement
 func kittyTransmitActualImage(data []byte, imageID uint32, cols, rows int, isTmux bool) error {

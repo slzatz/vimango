@@ -22,12 +22,6 @@ func (e *CGOEngineWrapper) Init(argc int) {
 	cvim.VimInit(argc)
 }
 
-// BufferOpen opens a file and returns a buffer
-func (e *CGOEngineWrapper) BufferOpen(filename string, lnum int, flags int) interfaces.VimBuffer {
-	buf := cvim.BufferOpen(filename, lnum, flags)
-	return &CGOBufferWrapper{buf: buf}
-}
-
 // BufferNew creates a new empty buffer
 func (e *CGOEngineWrapper) BufferNew(flags int) interfaces.VimBuffer {
 	buf := cvim.CBufferNew(flags)
@@ -49,11 +43,6 @@ func (e *CGOEngineWrapper) BufferSetCurrent(buf interfaces.VimBuffer) {
 	*/
 	// doesn't need if statement to check if buf is a CGOBufferWrapper
 	cvim.CBufferSetCurrent(buf.(*CGOBufferWrapper).buf)
-}
-
-// CursorGetLine gets the current cursor line
-func (e *CGOEngineWrapper) CursorGetLine() int {
-	return cvim.CursorGetLine()
 }
 
 // CursorGetPosition gets the cursor position
@@ -96,12 +85,6 @@ func (e *CGOEngineWrapper) GetMode() int {
 	return cvim.GetMode()
 }
 
-// GetCurrentMode gets the current mode with application-compatible mappings
-// For CGO implementation, this is the same as GetMode
-func (e *CGOEngineWrapper) GetCurrentMode() int {
-	return cvim.GetMode()
-}
-
 func (e *CGOEngineWrapper) GetSubMode() cvim.SubMode {
 	return cvim.GetSubMode()
 }
@@ -136,39 +119,9 @@ func (b *CGOBufferWrapper) GetID() int {
 	return cvim.BufferGetId(b.buf)
 }
 
-// GetLine gets a line from the buffer
-func (b *CGOBufferWrapper) GetLine(lnum int) string {
-	return cvim.BufferGetLine(b.buf, lnum)
-}
-
-// GetLineB gets a line as bytes from the buffer
-func (b *CGOBufferWrapper) GetLineB(lnum int) []byte {
-	return cvim.BufferGetLineB(b.buf, lnum)
-}
-
-// GetLineCount gets the number of lines in the buffer
-func (b *CGOBufferWrapper) GetLineCount() int {
-	return cvim.BufferGetLineCount(b.buf)
-}
-
 // Lines gets all lines from the buffer
 func (b *CGOBufferWrapper) Lines() []string {
 	return cvim.CBufferLines(b.buf)
-}
-
-// LinesB gets all lines as bytes from the buffer
-func (b *CGOBufferWrapper) LinesB() [][]byte {
-	return cvim.BufferLinesB(b.buf)
-}
-
-// SetCurrent sets this buffer as the current buffer
-func (b *CGOBufferWrapper) SetCurrent() {
-	BufferSetCurrent(b.buf)
-}
-
-// IsModified checks if the buffer has been modified
-func (b *CGOBufferWrapper) IsModified() bool {
-	return cvim.BufferGetModified(b.buf)
 }
 
 // GetLastChangedTick gets the last changed tick value

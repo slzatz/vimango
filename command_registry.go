@@ -86,16 +86,6 @@ func (r *CommandRegistry[T]) GetAllCommands() map[string][]CommandInfo {
 	return categories
 }
 
-// GetCommandNames returns all primary command names (no aliases)
-func (r *CommandRegistry[T]) GetCommandNames() []string {
-	var names []string
-	for name := range r.info {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}
-
 // SuggestCommand returns command suggestions for a typo using simple fuzzy matching
 func (r *CommandRegistry[T]) SuggestCommand(input string) []string {
 	input = strings.ToLower(input)

@@ -87,28 +87,6 @@ func GetWordAtIndex(text string, index int) (word string, startIndex int, endInd
 	return word, startIndex, endIndex
 }
 
-func test2() {
-	text := "Hello, this is a text with words and some punctuation!"
-	index := 15 // Index within the word "text"
-
-	word, startIndex, endIndex := GetWordAtIndex(text, index)
-
-	if word != "" {
-		fmt.Printf("At index %d, the word is \"%s\" (from index %d to %d)\n", index, word, startIndex, endIndex)
-	} else {
-		fmt.Printf("At index %d, no word was found.\n", index)
-	}
-
-	// Test with an index within punctuation
-	index = 5 // Index at the comma
-	word, startIndex, endIndex = GetWordAtIndex(text, index)
-	if word != "" {
-		fmt.Printf("At index %d, the word is \"%s\" (from index %d to %d)\n", index, word, startIndex, endIndex)
-	} else {
-		fmt.Printf("At index %d, no word was found.\n", index)
-	}
-}
-
 func test() {
 	text := "Hello, this is a text with words and some punctuation!"
 	wordPositions := GetWordPositionsSingleLine(text)

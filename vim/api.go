@@ -11,12 +11,7 @@ import (
 // Engine is the active engine wrapper (CGOEngineWrapper, set by InitializeVim)
 var Engine interfaces.VimEngine
 
-// API Functions - These functions are called by package main as vim.OpenBuffer (..) for example
-
-// OpenBuffer opens a file and returns a buffer - not currently in use
-func OpenBuffer(filename string, lnum int, flags int) interfaces.VimBuffer {
-	return Engine.BufferOpen(filename, lnum, flags)
-}
+// API Functions - called by package main as vim.NewBuffer(..), vim.SendKey(..), etc.
 
 // NewBuffer creates a new empty buffer
 // Returns VimBuffer for the new adapter API but can be used with old code too
@@ -44,11 +39,6 @@ func GetCurrentBuffer() interfaces.VimBuffer {
 // SetCurrentBuffer sets the current buffer
 func SetCurrentBuffer(buf interfaces.VimBuffer) {
 	Engine.BufferSetCurrent(buf)
-}
-
-// GetCursorLine gets the current cursor line
-func GetCursorLine() int {
-	return Engine.CursorGetLine()
 }
 
 // GetCursorPosition gets the cursor position

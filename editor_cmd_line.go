@@ -204,22 +204,6 @@ func (e *Editor) nopaste() {
 	vim.SendInput(":set nopaste\r")
 }
 
-func (e *Editor) readFile_() {
-	pos := strings.Index(e.command_line, " ")
-	if pos == -1 {
-		e.ShowMessage(BR, "You need to provide a filename")
-		return
-	}
-
-	filename := e.command_line[pos+1:]
-	err := e.readFileIntoNote(filename)
-	if err != nil {
-		e.ShowMessage(BR, "%v", err)
-		return
-	}
-	e.ShowMessage(BR, "Note generated from file: %s", filename)
-}
-
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax
 	if e.highlightSyntax {

@@ -205,20 +205,6 @@ func (c *ImageCache) saveIndex() error {
 	return nil
 }
 
-// NextKittyImageID reserves and returns the next kitty image ID, persisted in the index.
-func (c *ImageCache) NextKittyImageID() uint32 {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if c.index.NextImageID == 0 {
-		c.index.NextImageID = 50
-	}
-	id := c.index.NextImageID
-	c.index.NextImageID++
-	_ = c.saveIndex()
-	return id
-}
-
 // GetKittyMeta returns the cache entry (including kitty fields) if present.
 func (c *ImageCache) GetKittyMeta(url string) (CacheEntry, bool) {
 	key := c.generateCacheKey(url)

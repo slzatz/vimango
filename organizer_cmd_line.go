@@ -1139,63 +1139,6 @@ func (o *Organizer) setContext(pos int) {
 	o.ShowMessage(BL, "Moved current entry into context %q", input)
 }
 
-func (o *Organizer) setContextNew_(input string) {
-	var contextUUID string
-	var ok bool
-	//o.mode = NORMAL
-	if contextUUID, ok = o.Database.contextExists(input); !ok {
-		o.ShowMessage(BL, "%s is not a valid context!", input)
-		return
-	}
-
-	if len(o.marked_entries) > 0 {
-		for id := range o.marked_entries {
-			err := o.Database.updateTaskContextByUUID(contextUUID, id)
-			if err != nil {
-				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
-				return
-			}
-		}
-		o.ShowMessage(BL, "Marked entries moved into context %q", input)
-		return
-	}
-	id := o.rows[o.fr].id
-	err := o.Database.updateTaskContextByUUID(contextUUID, id)
-	if err != nil {
-		o.showMessage("Error updating context for entry %d: %v", id, err)
-		return
-	}
-	o.ShowMessage(BL, "Moved current entry into context %q", input)
-}
-
-func (o *Organizer) setFolderNew_(input string) {
-	var contextUUID string
-	var ok bool
-	//o.mode = NORMAL
-	if contextUUID, ok = o.Database.contextExists(input); !ok {
-		o.ShowMessage(BL, "%s is not a valid context!", input)
-		return
-	}
-
-	if len(o.marked_entries) > 0 {
-		for id := range o.marked_entries {
-			err := o.Database.updateTaskContextByUUID(contextUUID, id)
-			if err != nil {
-				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
-				return
-			}
-		}
-		o.ShowMessage(BL, "Marked entries moved into context %q", input)
-		return
-	}
-	id := o.rows[o.fr].id
-	err := o.Database.updateTaskContextByUUID(contextUUID, id)
-	if err != nil {
-		o.showMessage("Error updating context for entry %d: %v", id, err)
-		return
-	}
-	o.ShowMessage(BL, "Moved current entry into context %q", input)
-}
 func (o *Organizer) setFolder(pos int) {
 	var input string
 	if pos == -1 {

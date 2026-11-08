@@ -1,14 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
-	"errors"
 	"fmt"
-	"io"
-	"os"
 	"strings"
-	"sync/atomic"
 )
 
 // Kitty unicode placeholder character U+10EEEE
@@ -32,129 +26,6 @@ type kittyImageTxOptions struct {
 }
 
 var kittyImageCounter uint32 = 100 // fallback counter if cache not available
-
-func nextKittyImageID() uint32 {
-	if globalImageCache != nil {
-		if id := globalImageCache.NextKittyImageID(); id != 0 {
-			return id
-		}
-	}
-	return atomic.AddUint32(&kittyImageCounter, 1)
-}
-
-// kittyTransmitImage sends PNG (or other binary) data using kitty graphics protocol.
-// It supports quiet mode (q=2) and optional inline virtual placement creation (U=1).
-func kittyTransmitImage(out io.Writer, data []byte, opts kittyImageTxOptions) error {
-	if app == nil || !app.kitty {
-		return errors.New("kitty terminal not detected")
-	}
-
-	oscOpen, oscClose := KITTY_IMG_HDR, KITTY_IMG_FTR
-	if IsTmuxScreen() {
-		oscOpen, oscClose = TmuxOscOpenClose(oscOpen, oscClose)
-	}
-
-	header := []string{"a=T", "f=100"}
-	if opts.Quiet {
-		header = append(header, "q=2")
-	}
-	if opts.ImageID != 0 {
-		header = append(header, fmt.Sprintf("i=%d", opts.ImageID))
-	}
-	if opts.PlacementID != 0 {
-		header = append(header, fmt.Sprintf("p=%d", opts.PlacementID))
-	}
-	if opts.VirtualPlacement {
-		header = append(header, "U=1")
-	}
-	if opts.Cols > 0 {
-		header = append(header, fmt.Sprintf("c=%d", opts.Cols))
-	}
-	if opts.Rows > 0 {
-		header = append(header, fmt.Sprintf("r=%d", opts.Rows))
-	}
-	if opts.ZIndex != 0 {
-		header = append(header, fmt.Sprintf("z=%d", opts.ZIndex))
-	}
-	q := "2"
-	if os.Getenv("VIMANGO_KITTY_VERBOSE") != "" {
-		q = "1"
-	}
-	header = append(header, fmt.Sprintf("q=%s", q))
-	header = append(header, fmt.Sprintf("S=%d", len(data)))
-	bsHdr := []byte(strings.Join(header, ",") + ",")
-
-	oWC := NewWriteChunker(out, 4096)
-	defer oWC.Flush()
-
-	// send chunks
-	oWC.CustomWriFunc = func(iWri io.Writer, bsDat []byte) (int, error) {
-		parts := [][]byte{
-			[]byte(oscOpen),
-			bsHdr,
-			[]byte("m=1;"),
-			bsDat,
-			[]byte(oscClose),
-		}
-		bsHdr = nil // header only on first chunk
-		return iWri.Write(bytes.Join(parts, nil))
-	}
-
-	enc64 := base64.NewEncoder(base64.StdEncoding, &oWC)
-	if _, err := enc64.Write(data); err != nil {
-		return err
-	}
-	if err := enc64.Close(); err != nil {
-		return err
-	}
-
-	// final chunk marker
-	_, err := out.Write([]byte(oscOpen + "m=0;" + oscClose))
-	return err
-}
-
-// kittyCreateVirtualPlacement issues an explicit virtual placement (U=1) with no data transfer.
-func kittyCreateVirtualPlacement(out io.Writer, imgID, placementID uint32, cols, rows int, quiet bool) error {
-	if app == nil || !app.kitty {
-		return errors.New("kitty terminal not detected")
-	}
-	oscOpen, oscClose := KITTY_IMG_HDR, KITTY_IMG_FTR
-	if IsTmuxScreen() {
-		oscOpen, oscClose = TmuxOscOpenClose(oscOpen, oscClose)
-	}
-
-	args := []string{"a=p", "U=1"}
-	if quiet {
-		args = append(args, "q=2")
-	}
-	if imgID != 0 {
-		args = append(args, fmt.Sprintf("i=%d", imgID))
-	}
-	if placementID != 0 {
-		args = append(args, fmt.Sprintf("p=%d", placementID))
-	}
-	if cols > 0 {
-		args = append(args, fmt.Sprintf("c=%d", cols))
-	}
-	if rows > 0 {
-		args = append(args, fmt.Sprintf("r=%d", rows))
-	}
-
-	_, err := fmt.Fprintf(out, "%s%s%s", oscOpen, strings.Join(args, ","), oscClose)
-	return err
-}
-
-// buildPlaceholderAnchor returns a 1x1 placeholder cell at row/col zero for the given ids.
-// It intentionally restricts to a single cell so we don't rely on the full diacritic table yet.
-func buildPlaceholderAnchor(imgID, placementID uint32) string {
-	fg := fmt.Sprintf("\x1b[38;2;%d;%d;%dm", (imgID>>16)&0xff, (imgID>>8)&0xff, imgID&0xff)
-	ul := ""
-	if placementID != 0 {
-		ul = fmt.Sprintf("\x1b[58;2;%d;%d;%dm", (placementID>>16)&0xff, (placementID>>8)&0xff, placementID&0xff)
-	}
-	reset := "\x1b[0m"
-	return fg + ul + kittyPlaceholderRune + kittyZeroDiacritic + kittyZeroDiacritic + reset
-}
 
 // buildPlaceholderGrid emits a rows x cols block of placeholder cells with explicit row/col diacritics.
 func buildPlaceholderGrid(imgID, placementID uint32, cols, rows int) string {

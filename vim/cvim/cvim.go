@@ -29,12 +29,6 @@ func VimInit(argc int) {
 	C.vimInit(C.int(argc), &c)
 }
 
-// buf_T *vimBufferOpen(char_u *ffname_arg, linenr_T lnum, int flags);
-func BufferOpen(filename string, lnum int, flags int) *C.buf_T {
-	vbuf := C.vimBufferOpen(ucharP(filename), C.long(lnum), C.int(flags))
-	return vbuf
-}
-
 // buf_T *vimBufferLoad(char_u *ffname_arg, linenr_T lnum, int flags)
 // buf_T *vimBufferNew(int flags)
 func CBufferNew(flags int) *C.buf_T {
@@ -103,28 +97,6 @@ func BufferGetLine(vbuf *C.buf_T, lineNum int) string {
 	return s
 }
 
-// char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
-func BufferGetLineB(vbuf *C.buf_T, lineNum int) []byte {
-	line := C.vimBufferGetLine(vbuf, C.long(lineNum))
-	// need to cast to *C.char to use strlen
-	// in vim.h: #define STRLEN(s) strlen((char *)(s))
-	// this didn't work ln := C.int(C.STRLEN(unsafe.Pointer(line)))
-	ln := C.int(C.strlen((*C.char)(unsafe.Pointer(line))))
-	bb := C.GoBytes(unsafe.Pointer(line), ln)
-	return bb
-}
-
-// returns [][]byte
-func BufferLinesB(vbuf *C.buf_T) [][]byte {
-	var bbb [][]byte
-	lc := BufferGetLineCount(vbuf)
-	for i := 1; i <= lc; i++ {
-		bb := BufferGetLineB(vbuf, i)
-		bbb = append(bbb, bb)
-	}
-	return bbb
-}
-
 // returns []string
 func CBufferLines(vbuf *C.buf_T) []string {
 	// line count starts from 1
@@ -135,12 +107,6 @@ func CBufferLines(vbuf *C.buf_T) []string {
 		ss = append(ss, s)
 	}
 	return ss
-}
-
-// linenr_T vimCursorGetLine(void);
-func CursorGetLine() int {
-	lineNum := C.vimCursorGetLine()
-	return int(lineNum)
 }
 
 // size_t vimBufferGetLineCount(buf_T *buf);
@@ -163,22 +129,6 @@ func SetMappingsEnabled(enabled bool) {
 	} else {
 		C.vimSetMappingsEnabled(0)
 	}
-}
-
-// void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
-func BufferSetLinesB(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
-	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
-	defer C.free(unsafe.Pointer(p))
-	view := (*[1<<30 - 1]*C.uchar)(unsafe.Pointer(p))[0:count:count]
-
-	for i, b := range bb {
-		b = append(b, 0) // make sure c-string will be zero-terminated
-		view[i] = (*C.uchar)(C.CBytes(b))
-		defer C.free(unsafe.Pointer(view[i]))
-	}
-	/* Either of the below work */
-	//C.vimBufferSetLines(vbuf, C.long(start), C.long(end), &view[0], C.int(count))
-	C.vimBufferSetLines(vbuf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
 }
 
 // void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
@@ -205,14 +155,6 @@ func CursorGetPosition() [2]int {
 	pos[0] = int(p.lnum)
 	pos[1] = int(p.col)
 	return pos
-}
-
-// void vimCursorSetPosition(pos_T pos);
-func CursorSetPosition_old(pos [2]int) {
-	var p C.pos_T
-	p.lnum = C.long(pos[0])
-	p.col = C.int(pos[1])
-	C.vimCursorSetPosition(p)
 }
 
 // void vimCursorSetPosition(pos_T pos);
@@ -270,29 +212,6 @@ type pendingOp_T struct {
 	op_type int
 	regname int
 	count   int
-}
-
-// vimGetPendingOperator(pendingOp_T *pendingOp);
-// unfortunately not very useful - does catch commands like 'd', 'c', 'Nd', 'Nc'
-// not in use
-func GetPendingOperator() (int, pendingOp_T) {
-	var pendingOp C.pendingOp_T
-	x := C.vimGetPendingOperator(&pendingOp)
-	y := pendingOp_T{
-		op_type: int(pendingOp.op_type),
-		regname: int(pendingOp.regname),
-		count:   int(pendingOp.count),
-	}
-	return int(x), y
-}
-
-// int vimBufferGetModified(buf_T *buf);
-func BufferGetModified(vbuf *C.buf_T) bool {
-	b := C.vimBufferGetModified(vbuf)
-	if b == 0 {
-		return false
-	}
-	return true
 }
 
 // void vimVisualGetRange(pos_T *startPos, pos_T *endPos);

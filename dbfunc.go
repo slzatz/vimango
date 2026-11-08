@@ -32,16 +32,6 @@ func (db *Database) keywordExists(title string) (string, bool) {
 	return uuid, true
 }
 
-func (db *Database) filterTitle(filter string, tid int) string {
-	row := db.MainDB.QueryRow(fmt.Sprintf("SELECT title FROM %s WHERE tid=?;", filter), tid)
-	var title string
-	err := row.Scan(&title)
-	if err != nil {
-		return ""
-	}
-	return title
-}
-
 func (db *Database) contextExists(title string) (string, bool) {
 	var uuid string
 	err := db.MainDB.QueryRow("SELECT uuid FROM context WHERE title=?;", title).Scan(&uuid)
@@ -86,18 +76,6 @@ func (db *Database) folderList() map[string]struct{} {
 	return folders
 }
 
-func (db *Database) keywordList() map[string]struct{} {
-	rows, _ := db.MainDB.Query("SELECT title FROM keyword;")
-	defer rows.Close()
-
-	keywords := make(map[string]struct{})
-	for rows.Next() {
-		var title string
-		_ = rows.Scan(&title)
-		keywords[title] = struct{}{}
-	}
-	return keywords
-}
 func (db *Database) toggleStar(id int, state bool, table string) error {
 	s := fmt.Sprintf("UPDATE %s SET star=?, modified=datetime('now') WHERE id=?;",
 		table)
@@ -177,15 +155,6 @@ func (db *Database) getSyncItems(sort string, max int) []Row {
 
 	}
 	return orgRows
-}
-
-func (db *Database) deleteSyncItem(id int) {
-	_, err := db.MainDB.Exec("DELETE FROM sync_log  WHERE id=?;", id)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error deleting sync_log entry with id %d: %v", id, err)
-		return
-	}
-	app.Organizer.ShowMessage(BL, "Deleted sync_log entry with id %d", id)
 }
 
 func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) ([]Row, error) {
@@ -306,14 +275,6 @@ func (db *Database) insertTitle(row *Row, context_uuid, folder_uuid string) erro
 	return nil
 }
 
-func (db *Database) insertSyncEntry(title, note string) {
-	_, err := db.MainDB.Exec("INSERT INTO sync_log (title, note, modified) VALUES (?, ?, datetime('now'));",
-		title, note)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Wrote sync log to db")
-	}
-}
-
 func (db *Database) readNoteIntoString(id int) string {
 	if id == -1 {
 		return "" // id given to new and unsaved entries
@@ -327,16 +288,6 @@ func (db *Database) readNoteIntoString(id int) string {
 		return ""
 	}
 	return note.String
-}
-
-func (db *Database) readSyncLog(id int) string {
-	row := db.MainDB.QueryRow("SELECT note FROM sync_log WHERE id=?;", id)
-	var note string
-	err := row.Scan(&note)
-	if err != nil {
-		return ""
-	}
-	return note
 }
 
 func (db *Database) getEntryInfo(id int) NewEntry {
@@ -599,28 +550,6 @@ func (db *Database) getContainers(view View) []Row {
 	return orgRows
 }
 
-func (db *Database) getAltContainers(altView View) []AltRow {
-	var orgAltRows []AltRow
-	stmt := fmt.Sprintf("SELECT id, title, star FROM %s ORDER BY title COLLATE NOCASE ASC;", altView)
-	rows, err := db.MainDB.Query(stmt)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error SELECTING id, title, star FROM %s", altView)
-		return []AltRow{}
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var r AltRow
-		rows.Scan(
-			&r.id,
-			&r.title,
-			&r.star,
-		)
-
-		orgAltRows = append(orgAltRows, r)
-	}
-	return orgAltRows
-}
-
 func (db *Database) getContainerInfo(id int, view View) Container {
 
 	/*
@@ -810,59 +739,6 @@ func (db *Database) deleteKeywords(id int) int {
 	return int(rowsAffected)
 }
 
-// not in use but worked
-func highlightTerms__(text string, word_positions [][]int) string {
-
-	delimiters := " |,.;?:()[]{}&#/`-'\"—_<>$~@=&*^%+!\t\n\\" //must have \f if using it as placeholder
-
-	for _, v := range word_positions {
-		app.Organizer.ShowMessage(BR, "%v", word_positions)
-
-		// start and end are positions in the text
-		// word_num is what word number we are at in the text
-		//wp is the position that we are currently looking for to highlight
-
-		word_num := -1 //word position in text
-		end := -1
-		var start int
-
-		// need to be non-punctuation because syntax highlighting
-		// appears to strip some punctuation
-		pre := "uuu"
-		post := "yyy"
-		add := len(pre) + len(post)
-		for _, wp := range v {
-
-			for {
-				// I don't think the check below is necessary but we'll see
-				if end >= len(text)-1 {
-					break
-				}
-
-				start = start + end + 1
-				end = strings.IndexAny(text[start:], delimiters)
-				if end == -1 {
-					end = len(text) - 1
-				}
-
-				if end != 0 { //if end = 0 we were sitting on a delimiter like a space
-					word_num++
-				}
-
-				if wp == word_num {
-					//text = text[:start+end] + "\x1b[48;5;235m" + text[start+end:]
-					text = fmt.Sprintf("%s%s%s", text[:start+end], post, text[start+end:])
-					//text = text[:start] + "\x1b[48;5;31m" + text[start:]
-					text = fmt.Sprintf("%s%s%s", text[:start], pre, text[start:])
-					end += add
-					break // this breaks out of loop that was looking for the current highlighted word position
-				}
-			}
-		}
-	}
-	return text
-}
-
 // current method in use
 func (db *Database) highlightTerms2(id int) string {
 	if id == -1 {
@@ -882,71 +758,6 @@ func (db *Database) highlightTerms2(id int) string {
 		return ""
 	}
 	return note.String
-}
-
-// not currently in use but more general than generateWWString
-// has a length parameter and takes a ret param
-func generateWWString_(text string, width int, length int, ret string) string {
-
-	if text == "" {
-		return ""
-	}
-
-	if length <= 0 {
-		length = maxInt
-	}
-
-	ss := strings.Split(text, "\n")
-	var ab strings.Builder
-
-	y := 0
-	filerow := 0
-
-	for _, s := range ss {
-		if filerow == len(ss) {
-			return ab.String()
-		}
-
-		if s == "" {
-			if y == length-1 {
-				return ab.String()
-			}
-			ab.WriteString(ret)
-			filerow++
-			y++
-			continue
-		}
-
-		pos := 0
-		prev_pos := 0
-
-		for {
-			if prev_pos+width > len(s)-1 {
-				ab.WriteString(s[prev_pos:])
-				if y == length-1 {
-					return ab.String()
-				}
-				ab.WriteString(ret)
-				y++
-				filerow++
-				break
-			}
-			pos = strings.LastIndex(s[:prev_pos+width], " ")
-			if pos == -1 || pos == prev_pos-1 {
-				pos = prev_pos + width - 1
-			}
-
-			ab.WriteString(s[prev_pos : pos+1])
-
-			if y == length-1 {
-				return ab.String()
-			}
-			ab.WriteString(ret)
-			y++
-			prev_pos = pos + 1
-		}
-	}
-	return ab.String()
 }
 
 // copyEntry duplicates a task row: the title prefixed with "Copy of ",

@@ -421,32 +421,3 @@ func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
 	}
 	return RedrawNone
 }
-func (o *Organizer) NavigateContainerModeKeyHandler_(c int) RedrawScope {
-	if c >= '0' && c <= '9' {
-		index := int(c-'0') - 1
-		if o.altView == CONTEXT {
-			o.setContextNew(o.containerList[index])
-		}
-		o.mode = NORMAL
-		o.view = TASK
-		o.ShowMessage(BL, "NavigateContainer mode: %s %s", string(rune(c)), o.containerList[index])
-		return RedrawNone
-	}
-	switch c {
-	case ctrlKey('j'), PAGE_DOWN:
-		o.scrollNoticeDown()
-	case ctrlKey('k'), PAGE_UP:
-		o.scrollNoticeUp()
-	case HOME_KEY:
-		o.scrollNoticeHome()
-	case ':': // COMMAND or SEARCH
-		o.ShowMessage(BL, ":")
-		vim.SendKey("<esc>") // park in NORMAL mode
-		o.command_line = ""
-		//o.last_mode = o.mode //Should probably be NORMAL
-		o.mode = COMMAND_LINE
-		o.tabCompletion.index = 0
-		o.tabCompletion.list = nil
-	}
-	return RedrawNone
-}

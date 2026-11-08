@@ -93,11 +93,6 @@ func ShutdownHEICDecoder() {
 	shutdownHEICDecoder()
 }
 
-// ShowHEICNotAvailableMessage returns a user-friendly message
-func ShowHEICNotAvailableMessage() string {
-	return fmt.Sprintf("%sHEIC format not supported (requires CGO with libheif or .venv with pillow-heif)%s", YELLOW_BG, RESET)
-}
-
 // StubHEICDecoder provides a no-op implementation for platforms without HEIC support
 type StubHEICDecoder struct{}
 

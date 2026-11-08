@@ -82,21 +82,6 @@ func (handle *Hunhandle) Add(word string) bool {
 	return true
 }
 
-func (handle *Hunhandle) Stem(word string) []string {
-	wordcs := C.CString(word)
-	defer C.free(unsafe.Pointer(wordcs))
-	var carray **C.char
-	var length C.int
-	handle.lock.Lock()
-	length = C.Hunspell_stem(handle.handle, &carray, wordcs)
-	handle.lock.Unlock()
-
-	words := CArrayToString(carray, int(length))
-
-	C.Hunspell_free_list(handle.handle, &carray, length)
-	return words
-}
-
 func (handle *Hunhandle) Spell(word string) bool {
 	wordcs := C.CString(word)
 	defer C.free(unsafe.Pointer(wordcs))
