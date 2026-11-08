@@ -99,6 +99,25 @@ missing.
 
 **Symptom if missing:** linker errors / `libvim.a` not found when building.
 
+> **On the `libvim-spell` branch, until the fork's `spelling_restore` branch is
+> merged to its `master`:** the script below can't be used. It builds only the
+> fork's `master`, which has no spell code, and this branch then fails to link
+> (`undefined: vimSpellGetErrors`). Build the fork's branch by hand and copy
+> in the dictionary as well:
+>
+> ```bash
+> git -C ../libvim fetch origin                # or, with no ../libvim yet:
+> git -C ../libvim switch spelling_restore     #   git clone -b spelling_restore https://github.com/slzatz/libvim.git ../libvim
+> (cd ../libvim && ./build-macos.sh)           # ./build-linux.sh on Linux
+> cp ../libvim/src/libvim.a .
+> mkdir -p spell
+> cp ../libvim/runtime/spell/en.utf-8.spl ../libvim/runtime/spell/en.utf-8.sug spell/
+> ```
+>
+> Once it is merged, `git -C ../libvim switch master` and use the script
+> again; it copies the dictionary itself. (The spell code has been built and
+> tested on macOS only so far, not yet with GCC on Linux.)
+
 ### Use the script (macOS and Linux)
 
 ```bash
