@@ -103,9 +103,11 @@ missing.
 > merged to its `master`:** the script below can't be used. It builds only the
 > fork's `master`, which has no spell code, and this branch then fails to link
 > (`undefined: vimSpellGetErrors`). Build the fork's branch by hand and copy
-> in the dictionary as well:
+> in the dictionary as well. Run these **from the vimango root**; they expect
+> the fork checked out beside it, at `../libvim`:
 >
 > ```bash
+> # from the vimango root
 > git -C ../libvim fetch origin                # or, with no ../libvim yet:
 > git -C ../libvim switch spelling_restore     #   git clone -b spelling_restore https://github.com/slzatz/libvim.git ../libvim
 > (cd ../libvim && ./build-macos.sh)           # ./build-linux.sh on Linux
