@@ -21,9 +21,8 @@ import (
 // The syntax is deliberately just a blockquote whose first line is a
 // marker, so nothing here invents a block type: the marker line is
 // stripped and the surviving blockquote gets a class the stylesheet
-// knows (note_html.go). Renderers that ignore the class -- the
-// goldmark-pdf path in editor_cmd_line.go -- still get a clean quote
-// rather than a stray "[!NOTE]" line.
+// knows (note_html.go). A renderer that ignores the class still gets a
+// clean quote rather than a stray "[!NOTE]" line.
 //
 // This runs as a ParagraphTransformer, not the more obvious
 // ASTTransformer, because goldmark parses inlines *before* AST

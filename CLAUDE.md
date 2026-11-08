@@ -173,25 +173,27 @@ The command system is loosely based on the vim command system and the existence 
 - `:h` - Short alias for help command
 
 ### Ex Command Organization
-**Organizer Ex Commands (69+ commands in 9 categories):**
+**Organizer Ex Commands (37 commands in 10 categories):**
 - **Navigation**: open, opencontext, openfolder, openkeyword
+- **Entry Management**: new, write, refresh, set context, set folder, add keyword, e (edit), copy, deletekeywords, deletemarks
+- **Search & Filter**: find, recent
+- **Container Management**: contexts, newc, newf, folders, keywords
+- **View Management**: sort, showall
+- **Images**: convertgdrive, toggleimages, showimageinfo, refreshimageinfo, imagescale, cachewidth, clearcache, imagereset
+- **Research**: research, researchdebug, researchtest
 - **Data Management**: sync
-- **Search & Filter**: find, contexts, folders, keywords, recent, log
-- **View Control**: sort, showall, image
-- **Entry Management**: new, e (edit), copy, set context, set folder, deletekeywords, deletemarks
-- **Container Management**: cc (context), ff (folder), kk (keyword)
-- **Research**: research, researchdebug (rd)
-- **Output & Export**: print, ha, printlist, save, savelog
-- **System**: quit, which
+- **System**: quit
+- **Help**: help
 
-**Editor Ex Commands (18 commands in 7 categories):**
-- **File Operations**: write, read, save, checkstale
+**Editor Ex Commands (13 commands in 6 categories):**
+- **File Operations**: write, read, checkstale
 - **Data Management**: sync
 - **Editing**: syntax, number, paste, nopaste
 - **Utility**: spell, suggest
-- **Output**: ha, print, pdf, pdf-goldmark
 - **System**: quit, exit
 - **Help**: help
+
+Removed 2026-11-08 as TUI holdovers (PDF and printing belong in vimango_hybrid): editor `:pdf`, `:pdf-goldmark`, `:print`, `:ha`, `:save`; organizer `:print`, `:ha`, `:printlist`, `:save` — and with them the `mdtopdf`, `goldmark-pdf` and `gofpdf` dependencies.
 
 ### Key Interception
 
@@ -544,5 +546,4 @@ The sync system now supports full UUID synchronization between SQLite and Postgr
 
 ## Pending Follow-ups
 
-- **mdtopdf renamed upstream (noted 2026-10-04).** `github.com/mandolyte/mdtopdf/v2` is held at v2.2.17: from v2.2.18 the module declares itself `github.com/solworktech/md2pdf/v2`, so `go get -u` cannot move past it under the old path. Upgrading means switching the import path in `editor_cmd_line.go` and `organizer_cmd_line.go` (editor `:pdf` → `createPDF`, organizer `:print` → `printDocument`) and checking what changed in the API between 2.2.17 and the current md2pdf release. Not yet investigated.
 - **Taskwarrior link column: done 2026-10-16, except the Linux machines.** A task note's Taskwarrior uuid is `task.taskwarrior_uuid`, synced in both directions by `internal/sync`, and no longer in the note's text. It is written once and never cleared: push and pull both COALESCE it, and every sync starts with a backfill. vimango itself never reads it. The design, the decisions taken along the way, and how it rolled out are in `docs/taskwarrior-link-column.md`. Still open: rebuild vimango on the Linux machines. Until then they sync fine but carry no links.

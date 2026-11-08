@@ -161,7 +161,7 @@ FEATURES:
     - Vim-based text editing with normal and insert modes
     - SQLite database for note storage with FTS5 full-text search
     - Organizer mode for browsing and managing notes
-    - Markdown rendering and PDF export
+    - Markdown rendering
     - Context, folder, and keyword organization
     - AI-powered deep research with web search and fetch
     - Spell checking (CGO builds only)

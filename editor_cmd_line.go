@@ -2,19 +2,9 @@ package main
 
 import (
 	"fmt"
-	"image/color"
-	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 
-	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/vim"
-	pdf "github.com/stephenafamo/goldmark-pdf"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/util"
 )
 
 func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
@@ -43,14 +33,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Usage:       "read <filename>",
 		Category:    "File Operations",
 		Examples:    []string{":read todo.txt", ":r /tmp/notes.md"},
-	})
-
-	registry.Register("save", (*Editor).saveNoteToFile, CommandInfo{
-		Aliases:     []string{"savefile"},
-		Description: "Save current note to external file",
-		Usage:       "save <filename>",
-		Category:    "File Operations",
-		Examples:    []string{":save backup.txt", ":savefile /tmp/note.md"},
 	})
 
 	registry.Register("checkstale", (*Editor).checkStale, CommandInfo{
@@ -92,35 +74,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Category:    "Editing",
 		Examples:    []string{":nopaste"},
 	})
-	// Output commands
-	registry.Register("ha", (*Editor).printNote, CommandInfo{
-		Description: "Print current note using vim hardcopy",
-		Usage:       "ha",
-		Category:    "Output",
-		Examples:    []string{":ha"},
-	})
-
-	registry.Register("print", (*Editor).printDocument, CommandInfo{
-		Description: "Print current note as formatted document",
-		Usage:       "print",
-		Category:    "Output",
-		Examples:    []string{":print"},
-	})
-
-	registry.Register("pdf", (*Editor).createPDF, CommandInfo{
-		Description: "Create PDF from current note",
-		Usage:       "pdf",
-		Category:    "Output",
-		Examples:    []string{":pdf"},
-	})
-
-	registry.Register("pdf-goldmark", (*Editor).createPDFGoldmark, CommandInfo{
-		Description: "Create PDF from current note using goldmark-pdf",
-		Usage:       "pdf-goldmark <filename>",
-		Category:    "Output",
-		Examples:    []string{":pdf-goldmark output.pdf", ":pdf-goldmark /tmp/note.pdf"},
-	})
-
 	// Utility commands
 	registry.Register("spell", (*Editor).spellCmd, CommandInfo{
 		Description: "Highlight misspelled words",
@@ -217,28 +170,6 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"The same key again removes a decoration or list; the other one swaps it.\n" +
 	"Mappings live in vimango.vim, next to config.json.\n"
 
-func (e *Editor) saveNoteToFile() {
-	pos := strings.Index(e.command_line, " ")
-	if pos == -1 {
-		e.ShowMessage(BR, "You need to provide a filename")
-		return
-	}
-	filename := e.command_line[pos+1:]
-	f, err := os.Create(filename)
-	if err != nil {
-		e.ShowMessage(BR, "Error creating file %s: %v", filename, err)
-		return
-	}
-	defer f.Close()
-
-	_, err = f.WriteString(strings.Join(e.ss, "\n"))
-	if err != nil {
-		e.ShowMessage(BR, "Error writing file %s: %v", filename, err)
-		return
-	}
-	e.ShowMessage(BR, "Note written to file %s", filename)
-}
-
 func (e *Editor) writeNote() {
 	text := e.bufferToString()
 
@@ -298,10 +229,6 @@ func (e *Editor) syntax() {
 	e.drawText()
 	// no need to call drawFrame or drawStatusBar
 	e.ShowMessage(BR, "Syntax highlighting is %v", e.highlightSyntax)
-}
-
-func (e *Editor) printNote() {
-	vim.ExecuteCommand("ha")
 }
 
 /*
@@ -416,148 +343,6 @@ func (e *Editor) number() {
 	}
 	e.drawText()
 	e.ShowMessage(BR, "Line numbering is %t", e.numberLines)
-}
-
-func (e *Editor) createPDF() {
-	pos := strings.Index(e.command_line, " ")
-	if pos == -1 {
-		e.ShowMessage(BL, "You need to provide a filename")
-		return
-	}
-	filename := e.command_line[pos+1:]
-
-	params := mdtopdf.PdfRendererParams{
-		Orientation: "",
-		Papersz:     "",
-		PdfFile:     filename,
-		TracerFile:  "trace.log",
-		Opts:        nil,
-		Theme:       mdtopdf.LIGHT,
-	}
-
-	//pf := mdtopdf.NewPdfRenderer("", "", filename, "trace.log", nil, mdtopdf.LIGHT)
-	pf := mdtopdf.NewPdfRenderer(params)
-	//		pf.Pdf.SetSubject("How to convert markdown to PDF", true)
-	//		pf.Pdf.SetTitle("Example PDF converted from Markdown", true)
-	//		pf.THeader = mdtopdf.Styler{Font: "Times", Style: "IUB", Size: 20, Spacing: 2,
-	//			TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-	//			FillColor: mdtopdf.Color{Red: 179, Green: 179, Blue: 255}}
-	pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
-		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
-
-	content := strings.Join(e.ss, "\n")
-	err := pf.Process([]byte(content))
-	if err != nil {
-		e.ShowMessage(BL, "pdf error:%v", err)
-	}
-}
-
-// preprocessImageDescriptions removes image description text to prevent it from appearing as visible text in PDFs
-// Transforms ![description text](url) to ![](url) to work around goldmark-pdf rendering issues
-func preprocessImageDescriptions(markdown string) string {
-	// Regular expression to match image markdown: ![anything](url)
-	imageRegex := regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
-
-	// Replace with empty description: ![](url)
-	return imageRegex.ReplaceAllString(markdown, `![]($2)`)
-}
-
-func (e *Editor) createPDFGoldmark() {
-	pos := strings.Index(e.command_line, " ")
-	if pos == -1 {
-		e.ShowMessage(BL, "You need to provide a filename")
-		return
-	}
-	filename := e.command_line[pos+1:]
-
-	// Get markdown content from editor
-	content := strings.Join(e.ss, "\n")
-
-	// Pre-process markdown to handle Google Drive images
-	processedMarkdown, err := preprocessMarkdownImages(content)
-	if err != nil {
-		e.ShowMessage(BL, "Error preprocessing images: %v", err)
-		return
-	}
-
-	// Remove image description text to prevent it from appearing as visible text in PDF
-	processedMarkdown = preprocessImageDescriptions(processedMarkdown)
-
-	// Configure goldmark with the same extensions as the HTML renderer (note_html.go)
-	md := goldmark.New(
-		goldmark.WithExtensions(
-			extension.GFM,           // GitHub Flavored Markdown
-			extension.Table,         // Tables
-			extension.Strikethrough, // Strikethrough text
-			extension.Linkify,       // Auto-link URLs
-			extension.TaskList,      // Task lists
-		),
-		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(), // Auto-generate heading IDs
-			// Callouts, for the marker-stripping half only: goldmark-pdf
-			// has no attribute rendering, so a callout reaches the PDF as
-			// an unstyled quote. That is the point -- without this the
-			// marker would print as a literal "[!NOTE]" line.
-			parser.WithParagraphTransformers(
-				util.Prioritized(calloutTransformer{}, 100),
-			),
-		),
-		goldmark.WithRenderer(
-			pdf.New(
-				pdf.WithLinkColor(color.RGBA{0x00, 0x66, 0xcc, 0xff}),
-				pdf.WithHeadingFont(pdf.FontOpenSans),
-				pdf.WithCodeFont(pdf.FontRobotoMono),
-			),
-		),
-	)
-
-	// Create the PDF file
-	f, err := os.Create(filename)
-	if err != nil {
-		e.ShowMessage(BL, "Error creating PDF file %s: %v", filename, err)
-		return
-	}
-	defer f.Close()
-
-	// Convert markdown to PDF
-	err = md.Convert([]byte(processedMarkdown), f)
-	if err != nil {
-		e.ShowMessage(BL, "Error converting markdown to PDF: %v", err)
-		return
-	}
-
-	e.ShowMessage(BL, "PDF created successfully: %s", filename)
-}
-
-func (e *Editor) printDocument() {
-	content := strings.Join(e.ss, "\n")
-
-	params := mdtopdf.PdfRendererParams{
-		Orientation: "",
-		Papersz:     "",
-		PdfFile:     "output.pdf",
-		TracerFile:  "trace.log",
-		Opts:        nil,
-		Theme:       mdtopdf.LIGHT,
-	}
-
-	pf := mdtopdf.NewPdfRenderer(params)
-
-	//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
-	pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
-		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
-
-	err := pf.Process([]byte(content))
-	if err != nil {
-		e.ShowMessage(BR, "pdf error:%v", err)
-	}
-	cmd := exec.Command("lpr", "output.pdf")
-	err = cmd.Run()
-	if err != nil {
-		e.ShowMessage(BR, "Error printing document: %v", err)
-	}
 }
 
 // synchronize makes :sync work from the editor pane (the macOS host

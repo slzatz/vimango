@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -12,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jung-kurt/gofpdf"
-	"github.com/mandolyte/mdtopdf/v2"
 	"github.com/slzatz/vimango/auth"
 	"github.com/slzatz/vimango/vim"
 )
@@ -367,36 +364,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 			Examples:    []string{":kk"},
 		})
 	*/
-	// Output & Export commands
-	registry.Register("print", (*Organizer).printDocument, CommandInfo{
-		Description: "Print current note as PDF",
-		Usage:       "print",
-		Category:    "Output & Export",
-		Examples:    []string{":print"},
-	})
-
-	registry.Register("ha", (*Organizer).printList, CommandInfo{
-		Description: "Print current list using vim hardcopy",
-		Usage:       "ha",
-		Category:    "Output & Export",
-		Examples:    []string{":ha"},
-	})
-
-	registry.Register("printlist", (*Organizer).printList2, CommandInfo{
-		Aliases:     []string{"ha2", "pl"},
-		Description: "Print formatted list as PDF",
-		Usage:       "printlist",
-		Category:    "Output & Export",
-		Examples:    []string{":printlist", ":pl"},
-	})
-
-	registry.Register("save", (*Organizer).save, CommandInfo{
-		Description: "Save current note to file",
-		Usage:       "save <filename>",
-		Category:    "Output & Export",
-		Examples:    []string{":save note.txt", ":save /tmp/backup.md"},
-	})
-
 	/*
 		registry.Register("savelog", (*Organizer).savelog, CommandInfo{
 			Name:        "savelog",
@@ -1421,115 +1388,6 @@ func (o *Organizer) savelog(_ int) {
 	}
 }
 */
-
-func (o *Organizer) save(pos int) {
-	if pos == -1 {
-		o.ShowMessage(BL, "You need to provide a filename")
-		return
-	}
-	filename := o.command_line[pos+1:]
-	f, err := os.Create(filename)
-	if err != nil {
-		o.ShowMessage(BL, "Error creating file %s: %v", filename, err)
-		return
-	}
-	defer f.Close()
-
-	_, err = f.WriteString(strings.Join(o.note, "\n"))
-	if err != nil {
-		o.ShowMessage(BL, "Error writing file %s: %v", filename, err)
-		return
-	}
-	o.ShowMessage(BL, "Note written to file %s", filename)
-}
-
-func (o *Organizer) printDocument(_ int) {
-	id := o.rows[o.fr].id
-	note := o.Database.readNoteIntoString(id)
-	params := mdtopdf.PdfRendererParams{
-		Orientation: "",
-		Papersz:     "",
-		PdfFile:     "output.pdf",
-		TracerFile:  "trace.log",
-		Opts:        nil,
-		Theme:       mdtopdf.LIGHT,
-	}
-
-	pf := mdtopdf.NewPdfRenderer(params)
-
-	//pf := mdtopdf.NewPdfRenderer("", "", "output.pdf", "trace.log", nil, mdtopdf.LIGHT)
-	pf.TBody = mdtopdf.Styler{Font: "Arial", Style: "", Size: 12, Spacing: 2,
-		TextColor: mdtopdf.Color{Red: 0, Green: 0, Blue: 0},
-		FillColor: mdtopdf.Color{Red: 255, Green: 255, Blue: 255}}
-
-	err := pf.Process([]byte(note))
-	if err != nil {
-		o.ShowMessage(BL, "pdf error:%v", err)
-	}
-	cmd := exec.Command("lpr", "output.pdf")
-	err = cmd.Run()
-	if err != nil {
-		o.ShowMessage(BL, "Error printing document: %v", err)
-	}
-	//o.mode = o.last_mode
-	o.mode = NORMAL
-	o.command_line = ""
-}
-
-func (o *Organizer) printList(_ int) {
-	var ss []string
-	for i, row := range o.rows {
-		ss = append(ss, fmt.Sprintf("%2d. %s", i+1, row.title))
-	}
-	tempBuf := vim.NewBuffer(0)
-	tempBuf.SetLines(0, -1, ss)
-	vim.SetCurrentBuffer(tempBuf)
-	vim.ExecuteCommand("ha")
-
-	if o.Session.editor != nil {
-		vim.SetCurrentBuffer(o.Session.editor.vbuf)
-	}
-	//o.mode = o.last_mode
-	o.mode = NORMAL
-	o.command_line = ""
-}
-
-func (o *Organizer) printList2(_ int) {
-	pdf := gofpdf.New("P", "mm", "Letter", "")
-	pdf.AddPage()
-	pdf.SetFont("Arial", "B", 12)
-	curDate := time.Now().Format("January 02, 2006")
-	title := fmt.Sprintf("To Do List %s", curDate)
-	pdf.CellFormat(190, 1, title, "0", 0, "CM", false, 0, "") //190,7
-	var n int
-	pageCount := 1
-	for i, row := range o.rows {
-		line := fmt.Sprintf("%2d. %s", i+1, row.title)
-		if row.star {
-			pdf.SetFont("Arial", "B", 10)
-		} else {
-			pdf.SetFont("Arial", "", 10)
-		}
-		//if i%25 == 0 {
-		if pdf.PageCount() != pageCount {
-			pageCount += 1
-			n = 0
-		}
-		pdf.SetXY(5, float64(20+n*5))
-		pdf.CellFormat(1, 1, line, "0", 0, "L", false, 0, "") // cell format doesn't matter if no border? 7
-		n++
-	}
-
-	pdf.OutputFileAndClose("output.pdf")
-	cmd := exec.Command("lpr", "output.pdf")
-	err := cmd.Run()
-	if err != nil {
-		o.ShowMessage(BL, "Error printing document: %v", err)
-	}
-	//o.mode = o.last_mode
-	o.mode = NORMAL
-	o.command_line = ""
-}
 
 func (o *Organizer) sortEntries(pos int) {
 	if pos == -1 {
