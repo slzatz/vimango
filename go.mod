@@ -74,3 +74,5 @@ require (
 	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 )
+
+replace github.com/charmbracelet/glamour => github.com/slzatz/glamour v0.3.1-0.20260704003224-42bdbc1bf339

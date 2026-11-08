@@ -8,18 +8,26 @@ NOTE: When updating, fixing or adding to the code, the CGO build is the most com
 NOTE: `fts5` is the only tag this build needs. Do **not** add `cgo` to the tag list — `cgo` is one of Go's automatic build constraints, set by the toolchain whenever cgo is in use, so `CGO_ENABLED=1` already satisfies every `//go:build cgo` file. Passing `-tags=cgo` selects an identical file set (verified with `go list`) and is only misleading: with `CGO_ENABLED=0` it does not enable cgo, it just pulls in `//go:build cgo` files that don't import `"C"`.
 NOTE: hunspell spell check is opt-in behind a second tag: `CGO_ENABLED=1 go build --tags="fts5,spell"`. Without it `spellcheck_nocgo.go` (the stub) is compiled instead of `spellcheck_cgo.go`, so `:spell`, `:suggest` and `z=` degrade to the "spell check unavailable" messages. Left out of the default build deliberately — spelling has not been exercised in a while and needs testing before it goes back in by default.
 NOTE: CGO builds require `libvim.a` in the project root. See "Building libvim.a" below.
-NOTE: Every build requires a `go.work` pointing at the glamour fork. See "Glamour fork (go.work)" below.
+NOTE: The glamour fork comes in through a committed `replace` in `go.mod`; a fresh clone needs no extra checkout. See "Glamour fork" below.
 
-### Glamour fork (go.work)
+### Glamour fork
 
-vimango builds against **[slzatz/glamour](https://github.com/slzatz/glamour)**, not upstream `charmbracelet/glamour`; the fork adds kitty image and text-sizing support (`glamour.WithKittyImages`, `ansi.DecodeKittyTextSizeMarkers`, `ansi.SetKittyTextSizingEnabled`). `go.mod` still names `github.com/charmbracelet/glamour`, and the redirect to the fork lives in a per-machine `go.work`, which is gitignored so no local path is committed (it replaced a `replace` directive in 54ccf51). On a new machine, clone the fork next to vimango and create the workspace:
+vimango builds against **[slzatz/glamour](https://github.com/slzatz/glamour)**, not upstream `charmbracelet/glamour`; the fork adds kitty image and text-sizing support (`glamour.WithKittyImages`, `ansi.DecodeKittyTextSizeMarkers`, `ansi.SetKittyTextSizingEnabled`). `go.mod` still requires `github.com/charmbracelet/glamour` — the fork's own `go.mod` keeps that module path, so no import changes — and a committed `replace` redirects it to a pinned commit of the fork on GitHub:
 
-```bash
-git clone https://github.com/slzatz/glamour ../glamour
-go work init . ../glamour
+```
+replace github.com/charmbracelet/glamour => github.com/slzatz/glamour v0.3.1-0.20260704003224-42bdbc1bf339
 ```
 
-Without a `go.work`, the build quietly resolves upstream glamour from the module cache and fails with `undefined: ansi.DecodeKittyTextSizeMarkers` / `undefined: glamour.WithKittyImages`. `go env GOWORK` shows whether a workspace is active. The `cmd/*` builds (e.g. `heic_worker`) pick up the workspace too.
+`go build` downloads the fork like any other dependency, and the one `go.mod` covers the `cmd/*` builds too. History: a local-path `replace` (`../glamour`) gave way to a gitignored per-machine `go.work` in 54ccf51 so no local path was committed; on 2026-11-08 this remote `replace` superseded both, so new machines no longer clone the fork.
+
+A fork change reaches vimango only once it is pushed and the pin moves:
+
+```bash
+go mod edit -replace github.com/charmbracelet/glamour=github.com/slzatz/glamour@<commit>
+go mod tidy
+```
+
+To iterate on the fork without pushing, a local `go.work` (`go work init . ../glamour`, still gitignored) overrides the `replace` — the workspace copy wins, silently. Delete it afterwards: a leftover `go.work` builds against whatever `../glamour` holds, not the pin. `go env GOWORK` shows whether one is active; `go list -m -f '{{.Dir}}' github.com/charmbracelet/glamour` shows which copy a build uses.
 
 ### Building libvim.a (CGO Prerequisite)
 
@@ -563,4 +571,4 @@ The sync system now supports full UUID synchronization between SQLite and Postgr
 
 - **Move markdown→HTML into vimango_hybrid, together with PDF export (noted 2026-11-08).** `--render-html` (`render_html.go`, `note_html.go`, plus the `callout.go` / `frontmatter.go` / `wikilink.go` goldmark extensions — ~1500 lines and the goldmark dependency) now has exactly one user: hybrid's preview pane, which spawns `vimango --render-html <id>` per preview (`PreviewRenderer.swift`). The TUI never used it; it renders with glamour (`organizer_render.go`). It lives in vimango for history (it was written for the TUI's webview window, removed 2026-11-08) and because Google Drive images — OAuth token, download, the disk cache shared with the TUI's inline images, HEIC conversion — are Go-side. Decided: not now; do it as one piece of hybrid work with PDF export, which was removed from the TUI the same day as belonging in hybrid. Once hybrid makes its own HTML (`swift-markdown`, or client-side in the WKWebView with markdown-it so the CSS carries over), WebKit's own PDF export gives PDF output from the same HTML with no PDF library. Suggested split: markdown→HTML (and the three extensions and stylesheet) moves to Swift; images stay in vimango behind a narrow interface (a command that returns a Drive image's cached file, or hybrid reading `./image_cache/` directly) so Drive access stays single-sourced while the TUI still shows images. Gains: vimango sheds the render path and goldmark, no process spawn per preview, preview changes stop needing a vimango rebuild.
 - **Taskwarrior link column: done 2026-10-16, except the Linux machines.** A task note's Taskwarrior uuid is `task.taskwarrior_uuid`, synced in both directions by `internal/sync`, and no longer in the note's text. It is written once and never cleared: push and pull both COALESCE it, and every sync starts with a backfill. vimango itself never reads it. The design, the decisions taken along the way, and how it rolled out are in `docs/taskwarrior-link-column.md`. Still open: rebuild vimango on the Linux machines. Until then they sync fine but carry no links.
-- **Linux machines: rebuild order changed (noted 2026-11-08).** The next vimango rebuild there (the item above) is: pull vimango, run `./scripts/build-libvim.sh` (it pulls the fork and rebuilds `libvim.a`, which must be fork `ed0f2e241` or later — an older one fails to link with `undefined: vimSetMappingsEnabled`; it also refuses a `../libvim` that is upstream or off `master`), then `CGO_ENABLED=1 go build --tags=fts5`. The same applies to the other Macs. GTK 3 / webkit2gtk are no longer build dependencies, and any old `webview_worker` binary in the vimango directory can be deleted (its source and the webview are gone).
+- **Linux machines: rebuild order changed (noted 2026-11-08).** The next vimango rebuild there (the item above) is: pull vimango, run `./scripts/build-libvim.sh` (it pulls the fork and rebuilds `libvim.a`, which must be fork `ed0f2e241` or later — an older one fails to link with `undefined: vimSetMappingsEnabled`; it also refuses a `../libvim` that is upstream or off `master`), then `CGO_ENABLED=1 go build --tags=fts5`. The same applies to the other Macs. GTK 3 / webkit2gtk are no longer build dependencies, and any old `webview_worker` binary in the vimango directory can be deleted (its source and the webview are gone). Also delete the machine's `go.work` (glamour now comes from the `replace` in `go.mod`; a leftover workspace silently overrides the pin with whatever `../glamour` holds), after which `../glamour` itself is no longer needed.

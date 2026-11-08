@@ -11,20 +11,19 @@ path because several artifacts are deliberately *not* checked into the repo
 (they differ per platform/architecture) and one dependency is a personal fork.
 
 > **TL;DR of the gotchas.** A fresh `git clone` will **not** build until you:
-> 1. Clone the **glamour fork** and create a **`go.work`** file (both untracked).
-> 2. Install **hunspell** via Homebrew.
-> 3. Build **`libvim.a`** locally (`scripts/build-libvim.sh`).
-> 4. Build the **`heic_worker`** helper binary.
+> 1. Install **hunspell** via Homebrew.
+> 2. Build **`libvim.a`** locally (`scripts/build-libvim.sh`).
+> 3. Build the **`heic_worker`** helper binary.
 >
 > None of these come with the clone because they're `.gitignore`d or live in a
-> separate repo.
+> separate repo. (The glamour fork used to be on this list; `go.mod` now pins
+> it, so `go build` fetches it.)
 
 ---
 
 ## 0. Prerequisites
 
-- **Go** — 1.24+ (the workspace file pins `go 1.26.x`; your installed Go must be
-  ≥ that line in `go.work`). Check with `go version`.
+- **Go** — 1.26+ (`go.mod` says `go 1.26.0`). Check with `go version`.
 - **Homebrew** — https://brew.sh
 - **Xcode command line tools** — `xcode-select --install`
 
@@ -52,51 +51,22 @@ cd vimango
 
 ---
 
-## 2. The glamour fork + go.work  (REQUIRED — clone will not compile without it)
+## 2. The glamour fork (nothing to do)
 
 vimango imports Kitty text-sizing helpers (e.g. `ansi.DecodeKittyTextSizeMarkers`,
 `makeRaw`/`restoreTerminal`) that exist **only** in a personal fork of glamour,
-not in upstream `github.com/charmbracelet/glamour`. The fork is wired in via a
-Go **workspace** file (`go.work`), which is `.gitignore`d and therefore absent
-from a fresh clone.
+[slzatz/glamour](https://github.com/slzatz/glamour), not in upstream
+`github.com/charmbracelet/glamour`. A `replace` directive committed in `go.mod`
+pins a commit of the fork, and `go build` downloads it like any other
+dependency — no separate clone, no `go.work`.
 
-**Symptoms if you skip this:** `undefined: ansi.DecodeKittyTextSizeMarkers`,
-`undefined: makeRaw`, `undefined: restoreTerminal`, etc.
+**Machines set up before 2026-11-08** have a `go.work` next to `go.mod` and a
+`../glamour` checkout. Delete the `go.work`: while it exists it silently
+overrides the pin with whatever `../glamour` holds. (`go env GOWORK` prints
+`off` or nothing once it's gone.)
 
-### 2a. Clone the glamour fork as a sibling of vimango
-
-```bash
-cd ..                     # parent dir that contains vimango/
-git clone git@github.com:slzatz/glamour.git
-```
-
-You should now have `.../vimango` and `.../glamour` side by side.
-
-### 2b. Create go.work inside vimango
-
-`go.work` is not committed, so create it by hand:
-
-```bash
-cd vimango
-cat > go.work <<'EOF'
-go 1.26.1
-
-use (
-	.
-	../glamour
-)
-EOF
-```
-
-Adjust `../glamour` if you cloned the fork somewhere else — the path is relative
-to the vimango directory. Make sure the `go 1.26.1` line is **≤** your installed
-Go version, or the toolchain will complain.
-
-> **Note on the fork itself:** the fork carries macOS-specific termios code
-> (`ansi/kitty_text_sizing_darwin.go` using `TIOCGETA`, with the Linux/BSD file
-> narrowed to `//go:build linux || freebsd || openbsd || netbsd` using `TCGETS`).
-> If you ever see `undefined: unix.TCGETS` on macOS, your fork checkout is behind —
-> `git -C ../glamour pull`.
+**Symptoms of a stale `go.work`:** `undefined: ansi.DecodeKittyTextSizeMarkers`,
+`undefined: makeRaw`, `undefined: unix.TCGETS` on macOS.
 
 ---
 
@@ -304,9 +274,7 @@ Run it:
 
 | Error | Cause | Fix |
 |---|---|---|
-| `undefined: ansi.DecodeKittyTextSizeMarkers` | glamour fork / `go.work` missing | §2 |
-| `undefined: makeRaw` / `restoreTerminal` | fork checkout behind (darwin file missing) | `git -C ../glamour pull` (§2) |
-| `undefined: unix.TCGETS` on macOS | fork's darwin termios split not pulled | `git -C ../glamour pull` (§2) |
+| `undefined: ansi.DecodeKittyTextSizeMarkers` / `makeRaw` / `restoreTerminal`, or `undefined: unix.TCGETS` on macOS | a leftover `go.work` pointing at a stale `../glamour` | delete `go.work` (§2) |
 | `hunspell/hunspell.h: file not found` | hunspell not installed / Intel paths | §3 |
 | `libvim.a` not found / link errors | libvim.a not built or not in root | §4 |
 | `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream onivim/libvim | re-run `./scripts/build-libvim.sh` (§4) |

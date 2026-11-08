@@ -81,11 +81,9 @@ If `heic_worker` is missing or built for the wrong architecture, vimango will si
 
 **First-time setup (recommended):**
 ```bash
-# 1. Clone the repository, and the glamour fork it builds against (via go.work)
+# 1. Clone the repository (the glamour fork it builds against is pinned in go.mod and downloaded by go build)
 git clone https://github.com/slzatz/vimango.git
-git clone https://github.com/slzatz/glamour.git
 cd vimango
-go work init . ../glamour
 
 # 2. Build libvim.a from the slzatz/libvim fork into this directory (see "Building libvim.a" above)
 ./scripts/build-libvim.sh

@@ -105,49 +105,31 @@ brew install go
 **Verify:**
 
 ```bash
-go version    # needs 1.26 or later (the workspace file pins go 1.26.1)
+go version    # needs 1.26 or later (go.mod says go 1.26.0)
 ```
 
 Homebrew installs the current release, which satisfies this.
 
 ---
 
-## 5. Clone vimango and the glamour fork, create go.work
-
-vimango depends on a **personal fork** of the glamour markdown renderer (it
-carries kitty text-sizing helpers that upstream doesn't have). The fork must
-sit **next to** vimango, wired in by a `go.work` file that is deliberately not
-checked in. **A fresh clone will not compile without this step.**
+## 5. Clone vimango
 
 ```bash
 mkdir -p ~/code && cd ~/code       # or wherever you keep source
 git clone https://github.com/slzatz/vimango.git
-git clone https://github.com/slzatz/glamour.git
-```
-
-Create the workspace file inside vimango:
-
-```bash
 cd vimango
-cat > go.work <<'EOF'
-go 1.26.1
-
-use (
-	.
-	../glamour
-)
-EOF
 ```
 
-**Verify:**
-
-```bash
-ls ../glamour/go.mod go.work    # both files must exist
-```
+vimango depends on a **personal fork** of the glamour markdown renderer (it
+carries kitty text-sizing helpers that upstream doesn't have). There is nothing
+to clone for it: `go.mod` pins a commit of
+[slzatz/glamour](https://github.com/slzatz/glamour) with a `replace` directive,
+and `go build` downloads it.
 
 > If you later see `undefined: ansi.DecodeKittyTextSizeMarkers` or
-> `undefined: makeRaw` when building, this step was skipped or `go.work`
-> points at the wrong path.
+> `undefined: makeRaw` when building, look for a leftover `go.work` in the
+> vimango directory (from the old setup) and delete it — it overrides the pin
+> with whatever `../glamour` holds.
 
 ---
 
@@ -364,7 +346,6 @@ it can hold secrets):
 ```bash
 cd ~/code/vimango
 git pull
-git -C ../glamour pull                          # keep the glamour fork in step
 ./scripts/build-libvim.sh                       # pulls the libvim fork, rebuilds libvim.a
 CGO_ENABLED=1 go build --tags=fts5              # ALWAYS with the tag
 ```
@@ -385,7 +366,7 @@ first if cgo type errors appear — see step 9).
 |---|---|---|
 | `xcrun: error: invalid active developer path` | Command Line Tools missing | step 1 |
 | `brew: command not found` in a new terminal | shellenv not in `~/.zprofile` | step 2 |
-| `undefined: ansi.DecodeKittyTextSizeMarkers` / `undefined: makeRaw` | glamour fork or `go.work` missing | step 5 |
+| `undefined: ansi.DecodeKittyTextSizeMarkers` / `undefined: makeRaw` | leftover `go.work` pointing at a stale `../glamour` | delete `go.work` (step 5) |
 | `hunspell/hunspell.h: file not found` | hunspell not installed (or Intel paths) | steps 6–7 |
 | Spell check accepts everything | dictionaries missing from `/usr/share/hunspell` | step 7 |
 | linker can't find `libvim.a` | not built, or `go build` not run from vimango root | step 8 |
