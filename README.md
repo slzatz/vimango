@@ -27,66 +27,31 @@ This wasn't developed thinking anyone else would use it so there isn't an instal
 
 ## Building libvim.a
 
-The `libvim.a` static library provides vim modal editing via CGO. It must be compiled from source because the binary differs between macOS and Linux. CGO is required: libvim is the only vim engine (the pure-Go govim engine was removed; Windows is unsupported).
+The `libvim.a` static library provides vim modal editing via CGO. It must be compiled from source because the binary differs between macOS and Linux — every machine builds its own. CGO is required: libvim is the only vim engine (the pure-Go govim engine was removed; Windows is unsupported).
 
-**Source:** Clone [slzatz/libvim](https://github.com/slzatz/libvim) and build in its `src/` directory. Use that fork rather than the original [onivim/libvim](https://github.com/onivim/libvim), which is unmaintained: the fork carries fixes vimango depends on — notably Visual-mode `I`/`A` behaving as vim's operators, so blockwise `ctrl-v jjI- <esc>` prefixes every selected line. Building from an upstream clone yields a `libvim.a` that silently lacks them. See that repo's `PATCHES.md`.
+**Source:** the [slzatz/libvim](https://github.com/slzatz/libvim) fork. Use it rather than the original [onivim/libvim](https://github.com/onivim/libvim), which is unmaintained: the fork carries fixes vimango depends on — notably Visual-mode `I`/`A` behaving as vim's operators, so blockwise `ctrl-v jjI- <esc>` prefixes every selected line, and `vimSetMappingsEnabled`, which makes the mappings in `vimango.vim` work. A `libvim.a` built from upstream, or from a fork checkout older than your vimango, either fails to link (`undefined: vimSetMappingsEnabled`) or builds with the behavior silently missing — so **rebuild it whenever the fork moves**. See that repo's `PATCHES.md`.
 
-### macOS (Apple Silicon / Homebrew)
+Install the prerequisites:
 
-Install prerequisites:
+- **macOS:** `brew install ncurses gettext` (the script below does this for you)
+- **Debian/Ubuntu:** `sudo apt-get install make libtinfo-dev libacl1-dev`
+- **Arch Linux:** `sudo pacman -S --needed make ncurses acl`
+
+Then, from the vimango root, on either platform:
 ```bash
-brew install ncurses gettext
+./scripts/build-libvim.sh
 ```
 
-Configure and build:
+It clones the fork to `../libvim` (or uses the checkout already there — `LIBVIM_DIR` points it elsewhere), refuses a checkout that isn't the fork, isn't on `master` or has local changes, pulls `master`, builds with the fork's own `build-macos.sh` / `build-linux.sh`, and copies `libvim.a` into the vimango root. `--clean` rebuilds from scratch, `--tests` runs libvim's API tests, `--no-pull` builds the checkout as it is.
+
+By hand, the equivalent is:
 ```bash
-cd /path/to/libvim/src
-./configure --disable-selinux --with-tlib=ncurses \
-  CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
-    -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
-    -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
-    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype \
-    -Wno-error=implicit-int-float-conversion" \
-  LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
-make libvim.a
+git clone https://github.com/slzatz/libvim.git ../libvim   # or: git -C ../libvim pull
+(cd ../libvim && ./build-macos.sh)                         # Linux: ./build-linux.sh
+cp ../libvim/src/libvim.a .
 ```
 
-The `-Wno-error` flags are needed because Xcode's Clang is stricter than GCC and treats certain legacy C patterns as errors. `-Wno-error=implicit-int-float-conversion` in particular is required on current clang — without it the build stops at `evalfunc.c:3751` on `VARNUM_MAX` (`-Wimplicit-const-int-float-conversion`).
-
-Copy to the vimango project root:
-```bash
-cp libvim.a /path/to/vimango/
-```
-
-### Linux
-
-Install prerequisites:
-
-**Debian/Ubuntu:**
-```bash
-sudo apt-get install libtinfo-dev libacl1-dev
-```
-
-**Arch Linux:**
-```bash
-sudo pacman -S ncurses acl
-```
-
-Configure and build:
-```bash
-cd /path/to/libvim/src
-./configure --disable-selinux --with-tlib=tinfo \
-  CFLAGS="-fPIC -Wno-error=implicit-function-declaration \
-    -Wno-error=implicit-int -Wno-error=int-conversion"
-make libvim.a
-```
-
-The `-fPIC` flag is required on Linux for position-independent code. The `-Wno-error` flags are needed because GCC 14+ treats implicit function declarations and implicit int return types as errors, which breaks the legacy C in configure's test programs.
-
-Copy to the vimango project root:
-```bash
-cp libvim.a /path/to/vimango/
-```
+The fork's build scripts own the configure flags — the `-Wno-error` set that current clang and GCC 14+ need (libvim builds with `-Werror`), plus `-fPIC` on Linux — and reconfigure only when they change. The fork's `CLAUDE.md` explains each flag.
 
 ### Build Notes
 
@@ -116,11 +81,14 @@ If `heic_worker` is missing or built for the wrong architecture, vimango will si
 
 **First-time setup (recommended):**
 ```bash
-# 1. Clone the repository
+# 1. Clone the repository, and the glamour fork it builds against (via go.work)
 git clone https://github.com/slzatz/vimango.git
+git clone https://github.com/slzatz/glamour.git
 cd vimango
+go work init . ../glamour
 
-# 2. Build libvim.a and copy to this directory (see "Building libvim.a" above)
+# 2. Build libvim.a from the slzatz/libvim fork into this directory (see "Building libvim.a" above)
+./scripts/build-libvim.sh
 
 # 3. Build heic_worker (only if you want CGO HEIC support — see "Building heic_worker" above)
 cd cmd/heic_worker && CGO_ENABLED=1 go build -o ../../heic_worker && cd ../..

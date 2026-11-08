@@ -38,7 +38,7 @@ brew --prefix
 
 - `/opt/homebrew` → **Apple Silicon** (all the hardcoded paths below match).
 - `/usr/local` → **Intel** — you must substitute `/usr/local` for `/opt/homebrew`
-  in any hardcoded CFLAGS/LDFLAGS. (The `build-libvim.sh` script auto-detects
+  in any hardcoded CFLAGS/LDFLAGS. (The libvim build scripts auto-detect
   this; the hunspell binding is hardcoded — see the hunspell section.)
 
 ---
@@ -139,45 +139,51 @@ edit `hunspell/hunspell.go` to point the darwin `CFLAGS`/`LDFLAGS` at
 
 ## 4. Build libvim.a  (REQUIRED for CGO build)
 
-`libvim.a` is a static library built from
-[onivim/libvim](https://github.com/onivim/libvim). It is architecture-specific
-and `.gitignore`d, so it must be built on each machine and placed in the project
-root (next to `go.mod`).
+`libvim.a` is a static library built from the
+[slzatz/libvim](https://github.com/slzatz/libvim) fork — **never** upstream
+[onivim/libvim](https://github.com/onivim/libvim), which is unmaintained and
+lacks fixes vimango needs. It is architecture-specific and `.gitignore`d, so it
+must be built on each machine (every Mac and every Linux box) and placed in the
+project root (next to `go.mod`). **Rebuild it whenever the fork moves** — a
+`libvim.a` older than the vimango you are building either fails to link
+(e.g. `undefined: vimSetMappingsEnabled`) or builds fine with behavior silently
+missing.
 
 **Symptom if missing:** linker errors / `libvim.a` not found when building.
 
-### Easiest: use the script
+### Use the script (macOS and Linux)
 
 ```bash
 ./scripts/build-libvim.sh
 ```
 
-It auto-detects the Homebrew prefix (Apple Silicon vs Intel), installs
-ncurses/gettext, clones onivim/libvim next to vimango if needed, builds
-`libvim.a`, and copies it into the project root.
+It uses the fork checkout at `../libvim` (next to vimango; set `LIBVIM_DIR` to
+keep it elsewhere), cloning it there if it doesn't exist. It refuses to build
+from a checkout that isn't the fork, isn't on `master`, or has local changes,
+and says how to fix each. Otherwise it pulls `master`, builds with the fork's
+own `build-macos.sh` / `build-linux.sh` (installing the Homebrew ncurses and
+gettext first on macOS), copies `libvim.a` into the project root, and prints the
+libvim commit it was built from.
 
-### Manual (Apple Silicon)
+Options: `--clean` rebuilds every object, `--tests` also runs libvim's API
+tests, `--no-pull` builds the checkout as it is (e.g. offline).
+
+### Manual
+
+The script is a thin wrapper; by hand it is:
 
 ```bash
 cd ..
-git clone https://github.com/onivim/libvim.git
-cd libvim/src
-./configure --disable-selinux --with-tlib=ncurses \
-  CFLAGS="-I/opt/homebrew/opt/ncurses/include -I/opt/homebrew/include \
-    -Wno-error=implicit-function-declaration -Wno-error=implicit-int \
-    -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types \
-    -Wno-error=unused-but-set-variable -Wno-error=deprecated-non-prototype \
-    -Wno-error=implicit-int-float-conversion -Wno-error" \
-  LDFLAGS="-L/opt/homebrew/opt/ncurses/lib -L/opt/homebrew/lib"
-make libvim.a
-cp libvim.a /path/to/vimango/
+git clone https://github.com/slzatz/libvim.git    # or: git -C libvim pull
+cd libvim
+./build-macos.sh       # Linux: ./build-linux.sh   (--clean, --tests as above)
+cp src/libvim.a ../vimango/
 ```
 
-> libvim builds with `-Werror`, and newer clang/Xcode versions promote more
-> warnings to errors (e.g. `implicit conversion from 'long long' to 'double'`).
-> The trailing blanket `-Wno-error` downgrades *all* warnings back to warnings so
-> the build survives whatever your clang version flags. If you still hit a hard
-> error, it's a real compile failure, not a warning.
+The fork's scripts hold the configure flags — including the `-Wno-error`
+set newer clang and GCC 14+ need, because libvim builds with `-Werror` — and
+reconfigure only when those flags change. The fork's `CLAUDE.md` and
+`PATCHES.md` explain the flags and what the fork changes.
 
 > The CGO linker directives in `vim/cvim/cvim.go` reference `libvim.a` as a bare
 > filename resolved from the build working directory, so it must sit in the
@@ -253,8 +259,11 @@ Degrades gracefully if absent.
 From the project root:
 
 ```bash
-CGO_ENABLED=1 go build --tags="fts5,cgo"
+CGO_ENABLED=1 go build --tags=fts5
 ```
+
+`fts5` is the only tag needed (add `spell` — `--tags="fts5,spell"` — for
+hunspell spell check). Don't add `cgo`: `CGO_ENABLED=1` already sets it.
 
 CGO is required — libvim is the only vim engine (pure-Go builds and Windows are unsupported).
 
@@ -300,7 +309,8 @@ Run it:
 | `undefined: unix.TCGETS` on macOS | fork's darwin termios split not pulled | `git -C ../glamour pull` (§2) |
 | `hunspell/hunspell.h: file not found` | hunspell not installed / Intel paths | §3 |
 | `libvim.a` not found / link errors | libvim.a not built or not in root | §4 |
-| libvim build fails on a warning (e.g. `long long` to `double`) | newer clang promotes warnings under `-Werror` | blanket `-Wno-error` in §4 CFLAGS |
+| `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream onivim/libvim | re-run `./scripts/build-libvim.sh` (§4) |
+| libvim build fails on a warning (e.g. `long long` to `double`) | newer clang promotes warnings under `-Werror` | `git -C ../libvim pull` — the fork's build scripts carry the `-Wno-error` flags; report it there if it persists |
 | `exec: "pkg-config": executable file not found in $PATH` | `pkg-config` (and maybe libheif) not installed | `brew install pkg-config libheif` (§3) |
 | `Package libheif was not found in the pkg-config search path` | libheif not actually installed (despite `brew --prefix` printing a path) | `brew install libheif`; verify with `brew list libheif` (§5) |
 | `cannot use uint32(...) as _Ctype_heif_*` when building `heic_worker` | strukturag/libheif binding version ≠ installed libheif | `go get github.com/strukturag/libheif@<installed-version>` (§5) |

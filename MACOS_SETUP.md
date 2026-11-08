@@ -208,18 +208,23 @@ just silently reports every word as correct.
 
 ## 8. Build libvim.a (the vim engine)
 
-vimango's editor **is** vim, provided by a static library built from
-[onivim/libvim](https://github.com/onivim/libvim). It's architecture-specific,
-so each machine builds its own copy. A script does everything (detects your
-Homebrew prefix, clones libvim next to vimango, builds, and copies the result
-into the vimango root):
+vimango's editor **is** vim, provided by a static library built from the
+[slzatz/libvim](https://github.com/slzatz/libvim) fork — not upstream
+onivim/libvim, which lacks fixes vimango needs. It's architecture-specific, so
+each machine builds its own copy, and rebuilds it whenever the fork moves
+(step 14). A script does everything: it clones the fork next to vimango (or uses
+the checkout already there, after checking it *is* the fork, on `master`, with
+no local changes), pulls it, installs the ncurses/gettext Homebrew packages,
+builds with the fork's own `build-macos.sh`, and copies the result into the
+vimango root:
 
 ```bash
 cd ~/code/vimango       # adjust if you cloned elsewhere
 ./scripts/build-libvim.sh
 ```
 
-This takes a few minutes of C compilation.
+This takes a few minutes of C compilation the first time. It ends by printing
+the libvim commit it built from.
 
 **Verify:**
 
@@ -227,9 +232,8 @@ This takes a few minutes of C compilation.
 ls -la libvim.a         # sits in the vimango root, next to go.mod
 ```
 
-> If the script fails partway, the manual recipe and an explanation of the
-> `-Wno-error` workaround for newer clang versions are in
-> [INSTALL.md §4](./INSTALL.md).
+> If the script refuses, its message says what to fix (wrong remote, wrong
+> branch, local changes). The manual recipe is in [INSTALL.md §4](./INSTALL.md).
 
 ---
 
@@ -284,12 +288,13 @@ Skip freely — it degrades gracefully.
 From the vimango root:
 
 ```bash
-CGO_ENABLED=1 go build --tags="fts5,cgo"
+CGO_ENABLED=1 go build --tags=fts5
 ```
 
-**The tags are not optional.** `fts5` compiles SQLite's full-text-search
+**The tag is not optional.** `fts5` compiles SQLite's full-text-search
 module into the binary — without it vimango starts but **fails on every note
-save** with `no such module: fts5`. CGO is required because libvim is the only
+save** with `no such module: fts5`. (Don't add `cgo` to the tags —
+`CGO_ENABLED=1` already sets it.) CGO is required because libvim is the only
 vim engine.
 
 **Verify:**
@@ -359,14 +364,18 @@ it can hold secrets):
 ```bash
 cd ~/code/vimango
 git pull
-git -C ../glamour pull                          # keep the fork in step
-CGO_ENABLED=1 go build --tags="fts5,cgo"        # ALWAYS with the tags
+git -C ../glamour pull                          # keep the glamour fork in step
+./scripts/build-libvim.sh                       # pulls the libvim fork, rebuilds libvim.a
+CGO_ENABLED=1 go build --tags=fts5              # ALWAYS with the tag
 ```
 
-`libvim.a` and the workers only need rebuilding if libvim or their
-dependencies change (e.g. after `brew upgrade libheif`, rebuild
-`heic_worker`; bump the binding version first if cgo type errors appear —
-see step 9).
+Rebuilding `libvim.a` is cheap when the fork hasn't moved (only changed objects
+are recompiled), so it's simplest to always run it. Skipping it after the fork
+*has* moved gives either a link error (`undefined: vimSetMappingsEnabled` or
+similar) or, worse, a build that succeeds with the new behavior silently
+missing. The workers only need rebuilding if their dependencies change (e.g.
+after `brew upgrade libheif`, rebuild `heic_worker`; bump the binding version
+first if cgo type errors appear — see step 9).
 
 ---
 
@@ -380,9 +389,10 @@ see step 9).
 | `hunspell/hunspell.h: file not found` | hunspell not installed (or Intel paths) | steps 6–7 |
 | Spell check accepts everything | dictionaries missing from `/usr/share/hunspell` | step 7 |
 | linker can't find `libvim.a` | not built, or `go build` not run from vimango root | step 8 |
+| `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream | `./scripts/build-libvim.sh` (step 14) |
 | `exec: "pkg-config": executable file not found` | pkg-config missing | step 6 |
 | `cannot use uint32(...) as _Ctype_heif_*` | libheif binding/library version mismatch | step 9 note |
-| `no such module: fts5` when saving a note | built without `--tags="fts5,cgo"` | step 11 |
+| `no such module: fts5` when saving a note | built without `--tags=fts5` | step 11 |
 | Images don't render, notes otherwise fine | terminal lacks kitty graphics (e.g. Terminal.app) | step 3 |
 | HEIC images specifically don't render | `heic_worker` missing/wrong arch | step 9 (non-fatal) |
 | `config.json` / database errors at startup | first-run init never done, or wrong CWD | step 12 |

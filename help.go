@@ -155,7 +155,8 @@ BUILD INFORMATION:
     Go Version: %s
 
     Build (CGO is required — vim editing is libvim; Windows is unsupported):
-        CGO_ENABLED=1 go build --tags="fts5,cgo"
+        ./scripts/build-libvim.sh            # libvim.a from the slzatz/libvim fork
+        CGO_ENABLED=1 go build --tags=fts5
 
 FEATURES:
     - Vim-based text editing with normal and insert modes
