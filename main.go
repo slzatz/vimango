@@ -155,6 +155,9 @@ func main() {
 	// Registers saved by the previous run (see registers.go)
 	restoreRegisters()
 
+	// vimango.vim: user mappings and functions (see vimrc.go)
+	sourceVimrc()
+
 	// Enable raw mode
 	origCfg, err := rawmode.Enable()
 	if err != nil {

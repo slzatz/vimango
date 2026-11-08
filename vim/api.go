@@ -81,6 +81,17 @@ func ExecuteCommand(s string) {
 	Engine.Execute(s)
 }
 
+// SendUserKey forwards a key the user typed with vim's mapping expansion on,
+// so definitions from vimango.vim apply to it. Every other Send* call runs
+// with expansion off: vimango's own key sequences (the counted "s" of
+// decorateSpan, the ":" forwards) must mean what vim defines them to mean,
+// whatever the user has mapped.
+func SendUserKey(send func()) {
+	Engine.SetMappingsEnabled(true)
+	defer Engine.SetMappingsEnabled(false)
+	send()
+}
+
 // GetCurrentMode gets the current mode
 // This is specifically used by the editor to determine the mode
 func GetCurrentMode() int {

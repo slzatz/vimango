@@ -15,9 +15,7 @@ import (
 // types). A real "ayy makes the unnamed register genuinely alias a
 // (setreg alone never moves vim's y_previous pointer).
 func TestRegistersRoundTrip(t *testing.T) {
-	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(t.TempDir())
 	vim.InitializeVim(0)
 	buf := vim.NewBuffer(0)
 	vim.SetCurrentBuffer(buf)
@@ -85,9 +83,7 @@ func TestRegistersRoundTrip(t *testing.T) {
 // The common case end-to-end with real vim operations: yank in one
 // "session", save, restore in the next, paste.
 func TestRegistersYankQuitPaste(t *testing.T) {
-	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(t.TempDir())
 	vim.InitializeVim(0)
 	buf := vim.NewBuffer(0)
 	vim.SetCurrentBuffer(buf)
@@ -114,9 +110,7 @@ func TestRegistersYankQuitPaste(t *testing.T) {
 // The delete case: dd, "quit", restore, p pastes the deleted line (the
 // unnamed register aliased register 1, replayed through '"').
 func TestRegistersDeleteQuitPaste(t *testing.T) {
-	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(t.TempDir())
 	vim.InitializeVim(0)
 	buf := vim.NewBuffer(0)
 	vim.SetCurrentBuffer(buf)
@@ -138,9 +132,7 @@ func TestRegistersDeleteQuitPaste(t *testing.T) {
 
 // Registers that should not be persisted: empty, oversized, NUL-bearing.
 func TestSaveRegistersSkips(t *testing.T) {
-	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(t.TempDir())
 	vim.InitializeVim(0)
 	vim.NewBuffer(0)
 

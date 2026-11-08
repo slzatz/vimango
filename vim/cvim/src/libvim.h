@@ -223,6 +223,25 @@ void vimSetInputMapCallback(InputMapCallback mapCallback);
  */
 void vimSetInputUnmapCallback(InputUnmapCallback unmapCallback);
 
+/*
+ * vimSetMappingsEnabled
+ *
+ * Mappings defined with `:map` and friends are stored but, by default, never
+ * expanded: vimInit disables expansion because upstream expected the embedder
+ * to implement keybindings itself. Passing TRUE turns vim's own expansion back
+ * on for keys sent with vimInput/vimKey; FALSE (the default) turns it off.
+ *
+ * An embedder that sends keys of its own as well as the user's can enable
+ * mappings only around forwarding a user keystroke, so a user mapping never
+ * rewrites the embedder's internal key sequences.
+ *
+ * Only single-key left-hand sides work reliably: a partially matched
+ * multi-key mapping waits in the typeahead buffer, and libvim inserts each new
+ * key at the front of it rather than after it.
+ */
+void vimSetMappingsEnabled(int enabled);
+int vimGetMappingsEnabled(void);
+
 /***
  * Messages
  ***/

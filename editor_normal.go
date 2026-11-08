@@ -13,10 +13,10 @@ import (
 // Normal mode intercepts single bytes only: no prefixes, no multi-key
 // sequences, no leader. A key registered here never reaches vim, so the table
 // is deliberately confined to what vim cannot know about (which editor has
-// focus) plus the markdown decoration shortcuts, which libvim cannot provide
-// because it registers mappings without ever expanding them. Everything else --
-// anything wanting an argument, a range or a name -- is an ex command; see
-// setEditorExCmds.
+// focus) plus the markdown decoration shortcuts, which predate vim mappings
+// working here (vimango.vim, see vimrc.go) and are candidates to move there.
+// Everything else -- anything wanting an argument, a range or a name -- is an
+// ex command; see setEditorExCmds.
 func (a *App) setEditorNormalCmds(editor *Editor) map[string]func(*Editor, int) {
 	registry := NewCommandRegistry[func(*Editor, int)]()
 

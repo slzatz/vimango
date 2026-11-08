@@ -154,6 +154,17 @@ func Execute(s string) {
 	C.vimExecute(ucharP(s))
 }
 
+// void vimSetMappingsEnabled(int enabled);
+// vimInit leaves :map definitions stored but never expanded; this turns vim's
+// expansion on (or back off) for keys sent with Input/Key.
+func SetMappingsEnabled(enabled bool) {
+	if enabled {
+		C.vimSetMappingsEnabled(1)
+	} else {
+		C.vimSetMappingsEnabled(0)
+	}
+}
+
 // void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
 func BufferSetLinesB(vbuf *C.buf_T, start, end int, bb [][]byte, count int) {
 	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))

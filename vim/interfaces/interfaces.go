@@ -33,6 +33,7 @@ type VimEngine interface {
 	Input2(s string)  // For multi-character input
 	Key(s string)     // For special keys
 	Execute(s string) // For ex commands
+	SetMappingsEnabled(enabled bool) // expand :map definitions for Input/Key
 
 	// Mode operations
 	GetMode() int

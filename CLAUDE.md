@@ -219,10 +219,39 @@ wanting an argument, a range or a name — is an ex command.
 
 This matters because `<Space>` is a real vim motion (`l`): the old leader
 swallowed it, and swallowed the following key too when the pair didn't match a
-registered command. It is not fixable by using vim's own `:map`, because libvim
-registers mappings without ever expanding them (`maparg()` reads a mapping back,
-but pressing the key does nothing) — so anything vimango binds has to be a
-Go-side interception, which is the argument for keeping the set small.
+registered command.
+
+### vim mappings: `vimango.vim`
+
+New key bindings belong in `vimango.vim` (project root, cwd-relative like
+`config.json`), not in `normalCmds`. It is sourced once at startup
+(`sourceVimrc`, `vimrc.go`), so `--editor` processes get it too; a missing file
+is fine and errors in it are silenced. It holds ordinary vimscript — `xnoremap`,
+functions — and currently just the visual-mode `-` that turns the selected lines
+into a markdown list.
+
+Until 2026-11-08 `:map` did nothing here: upstream libvim's `vimInit` raised
+`no_mapping` because Onivim 2 owned keybindings itself, so mappings were stored
+(`maparg()` read them back) but never expanded. The fork's
+`vimSetMappingsEnabled()` lifts that (see its `PATCHES.md`); an older
+`libvim.a` now fails to *link* (`_vimSetMappingsEnabled` undefined) rather than
+silently dropping mappings.
+
+Expansion is on only while a key the user typed in the note editor is forwarded
+(`vim.SendUserKey` around `sendToVim` in `editorProcessKey`). Every key vimango
+sends itself — `decorateSpan`'s counted `s`, the `:` forwards, `<c-e><c-u>` —
+runs with it off, so a user's `nnoremap s dd` cannot break `:bold`; the organizer
+never expands mappings. Limits, from libvim:
+- **single-key left-hand sides only** — a two-key lhs (`jk`, `,b`) swallows its
+  first key, because libvim inserts later keys ahead of the waiting one
+- no `<C-r>` in an insert-mode rhs (inserts `^R`); call a function instead
+- keys Go intercepts first (Ctrl-H/L, Ctrl-B/E/I, `<esc>`) never reach a mapping
+- vim 8.1 wants a modifier before the range: `:<C-u>keeppatterns '<,'>s/…`,
+  not `:keeppatterns s/…` from VISUAL (E488)
+
+Ctrl-B/E/I and `:bold`/`:italic`/`:code` predate this and are candidates to move
+into `vimango.vim` as functions, which would retire most of the decoration code
+in `editor_normal.go`.
 
 `:bold` / `:italic` / `:code` are range-aware: with no range they decorate the
 word under the cursor, and with the `'<,'>` range vim writes when `:` is pressed

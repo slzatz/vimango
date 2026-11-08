@@ -64,8 +64,9 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	if exit {
 		return
 	}
-	// Process the key
-	sendToVim(c)
+	// Process the key -- with vim's mapping expansion on, so vimango.vim's
+	// mappings apply to what the user types (and only to that; see vimrc.go)
+	vim.SendUserKey(func() { sendToVim(c) })
 
 	tick := e.vbuf.GetLastChangedTick()
 	if tick > e.bufferTick {

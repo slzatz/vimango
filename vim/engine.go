@@ -86,6 +86,11 @@ func (e *CGOEngineWrapper) Execute(s string) {
 	cvim.Execute(s)
 }
 
+// SetMappingsEnabled turns expansion of :map definitions on or off
+func (e *CGOEngineWrapper) SetMappingsEnabled(enabled bool) {
+	cvim.SetMappingsEnabled(enabled)
+}
+
 // GetMode gets the current mode
 func (e *CGOEngineWrapper) GetMode() int {
 	return cvim.GetMode()
