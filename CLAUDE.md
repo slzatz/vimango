@@ -198,10 +198,9 @@ The command system is loosely based on the vim command system and the existence 
 - **Output & Export**: print, ha, printlist, save, savelog
 - **System**: quit, which
 
-**Editor Ex Commands (30+ commands in 8 categories):**
+**Editor Ex Commands (30 commands in 7 categories):**
 - **File Operations**: write, writeall, read, save, open, checkstale
 - **Editing**: syntax, number, fmt, run, paste, nopaste
-- **Markup**: bold, italic, code — range-aware (see "Key Interception" below)
 - **Preview**: preview, webview
 - **Utility**: style, template, spell, suggest
 - **Layout**: vertical resize, resize
@@ -213,9 +212,9 @@ The command system is loosely based on the vim command system and the existence 
 Normal mode intercepts **single bytes only** — no prefixes, no multi-key
 sequences, no leader (the `<leader>` prefix matcher and the `<C-w>>`/`<C-w><`
 pair were removed 2026-09-13). A key registered in `normalCmds` never reaches
-vim, so the table is confined to what vim cannot know about (which editor has
-focus) plus the markdown decoration shortcuts. Everything else — anything
-wanting an argument, a range or a name — is an ex command.
+vim, so the table is confined to what vim cannot know about: which editor has
+focus (Ctrl-H/Ctrl-L). Editing shortcuts are vim mappings in `vimango.vim`
+(below); anything wanting an argument or a name is an ex command.
 
 This matters because `<Space>` is a real vim motion (`l`): the old leader
 swallowed it, and swallowed the following key too when the pair didn't match a
@@ -226,10 +225,25 @@ registered command.
 New key bindings belong in `vimango.vim` (project root, cwd-relative like
 `config.json`), not in `normalCmds`. It is sourced once at startup
 (`sourceVimrc`, `vimrc.go`), so `--editor` processes get it too; a missing file
-is fine and errors in it are silenced. It holds ordinary vimscript — `xnoremap`,
-functions — and currently just visual-mode `-` and `#`, which toggle the
-selected lines as a bulleted or numbered (`1. ` on every line) markdown list and
-switch a list of one kind to the other (`VimangoToggleList`).
+is fine and errors in it are silenced. It holds ordinary vimscript — mappings
+and the functions they call:
+- visual `-` / `#` toggle the selected lines as a bulleted or numbered (`1. ` on
+  every line) markdown list, and switch a list of one kind to the other
+  (`VimangoToggleList`)
+- Ctrl-B / Ctrl-I / Ctrl-E toggle bold / italic / code on the word under the
+  cursor (normal) or a one-line selection (visual); a different key swaps the
+  style (`VimangoDecorate`). Ctrl-I is Tab to a terminal, so Tab does italic in
+  normal and visual mode. Ghostty — and so vimango_hybrid — sends Ctrl-I as the
+  kitty-protocol `ESC [105;5u` instead; `terminal.ReadKey` decodes CSI-u
+  Ctrl+letter back to its control byte and drops any sequence it can't use
+  whole. Before that, the unparsed tail `;5u` reached vim as keys: "undo five
+  times"
+
+Both are string edits on the line (`getline`/`setline`), never `iw`/`gv`: after
+a decoration the text has moved, so vim's word motions and the `'<`/`'>` marks
+no longer describe it. A decoration "word" runs to whitespace or sentence
+punctuation with `*` and `` ` `` counted in, so the cursor anywhere on
+`**word**` finds it and toggles it off.
 
 Until 2026-11-08 `:map` did nothing here: upstream libvim's `vimInit` raised
 `no_mapping` because Onivim 2 owned keybindings itself, so mappings were stored
@@ -240,33 +254,25 @@ silently dropping mappings.
 
 Expansion is on only while a key the user typed in the note editor is forwarded
 (`vim.SendUserKey` around `sendToVim` in `editorProcessKey`). Every key vimango
-sends itself — `decorateSpan`'s counted `s`, the `:` forwards, `<c-e><c-u>` —
-runs with it off, so a user's `nnoremap s dd` cannot break `:bold`; the organizer
+sends itself — the `:` forwards, `<c-e><c-u>`, ex commands' keys — runs with it
+off, so a mapping cannot rewrite vimango's internal key sequences; the organizer
 never expands mappings. Limits, from libvim:
 - **single-key left-hand sides only** — a two-key lhs (`jk`, `,b`) swallows its
   first key, because libvim inserts later keys ahead of the waiting one
 - no `<C-r>` in an insert-mode rhs (inserts `^R`); call a function instead
-- keys Go intercepts first (Ctrl-H/L, Ctrl-B/E/I, `<esc>`) never reach a mapping
+- keys Go intercepts first (Ctrl-H/L, `<esc>`) never reach a mapping
 - vim 8.1 wants a modifier before the range: `:<C-u>keeppatterns '<,'>s/…`,
   not `:keeppatterns s/…` from VISUAL (E488)
 
-Ctrl-B/E/I and `:bold`/`:italic`/`:code` predate this and are candidates to move
-into `vimango.vim` as functions, which would retire most of the decoration code
-in `editor_normal.go`.
-
-`:bold` / `:italic` / `:code` are range-aware: with no range they decorate the
-word under the cursor, and with the `'<,'>` range vim writes when `:` is pressed
-from VISUAL mode they decorate the selection. `ExModeKeyHandler` strips a
-leading range (`splitExRange`) before looking the command up, and `visualMarks`
-reads `'<`/`'>` back — those marks outlive the `<esc>` that cancels vim's
-cmdline. Replacement uses vim's counted `s` (`decorateSpan`), not `ciw`: `ciw`
-and `expand('<cword>')` disagree whenever the cursor sits on a marker, which is
-why toggling a decoration back off never used to work.
+Ctrl-B/E/I were Go intercepts with `:bold`/`:italic`/`:code` ex forms until
+2026-11-08; both moved into `vimango.vim` and the ex commands were dropped.
+`ExModeKeyHandler` still strips a leading `'<,'>` (`splitExRange`) before the
+command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
 
 ### Normal Mode Command Organization
-**Editor Normal Mode Commands (5 commands in 2 categories):**
+**Editor Normal Mode Commands (2 commands in 1 category):**
 - **Editor Selection**: Ctrl-H (previous editor / back to organizer), Ctrl-L (next editor)
-- **Markup Shortcuts**: Ctrl-B (bold), Ctrl-I (italic), Ctrl-E (code) — the one-keystroke form of `:bold` / `:italic` / `:code`; in VISUAL mode they act on the selection
+- Markup and list shortcuts are vim mappings in `vimango.vim` (see above), so `:help normal` does not list them
 
 **Organizer Normal Mode Commands (11+ commands in 5 categories):**
 - **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive)

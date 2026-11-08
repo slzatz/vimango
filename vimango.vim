@@ -61,3 +61,107 @@ endfunction
 " Visual mode: toggle the selected lines as a bulleted (-) or numbered (#) list.
 xnoremap - :<C-u>call VimangoToggleList(line("'<"), line("'>"), 'bullet')<CR>
 xnoremap # :<C-u>call VimangoToggleList(line("'<"), line("'>"), 'number')<CR>
+
+" ---------------------------------------------------------------------------
+" Bold, italic, code.
+"
+" Ctrl-B (bold **), Ctrl-I (italic *), Ctrl-E (code `): in normal mode they
+" act on the word under the cursor, in visual mode on the selection (one line).
+" Pressing the same key again takes the decoration off; a different key
+" replaces it (Ctrl-I on **word** gives *word*). Ctrl-I and Tab are the same
+" byte in a terminal, so Tab does italic too in normal and visual mode -- not in
+" insert mode, which has no mapping here.
+"
+" This is plain string editing on the line -- never iw or gv. After a
+" decoration the text has moved, so vim's word motions and the '< '> marks no
+" longer describe it; computing the span here is what makes toggling back off
+" work.
+
+" A word for decoration runs up to whitespace or sentence punctuation. * and `
+" are deliberately not breaks, so with the cursor anywhere on **word** the word
+" is the whole **word** -- markers included -- and the key toggles it off.
+let s:word_break = '[[:space:].,;:!?()\[\]{}"<>/\\|]'
+let s:is_marker = '[*`]'
+
+" The marker t is wrapped in, if any. ** is tried before *, which is its prefix.
+function! s:WrappedIn(t) abort
+  for m in ['**', '*', '`']
+    let n = len(m)
+    if len(a:t) > 2 * n && strpart(a:t, 0, n) ==# m && strpart(a:t, len(a:t) - n) ==# m
+      return m
+    endif
+  endfor
+  return ''
+endfunction
+
+" Toggle marker on bytes [b, e) of line lnum, then put the cursor on the first
+" character of the text, so pressing the key again finds it.
+function! s:DecorateSpan(lnum, b, e, marker) abort
+  let s = getline(a:lnum)
+  let [b, e] = [a:b, a:e]
+  " widen across markers just outside the span, in matched pairs, so a word
+  " selected or found without its decoration still toggles
+  while b > 0 && e < len(s) && s[b - 1] =~ s:is_marker && s[e] =~ s:is_marker
+    let b -= 1
+    let e += 1
+  endwhile
+
+  let t = strpart(s, b, e - b)
+  let had = s:WrappedIn(t)
+  let inner = substitute(t, '^[*`]*\|[*`]*$', '', 'g')
+  if inner ==# ''
+    return
+  endif
+  let new = had ==# a:marker ? inner : a:marker . inner . a:marker
+  call setline(a:lnum, strpart(s, 0, b) . new . strpart(s, e))
+  call cursor(a:lnum, b + 1 + (had ==# a:marker ? 0 : len(a:marker)))
+endfunction
+
+" mode: 'n' for the word under the cursor, or visualmode() for the selection.
+function! VimangoDecorate(marker, mode) abort
+  if a:mode ==# 'n'
+    let lnum = line('.')
+    let s = getline(lnum)
+    let c = col('.') - 1
+    if c >= len(s) || s[c] =~ s:word_break
+      return
+    endif
+    let b = c
+    while b > 0 && s[b - 1] !~ s:word_break
+      let b -= 1
+    endwhile
+    let e = c + 1
+    while e < len(s) && s[e] !~ s:word_break
+      let e += 1
+    endwhile
+    call s:DecorateSpan(lnum, b, e, a:marker)
+    return
+  endif
+
+  let lnum = line("'<")
+  if line("'>") != lnum
+    return
+  endif
+  let s = getline(lnum)
+  if a:mode ==# 'V'
+    " the whole line, less its indentation and trailing blanks
+    let b = match(s, '\S')
+    let e = len(substitute(s, '\s*$', '', ''))
+  else
+    let b = col("'<") - 1
+    " '> is the first byte of the last character; take all of its bytes
+    let e = col("'>") - 1 + len(matchstr(strpart(s, col("'>") - 1), '^.'))
+    let e = min([e, len(s)])
+  endif
+  if b < 0 || e <= b
+    return
+  endif
+  call s:DecorateSpan(lnum, b, e, a:marker)
+endfunction
+
+nnoremap <C-b> :<C-u>call VimangoDecorate('**', 'n')<CR>
+nnoremap <C-i> :<C-u>call VimangoDecorate('*', 'n')<CR>
+nnoremap <C-e> :<C-u>call VimangoDecorate('`', 'n')<CR>
+xnoremap <C-b> :<C-u>call VimangoDecorate('**', visualmode())<CR>
+xnoremap <C-i> :<C-u>call VimangoDecorate('*', visualmode())<CR>
+xnoremap <C-e> :<C-u>call VimangoDecorate('`', visualmode())<CR>

@@ -180,30 +180,6 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":pdf-goldmark output.pdf", ":pdf-goldmark /tmp/note.pdf"},
 	})
 
-	// Markup commands -- Ctrl-B/I/E are the one-keystroke form of these.
-	// With no range they decorate the word under the cursor; pressed from
-	// VISUAL mode vim supplies a "'<,'>" range and they decorate the selection.
-	registry.Register("bold", (*Editor).boldCmd, CommandInfo{
-		Description: "Toggle bold (**) on the selection, or the word under the cursor",
-		Usage:       "bold",
-		Category:    "Markup",
-		Examples:    []string{":bold", ":'<,'>bold - select text, press : and type bold"},
-	})
-
-	registry.Register("italic", (*Editor).italicCmd, CommandInfo{
-		Description: "Toggle italic (*) on the selection, or the word under the cursor",
-		Usage:       "italic",
-		Category:    "Markup",
-		Examples:    []string{":italic", ":'<,'>italic"},
-	})
-
-	registry.Register("code", (*Editor).codeCmd, CommandInfo{
-		Description: "Toggle code (`) on the selection, or the word under the cursor",
-		Usage:       "code",
-		Category:    "Markup",
-		Examples:    []string{":code", ":'<,'>code"},
-	})
-
 	// Preview commands
 	registry.Register("preview", (*Editor).previewCmd, CommandInfo{
 		Description: "Show markdown preview of current note",

@@ -60,95 +60,23 @@ func TestSpaceIsAMotionNotALeader(t *testing.T) {
 	}
 }
 
-func TestDecorateWordNormalMode(t *testing.T) {
-	e := newTestEditor(t, "alpha bravo charlie")
-	vim.SetCursorPosition(1, 6) // on "bravo"
-	e.ss = e.vbuf.Lines()
-	e.fr, e.fc = 0, 6
-
-	e.editorProcessKey(ctrlKey('b'))
-	if got, want := e.line(0), "alpha **bravo** charlie"; got != want {
-		t.Fatalf("Ctrl-B: %q, want %q", got, want)
-	}
-
-	// same style again toggles it back off
-	e.editorProcessKey(ctrlKey('b'))
-	if got, want := e.line(0), "alpha bravo charlie"; got != want {
-		t.Errorf("Ctrl-B twice: %q, want %q", got, want)
-	}
-
-	// a different style replaces rather than nests
-	e.editorProcessKey(ctrlKey('b'))
-	e.editorProcessKey(ctrlKey('i'))
-	if got, want := e.line(0), "alpha *bravo* charlie"; got != want {
-		t.Errorf("Ctrl-B then Ctrl-I: %q, want %q", got, want)
-	}
-}
-
-func TestDecorateVisualSelection(t *testing.T) {
-	e := newTestEditor(t, "alpha bravo charlie")
-	vim.SetCursorPosition(1, 6)
-	e.ss = e.vbuf.Lines()
-	e.fr, e.fc = 0, 6
-
-	e.sendKeys("ve") // select "bravo"
-	if e.mode != VISUAL {
-		t.Fatalf("expected VISUAL, got %v", e.mode)
-	}
-	e.editorProcessKey(ctrlKey('b'))
-	if got, want := e.line(0), "alpha **bravo** charlie"; got != want {
-		t.Errorf("visual Ctrl-B: %q, want %q", got, want)
-	}
-}
-
-// :bold with no range decorates the word under the cursor; with the "'<,'>"
-// range vim writes when ':' is pressed from VISUAL mode, it decorates the
-// selection. The '< and '> marks survive the <esc> that cancels vim's cmdline.
-func TestBoldExCommand(t *testing.T) {
-	e := newTestEditor(t, "alpha bravo charlie")
-	vim.SetCursorPosition(1, 6)
-	e.ss = e.vbuf.Lines()
-	e.fr, e.fc = 0, 6
-
-	e.sendKeys(":bold")
-	e.editorProcessKey('\r')
-	if got, want := e.line(0), "alpha **bravo** charlie"; got != want {
-		t.Fatalf(":bold with no range: %q, want %q", got, want)
-	}
-
-	e2 := newTestEditor(t, "alpha bravo charlie")
-	vim.SetCursorPosition(1, 6)
-	e2.ss = e2.vbuf.Lines()
-	e2.fr, e2.fc = 0, 6
-	e2.sendKeys("ve") // select "bravo"
-	e2.editorProcessKey(':')
-	if got := vim.CommandLineGetText(); got != "'<,'>" {
-		t.Fatalf("after ':' from visual, cmdline = %q, want %q", got, "'<,'>")
-	}
-	e2.sendKeys("bold")
-	e2.editorProcessKey('\r')
-	if got, want := e2.line(0), "alpha **bravo** charlie"; got != want {
-		t.Errorf(":'<,'>bold: %q, want %q", got, want)
-	}
-}
-
 // A buffer-changing ex command must ask the caller to redraw. MainLoop only
 // calls drawText when editorProcessKey returns true, and dispatch ends the
 // keystroke, so returning false leaves the edit invisible until some later key
-// trips the tick check -- ":bold" showed the old text until you pressed l.
+// trips the tick check -- the old :bold showed the old text until you pressed
+// l. The dispatch is generic, so a stand-in command that edits the buffer the
+// way vimango's own commands do (keys sent to vim) exercises it.
 func TestBufferChangingExCommandRequestsRedraw(t *testing.T) {
 	e := newTestEditor(t, "alpha bravo charlie")
-	vim.SetCursorPosition(1, 6)
-	e.ss = e.vbuf.Lines()
-	e.fr, e.fc = 0, 6
+	e.exCmds["zzedit"] = func(*Editor) { vim.SendInput("x") }
 
-	e.sendKeys(":bold")
+	e.sendKeys(":zzedit")
 	if redraw := e.editorProcessKey('\r'); !redraw {
-		t.Error(":bold returned redraw=false; the change would not be drawn")
+		t.Error(":zzedit returned redraw=false; the change would not be drawn")
 	}
 	// and the editor's own copy of the text must be current, since drawText
 	// renders e.ss rather than re-reading the buffer
-	if got, want := e.ss[0], "alpha **bravo** charlie"; got != want {
+	if got, want := e.ss[0], "lpha bravo charlie"; got != want {
 		t.Errorf("e.ss[0] = %q, want %q", got, want)
 	}
 
@@ -247,21 +175,6 @@ func TestSplitExRange(t *testing.T) {
 		rng, rest := splitExRange(tc.in)
 		if rng != tc.rng || rest != tc.rest {
 			t.Errorf("splitExRange(%q) = (%q, %q), want (%q, %q)", tc.in, rng, rest, tc.rng, tc.rest)
-		}
-	}
-}
-
-func TestDecorateText(t *testing.T) {
-	for _, tc := range []struct{ in, marker, want string }{
-		{"word", markerBold, "**word**"},
-		{"**word**", markerBold, "word"},
-		{"*word*", markerBold, "**word**"},
-		{"**word**", markerItalic, "*word*"},
-		{"word", markerCode, "`word`"},
-		{"`word`", markerCode, "word"},
-	} {
-		if got := decorateText(tc.in, tc.marker); got != tc.want {
-			t.Errorf("decorateText(%q, %q) = %q, want %q", tc.in, tc.marker, got, tc.want)
 		}
 	}
 }

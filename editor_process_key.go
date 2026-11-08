@@ -48,8 +48,6 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	switch e.mode {
 	case NORMAL, NORMAL_BUSY: //NORMAL only occurs after INSERT is escaped
 		redraw, exit = e.NormalModeKeyHandler(c)
-	case VISUAL:
-		redraw, exit = e.VisualModeKeyHandler(c)
 	case EX_COMMAND:
 		redraw, exit = e.ExModeKeyHandler(c)
 	case SEARCH:
@@ -66,6 +64,7 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	}
 	// Process the key -- with vim's mapping expansion on, so vimango.vim's
 	// mappings apply to what the user types (and only to that; see vimrc.go)
+	wasVisual := e.mode == VISUAL
 	vim.SendUserKey(func() { sendToVim(c) })
 
 	tick := e.vbuf.GetLastChangedTick()
@@ -123,6 +122,13 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		e.mode = m
 	} else {
 		e.mode = OTHER // not sure this ever happens
+	}
+
+	// A key that ends VISUAL without changing text (y, a mapping that found
+	// nothing to do) would otherwise leave the selection highlight on screen:
+	// the tick check above saw no change, and only VISUAL itself redraws.
+	if wasVisual && e.mode != VISUAL {
+		redraw = true
 	}
 
 	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
@@ -230,24 +236,6 @@ func (e *Editor) NormalModeKeyHandler(c int) (redraw, skip bool) {
 	return e.mode != PREVIEW, true
 }
 
-// case VISUAL:
-func (e *Editor) VisualModeKeyHandler(c int) (redraw, skip bool) {
-	// Special commands in visual mode to do markdown decoration: ctrl-b, e, i
-	if strings.IndexAny(string(rune(c)), "\x02\x05\x09") != -1 { // this should define commmands like normalCmds, ie visualCmds
-		// leave VISUAL first: decorateSpan replaces the span with a counted
-		// "s", which in VISUAL would substitute the selection instead
-		vim.SendKey("<esc>")
-		e.decorateWordVisual(c)
-		e.mode = NORMAL
-		e.ss = e.vbuf.Lines()
-		pos := vim.GetCursorPosition() //set screen cx and cy from pos
-		e.fr = pos[0] - 1
-		e.fc = pos[1]
-		return true, true
-	}
-	return false, false
-}
-
 // case EX_COMMAND:
 // vim sits in cmdline mode acting purely as a line editor: keys are forwarded
 // and the line + cursor are mirrored from vim's cmdline buffer. vim executes
@@ -270,14 +258,10 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 
 		// vim writes its own "'<,'>" range in front of the command when ':'
 		// is pressed from VISUAL mode. Peel any range off so the lookup below
-		// matches on the command name, and record that one was given so
-		// range-aware commands (:bold and friends) act on the selection
-		// rather than the word under the cursor. fullLine keeps the range for
-		// the commands forwarded to vim, which want it.
+		// matches on the command name; fullLine keeps the range for the
+		// commands forwarded to vim (:'<,'>s/a/b/), which want it.
 		fullLine := e.command_line
-		var exRange string
-		exRange, e.command_line = splitExRange(e.command_line)
-		e.exRange = exRange != ""
+		_, e.command_line = splitExRange(e.command_line)
 
 		// Index doesn't work for vert resize
 		// and LastIndex doesn't work for run
@@ -337,7 +321,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 			// caller only redraws when this returns true, and dispatch ends
 			// the keystroke, so otherwise the edit sits invisible until the
 			// next key happens to trip the tick check in editorProcessKey --
-			// which is what ":bold" looked like: correct text, blank screen.
+			// which is what the old :bold looked like: correct text, blank screen.
 			if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != PREVIEW {
 				e.bufferTick = tick
 				e.ss = e.vbuf.Lines()
