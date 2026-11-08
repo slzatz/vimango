@@ -19,21 +19,6 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// Global image cache instance
-var globalImageCache *ImageCache
-
-// initImageCache initializes the global image cache
-func initImageCache() {
-	if globalImageCache == nil {
-		var err error
-		globalImageCache, err = NewImageCache()
-		if err != nil {
-			log.Printf("Warning: Failed to initialize image cache: %v", err)
-			globalImageCache = nil
-		}
-	}
-}
-
 // defaultAccent is the blue used for the blockquote bar and list markers
 // when config.json has no webview.accent entry.
 const defaultAccent = "#3498db"

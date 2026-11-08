@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -57,6 +58,26 @@ type ImageCache struct {
 	maxBytes   int64
 	mutex      sync.RWMutex
 	index      CacheIndex
+}
+
+// globalImageCache is the process's one disk image cache (./image_cache/).
+// Two users share it: the TUI's inline kitty images (organizer_display.go,
+// organizer_render.go, and :clearcache and friends in organizer_cmd_line.go)
+// and --render-html, which inlines Google Drive images as data URIs for
+// vimango_hybrid's preview pane (note_html.go, render_html.go) without
+// re-downloading them. nil if it could not be created; every user checks.
+var globalImageCache *ImageCache
+
+// initImageCache creates globalImageCache on first call; later calls are no-ops.
+func initImageCache() {
+	if globalImageCache == nil {
+		var err error
+		globalImageCache, err = NewImageCache()
+		if err != nil {
+			log.Printf("Warning: Failed to initialize image cache: %v", err)
+			globalImageCache = nil
+		}
+	}
 }
 
 // NewImageCache creates a new image cache instance
