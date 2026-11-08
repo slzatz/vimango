@@ -15,14 +15,13 @@ There are a few semi-notable features:
 - Syncing of notes to a remote PostgreSQL database (optional)
 - Note editing supports full vim keybindings via libvim, which was originally develeped to support the Onivim 2 editor
 - There is full-text search via sqlite's fts5 extension
-- Spell checking through the use of the hunspell library
+- Spell checking with vim's own spell checker (from libvim): misspellings are highlighted as you type, and `]s`, `zg`, `z=` work as in vim
 - You can launch deep research via Claude and the results will be stored as a note
 
 This wasn't developed thinking anyone else would use it so there isn't an installable package. You'll need to clone the repository and build it yourself. On macOS, [MACOS_SETUP.md](./MACOS_SETUP.md) walks a completely fresh machine (no git/Homebrew/Go) through the whole setup; [INSTALL.md](./INSTALL.md) is the condensed build guide. There are a few dependencies that you'll need to have installed first.  These are:
 
  - Go 1.20 or later
  - SQLite3 development files
- - Hunspell development files
  - libvim.a (must be built from source — see [Building libvim.a](#building-libvima) below)
 
 ## Building libvim.a
@@ -150,11 +149,11 @@ The `config.json` file structure (copy from `config.json.example`):
 - **glamour**: Markdown rendering style - `darkslz.json` and `default.json` are included
 - **claude**: API key for deep research feature (optional)
 
-The full application makes heavy use of CGO to access various C libraries (libvim, hunspell, sqlite3); CGO is required — pure-Go builds are unsupported.
+The full application makes heavy use of CGO to access various C libraries (libvim, sqlite3); CGO is required — pure-Go builds are unsupported.
 
 So if this hasn't been offputting enough, after you can clone the repository you can build as follows:
 
- - `CGO_ENABLED=1 go build --tags=fts5` (the `fts5` tag is mandatory and enforced at compile time by `fts5_guard.go`; add `spell` — `--tags="fts5,spell"` — for hunspell spell check)
+ - `CGO_ENABLED=1 go build --tags=fts5` (the `fts5` tag is mandatory and enforced at compile time by `fts5_guard.go`)
 
 The main runtime options are:
 

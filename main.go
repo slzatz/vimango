@@ -155,6 +155,10 @@ func main() {
 	// Registers saved by the previous run (see registers.go)
 	restoreRegisters()
 
+	// Spell checking: dictionary in spell/ (see spellcheck.go). Before
+	// vimango.vim so the user can override the spell options there.
+	initSpell()
+
 	// vimango.vim: user mappings and functions (see vimrc.go)
 	sourceVimrc()
 

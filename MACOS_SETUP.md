@@ -1,9 +1,8 @@
 # Setting up vimango on a brand-new Mac
 
 This guide takes a **completely fresh macOS machine** — no developer tools, no
-Homebrew, no Go, no git — to a fully working vimango with spell checking
-(hunspell), inline images in the terminal (including HEIC), and full-text
-search.
+Homebrew, no Go, no git — to a fully working vimango with spell checking,
+inline images in the terminal (including HEIC), and full-text search.
 
 Every step includes a verification command so you can confirm it worked before
 moving on. Follow the steps **in order** — later steps assume earlier ones.
@@ -136,7 +135,7 @@ and `go build` downloads it.
 ## 6. Native libraries from Homebrew
 
 ```bash
-brew install pkg-config hunspell ncurses gettext libheif
+brew install pkg-config ncurses gettext libheif
 ```
 
 What each is for:
@@ -144,7 +143,6 @@ What each is for:
 | Package | Used by |
 |---|---|
 | `pkg-config` | locating libheif when building the HEIC worker |
-| `hunspell` | spell checking (the library; dictionaries are step 7) |
 | `ncurses`, `gettext` | linking libvim and the vimango binary |
 | `libheif` | decoding HEIC/HEIF images (iPhone photos) |
 
@@ -152,39 +150,25 @@ What each is for:
 
 ```bash
 pkg-config --modversion libheif     # prints a version, e.g. 1.23.x
-brew list hunspell >/dev/null && echo hunspell OK
 ```
 
 ---
 
-## 7. Hunspell dictionaries (spell check won't work without them)
+## 7. Spell checking (nothing to install)
 
-Homebrew installs the hunspell *library* but **no dictionaries**, and vimango
-looks for them at a fixed path: `/usr/share/hunspell/en_US.aff` and
-`/usr/share/hunspell/en_US.dic`. Fetch the standard US-English dictionary from
-the LibreOffice project and put it there:
+Spell checking is vim's own, built into libvim, so there is no library to
+install. Its English dictionary (`en.utf-8.spl`) comes from the libvim fork:
+`scripts/build-libvim.sh` in step 8 copies it into `spell/` next to
+config.json. Words you add with `zg` go to `spell/en.utf-8.add` beside it.
 
-```bash
-sudo mkdir -p /usr/share/hunspell
-sudo curl -fsSL -o /usr/share/hunspell/en_US.aff \
-  https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.aff
-sudo curl -fsSL -o /usr/share/hunspell/en_US.dic \
-  https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.dic
-```
-
-**Verify:**
+**Verify** (after step 8):
 
 ```bash
-ls -la /usr/share/hunspell/    # both files present and non-trivial in size
+ls -la spell/    # en.utf-8.spl and en.utf-8.sug
 ```
 
-If the dictionaries are absent vimango still builds and runs — spell check
-just silently reports every word as correct.
-
-> **Intel Macs only:** the Go binding hardcodes Apple Silicon include/lib
-> paths. Edit `hunspell/hunspell.go` and change `/opt/homebrew/include` →
-> `/usr/local/include` and `/opt/homebrew/lib` → `/usr/local/lib` in the two
-> `#cgo darwin` lines.
+Without it vimango still builds and runs; `:spell` just says spell check is
+unavailable.
 
 ---
 
@@ -352,8 +336,7 @@ first if cgo type errors appear — see step 9).
 | `xcrun: error: invalid active developer path` | Command Line Tools missing | step 1 |
 | `brew: command not found` in a new terminal | shellenv not in `~/.zprofile` | step 2 |
 | `undefined: ansi.DecodeKittyTextSizeMarkers` / `undefined: makeRaw` | leftover `go.work` pointing at a stale `../glamour` | delete `go.work` (step 5) |
-| `hunspell/hunspell.h: file not found` | hunspell not installed (or Intel paths) | steps 6–7 |
-| Spell check accepts everything | dictionaries missing from `/usr/share/hunspell` | step 7 |
+| `:spell` says "Spell check unavailable" | no `spell/en.utf-8.spl` next to config.json | `./scripts/build-libvim.sh` (step 8) |
 | linker can't find `libvim.a` | not built, or `go build` not run from vimango root | step 8 |
 | `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream | `./scripts/build-libvim.sh` (step 13) |
 | `exec: "pkg-config": executable file not found` | pkg-config missing | step 6 |

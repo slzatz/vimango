@@ -113,6 +113,20 @@ func GetMatchingPair() [2]int {
 	return Engine.SearchGetMatchingPair()
 }
 
+// GetSpellSuggestions returns the word z= would change (the misspelling under
+// or after the cursor, else the word under it) and its suggestions, best
+// first. Sending "{n}z=" replaces the word with suggestions[n-1]. ok is false
+// when 'spell' is off or there is no word.
+func GetSpellSuggestions() (word string, suggestions []string, ok bool) {
+	return Engine.SpellGetSuggestions()
+}
+
+// TakeSpellSuggestRequest reports whether the user typed z= (without a count)
+// since the last call, and clears the request.
+func TakeSpellSuggestRequest() bool {
+	return Engine.TakeSpellSuggestRequest()
+}
+
 // Command-line (cmdline) state — like BufferNew, these call cvim directly
 // rather than going through the Engine wrapper.
 

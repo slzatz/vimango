@@ -158,6 +158,8 @@ void qsort(void *base, size_t elm_count, size_t elm_size, int (*cmp)(const void 
 #include "sign.pro"
 #endif
 #include "state_insert_literal.pro"
+#include "spell.pro"
+#include "spellfile.pro"
 #include "state_machine.pro"
 #include "syntax.pro"
 #include "tag.pro"

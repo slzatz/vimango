@@ -21,12 +21,6 @@ const (
 	TR
 )
 
-type Position struct {
-	rowNum int
-	start  int
-	end    int
-}
-
 /*
 type Window interface {
 	drawText()
@@ -176,7 +170,7 @@ const (
 	VISUAL_BLOCK // only editor mode
 	SEARCH       // only editor mode
 	//FIND            // only organizer mode
-	SPELLING        // this mode recognizes 'z='
+	SPELLING        // choosing a z= suggestion by number (spellcheck.go)
 	NAVIGATE_NOTICE // only in organizer mode
 	HELP            // organizer and editor mode
 	CONTAINER       // overlay for choosing folder/context

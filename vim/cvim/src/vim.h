@@ -1855,6 +1855,8 @@ typedef enum
 
 #include "ex_cmds.h" /* Ex command defines */
 
+#include "spell.h" /* spell checking stuff */
+
 #include "proto.h" /* function prototypes */
 
 #ifndef FEAT_LINEBREAK

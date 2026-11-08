@@ -18,8 +18,9 @@
 #   4. Builds with the fork's own script -- build-macos.sh or build-linux.sh --
 #      which owns the configure flags and reconfigures only when they change.
 #      On macOS it installs the Homebrew build deps (ncurses, gettext) first.
-#   5. Copies libvim.a into the vimango root and reports the commit it was
-#      built from.
+#   5. Copies libvim.a into the vimango root, and the English spell dictionary
+#      (runtime/spell/en.utf-8.{spl,sug}) into spell/, and reports the commit
+#      it was built from.
 #
 # Usage:
 #   ./scripts/build-libvim.sh            # pull, build, copy
@@ -106,6 +107,10 @@ fi
 
 # --- 5. Copy it in.
 cp src/libvim.a "${VIMANGO_ROOT}/libvim.a"
+# vim's spell dictionary, which libvim reads from spell/ (see spellcheck.go).
+# The user's own word list (spell/en.utf-8.add, from zg) is left alone.
+mkdir -p "${VIMANGO_ROOT}/spell"
+cp runtime/spell/en.utf-8.spl runtime/spell/en.utf-8.sug "${VIMANGO_ROOT}/spell/"
 echo
 echo "Done. ${VIMANGO_ROOT}/libvim.a is libvim ${commit}"
 echo "Now build vimango:"

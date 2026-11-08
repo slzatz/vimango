@@ -28,13 +28,13 @@ type Editor struct {
 	redraw             bool
 	id                 int //db id of entry
 	//output             *Output
-	vbuf               interfaces.VimBuffer
-	ss                 []string
-	searchPrefix       string
-	highlightPositions []Position
-	suggestions        []string //spelling suggestions
-	bufferTick         int
-	saveTick           int
+	vbuf         interfaces.VimBuffer
+	ss           []string
+	searchPrefix string
+	suggestions  []string // spelling suggestions offered in SPELLING mode
+	spellKeys    string   // last NORMAL keys typed, to spot zg/zw (spellListKey)
+	bufferTick   int
+	saveTick     int
 	// dbText is the note exactly as this editor last read it from — or
 	// wrote it to — the database. It is the baseline :checkstale compares
 	// against, which is what separates "the row changed in the database

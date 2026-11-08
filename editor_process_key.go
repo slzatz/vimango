@@ -53,6 +53,8 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 		redraw, exit = e.SearchModeKeyHandler(c)
 	case HELP:
 		redraw, exit = e.HelpModeKeyHandler(c)
+	case SPELLING:
+		redraw, exit = e.SpellingModeKeyHandler(c)
 	}
 
 	// if exit true, don't process key any further
@@ -62,7 +64,11 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	// Process the key -- with vim's mapping expansion on, so vimango.vim's
 	// mappings apply to what the user types (and only to that; see vimrc.go)
 	wasVisual := e.mode == VISUAL
+	vim.TakeSpellSuggestRequest() // drop a z= typed outside the editor (organizer)
 	vim.SendUserKey(func() { sendToVim(c) })
+	// zg, zw etc. change what is misspelled without changing the buffer
+	spellRedraw := spellOn && spellListKey(e.spellKeys, c)
+	e.spellKeys = (e.spellKeys + string(rune(c)))[max(0, len(e.spellKeys)+len(string(rune(c)))-2):]
 
 	tick := e.vbuf.GetLastChangedTick()
 	if tick > e.bufferTick {
@@ -153,6 +159,14 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 
 	e.fc = pos[1]
 
+	if spellRedraw {
+		redraw = true
+	}
+	// z= without a count: libvim asked for the suggestion list
+	if vim.TakeSpellSuggestRequest() {
+		e.spellSuggest()
+	}
+
 	return
 }
 
@@ -241,9 +255,10 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		if cmd0, found := e.exCmds[cmd]; found {
 			cmd0(e)
 			e.command_line = ""
-			// a command that put up its own screen (:help) owns the
-			// mode from here; everything else lands back in NORMAL
-			if e.mode != HELP {
+			// a command that put up its own screen (:help) or is waiting
+			// for a choice (:suggest) owns the mode from here; everything
+			// else lands back in NORMAL
+			if e.mode != HELP && e.mode != SPELLING {
 				e.mode = NORMAL
 			}
 			e.tabCompletion.index = 0

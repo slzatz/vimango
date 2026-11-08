@@ -75,15 +75,15 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":nopaste"},
 	})
 	// Utility commands
-	registry.Register("spell", (*Editor).spellCmd, CommandInfo{
-		Description: "Highlight misspelled words",
+	registry.Register("spell", (*Editor).toggleSpell, CommandInfo{
+		Description: "Toggle spell checking (misspellings are highlighted as you edit)",
 		Usage:       "spell",
 		Category:    "Utility",
 		Examples:    []string{":spell"},
 	})
 
-	registry.Register("suggest", (*Editor).suggestCmd, CommandInfo{
-		Description: "Show spelling suggestions for the word under the cursor",
+	registry.Register("suggest", (*Editor).spellSuggest, CommandInfo{
+		Description: "Pick a spelling correction for the word under the cursor (same as z=)",
 		Usage:       "suggest",
 		Category:    "Utility",
 		Examples:    []string{":suggest"},

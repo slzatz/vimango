@@ -35,6 +35,9 @@ image_cache/
 # libvim.a different on mac and linux
 libvim.a
 
+# spell dictionary (copied in by scripts/build-libvim.sh) and the user's zg word list
+/spell/
+
 # heic_worker subprocess binary - must be built per platform
 /heic_worker
 

@@ -20,6 +20,7 @@ type CGOEngineWrapper struct{}
 // Init initializes the vim engine
 func (e *CGOEngineWrapper) Init(argc int) {
 	cvim.VimInit(argc)
+	cvim.EnableSpellSuggestCallback()
 }
 
 // BufferNew creates a new empty buffer
@@ -109,6 +110,16 @@ func (e *CGOEngineWrapper) SearchGetMatchingPair() [2]int {
 	return cvim.SearchGetMatchingPair()
 }
 
+// SpellGetSuggestions returns the word z= would change and its suggestions
+func (e *CGOEngineWrapper) SpellGetSuggestions() (string, []string, bool) {
+	return cvim.SpellGetSuggestions()
+}
+
+// TakeSpellSuggestRequest reports (and clears) whether z= was typed
+func (e *CGOEngineWrapper) TakeSpellSuggestRequest() bool {
+	return cvim.TakeSpellSuggestRequest()
+}
+
 // CGOBufferWrapper wraps a C buffer
 type CGOBufferWrapper struct {
 	buf cvim.Buffer
@@ -132,4 +143,9 @@ func (b *CGOBufferWrapper) GetLastChangedTick() int {
 // SetLines sets all lines in the buffer
 func (b *CGOBufferWrapper) SetLines(start, end int, lines []string) {
 	cvim.CBufferSetLines(b.buf, start, end, lines, len(lines))
+}
+
+// SpellErrors returns the misspellings in lines start..end (1-based, inclusive)
+func (b *CGOBufferWrapper) SpellErrors(start, end int) []cvim.SpellError {
+	return cvim.SpellGetErrors(b.buf, start, end)
 }

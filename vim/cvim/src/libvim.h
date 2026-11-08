@@ -399,6 +399,64 @@ char_u *vimSearchGetPattern();
 void vimSetStopSearchHighlightCallback(VoidCallback callback);
 
 /***
+ * Spell checking
+ ***/
+
+/*
+ * vimSpellGetErrors
+ *
+ * Find the spelling errors in lines start_lnum..end_lnum (1-based, inclusive)
+ * of "buf". On return "*errors" points to "*num_errors" entries, in order, or
+ * is NULL when there are none; the caller frees the array with vim_free().
+ *
+ * Columns and lengths are in bytes, not characters.
+ *
+ * Like vim's own highlighting, this reports nothing unless the buffer is shown
+ * in a window with 'spell' set and the 'spelllang' dictionaries loaded, e.g.:
+ *
+ *   vimExecute("set runtimepath+=/path/to/runtime"); // contains spell/en.utf-8.spl
+ *   vimExecute("set spelllang=en spell");
+ *
+ * The first word of a line is checked for a capital when the previous line
+ * ends a sentence ('spellcapcheck'). Unlike vim's display, the check does not
+ * look across line breaks for dictionary entries that contain a space.
+ */
+void vimSpellGetErrors(buf_T *buf, linenr_T start_lnum, linenr_T end_lnum,
+                       int *num_errors, spellError_T **errors);
+
+/*
+ * vimSpellGetSuggestions
+ *
+ * Get the suggestions "z=" offers for the word it would change: the badly
+ * spelled word under or after the cursor, else the word under the cursor, or
+ * in Visual mode the (single-line) selection. Nothing is changed.
+ *
+ * On OK, "*badWord" is the word and "*suggestions" holds "*num_suggestions"
+ * replacements (possibly none), best first. Sending "{n}z=" (e.g.
+ * vimInput("3"); vimInput("z"); vimInput("=")) with the cursor and Visual
+ * selection unchanged replaces the word with suggestion n, counting from 1,
+ * with undo, "." and :spellrepall support.
+ *
+ * Returns FAIL, with "*badWord" NULL, when spell checking is off or there is
+ * no word. The caller frees "*badWord", each suggestion and the array with
+ * vim_free().
+ *
+ * At most 'spellsuggest''s number (e.g. "set spellsuggest=best,9") or the
+ * window height minus 2 suggestions are returned, as for "z=".
+ */
+int vimSpellGetSuggestions(char_u **badWord, int *num_suggestions, char_u ***suggestions);
+
+/*
+ * vimSetSpellSuggestCallback
+ *
+ * Called when "z=" is typed without a count. vim would list the suggestions
+ * and block on a numbered prompt; instead the embedder can show them, from
+ * vimSpellGetSuggestions, and send "{n}z=" for the one chosen. Without a
+ * callback, plain "z=" just beeps.
+ */
+void vimSetSpellSuggestCallback(VoidCallback callback);
+
+/***
  * Terminal
  */
 

@@ -188,9 +188,7 @@ func (e *Editor) drawText() {
 	} else {
 		e.drawPlainRows(&ab)
 	}
-	if e.highlightPositions != nil {
-		e.drawHighlights(&ab)
-	}
+	e.drawSpellErrors(&ab) // no-op unless :spell is on
 	if e.mode == VISUAL {
 		e.drawVisual(&ab)
 	}
@@ -368,51 +366,6 @@ func (e *Editor) drawHighlightedRows(pab *strings.Builder) {
 			for i := 0; i < len(line); i++ {
 				fmt.Fprintf(pab, s, line[i])
 			}
-		}
-	}
-}
-
-func (e *Editor) highlightMispelledWords() {
-	if !IsSpellCheckAvailable() {
-		e.ShowMessage(BR, "%s", ShowSpellCheckNotAvailableMessage())
-		return
-	}
-
-	e.highlightPositions = nil
-	curPos := vim.GetCursorPosition()
-	for i, line := range e.ss {
-		wordPositions := GetWordPositionsSingleLine(line)
-		for _, wp := range wordPositions {
-			if CheckSpelling(wp.Word) {
-				continue
-			}
-			e.highlightPositions = append(e.highlightPositions, Position{i, wp.Start, wp.End + 1})
-		}
-	}
-
-	vim.SetCursorPosition(curPos[0], curPos[1]) //return cursor to where it was
-}
-
-func (e *Editor) drawHighlights(pab *strings.Builder) {
-	if e.highlightPositions == nil {
-		return
-	}
-	if e.isModified() {
-		e.highlightPositions = nil
-		return
-	}
-	for _, p := range e.highlightPositions {
-		row := e.ss[p.rowNum]
-		if p.start < 0 || p.end > len(row) {
-			continue // skip if out of bounds
-		}
-		chars := "\x1b[48;5;31m" + row[p.start:p.end] + "\x1b[0m"
-		start := p.start
-		y := e.getScreenYFromRowColWW(p.rowNum, start) + e.top_margin - e.lineOffset          // - 1
-		x := e.getScreenXFromRowColWW(p.rowNum, start) + e.left_margin + e.left_margin_offset // - 1
-		if y >= e.top_margin && y <= e.screenlines {
-			fmt.Fprintf(pab, "\x1b[%d;%dH\x1b[0m", y, x+1) //not sure why the +1
-			fmt.Fprint(pab, chars)
 		}
 	}
 }

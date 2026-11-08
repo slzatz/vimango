@@ -2,8 +2,8 @@
 
 > **Starting from a completely fresh Mac** (no git, Homebrew, or Go installed)?
 > Use [MACOS_SETUP.md](./MACOS_SETUP.md) — it bootstraps the machine from zero
-> (developer tools, Homebrew, a terminal that can display images, hunspell
-> dictionaries) and covers the same build steps as this file.
+> (developer tools, Homebrew, a terminal that can display images) and covers
+> the same build steps as this file.
 
 This is a step-by-step guide to building vimango from scratch on a new machine.
 It focuses on the **full CGO build** on **macOS**, which is the most involved
@@ -11,12 +11,10 @@ path because several artifacts are deliberately *not* checked into the repo
 (they differ per platform/architecture) and one dependency is a personal fork.
 
 > **TL;DR of the gotchas.** A fresh `git clone` will **not** build until you
-> build **`libvim.a`** locally (`scripts/build-libvim.sh`, §4). Two more pieces
-> are optional, and vimango builds and runs without them:
-> - the **`heic_worker`** helper binary (§5), without which HEIC images don't
->   display;
-> - **hunspell** (§3), needed only for a spell-check build
->   (`--tags="fts5,spell"`).
+> build **`libvim.a`** locally (`scripts/build-libvim.sh`, §4), which also
+> copies the spell-check dictionary into `spell/`. One more piece is optional,
+> and vimango builds and runs without it: the **`heic_worker`** helper binary
+> (§5), without which HEIC images don't display.
 >
 > None of these come with the clone because they're `.gitignore`d or live in a
 > separate repo. (The glamour fork used to be on this list; `go.mod` now pins
@@ -41,7 +39,7 @@ brew --prefix
 - `/opt/homebrew` → **Apple Silicon** (all the hardcoded paths below match).
 - `/usr/local` → **Intel** — you must substitute `/usr/local` for `/opt/homebrew`
   in any hardcoded CFLAGS/LDFLAGS. (The libvim build scripts auto-detect
-  this; the hunspell binding is hardcoded — see the hunspell section.)
+  this.)
 
 ---
 
@@ -76,7 +74,7 @@ overrides the pin with whatever `../glamour` holds. (`go env GOWORK` prints
 ## 3. Native dependencies (Homebrew)
 
 ```bash
-brew install pkg-config hunspell ncurses gettext libheif
+brew install pkg-config ncurses gettext libheif
 ```
 
 > **`pkg-config` is required for the `heic_worker` build** (§5). The go-libheif
@@ -84,34 +82,6 @@ brew install pkg-config hunspell ncurses gettext libheif
 > is often present as a transitive dependency of other formulae, but on a fresh
 > machine it may be absent — its omission produces
 > `exec: "pkg-config": executable file not found in $PATH`.
-
-### hunspell — header path caveat
-
-hunspell is compiled in only with the `spell` build tag; the default
-`--tags=fts5` build uses a stub (`spellcheck_nocgo.go`) and needs neither the
-library nor its headers. Skip this section unless you build with
-`--tags="fts5,spell"`.
-
-The Go binding hardcodes the **Apple Silicon** Homebrew paths in
-`hunspell/hunspell.go`:
-
-```go
-// #cgo darwin LDFLAGS: -lhunspell-1.7 -L/opt/homebrew/lib
-// #cgo darwin CFLAGS: -I/opt/homebrew/include
-// #include <hunspell/hunspell.h>
-```
-
-**Symptom if hunspell is missing:** `hunspell/hunspell.h: file not found`.
-Just `brew install hunspell` fixes it on Apple Silicon.
-
-**On Intel** (`brew --prefix` = `/usr/local`), those hardcoded paths are wrong —
-edit `hunspell/hunspell.go` to point the darwin `CFLAGS`/`LDFLAGS` at
-`/usr/local/include` and `/usr/local/lib`.
-
-> Runtime note: spell-check dictionaries are looked up at
-> `/usr/share/hunspell/en_US.{aff,dic}` (`spellcheck_cgo.go`), a Linux path that
-> won't exist on macOS. Spell check degrades gracefully if they're absent — the
-> build and app are unaffected.
 
 ---
 
@@ -226,8 +196,9 @@ From the project root:
 CGO_ENABLED=1 go build --tags=fts5
 ```
 
-`fts5` is the only tag needed (add `spell` — `--tags="fts5,spell"` — for
-hunspell spell check). Don't add `cgo`: `CGO_ENABLED=1` already sets it.
+`fts5` is the only tag needed. Don't add `cgo`: `CGO_ENABLED=1` already sets
+it. Spell checking needs no tag or library: it is vim's own, built into
+libvim, and reads the dictionary `scripts/build-libvim.sh` puts in `spell/`.
 
 CGO is required — libvim is the only vim engine (pure-Go builds and Windows are unsupported).
 
@@ -269,8 +240,8 @@ Run it:
 | Error | Cause | Fix |
 |---|---|---|
 | `undefined: ansi.DecodeKittyTextSizeMarkers` / `makeRaw` / `restoreTerminal`, or `undefined: unix.TCGETS` on macOS | a leftover `go.work` pointing at a stale `../glamour` | delete `go.work` (§2) |
-| `hunspell/hunspell.h: file not found` (`spell` builds only) | hunspell not installed / Intel paths | §3 |
 | `libvim.a` not found / link errors | libvim.a not built or not in root | §4 |
+| `:spell` says "Spell check unavailable" | no `spell/en.utf-8.spl` next to config.json | re-run `./scripts/build-libvim.sh` (§4) |
 | `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream onivim/libvim | re-run `./scripts/build-libvim.sh` (§4) |
 | libvim build fails on a warning (e.g. `long long` to `double`) | newer clang promotes warnings under `-Werror` | `git -C ../libvim pull` — the fork's build scripts carry the `-Wno-error` flags; report it there if it persists |
 | `exec: "pkg-config": executable file not found in $PATH` | `pkg-config` (and maybe libheif) not installed | `brew install pkg-config libheif` (§3) |

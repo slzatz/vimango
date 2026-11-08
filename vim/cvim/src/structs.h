@@ -452,6 +452,10 @@ typedef struct
 #endif
   long wo_scr;
 #define w_p_scr w_onebuf_opt.wo_scr /* 'scroll' */
+#ifdef FEAT_SPELL
+  int wo_spell;
+#define w_p_spell w_onebuf_opt.wo_spell /* 'spell' */
+#endif
   int wo_scb;
 #define w_p_scb w_onebuf_opt.wo_scb /* 'scrollbind' */
   int wo_diff_saved;                /* options were saved for starting diff mode */
@@ -2053,7 +2057,11 @@ typedef struct
 #define SYNSPL_NOTOP 2   /* don't spell check toplevel text */
 
 /* avoid #ifdefs for when b_spell is not available */
+#ifdef FEAT_SPELL
+#define B_SPELL(buf) ((buf)->b_spell)
+#else
 #define B_SPELL(buf) (0)
+#endif
 
 #ifdef FEAT_QUICKFIX
 typedef struct qf_info_S qf_info_T;
@@ -2095,7 +2103,19 @@ struct timer_S
  */
 typedef struct
 {
+#ifdef FEAT_SPELL
+  /* for spell checking */
+  garray_T b_langp;         /* list of pointers to slang_T, see spell.c */
+  char_u b_spell_ismw[256]; /* flags: is midword char */
+  char_u *b_spell_ismw_mb;  /* multi-byte midword chars */
+  char_u *b_p_spc;          /* 'spellcapcheck' */
+  regprog_T *b_cap_prog;    /* program for 'spellcapcheck' */
+  char_u *b_p_spf;          /* 'spellfile' */
+  char_u *b_p_spl;          /* 'spelllang' */
+  int b_cjk;                /* all CJK letters as OK */
+#else
   int dummy;
+#endif
   char_u b_syn_chartab[32]; /* syntax iskeyword option */
   char_u *b_syn_isk;        /* iskeyword option */
 } synblock_T;
@@ -2444,6 +2464,13 @@ struct file_buffer
 				   is "help") */
 
   int b_shortname; /* this file has an 8.3 file name */
+#ifdef FEAT_SPELL
+  int b_spell; /* TRUE for a spell file buffer, most fields
+                  are not used!  Use the B_SPELL macro to
+                  access b_spell without #ifdef. */
+  synblock_T b_s; /* spell checking state (vim's w_s always points
+                     here; libvim has no :ownsyntax) */
+#endif
 
 #ifdef FEAT_JOB_CHANNEL
   char_u *b_prompt_text;         // set by prompt_setprompt()
@@ -2681,6 +2708,30 @@ typedef struct
   pos_T start;
   pos_T end;
 } searchHighlight_T;
+
+/*
+ * Kinds of spelling error reported by vimSpellGetErrors(). These correspond
+ * to vim's SpellBad, SpellCap, SpellRare and SpellLocal highlight groups.
+ */
+typedef enum
+{
+  SPELL_ERROR_BAD,   /* word not recognized */
+  SPELL_ERROR_CAPS,  /* word should start with a capital */
+  SPELL_ERROR_RARE,  /* word is rarely used */
+  SPELL_ERROR_LOCAL  /* word is only used in another region */
+} spellErrorType_T;
+
+/*
+ * A spelling error found by vimSpellGetErrors(). "col" is the 0-based byte
+ * offset of the word in line "lnum" and "len" its length in bytes.
+ */
+typedef struct
+{
+  linenr_T lnum;
+  colnr_T col;
+  int len;
+  spellErrorType_T type;
+} spellError_T;
 
 /* number of positions supported by matchaddpos() */
 #define MAXPOSMATCH 8

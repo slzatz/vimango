@@ -8,6 +8,9 @@ type VimBuffer interface {
 	Lines() []string
 	GetLastChangedTick() int
 	SetLines(start, end int, lines []string)
+	// SpellErrors returns the misspellings in lines start..end (1-based,
+	// inclusive); empty unless the buffer is current and 'spell' is set
+	SpellErrors(start, end int) []cvim.SpellError
 }
 
 // VimEngine represents the interface for the vim engine
@@ -38,4 +41,8 @@ type VimEngine interface {
 	// Misc
 	Eval(expr string) string
 	SearchGetMatchingPair() [2]int
+
+	// Spell checking
+	SpellGetSuggestions() (word string, suggestions []string, ok bool)
+	TakeSpellSuggestRequest() bool // z= typed since the last call
 }

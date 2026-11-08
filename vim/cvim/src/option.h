@@ -515,6 +515,9 @@ EXTERN long p_mfd; /* 'maxfuncdepth' */
 EXTERN long p_mmd;       /* 'maxmapdepth' */
 EXTERN long p_mm;        /* 'maxmem' */
 EXTERN long p_mmp;       /* 'maxmempattern' */
+#ifdef FEAT_SPELL
+EXTERN char_u *p_msm; /* 'mkspellmem' */
+#endif
 EXTERN long p_mmt;       /* 'maxmemtot' */
 EXTERN int p_minimap;    /* 'minimap' (Onivim) */
 EXTERN long p_mle;       /* 'modelineexpr' */
@@ -657,6 +660,9 @@ EXTERN int p_sb;           /* 'splitbelow' */
 EXTERN long p_tpm;         /* 'tabpagemax' */
 #if defined(FEAT_STL_OPT)
 EXTERN char_u *p_tal; /* 'tabline' */
+#endif
+#ifdef FEAT_SPELL
+EXTERN char_u *p_sps; /* 'spellsuggest' */
 #endif
 EXTERN int p_spr;     /* 'splitright' */
 EXTERN int p_sol;     /* 'startofline' */
@@ -890,6 +896,11 @@ enum
 #endif
   ,
   BV_SN,
+#ifdef FEAT_SPELL
+  BV_SPC,
+  BV_SPF,
+  BV_SPL,
+#endif
   BV_STS
 #ifdef FEAT_SEARCHPATH
   ,
@@ -996,6 +1007,10 @@ enum
   WV_SCROLL,
   WV_SISO,
   WV_SO
+#ifdef FEAT_SPELL
+  ,
+  WV_SPELL
+#endif
 #ifdef FEAT_STL_OPT
   ,
   WV_STL

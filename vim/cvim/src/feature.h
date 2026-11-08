@@ -813,7 +813,7 @@
  * The Netbeans feature
  */
 #undef FEAT_NETBEANS_INTG
-#undef FEAT_SPELL
+#define FEAT_SPELL /* restored: spell checking (spell.c, spellfile.c) */
 #undef FEAT_STL_OPT
 #undef FEAT_SYN_HL
 #undef FEAT_TERMINAL // Handled by consumer
