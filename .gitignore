@@ -42,3 +42,6 @@ libvim.a
 go.work
 go.work.sum
 .abtest/
+
+# macOS Finder metadata
+.DS_Store

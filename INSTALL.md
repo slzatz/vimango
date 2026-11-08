@@ -10,10 +10,13 @@ It focuses on the **full CGO build** on **macOS**, which is the most involved
 path because several artifacts are deliberately *not* checked into the repo
 (they differ per platform/architecture) and one dependency is a personal fork.
 
-> **TL;DR of the gotchas.** A fresh `git clone` will **not** build until you:
-> 1. Install **hunspell** via Homebrew.
-> 2. Build **`libvim.a`** locally (`scripts/build-libvim.sh`).
-> 3. Build the **`heic_worker`** helper binary.
+> **TL;DR of the gotchas.** A fresh `git clone` will **not** build until you
+> build **`libvim.a`** locally (`scripts/build-libvim.sh`, §4). Two more pieces
+> are optional, and vimango builds and runs without them:
+> - the **`heic_worker`** helper binary (§5), without which HEIC images don't
+>   display;
+> - **hunspell** (§3), needed only for a spell-check build
+>   (`--tags="fts5,spell"`).
 >
 > None of these come with the clone because they're `.gitignore`d or live in a
 > separate repo. (The glamour fork used to be on this list; `go.mod` now pins
@@ -83,6 +86,11 @@ brew install pkg-config hunspell ncurses gettext libheif
 > `exec: "pkg-config": executable file not found in $PATH`.
 
 ### hunspell — header path caveat
+
+hunspell is compiled in only with the `spell` build tag; the default
+`--tags=fts5` build uses a stub (`spellcheck_nocgo.go`) and needs neither the
+library nor its headers. Skip this section unless you build with
+`--tags="fts5,spell"`.
 
 The Go binding hardcodes the **Apple Silicon** Homebrew paths in
 `hunspell/hunspell.go`:
@@ -261,7 +269,7 @@ Run it:
 | Error | Cause | Fix |
 |---|---|---|
 | `undefined: ansi.DecodeKittyTextSizeMarkers` / `makeRaw` / `restoreTerminal`, or `undefined: unix.TCGETS` on macOS | a leftover `go.work` pointing at a stale `../glamour` | delete `go.work` (§2) |
-| `hunspell/hunspell.h: file not found` | hunspell not installed / Intel paths | §3 |
+| `hunspell/hunspell.h: file not found` (`spell` builds only) | hunspell not installed / Intel paths | §3 |
 | `libvim.a` not found / link errors | libvim.a not built or not in root | §4 |
 | `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream onivim/libvim | re-run `./scripts/build-libvim.sh` (§4) |
 | libvim build fails on a warning (e.g. `long long` to `double`) | newer clang promotes warnings under `-Werror` | `git -C ../libvim pull` — the fork's build scripts carry the `-Wno-error` flags; report it there if it persists |
