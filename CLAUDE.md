@@ -101,7 +101,7 @@ cd cmd/heic_worker
 CGO_ENABLED=1 go build -o ../../heic_worker
 ```
 
-`heic_cgo.go` looks for `heic_worker` next to the main executable, then in the current directory. If it's missing or built for the wrong architecture, `IsHEICAvailable()` returns false and HEIC images silently fail to render. The pure Go pillow-heif fallback (see "HEIC Image Support" below) is unaffected.
+`heic_cgo.go` looks for `heic_worker` next to the main executable, then in the current directory. If it's missing or built for the wrong architecture, `IsHEICAvailable()` returns false and HEIC images fail to render; nothing else is affected, and vimango itself builds and runs without libheif either way (see "HEIC Image Support" below).
 
 - Run: `go run main.go`
 
@@ -429,41 +429,26 @@ The kitty text sizing protocol (OSC 66, added in kitty 0.40.0) allows scaled hea
 - The disk cache works with any kitty-graphics-compatible terminal (kitty, ghostty, etc.)
 
 ## HEIC Image Support
-The application supports HEIC/HEIF image format (commonly used by Apple devices for high-efficiency image storage) on Linux and macOS using Python pillow-heif.
+HEIC/HEIF images (the iPhone camera format) are decoded by libheif running in the separate **`heic_worker`** binary — build it as in "Building heic_worker" above. That is the only decoder in a supported build.
 
-### Setup
-HEIC support requires a Python virtual environment with pillow-heif:
-```bash
-python3 -m venv .venv
-.venv/bin/pip install Pillow pillow-heif
-```
+### How it works
+- vimango never links libheif. `heic_cgo.go` uses go-libheif's client side, which runs `heic_worker` as a hashicorp/go-plugin RPC subprocess and sends it the image bytes; only `cmd/heic_worker` imports the C binding (`strukturag/libheif/go/heif`). So the vimango build needs neither libheif nor `pkg-config` — only the worker build does — and a libheif crash kills the worker, not vimango.
+- The worker is started on the first HEIC image (`createHEICDecoder`, once per process), found next to the vimango executable or else in the current directory.
+- It is **not** tied to its parent's lifetime: it outlives a clean exit holding ~136MB. `ShutdownHEICDecoder` (`heic.go`) kills it and must run before the process exits — this matters most for `--render-html`, a fresh process per hybrid preview. It is one-shot: go-libheif v1.3.0's `DeInit` leaves its initialized flag set, so the worker cannot be restarted in the same process.
+- `decodeImageWithOrientation` (`term_misc.go`) checks for HEIC first; the decoded image then goes through the normal image path and is cached as base64 PNG in `./image_cache/`, so later displays need no HEIC decoding (and no worker).
 
-The `.venv` directory and `heic_convert.py` script must be located either next to the `vimango` executable or in the current working directory.
-
-### Graceful Degradation
-HEIC support degrades gracefully in all failure scenarios - the main application will never crash due to missing HEIC dependencies:
-
-- **Missing `.venv` or pillow-heif**: HEIC reported as unavailable with descriptive error
-- **Missing `heic_convert.py`**: HEIC reported as unavailable with descriptive error
-- **Windows builds**: HEIC images skipped with informative message
-- **Corrupted HEIC file**: Python subprocess returns error, main app continues operating
-
-When HEIC is unavailable, attempting to display a HEIC image will show an error message rather than crashing.
-
-### Behavior
-- **Linux/macOS with pillow-heif**: HEIC images are automatically detected by magic bytes and converted to PNG for display/caching
-- **First access**: HEIC is decoded via Python subprocess and converted to PNG, then cached as base64 in `./image_cache/`
-- **Subsequent access**: Cached PNG is used directly - no HEIC decoding needed
-- **Windows**: HEIC images are gracefully skipped with an informative message
+### When it's unavailable
+Missing worker, wrong architecture, or a corrupt file: `IsHEICAvailable()` is false or `Decode` returns an error, and that one image shows an error instead of rendering. Nothing else is affected.
 
 ### HEIC Detection
 HEIC files are detected by magic bytes (ftyp box with heic/heix/hevc/hevx/mif1/msf1 brand identifiers), not by file extension, ensuring reliable detection for Google Drive images where extension may not be preserved.
 
 ### Implementation Files
-- `heic.go` - Shared interface and HEIC magic bytes detection
-- `heic_pillow.go` - Python pillow-heif based HEIC decoding (Linux, macOS)
-- `heic_nocgo.go` - Stub implementation for Windows
-- `heic_convert.py` - Python script that converts HEIC to PNG via stdin/stdout
+- `heic.go` - Shared interface, magic-byte detection, `ShutdownHEICDecoder`
+- `heic_cgo.go` (`cgo && !windows`) - the `heic_worker` decoder; the one every supported build uses
+- `cmd/heic_worker/main.go` - the worker: go-libheif plugin over libheif
+- `heic_pillow.go` (`!cgo && !windows`) and `heic_convert.py` - Python pillow-heif decoder (a `.venv` with Pillow and pillow-heif, spawned per image). **Dead code:** only a `CGO_ENABLED=0` build compiles it, and those are unsupported since libvim became the only vim engine. A `.venv` has no effect on a supported build.
+- `heic_nocgo.go` (`windows`) - stub; Windows is unsupported
 
 ## Local-Only Operation (UUID-Based Containers)
 
