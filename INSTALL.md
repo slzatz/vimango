@@ -210,21 +210,7 @@ expected and harmless.
 
 ---
 
-## 6. HEIC Python fallback (optional)
-
-Independent of `heic_worker`, there is a pure-Python HEIC path via pillow-heif:
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install Pillow pillow-heif
-```
-
-`.venv/` and `heic_convert.py` must be next to the executable or in the CWD.
-Degrades gracefully if absent.
-
----
-
-## 7. Build vimango
+## 6. Build vimango
 
 From the project root:
 
@@ -239,7 +225,7 @@ CGO is required — libvim is the only vim engine (pure-Go builds and Windows ar
 
 ---
 
-## 8. First-run configuration
+## 7. First-run configuration
 
 `config.json` is `.gitignore`d (it can hold secrets), so a fresh clone has none.
 Generate a default one plus the local SQLite databases:
@@ -283,4 +269,4 @@ Run it:
 | `Package libheif was not found in the pkg-config search path` | libheif not actually installed (despite `brew --prefix` printing a path) | `brew install libheif`; verify with `brew list libheif` (§5) |
 | `cannot use uint32(...) as _Ctype_heif_*` when building `heic_worker` | strukturag/libheif binding version ≠ installed libheif | `go get github.com/strukturag/libheif@<installed-version>` (§5) |
 | HEIC images don't render | `heic_worker` missing/wrong arch | §5 (non-fatal) |
-| `config.json` / database errors on first run | never initialized | `./vimango --init` (§8) |
+| `config.json` / database errors on first run | never initialized | `./vimango --init` (§7) |

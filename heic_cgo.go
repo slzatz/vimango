@@ -27,9 +27,6 @@ var (
 )
 
 func init() {
-	// Override the default - HEIC is available with CGO
-	isHEICAvailableDefault = true
-
 	// Suppress debug output from hashicorp/go-plugin used by go-libheif
 	os.Setenv("HCLOG_LEVEL", "OFF")
 

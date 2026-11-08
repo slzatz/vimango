@@ -75,7 +75,7 @@ cd cmd/heic_worker
 CGO_ENABLED=1 go build -o ../../heic_worker
 ```
 
-If `heic_worker` is missing or built for the wrong architecture, vimango will silently fall through HEIC images (the placeholder will not render). HEIC support is optional — non-HEIC images are unaffected, and pure Go builds use a `pillow-heif` Python fallback when `.venv` is set up (see "HEIC Image Support" below).
+If `heic_worker` is missing or built for the wrong architecture, vimango will silently fall through HEIC images (the placeholder will not render). HEIC support is optional — non-HEIC images are unaffected, and vimango itself builds without libheif.
 
 ## Quick Start
 

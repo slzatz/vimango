@@ -61,7 +61,7 @@ func isValidGoogleDriveID(id string) bool {
 // decodeImageWithOrientation decodes an image and applies EXIF orientation correction.
 // Uses the imaging library's AutoOrientation feature to handle phone camera images
 // that store orientation in EXIF metadata. Falls back gracefully if no EXIF present.
-// Now supports HEIC format when CGO is available.
+// HEIC is decoded by the heic_worker subprocess (heic_cgo.go).
 func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
 	// Buffer the input so we can read it multiple times
 	data, err := io.ReadAll(r)
@@ -76,12 +76,13 @@ func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
 			if err != nil {
 				return nil, "", fmt.Errorf("HEIC decode failed: %v", err)
 			}
-			// HEIC images decoded by pillow-heif should already have orientation applied
-			// Return as "heic" format - will be converted to PNG for caching
+			// No EXIF pass: libheif applies the HEIC's own rotation/mirror
+			// when it decodes. Return as "heic" format - will be converted to
+			// PNG for caching
 			return img, "heic", nil
 		}
 		// HEIC not available - return meaningful error
-		return nil, "", fmt.Errorf("HEIC format detected but not supported (requires CGO with libheif or .venv with pillow-heif)")
+		return nil, "", fmt.Errorf("HEIC format detected but not supported (heic_worker missing or failed to start: build cmd/heic_worker and put it next to vimango)")
 	}
 
 	// Detect format using standard library for non-HEIC formats

@@ -23,9 +23,6 @@ var (
 	globalHEICDecoderOnce sync.Once
 )
 
-// Default availability flag - overridden by heic_pillow.go init()
-var isHEICAvailableDefault = false
-
 // GetHEICDecoder returns the global HEIC decoder instance
 func GetHEICDecoder() HEICDecoder {
 	globalHEICDecoderOnce.Do(func() {
@@ -87,8 +84,7 @@ func IsHEICData(data []byte) bool {
 // machine is up.
 //
 // Safe to call unconditionally: a no-op when no decoder was ever
-// created, when this build has no worker to kill (pillow spawns a
-// short-lived python per decode and waits on it), or when called twice.
+// created, when this build has no worker (the stub), or when called twice.
 func ShutdownHEICDecoder() {
 	shutdownHEICDecoder()
 }
@@ -101,7 +97,7 @@ func (s *StubHEICDecoder) IsAvailable() bool {
 }
 
 func (s *StubHEICDecoder) Decode(r io.Reader) (image.Image, error) {
-	return nil, fmt.Errorf("HEIC decoding not available (requires CGO with libheif or .venv with pillow-heif)")
+	return nil, fmt.Errorf("HEIC decoding not available in this build (requires cgo and the heic_worker binary)")
 }
 
 func createStubHEICDecoder() HEICDecoder {

@@ -1,10 +1,12 @@
-//go:build windows
+//go:build !cgo || windows
 
 package main
 
-// No init function needed - isHEICAvailableDefault remains false
+// The complement of heic_cgo.go. Neither case is a supported build (libvim
+// needs cgo; Windows was dropped), so this only keeps the HEIC files
+// complete for every build constraint.
 
-// createHEICDecoder provides a stub implementation when CGO is not available
+// createHEICDecoder returns the stub: there is no heic_worker to drive.
 func createHEICDecoder() HEICDecoder {
 	return createStubHEICDecoder()
 }

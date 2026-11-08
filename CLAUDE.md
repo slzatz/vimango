@@ -447,8 +447,9 @@ HEIC files are detected by magic bytes (ftyp box with heic/heix/hevc/hevx/mif1/m
 - `heic.go` - Shared interface, magic-byte detection, `ShutdownHEICDecoder`
 - `heic_cgo.go` (`cgo && !windows`) - the `heic_worker` decoder; the one every supported build uses
 - `cmd/heic_worker/main.go` - the worker: go-libheif plugin over libheif
-- `heic_pillow.go` (`!cgo && !windows`) and `heic_convert.py` - Python pillow-heif decoder (a `.venv` with Pillow and pillow-heif, spawned per image). **Dead code:** only a `CGO_ENABLED=0` build compiles it, and those are unsupported since libvim became the only vim engine. A `.venv` has no effect on a supported build.
-- `heic_nocgo.go` (`windows`) - stub; Windows is unsupported
+- `heic_nocgo.go` (`!cgo || windows`) - stub for the complement of `heic_cgo.go`; neither case is a supported build
+
+A Python pillow-heif decoder (`heic_pillow.go`, `heic_convert.py`, a `.venv` with Pillow and pillow-heif) was removed 2026-11-08: only a `CGO_ENABLED=0` build compiled it, and those have been unsupported since libvim became the only vim engine. An old `.venv` in the vimango directory can be deleted.
 
 ## Local-Only Operation (UUID-Based Containers)
 

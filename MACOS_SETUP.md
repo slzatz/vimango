@@ -194,7 +194,7 @@ vimango's editor **is** vim, provided by a static library built from the
 [slzatz/libvim](https://github.com/slzatz/libvim) fork — not upstream
 onivim/libvim, which lacks fixes vimango needs. It's architecture-specific, so
 each machine builds its own copy, and rebuilds it whenever the fork moves
-(step 14). A script does everything: it clones the fork next to vimango (or uses
+(step 13). A script does everything: it clones the fork next to vimango (or uses
 the checkout already there, after checking it *is* the fork, on `master`, with
 no local changes), pulls it, installs the ncurses/gettext Homebrew packages,
 builds with the fork's own `build-macos.sh`, and copies the result into the
@@ -246,26 +246,11 @@ cd ../..
 ls -la heic_worker
 ```
 
-If it is missing vimango still works: HEIC images fall back to a Python path
-(step 10) or don't render.
+If it is missing vimango still works; HEIC images just don't render.
 
 ---
 
-## 10. Optional: Python HEIC fallback
-
-A second, pure-Python HEIC decode path used when `heic_worker` can't handle a
-file. macOS's `python3` (installed with the Command Line Tools) is fine:
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install Pillow pillow-heif
-```
-
-Skip freely — it degrades gracefully.
-
----
-
-## 11. Build vimango itself
+## 10. Build vimango itself
 
 From the vimango root:
 
@@ -288,7 +273,7 @@ ls -la vimango
 
 ---
 
-## 12. First run
+## 11. First run
 
 Generate the config file and local databases:
 
@@ -316,7 +301,7 @@ right. Basics to try:
 and view it — the image should render inline in the terminal.
 
 > **Always run vimango from its own directory.** It resolves `config.json`,
-> the style files, both databases, `.venv`, and the worker binary relative
+> the style files, both databases, and the worker binary relative
 > to the current directory. A shell alias keeps that convenient:
 >
 > ```bash
@@ -325,7 +310,7 @@ and view it — the image should render inline in the terminal.
 
 ---
 
-## 13. Optional integrations
+## 12. Optional integrations
 
 Configured in `config.json` (created by `--init`; it's `.gitignore`d because
 it can hold secrets):
@@ -341,7 +326,7 @@ it can hold secrets):
 
 ---
 
-## 14. Updating later
+## 13. Updating later
 
 ```bash
 cd ~/code/vimango
@@ -370,10 +355,10 @@ first if cgo type errors appear — see step 9).
 | `hunspell/hunspell.h: file not found` | hunspell not installed (or Intel paths) | steps 6–7 |
 | Spell check accepts everything | dictionaries missing from `/usr/share/hunspell` | step 7 |
 | linker can't find `libvim.a` | not built, or `go build` not run from vimango root | step 8 |
-| `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream | `./scripts/build-libvim.sh` (step 14) |
+| `undefined: vimSetMappingsEnabled` (or another `vim…` symbol) at link time | `libvim.a` older than this vimango, or built from upstream | `./scripts/build-libvim.sh` (step 13) |
 | `exec: "pkg-config": executable file not found` | pkg-config missing | step 6 |
 | `cannot use uint32(...) as _Ctype_heif_*` | libheif binding/library version mismatch | step 9 note |
-| `no such module: fts5` when saving a note | built without `--tags=fts5` | step 11 |
+| `no such module: fts5` when saving a note | built without `--tags=fts5` | step 10 |
 | Images don't render, notes otherwise fine | terminal lacks kitty graphics (e.g. Terminal.app) | step 3 |
 | HEIC images specifically don't render | `heic_worker` missing/wrong arch | step 9 (non-fatal) |
-| `config.json` / database errors at startup | first-run init never done, or wrong CWD | step 12 |
+| `config.json` / database errors at startup | first-run init never done, or wrong CWD | step 11 |
