@@ -400,11 +400,12 @@ The application uses the kitty graphics protocol for inline image display. This 
 ### Supported Terminals
 - **Kitty**: Full support including images, Unicode placeholders, and text sizing (OSC 66)
 - **Ghostty**: Supports images and Unicode placeholders; text sizing not yet supported (falls back gracefully)
-- **Other terminals**: Any terminal implementing the kitty graphics protocol should work for images
+- **Rex** (superlogical's tmux-like multiplexer): images, treated like Ghostty. Rex sets `TERM=xterm-256color`, so it is detected by `TERM_PROGRAM=rex` (added 2026-11-09; before that it needed `TERM=xterm-ghostty ./vimango`)
+- **Other terminals**: detection reads environment variables only and never queries the terminal, so a terminal that implements the kitty graphics protocol but isn't named in `IsTermKitty()` gets no images. Launching with `TERM=xterm-ghostty` turns them on (graphics without kitty text sizing); `TERM=xterm-kitty` also turns on text sizing and runs `kitty --version`
 
 ### Feature Detection
 The application automatically detects terminal capabilities:
-- `IsTermKitty()` in `term_misc.go` - Detects kitty graphics protocol support (kitty, ghostty, etc.)
+- `IsTermKitty()` in `term_misc.go` - Detects kitty graphics protocol support from `TERM`, `TERM_PROGRAM` and `GHOSTTY_RESOURCES_DIR` (kitty, ghostty, rex)
 - `isActualKittyTerminal()` in `kitty_capabilities.go` - Distinguishes actual kitty from other compatible terminals
 - Text sizing (OSC 66) is only enabled for actual kitty terminal; other terminals get standard ANSI heading styles
 

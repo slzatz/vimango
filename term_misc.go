@@ -355,7 +355,7 @@ func GetEnvIdentifiers() map[string]string {
 }
 
 // IsTermKitty checks if the terminal supports the kitty graphics protocol.
-// This includes Kitty terminal, Ghostty, and other compatible terminals.
+// This includes Kitty terminal, Ghostty, Rex, and other compatible terminals.
 // NOTE: $TERM may be overwritten by tmux
 func IsTermKitty() bool {
 	V := GetEnvIdentifiers()
@@ -373,6 +373,12 @@ func IsTermKitty() bool {
 		return true
 	}
 	if os.Getenv("GHOSTTY_RESOURCES_DIR") != "" {
+		return true
+	}
+
+	// Rex (superlogical's terminal multiplexer) supports the graphics protocol
+	// but sets TERM=xterm-256color; it identifies itself only by TERM_PROGRAM.
+	if V["TERM_PROGRAM"] == "rex" {
 		return true
 	}
 
