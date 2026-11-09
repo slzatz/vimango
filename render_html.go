@@ -22,6 +22,18 @@ func DetermineWikiLinks(args []string) bool {
 	return false
 }
 
+// DetermineTitle reports whether --title was given: put the note's title
+// at the top of a --render-html page. A host pane has its own title bar
+// and leaves it off; an export (a PDF) has nothing else to name it.
+func DetermineTitle(args []string) bool {
+	for _, arg := range args {
+		if arg == "--title" {
+			return true
+		}
+	}
+	return false
+}
+
 // DetermineRenderHTML returns the note id passed to --render-html, or -1 if
 // the flag is absent. ValidateArgs has already guaranteed the value is
 // present and numeric.
@@ -42,7 +54,7 @@ func DetermineRenderHTML(args []string) int {
 // app's preview pane). Google Drive images resolve to inline data URIs via
 // the same auth token and image cache the TUI uses; if Drive is not
 // configured the image markdown is passed through untouched.
-func RunRenderHTML(id int, linkNotes bool) int {
+func RunRenderHTML(id int, linkNotes, showTitle bool) int {
 	// The HEIC decoder leaves a plugin subprocess running that outlives
 	// this process unless it is killed. Deferred rather than placed at
 	// the end: every return below is an early one, and main() calls
@@ -78,10 +90,10 @@ func RunRenderHTML(id int, linkNotes bool) int {
 		return 1
 	}
 
-	// Embedded-pane style: no <h1> — the host app
-	// shows the title in its own native header — and left-aligned
-	// content instead of a centered reading column.
-	html, err := RenderNoteAsHTML(title, note.String, linkNotes)
+	// Embedded-pane style: left-aligned content instead of a centered
+	// reading column, and no <h1> unless asked for (--title) — the host
+	// app's panes show the title in their own native header.
+	html, err := RenderNoteAsHTML(title, note.String, linkNotes, showTitle)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)
 		return 1

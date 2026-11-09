@@ -18,6 +18,7 @@ var validFlags = map[string]bool{
 	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
 	"--gdrive-auth": true, // sign in to Google Drive (create/refresh token.json) and exit
 	"--wiki-links":  true, // with --render-html: emit [[refs]] as clickable anchors
+	"--title":       true, // with --render-html: put the note's title at the top as an <h1>
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
@@ -124,6 +125,11 @@ OPTIONS:
         anchors with a vimango://note/ href instead of inert spans. Only
         for a host that intercepts that scheme: without one the links are
         dead, so this is off unless asked for.
+
+    --title
+        With --render-html, put the note's title at the top of the page
+        as a heading. Off by default: a host pane shows the title in its
+        own header. For exports (a PDF has nothing else to name it).
 
     --gdrive-auth
         Sign in to Google Drive and exit: runs the OAuth flow (prints a

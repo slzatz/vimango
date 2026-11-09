@@ -74,7 +74,10 @@ func resolveAccent(configured, key, fallback string) string {
 // it is metadata, not part of the note) and left-aligned content, since
 // auto-centering inside a pane reads as a large wasted indent. title fills
 // only <title>.
-func RenderNoteAsHTML(title, markdownContent string, linkNotes bool) (string, error) {
+// showTitle puts the note's title at the top of the page as an <h1>. The
+// app's panes leave it out -- each has a native title bar right above --
+// but an exported page has nothing above it.
+func RenderNoteAsHTML(title, markdownContent string, linkNotes, showTitle bool) (string, error) {
 	// Peel off a YAML frontmatter block, if the note opens with one, and
 	// render it as its own metadata card (frontmatter.go). Ahead of the
 	// image pass and of goldmark both: goldmark has no notion of
@@ -634,10 +637,27 @@ func RenderNoteAsHTML(title, markdownContent string, linkNotes bool) (string, er
                 color: #6cb6ff;
             }
         }
+        /* Paper (the host's PDF export). A code block scrolls sideways
+           on screen, but a page has no scrollbar: an unwrapped line is
+           cut off at the margin, so wrap it there instead. */
+        @media print {
+            pre {
+                white-space: pre-wrap;
+                overflow-wrap: anywhere;
+                overflow-x: visible;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                break-after: avoid;
+            }
+            img {
+                break-inside: avoid;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="content">
+        {{if .ShowTitle}}<h1>{{.Title}}</h1>{{end}}
         {{.Content}}
     </div>
 </body>
@@ -651,12 +671,14 @@ func RenderNoteAsHTML(title, markdownContent string, linkNotes bool) (string, er
 	var buf strings.Builder
 	err = tmpl.Execute(&buf, struct {
 		Title      string
+		ShowTitle  bool
 		Content    template.HTML
 		Accent     template.CSS
 		CodeAccent template.CSS
 	}{
-		Title:   title,
-		Content: template.HTML(htmlContent),
+		Title:     title,
+		ShowTitle: showTitle,
+		Content:   template.HTML(htmlContent),
 		// template.CSS is safe here: both resolvers only return
 		// regex-validated hex or fixed keywords.
 		Accent:     template.CSS(previewAccent()),
