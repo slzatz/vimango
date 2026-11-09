@@ -13,8 +13,10 @@
 # This script:
 #   1. Finds the fork checkout at ../libvim (next to vimango), or clones it there.
 #   2. Refuses to build unless that checkout's origin is slzatz/libvim, it is on
-#      master, and it has no local changes -- each failure says how to fix it.
-#   3. Pulls master (skip with --no-pull, e.g. offline).
+#      main, and it has no local changes -- each failure says how to fix it.
+#      A checkout still on master (the fork's branch was renamed to main on
+#      2026-11-09) is switched over first, when that is a fast-forward.
+#   3. Pulls main (skip with --no-pull, e.g. offline).
 #   4. Builds with the fork's own script -- build-macos.sh or build-linux.sh --
 #      which owns the configure flags and reconfigures only when they change.
 #      On macOS it installs the Homebrew build deps (ncurses, gettext) first.
@@ -42,7 +44,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-pull) PULL=0 ;;
     --clean | --tests) PASS+=("$arg") ;;
-    -h | --help) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "error: unknown option: $arg (see --help)" >&2; exit 1 ;;
   esac
 done
@@ -64,7 +66,7 @@ if [[ ! -d "${LIBVIM_DIR}" ]]; then
 fi
 cd "${LIBVIM_DIR}"
 
-# --- 2. It must be the fork, on master, unmodified.
+# --- 2. It must be the fork, on main, unmodified.
 origin="$(git remote get-url origin 2>/dev/null || true)"
 if ! [[ "${origin}" =~ ${FORK_RE} ]]; then
   echo "error: ${LIBVIM_DIR} is not the slzatz/libvim fork (origin: ${origin:-none})." >&2
@@ -73,22 +75,46 @@ if ! [[ "${origin}" =~ ${FORK_RE} ]]; then
   exit 1
 fi
 branch="$(git branch --show-current)"
-if [[ "${branch}" != "master" ]]; then
-  echo "error: ${LIBVIM_DIR} is on branch '${branch:-detached HEAD}', not master." >&2
-  echo "       vimango is built from the fork's master:  git -C '${LIBVIM_DIR}' checkout master" >&2
+# The fork's master became main on 2026-11-09. Move a checkout made before
+# that across, but only when its master is behind origin/main (nothing local
+# would be lost); anything else is left for a person to sort out.
+if [[ "${branch}" == "master" ]] && [[ "${PULL}" -eq 1 ]]; then
+  echo "==> The fork's master is now main; switching ${LIBVIM_DIR} over"
+  git fetch --prune origin
+  if git merge-base --is-ancestor master origin/main; then
+    if git show-ref --verify --quiet refs/heads/main; then
+      git checkout main
+      git branch -d master
+    else
+      git branch -m master main
+    fi
+    git branch -u origin/main main
+    git remote set-head origin -a >/dev/null
+    branch=main
+  else
+    echo "error: ${LIBVIM_DIR}'s master has commits that are not on origin/main." >&2
+    echo "       Look at them (git -C '${LIBVIM_DIR}' log origin/main..master), then switch:" >&2
+    echo "       git -C '${LIBVIM_DIR}' switch main" >&2
+    exit 1
+  fi
+fi
+if [[ "${branch}" != "main" ]]; then
+  echo "error: ${LIBVIM_DIR} is on branch '${branch:-detached HEAD}', not main." >&2
+  echo "       vimango is built from the fork's main:" >&2
+  echo "       git -C '${LIBVIM_DIR}' fetch origin && git -C '${LIBVIM_DIR}' switch main" >&2
   exit 1
 fi
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "error: ${LIBVIM_DIR} has uncommitted changes to tracked files:" >&2
   git status --short --untracked-files=no >&2
-  echo "       Commit or stash them; vimango is built from the fork's master as published." >&2
+  echo "       Commit or stash them; vimango is built from the fork's main as published." >&2
   exit 1
 fi
 
-# --- 3. Bring master up to date.
+# --- 3. Bring main up to date.
 if [[ "${PULL}" -eq 1 ]]; then
   echo "==> Pulling ${LIBVIM_DIR}"
-  git pull --ff-only origin master
+  git pull --ff-only origin main
 fi
 commit="$(git log -1 --format='%h %s')"
 echo "==> Building libvim at ${commit}"

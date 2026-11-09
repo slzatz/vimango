@@ -41,7 +41,7 @@ Then, from the vimango root, on either platform:
 ./scripts/build-libvim.sh
 ```
 
-It clones the fork to `../libvim` (or uses the checkout already there — `LIBVIM_DIR` points it elsewhere), refuses a checkout that isn't the fork, isn't on `master` or has local changes, pulls `master`, builds with the fork's own `build-macos.sh` / `build-linux.sh`, and copies `libvim.a` into the vimango root. `--clean` rebuilds from scratch, `--tests` runs libvim's API tests, `--no-pull` builds the checkout as it is.
+It clones the fork to `../libvim` (or uses the checkout already there — `LIBVIM_DIR` points it elsewhere), refuses a checkout that isn't the fork, isn't on `main` or has local changes, pulls `main`, builds with the fork's own `build-macos.sh` / `build-linux.sh`, and copies `libvim.a` into the vimango root. `--clean` rebuilds from scratch, `--tests` runs libvim's API tests, `--no-pull` builds the checkout as it is.
 
 By hand, the equivalent is:
 ```bash

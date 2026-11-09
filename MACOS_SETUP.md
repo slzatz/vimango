@@ -179,7 +179,7 @@ vimango's editor **is** vim, provided by a static library built from the
 onivim/libvim, which lacks fixes vimango needs. It's architecture-specific, so
 each machine builds its own copy, and rebuilds it whenever the fork moves
 (step 13). A script does everything: it clones the fork next to vimango (or uses
-the checkout already there, after checking it *is* the fork, on `master`, with
+the checkout already there, after checking it *is* the fork, on `main`, with
 no local changes), pulls it, installs the ncurses/gettext Homebrew packages,
 builds with the fork's own `build-macos.sh`, and copies the result into the
 vimango root:

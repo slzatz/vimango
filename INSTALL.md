@@ -99,11 +99,13 @@ missing.
 
 **Symptom if missing:** linker errors / `libvim.a` not found when building.
 
-> **If `../libvim` is on the fork's `spelling_restore` branch** (from the
-> hand-build steps this section used to give): that branch was merged into
-> `master` on 2026-11-09, and the script refuses a checkout that isn't on
-> `master`. Run `git -C ../libvim switch master` first. (The spell code has
-> been built and tested on macOS only so far, not yet with GCC on Linux.)
+> **The fork's `master` branch was renamed `main` on 2026-11-09.** A
+> `../libvim` still on `master` is switched to `main` by the script. One on
+> the `spelling_restore` branch (from the hand-build steps this section used
+> to give) is refused; that branch is merged, so switch first:
+> `git -C ../libvim fetch origin && git -C ../libvim switch main`. (The spell
+> code has been built and tested on macOS only so far, not yet with GCC on
+> Linux.)
 
 ### Use the script (macOS and Linux)
 
@@ -113,8 +115,8 @@ missing.
 
 It uses the fork checkout at `../libvim` (next to vimango; set `LIBVIM_DIR` to
 keep it elsewhere), cloning it there if it doesn't exist. It refuses to build
-from a checkout that isn't the fork, isn't on `master`, or has local changes,
-and says how to fix each. Otherwise it pulls `master`, builds with the fork's
+from a checkout that isn't the fork, isn't on `main`, or has local changes,
+and says how to fix each. Otherwise it pulls `main`, builds with the fork's
 own `build-macos.sh` / `build-linux.sh` (installing the Homebrew ncurses and
 gettext first on macOS), copies `libvim.a` into the project root, and prints the
 libvim commit it was built from.
