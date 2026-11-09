@@ -364,12 +364,16 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 func (o *Organizer) NavigateNoticeModeKeyHandler(c int) RedrawScope {
 	o.ShowMessage(BL, "NavigateRender mode")
 	switch c {
-	case ctrlKey('j'), PAGE_DOWN:
+	case ctrlKey('j'):
 		o.scrollNoticeDown()
-	case ctrlKey('k'), PAGE_UP:
+	case ctrlKey('k'):
 		o.scrollNoticeUp()
 	case HOME_KEY:
 		o.scrollNoticeHome()
+	case ' ', PAGE_DOWN: // half a page, as in the rendered note
+		o.pageNoticeDown()
+	case 'b', PAGE_UP:
+		o.pageNoticeUp()
 	case ':': // COMMAND or SEARCH
 		o.ShowMessage(BL, ":")
 		vim.SendKey("<esc>") // park in NORMAL mode
@@ -404,12 +408,16 @@ func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
 		return RedrawFull // needed to redraw status line
 	}
 	switch c {
-	case ctrlKey('j'), PAGE_DOWN:
+	case ctrlKey('j'):
 		o.scrollNoticeDown()
-	case ctrlKey('k'), PAGE_UP:
+	case ctrlKey('k'):
 		o.scrollNoticeUp()
 	case HOME_KEY:
 		o.scrollNoticeHome()
+	case ' ', PAGE_DOWN: // half a page, as in the rendered note
+		o.pageNoticeDown()
+	case 'b', PAGE_UP:
+		o.pageNoticeUp()
 	case ':': // COMMAND or SEARCH
 		o.ShowMessage(BL, ":")
 		vim.SendKey("<esc>") // park in NORMAL mode

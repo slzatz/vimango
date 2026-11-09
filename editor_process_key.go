@@ -174,12 +174,16 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 // pane; these keys scroll it, and ':' starts a new command line.
 func (e *Editor) HelpModeKeyHandler(c int) (redraw, exit bool) {
 	switch c {
-	case PAGE_DOWN, ctrlKey('j'):
+	case ctrlKey('j'):
 		app.Organizer.scrollNoticeDown()
-	case PAGE_UP, ctrlKey('k'):
+	case ctrlKey('k'):
 		app.Organizer.scrollNoticeUp()
 	case HOME_KEY:
 		app.Organizer.scrollNoticeHome()
+	case ' ', PAGE_DOWN: // half a page, as in the rendered note
+		app.Organizer.pageNoticeDown()
+	case 'b', PAGE_UP:
+		app.Organizer.pageNoticeUp()
 	case ':': // COMMAND or SEARCH
 		e.ShowMessage(BR, ":")
 		vim.SendKey("<esc>")

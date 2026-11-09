@@ -290,9 +290,9 @@ command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
 ### Normal Mode Command Organization
 **Editor:** none. The editor intercepts no normal-mode keys (`normalCmds`, `NormalModeKeyHandler` and the editor's normal-command registry were removed with Ctrl-H/Ctrl-L on 2026-11-08); every key goes to vim. Markup and list shortcuts are vim mappings in `vimango.vim`, and the editor's `:help normal` lists them (`editorNormalModeHelp` — keep it in step with that file).
 
-**Organizer Normal Mode Commands (10 commands in 3 categories, plus `:`):**
+**Organizer Normal Mode Commands (12 commands in 3 categories, plus `:`):**
 - **Entry Actions**: m (mark), Ctrl-D (delete), Ctrl-A (star), Ctrl-X (archive), Ctrl-F (new folder), Ctrl-C (new context)
-- **Navigation**: Ctrl-J / Ctrl-K (scroll the rendered note down / up), Home (back to its top)
+- **Navigation**: Space or PgDn / b or PgUp (page the rendered note down / up by half a pane, as Space/Shift-Space and PgDn/PgUp do in vimango_hybrid), Ctrl-J / Ctrl-K (one line down / up), Home (back to its top). The same keys scroll `:help` and the other notices, in the organizer and the editor. Space and b are there because ssh and rex often don't carry Ctrl-J/K. Shift-Space can't be the way back as it is in hybrid: terminals send it as a bare space (and `csiUKey` decodes the kitty protocol's form to one too), so it pages down like Space. Taking Space and b costs title editing vim's `l` and `b`.
 - **Information**: Ctrl-I (show entry info)
 - `:` opens the ex command line
 

@@ -39,16 +39,33 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 
 	// Navigation commands
 	registry.Register(string(rune(ctrlKey('j'))), (*Organizer).scrollPreviewDown, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('j')))) + "/PgDn",
-		Aliases:     []string{string(rune(PAGE_DOWN))},
-		Description: "Scroll rendered note down",
+		Name:        keyToDisplayName(string(rune(ctrlKey('j')))),
+		Description: "Scroll rendered note down one line",
 		Category:    "Navigation",
 	})
 
 	registry.Register(string(rune(ctrlKey('k'))), (*Organizer).scrollPreviewUp, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('k')))) + "/PgUp",
+		Name:        keyToDisplayName(string(rune(ctrlKey('k')))),
+		Description: "Scroll rendered note up one line",
+		Category:    "Navigation",
+	})
+
+	// Half-page paging, as in vimango_hybrid's preview. Space and b are plain
+	// characters, so they survive ssh and rex, which often drop Ctrl-J/K.
+	// Shift-Space is Space here: terminals send it as a bare space (and the
+	// kitty protocol's CSI-u form decodes to one too), so the way back is b,
+	// as in less. They take Space (vim's l) and b from title editing.
+	registry.Register(" ", (*Organizer).pagePreviewDown, CommandInfo{
+		Name:        "Space/PgDn",
+		Aliases:     []string{string(rune(PAGE_DOWN))},
+		Description: "Scroll rendered note down half a page",
+		Category:    "Navigation",
+	})
+
+	registry.Register("b", (*Organizer).pagePreviewUp, CommandInfo{
+		Name:        "b/PgUp",
 		Aliases:     []string{string(rune(PAGE_UP))},
-		Description: "Scroll rendered note up",
+		Description: "Scroll rendered note up half a page",
 		Category:    "Navigation",
 	})
 
@@ -165,6 +182,28 @@ func (o *Organizer) scrollPreviewUp() {
 	}
 }
 
+// for paging the terminal markdown rendered note by half a screen; it stops
+// once the note's last line reaches the bottom of the pane
+func (o *Organizer) pagePreviewDown() {
+	last := max(len(o.note)-o.Screen.textLines, 0)
+	if o.altRowoff >= last {
+		o.ShowMessage(BL, "Reached end of rendered note")
+		return
+	}
+	o.altRowoff = min(o.altRowoff+max(o.Screen.textLines/2, 1), last)
+	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
+	o.Screen.eraseRightScreen()
+	o.drawRenderedNote()
+}
+
+func (o *Organizer) pagePreviewUp() {
+	if o.altRowoff > 0 {
+		o.altRowoff = max(o.altRowoff-max(o.Screen.textLines/2, 1), 0)
+		o.Screen.eraseRightScreen()
+		o.drawRenderedNote()
+	}
+}
+
 func (o *Organizer) scrollPreviewHome() {
 	o.altRowoff = 0
 	o.Screen.eraseRightScreen()
@@ -185,6 +224,41 @@ func (o *Organizer) scrollNoticeDown() {
 	o.drawNoticeLayer()
 	o.drawNoticeText()
 }
+
+// noticeRows is how many lines of a notice drawNoticeText shows: all of a
+// notice that fits in its box, otherwise the box less two rows.
+func (o *Organizer) noticeRows() int {
+	box := o.Screen.textLines - 10
+	if len(o.notice) <= box {
+		return len(o.notice)
+	}
+	return max(box-2, 1)
+}
+
+// for paging reports (notices) like help by half the box
+func (o *Organizer) pageNoticeDown() {
+	if len(o.notice) == 0 {
+		return
+	}
+	last := len(o.notice) - o.noticeRows()
+	if o.altRowoff >= last {
+		o.ShowMessage(BL, "Reached end of rendered note")
+		return
+	}
+	o.altRowoff = min(o.altRowoff+max(o.noticeRows()/2, 1), last)
+	o.drawNoticeLayer()
+	o.drawNoticeText()
+}
+
+func (o *Organizer) pageNoticeUp() {
+	if len(o.notice) == 0 || o.altRowoff == 0 {
+		return
+	}
+	o.altRowoff = max(o.altRowoff-max(o.noticeRows()/2, 1), 0)
+	o.drawNoticeLayer()
+	o.drawNoticeText()
+}
+
 func (o *Organizer) scrollNoticeHome() {
 	if len(o.notice) == 0 {
 		return
