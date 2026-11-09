@@ -173,3 +173,30 @@ func TestDrawSpellErrors(t *testing.T) {
 		t.Errorf("drew with spell off: %q", b.String())
 	}
 }
+
+// 'spelloptions' noallcaps (the libvim fork's, set in vimango.vim): an unknown
+// word in capitals only is neither highlighted nor a stop for ]s.
+func TestNoAllCapsSkipsAcronyms(t *testing.T) {
+	e := newSpellEditor(t, "The ZXQV report wrold ZXQV's.")
+	vim.ExecuteCommand("set spelloptions=noallcaps")
+	t.Cleanup(func() { vim.ExecuteCommand("set spelloptions=") })
+
+	var b strings.Builder
+	e.drawSpellErrors(&b)
+	out := b.String()
+	if strings.Contains(out, "mZXQV\x1b[0m") {
+		t.Errorf("acronym highlighted: %q", out)
+	}
+	if !strings.Contains(out, "\x1b[48;5;31mwrold\x1b[0m") {
+		t.Errorf("bad word not highlighted: %q", out)
+	}
+	if !strings.Contains(out, "\x1b[48;5;31mZXQV's\x1b[0m") {
+		t.Errorf("word with a lower-case letter not highlighted: %q", out)
+	}
+
+	vim.SetCursorPosition(1, 0)
+	e.sendKeys("]s")
+	if got := vim.GetCursorPosition(); got != [2]int{1, 16} {
+		t.Errorf("]s went to %v, want [1 16] (wrold)", got)
+	}
+}

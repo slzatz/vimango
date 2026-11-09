@@ -173,3 +173,9 @@ xnoremap <C-e> :<C-u>call VimangoDecorate('`', visualmode())<CR>
 " line or a sentence end, which notes are full of. Misspellings are still
 " highlighted.
 set spellcapcheck=
+
+" Unknown words in capitals only (NASA, MP3) are acronyms, not misspellings:
+" not highlighted, and ]s [s skip them. A word with a lower-case letter is
+" still checked (NASA's, IPv6). 'spelloptions' noallcaps is the libvim fork's
+" own; :syntax and @NoSpell are not available (libvim has no syntax engine).
+set spelloptions=noallcaps
