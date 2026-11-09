@@ -122,6 +122,27 @@ func TestSpellNormalCommands(t *testing.T) {
 	}
 }
 
+// zg writes the word to 'spellfile' (zG, above, only to an internal list).
+// It crashed when libvim's Makefile had no header dependencies for spellfile.o:
+// a structs.h change left it compiled against the old synblock_T, so it read
+// 'spellfile' from the wrong field and dereferenced NULL.
+func TestSpellZgWritesSpellfile(t *testing.T) {
+	vbuf := spellSetup(t, []string{"Hello wrold and", "more wurds here."})
+	CursorSetPosition(1, 0)
+
+	input("]", "s", "z", "g")
+	if errs := SpellGetErrors(vbuf, 1, 2); len(errs) != 1 || errs[0].Line != 2 {
+		t.Errorf("after zg got %+v, want only the line 2 error", errs)
+	}
+	data, err := os.ReadFile(Eval("&spellfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(data)); got != "wrold" {
+		t.Errorf("spellfile holds %q, want %q", got, "wrold")
+	}
+}
+
 // z= on a long run of one letter used to freeze the editor: the suggestion
 // search is exponential in the word's length (12 l's took over two minutes).
 // timeout:1000 bounds it, and asking twice must give the same list, since the
