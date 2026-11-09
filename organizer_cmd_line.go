@@ -428,8 +428,8 @@ func (o *Organizer) help(pos int) {
 			helpText = o.commandRegistry.FormatCommandHelp(arg)
 		} else if o.normalCommandRegistry != nil {
 			// Check if it's a normal mode command (by display name)
-			if normalInfo, exists := o.findNormalCommandByDisplayName(arg); exists {
-				helpText = o.normalCommandRegistry.FormatCommandHelp(normalInfo.Name)
+			if key, exists := o.normalCommandRegistry.KeyFor(arg); exists {
+				helpText = o.normalCommandRegistry.FormatCommandHelp(key)
 			} else {
 				// Check if it's a category (ex commands first, then normal)
 				exCategories := o.commandRegistry.GetAllCommands()
@@ -556,23 +556,6 @@ func (o *Organizer) formatNormalModeHelp() string {
 	help.WriteString("Use ':help <category>' for commands in a specific category.\n")
 
 	return help.String()
-}
-
-// findNormalCommandByDisplayName finds a normal command by its display name
-func (o *Organizer) findNormalCommandByDisplayName(displayName string) (CommandInfo, bool) {
-	if o.normalCommandRegistry == nil {
-		return CommandInfo{}, false
-	}
-
-	allCommands := o.normalCommandRegistry.GetAllCommands()
-	for _, commands := range allCommands {
-		for _, cmd := range commands {
-			if cmd.Name == displayName {
-				return cmd, true
-			}
-		}
-	}
-	return CommandInfo{}, false
 }
 
 func (o *Organizer) openContainerSelection() {

@@ -10,7 +10,7 @@ import (
 )
 
 func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Organizer) {
-	registry := NewCommandRegistry[func(*Organizer)]()
+	registry := NewKeyRegistry[func(*Organizer)]()
 
 	// Entry Actions commands
 	registry.Register(string(rune(0x4)), (*Organizer).del, CommandInfo{

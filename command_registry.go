@@ -22,6 +22,7 @@ type CommandRegistry[T any] struct {
 	commands map[string]T           // Command name -> function
 	info     map[string]CommandInfo // Command name -> metadata
 	aliases  map[string]string      // Alias -> primary command name
+	keyed    bool                   // see NewKeyRegistry
 }
 
 // NewCommandRegistry creates a new command registry
@@ -31,6 +32,53 @@ func NewCommandRegistry[T any]() *CommandRegistry[T] {
 		info:     make(map[string]CommandInfo),
 		aliases:  make(map[string]string),
 	}
+}
+
+// NewKeyRegistry creates a registry of normal-mode commands, which are keyed
+// by the bytes their key sends (Ctrl-D is "\x04", PgDn a synthetic key code)
+// rather than by a name. Help finds them by their display name (KeyFor), and
+// the keys themselves -- aliases included -- are never shown: Name already
+// says which keys run the command ("Space/PgDn").
+func NewKeyRegistry[T any]() *CommandRegistry[T] {
+	r := NewCommandRegistry[T]()
+	r.keyed = true
+	return r
+}
+
+// KeyFor returns the key a keyed registry's command is bound to, given the
+// name help shows for it or any "/"-separated part of that name, ignoring
+// case: "Ctrl-D", "ctrl-d", "Space" or "pgdn" for "Space/PgDn".
+func (r *CommandRegistry[T]) KeyFor(name string) (string, bool) {
+	for key, info := range r.info {
+		for _, part := range append(strings.Split(info.Name, "/"), info.Name) {
+			if strings.EqualFold(part, name) {
+				return key, true
+			}
+		}
+	}
+	return "", false
+}
+
+// shownAliases is the aliases help displays: none for a keyed registry.
+func (r *CommandRegistry[T]) shownAliases(info CommandInfo) []string {
+	if r.keyed {
+		return nil
+	}
+	return info.Aliases
+}
+
+// names is what SuggestCommand matches against: display names in a keyed
+// registry, whose keys are not text.
+func (r *CommandRegistry[T]) names() []string {
+	var names []string
+	for key, info := range r.info {
+		if r.keyed {
+			names = append(names, info.Name)
+		} else {
+			names = append(names, key)
+		}
+	}
+	return names
 }
 
 // Register adds a command with its metadata to the registry
@@ -92,7 +140,7 @@ func (r *CommandRegistry[T]) SuggestCommand(input string) []string {
 	var suggestions []string
 
 	// First pass: exact prefix matches
-	for name := range r.info {
+	for _, name := range r.names() {
 		if strings.HasPrefix(strings.ToLower(name), input) {
 			suggestions = append(suggestions, name)
 		}
@@ -100,7 +148,7 @@ func (r *CommandRegistry[T]) SuggestCommand(input string) []string {
 
 	// Second pass: contains matches if no prefix matches found
 	if len(suggestions) == 0 {
-		for name := range r.info {
+		for _, name := range r.names() {
 			if strings.Contains(strings.ToLower(name), input) {
 				suggestions = append(suggestions, name)
 			}
@@ -109,7 +157,7 @@ func (r *CommandRegistry[T]) SuggestCommand(input string) []string {
 
 	// Third pass: similar commands (edit distance or similar)
 	if len(suggestions) == 0 {
-		for name := range r.info {
+		for _, name := range r.names() {
 			if levenshteinDistance(strings.ToLower(input), strings.ToLower(name)) <= 2 {
 				suggestions = append(suggestions, name)
 			}
@@ -130,8 +178,8 @@ func (r *CommandRegistry[T]) FormatCommandHelp(name string) string {
 	var help strings.Builder
 	help.WriteString(fmt.Sprintf("Command: %s\n", info.Name))
 
-	if len(info.Aliases) > 0 {
-		help.WriteString(fmt.Sprintf("Aliases: %s\n", strings.Join(info.Aliases, ", ")))
+	if aliases := r.shownAliases(info); len(aliases) > 0 {
+		help.WriteString(fmt.Sprintf("Aliases: %s\n", strings.Join(aliases, ", ")))
 	}
 
 	if info.Usage != "" {
@@ -165,8 +213,8 @@ func (r *CommandRegistry[T]) FormatCategoryHelp(category string) string {
 
 	for _, cmd := range commands {
 		help.WriteString(fmt.Sprintf("  %-15s %s\n", cmd.Name, cmd.Description))
-		if len(cmd.Aliases) > 0 {
-			help.WriteString(fmt.Sprintf("  %-15s (aliases: %s)\n", "", strings.Join(cmd.Aliases, ", ")))
+		if aliases := r.shownAliases(cmd); len(aliases) > 0 {
+			help.WriteString(fmt.Sprintf("  %-15s (aliases: %s)\n", "", strings.Join(aliases, ", ")))
 		}
 	}
 
@@ -193,8 +241,8 @@ func (r *CommandRegistry[T]) FormatAllHelp() string {
 
 		for _, cmd := range commands {
 			aliases := ""
-			if len(cmd.Aliases) > 0 {
-				aliases = fmt.Sprintf(" (%s)", strings.Join(cmd.Aliases, ", "))
+			if shown := r.shownAliases(cmd); len(shown) > 0 {
+				aliases = fmt.Sprintf(" (%s)", strings.Join(shown, ", "))
 			}
 			examples := ""
 			if len(cmd.Examples) > 0 {
