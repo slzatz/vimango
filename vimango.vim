@@ -174,8 +174,11 @@ xnoremap <C-e> :<C-u>call VimangoDecorate('`', visualmode())<CR>
 " highlighted.
 set spellcapcheck=
 
-" Unknown words in capitals only (NASA, MP3) are acronyms, not misspellings:
-" not highlighted, and ]s [s skip them. A word with a lower-case letter is
-" still checked (NASA's, IPv6). 'spelloptions' noallcaps is the libvim fork's
-" own; :syntax and @NoSpell are not available (libvim has no syntax engine).
-set spelloptions=noallcaps
+" Unknown words written with capitals are names, not misspellings: not
+" highlighted, and ]s [s skip them.
+"   noallcaps    capitals only: NASA, MP3
+"   nomixedcase  a capital after the first letter: iOS, GitHub, NASA's, PDFs
+" A word capitalized only at its start (Smith) is still checked; zg adds it.
+" Both values are the libvim fork's own; :syntax and @NoSpell are not available
+" (libvim has no syntax engine).
+set spelloptions=noallcaps,nomixedcase

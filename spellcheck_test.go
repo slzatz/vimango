@@ -178,7 +178,7 @@ func TestDrawSpellErrors(t *testing.T) {
 // word in capitals only is neither highlighted nor a stop for ]s.
 func TestNoAllCapsSkipsAcronyms(t *testing.T) {
 	e := newSpellEditor(t, "The ZXQV report wrold ZXQV's.")
-	vim.ExecuteCommand("set spelloptions=noallcaps")
+	vim.ExecuteCommand("set spelloptions=noallcaps") // not nomixedcase: ZXQV's stays bad
 	t.Cleanup(func() { vim.ExecuteCommand("set spelloptions=") })
 
 	var b strings.Builder
@@ -198,5 +198,26 @@ func TestNoAllCapsSkipsAcronyms(t *testing.T) {
 	e.sendKeys("]s")
 	if got := vim.GetCursorPosition(); got != [2]int{1, 16} {
 		t.Errorf("]s went to %v, want [1 16] (wrold)", got)
+	}
+}
+
+// nomixedcase: a capital after the first letter (iOS, NASA's) is a name.
+func TestNoMixedCaseSkipsMixedCaseWords(t *testing.T) {
+	e := newSpellEditor(t, "The zXqv ZXQV's report Zxqv wrold.")
+	vim.ExecuteCommand("set spelloptions=nomixedcase")
+	t.Cleanup(func() { vim.ExecuteCommand("set spelloptions=") })
+
+	var words []string
+	for _, se := range e.vbuf.SpellErrors(1, 1) {
+		words = append(words, e.ss[0][se.Col:se.Col+se.Len])
+	}
+	if got, want := strings.Join(words, " "), "Zxqv wrold"; got != want {
+		t.Errorf("misspelled = %q, want %q", got, want)
+	}
+
+	vim.SetCursorPosition(1, 0)
+	e.sendKeys("]s")
+	if got := vim.GetCursorPosition(); got != [2]int{1, 23} {
+		t.Errorf("]s went to %v, want [1 23] (Zxqv)", got)
 	}
 }
