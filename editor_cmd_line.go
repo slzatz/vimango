@@ -189,7 +189,6 @@ func (e *Editor) writeNote() {
 	e.saveTick = e.vbuf.GetLastChangedTick()
 
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
-	e.ShowMessage(BR, "isModified = %t", e.isModified())
 }
 
 func (e *Editor) readFile() {
