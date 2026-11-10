@@ -144,7 +144,7 @@ reconfigure only when those flags change. The fork's `CLAUDE.md` and
 > The CGO linker directives in `vim/cvim/cvim.go` reference `libvim.a` as a bare
 > filename resolved from the build working directory, so it must sit in the
 > project root and you must run `go build` from there. The checked-in
-> `vim/cvim/auto/config.h` and `auto/pathdef.c` work on both platforms and don't
+> libvim headers under `vim/cvim/` (including `auto/config.h`) work on both platforms and don't
 > need regenerating.
 
 ---

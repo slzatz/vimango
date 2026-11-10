@@ -144,6 +144,3 @@ func CommandLineGetText() string {
 func CommandLineGetPosition() int {
 	return cvim.CommandLineGetPosition()
 }
-
-// Helper functions to convert between buffer types
-// (CGO-specific conversion functions are in api_cgo_compat.go)

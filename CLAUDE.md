@@ -85,7 +85,7 @@ The two `-Wno-error` flags are needed on GCC 14+ (verified on GCC 16.2, Arch, 20
 
 **Notes:**
 - The CGO linkage flags in `vim/cvim/cvim.go` reference `libvim.a` as a bare filename resolved from the build working directory (project root).
-- The `auto/config.h` and `auto/pathdef.c` checked into `vim/cvim/auto/` do not need to be regenerated; they work on both platforms.
+- `vim/cvim/src/`, `proto/` and `auto/` (`config.h`, `osdef.h`) are the libvim headers the cgo bindings compile against, copied from the fork; they work on both platforms and do not need regenerating. A second, stale copy of them directly under `vim/` and the configure leftovers in `vim/cvim/auto/` were deleted 2026-11-10.
 - CGO is required: libvim is the only vim engine (the pure-Go `govim` engine and its adapter layer were removed 2026-07; Windows and `CGO_ENABLED=0` builds are unsupported).
 
 ### Building heic_worker (CGO HEIC Prerequisite)

@@ -10,7 +10,6 @@ support was dropped.)
 
 - `vim/` — API layer used by the application
   - `api.go` — package-level functions the app calls (`vim.SendKey`, …)
-  - `api_cgo_compat.go` — older-style helpers operating on raw `cvim.Buffer`
   - `engine.go` — `InitializeVim` plus thin wrappers (`CGOEngineWrapper`,
     `CGOBufferWrapper`) that satisfy the interfaces in `interfaces/`
   - `interfaces/` — `VimEngine` / `VimBuffer` interfaces (application code
