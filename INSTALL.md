@@ -134,7 +134,13 @@ git clone https://github.com/slzatz/libvim.git    # or: git -C libvim pull
 cd libvim
 ./build-macos.sh       # Linux: ./build-linux.sh   (--clean, --tests as above)
 cp src/libvim.a ../vimango/
+cp src/ex_cmds.h ../vimango/vim/       # vim's command table, which vimango embeds
+cd ../vimango
+CGO_ENABLED=1 go test --tags=fts5 -run TestHeaderMatchesLibvim ./vim
 ```
+
+The last command checks `vim/libvim_api.h`, vimango's own copy of the libvim
+declarations it uses, against the fork's headers.
 
 The fork's scripts hold the configure flags — including the `-Wno-error`
 set newer clang and GCC 14+ need, because libvim builds with `-Werror` — and

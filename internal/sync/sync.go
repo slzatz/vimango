@@ -64,26 +64,15 @@ type container struct {
 	uuid     string
 	title    string
 	star     bool
-	deleted  bool
 	modified string
-	count    int
 }
 
 // entry is the in-flight representation of a task row used for deletes.
 type entry struct {
-	id           int
-	tid          int
-	title        string
-	folder_tid   int
-	context_tid  int
-	folder_uuid  string
-	context_uuid string
-	star         bool
-	note         sql.NullString
-	added        sql.NullString
-	completed    sql.NullString
-	deleted      bool
-	modified     string
+	id       int
+	tid      int
+	title    string
+	modified string
 	// The server's modified as this client last saw it (client rows only).
 	serverModified sql.NullString
 }
@@ -101,7 +90,6 @@ type newEntry struct {
 	note         sql.NullString
 	added        string
 	archived     bool
-	deleted      bool
 	modified     string
 	// The server's modified as this client last saw it (client rows only).
 	serverModified sql.NullString

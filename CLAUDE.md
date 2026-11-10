@@ -43,7 +43,7 @@ CGO_ENABLED=1 go build --tags=fts5
   | vim writes no file | `31301666c` | `undefined: vimSetFileWritesEnabled` |
 
 - **If a header change in the fork does not seem to rebuild an object, use `--clean`.** Any object the fork adds to its build needs a line in the generated `### Dependencies:` section of `src/Makefile`, or header changes will not rebuild it (a stale `spellfile.o` once made `zg` segfault; `TestSpellZgWritesSpellfile` catches that).
-- `vim/src/`, `vim/proto/` and `vim/auto/` are the fork's headers, which the binding compiles against. When the fork changes `libvim.h` (or another header a binding uses), copy the new one in.
+- **The binding compiles against `vim/libvim_api.h`, vimango's own copy of the libvim declarations it uses** (about thirty functions, five types, a few constants) — not against the fork's headers, which the vimango build never sees. `TestHeaderMatchesLibvim` (`vim/header_test.go`) is what keeps the copy honest: it compiles `libvim_api.h` together with the fork's `libvim.h`, so a prototype that differs does not compile, and compares the size and layout of every type and the value of every constant. It needs the fork's checkout (`../libvim` or `$LIBVIM_DIR`) and is skipped without one; `build-libvim.sh` runs it after every build and fails if it does. To use something more of libvim, copy its declaration into `libvim_api.h` and add any new type or constant to the test's probe.
 
 ### The vim package
 
@@ -147,7 +147,7 @@ Full-text search is the FTS5 table `task_fts` inside `vimango.db`: one row per n
 
 ### Containers and UUIDs
 
-Contexts, folders and keywords each have a `tid` (the PostgreSQL id, NULL until synced) and a `uuid` (generated locally, the identifier for local operations). Tasks point at containers by `context_uuid` / `folder_uuid`; `task_keyword` carries `keyword_uuid`. Sync sends both, and resolves a `tid` from the `uuid` for rows created before their container had one. The defaults, both titled "none": context `00000000-0000-0000-0000-000000000001`, folder `00000000-0000-0000-0000-000000000002`. Schemas: `init.go` (`sqliteSchema`), `schema/postgres.sql`, and `DATABASE_SCHEMA.md`.
+Contexts, folders and keywords each have a `tid` (the PostgreSQL id, NULL until synced) and a `uuid` (generated locally, the identifier for local operations). Tasks point at containers by `context_uuid` / `folder_uuid`; `task_keyword` carries `keyword_uuid`. Sync sends both, and resolves a `tid` from the `uuid` for rows created before their container had one. The defaults, both titled "none": context `00000000-0000-0000-0000-000000000001`, folder `00000000-0000-0000-0000-000000000002`. A database with no server configured works, with one gap: keywords, since `task_keyword` hangs off the server `tid`. Schemas: `init.go` (`sqliteSchema`), `schema/postgres.sql`, and `DATABASE_SCHEMA.md`.
 
 ## Sync
 
@@ -205,7 +205,7 @@ A range in front of a command (`'<,'>` is what vim writes when `:` is pressed in
 
 Why a list of what is allowed, not of what is forbidden: libvim is vim with no screen, one window and one buffer, and commands outside that do real harm, quietly. `:e x` and `:bn` leave the note's buffer, after which every command edits some other buffer; `:cd` moves the working directory vimango finds its files relative to; bare `:let` never returns — it waits inside the C call for a key to page with. So a built-in command not on the list is refused with a reason. A name vim's table does not have (a user-defined `:Command`, a typo) is forwarded, and vim answers (`E492`).
 
-- Names are resolved as vim resolves them: `vim.FindExCommand` is a port of vim's `find_command` over the command table in `vim/src/ex_cmds.h`, embedded in the binary, so `:wri`, `:sav`, `:bn` mean here what they mean in vim.
+- Names are resolved as vim resolves them: `vim.FindExCommand` is a port of vim's `find_command` over the command table in `vim/ex_cmds.h` (the fork's file, copied in by `build-libvim.sh`), embedded in the binary, so `:wri`, `:sav`, `:bn` mean here what they mean in vim.
 - The check covers every command on a line joined with `|` and the command given to `:g`. **It does not look inside vimscript**: `:execute`, `:normal` and `:call` run what they are given. The list guards against habit, not intent.
 - **Two things are enforced by libvim instead, so they hold by every route** — typed, in a mapping, a sourced script, `:execute`. `vim.InitializeVim` sets both:
   - **vim starts no program** (restricted mode, `restricted = 1`, what `vim -Z` sets): `:r !cmd`, `` :r `cmd` ``, `system()`, `:!cmd`, `:diffpatch` each get `E145`. Restricted mode also turns off vimscript's `delete()`, `rename()` and `mkdir()`.
@@ -336,7 +336,6 @@ Listed 2026-11-10; nothing here is started unless it says so.
 
 - **To update another Mac, follow [docs/UPDATING_A_MAC.md](docs/UPDATING_A_MAC.md)**, and keep it current when a change adds a per-machine step. vimango and hybrid must be updated together, and `libvim.a` rebuilt.
 - **Run the sync integration tests once against `localdb.Open`.** Foreign keys became per-connection on 2026-11-10 with no Postgres on the machine to run them. They have always run on a single connection with enforcement on, so no change is expected.
-- **Dead weight.** `MigrateToUUID()` (`app.go`) runs at every start and is a no-op on every database in use. Local-only operation (no PostgreSQL) is not something anyone runs and does not fully work: keywords need a server `tid`. The vendored libvim headers under `vim/` are about 1 MB for the dozen declarations the bindings use.
 - **Structure.** The database layer (`dbfunc.go`) prints to the screen through the global `app`, and `--editor` still builds an organizer and loads its rows (about 20 `editorOnly` checks paper over that). The organizer's ex commands repeat the same reload code about eight times, and `help()` is nested six deep. Suggested split: a store package that returns errors, the HTML renderer, the editor, with the organizer as the optional layer.
 - **Image cache.** It holds two formats: entries `--render-html` wrote are JPEG data URIs without pixel dimensions, which the TUI cannot use — it downloads the image again and overwrites the entry as PNG. Letting the TUI decode those would end the re-download. Separately, each process keeps its own copy of the index and writes the whole of it, so the last writer wins: a long-running TUI drops the entries a `--render-html` added in the meantime (the image file stays, unindexed, and is downloaded again).
 - **libvim (the fork).** On the Enter that completes a typed `/pattern` the wrap warning is wrong, so vimango drops it there. `:registers`, `:history`, `:messages`, `:version` and a bare `:map` produce no output. A bare `:let` never returns (vimango refuses it). `` :runtime `cmd` `` segfaults (in restricted mode vim refuses the backtick first). `:s` with the `c` flag has no prompt. A multi-key mapping left-hand side loses its first key.

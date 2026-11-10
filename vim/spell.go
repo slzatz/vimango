@@ -1,7 +1,7 @@
 package vim
 
 /*
-#include "src/libvim.h"
+#include "libvim_api.h"
 
 extern void goSpellSuggestCallback(void);
 */

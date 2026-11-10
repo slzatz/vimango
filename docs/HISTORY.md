@@ -267,3 +267,26 @@ repositories:
   here, and in vimango_hybrid).
 - **This file.** CLAUDE.md had grown to 70 KB, loaded every session and mostly
   history; it was rewritten as rules and how-tos, and the history moved here.
+- **Dead weight removed.**
+  - `MigrateToUUID()`: about 160 lines that ran at every start of the TUI and
+    `--editor` to move a pre-UUID database to UUID containers, and returned
+    at once on every database in use.
+  - `extension/` and `extension/ast/`: goldmark extensions for `==highlight==`
+    and `~~strikethrough~~` that nothing imported.
+  - Twelve struct fields in `internal/sync` that were never read or written.
+  - The vendored libvim headers: `vim/src/`, `vim/proto/` and `vim/auto/`,
+    109 files and about 1 MB, copied from the fork because `libvim.h`
+    includes `vim.h`, which includes everything — and among them four `.c`
+    files and twenty-four headers that not even that reached. The binding
+    uses about thirty functions, five types and a few constants, now declared
+    in `vim/libvim_api.h`. The vendored copy was never checked against the
+    library either; the new one is, by `TestHeaderMatchesLibvim`, which
+    `scripts/build-libvim.sh` runs after every build. `vim/ex_cmds.h` (the
+    embedded command table) is the one file kept from the old tree, and the
+    script now copies it from the fork.
+  - Found by `deadcode` and `staticcheck -checks U1000`, which report nothing
+    more in any package; `go mod tidy` had nothing to drop.
+  - Left in on purpose: running with no PostgreSQL configured. It is a few
+    lines in `InitDatabases` and `Synchronize`, and a state the installation
+    guides and vimango_hybrid's README describe as supported (sync reports
+    itself unavailable and everything else works; keywords are the gap).

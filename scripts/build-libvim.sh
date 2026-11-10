@@ -20,9 +20,11 @@
 #   4. Builds with the fork's own script -- build-macos.sh or build-linux.sh --
 #      which owns the configure flags and reconfigures only when they change.
 #      On macOS it installs the Homebrew build deps (ncurses, gettext) first.
-#   5. Copies libvim.a into the vimango root, and the English spell dictionary
-#      (runtime/spell/en.utf-8.{spl,sug}) into spell/, and reports the commit
-#      it was built from.
+#   5. Copies libvim.a into the vimango root, the English spell dictionary
+#      (runtime/spell/en.utf-8.{spl,sug}) into spell/, and vim's command table
+#      (src/ex_cmds.h) into vim/, and reports the commit it was built from.
+#   6. Checks that vim/libvim_api.h -- vimango's own copy of the libvim
+#      declarations it uses -- still matches the fork's headers.
 #
 # Usage:
 #   ./scripts/build-libvim.sh            # pull, build, copy
@@ -44,7 +46,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-pull) PULL=0 ;;
     --clean | --tests) PASS+=("$arg") ;;
-    -h | --help) sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "error: unknown option: $arg (see --help)" >&2; exit 1 ;;
   esac
 done
@@ -137,6 +139,26 @@ cp src/libvim.a "${VIMANGO_ROOT}/libvim.a"
 # The user's own word list (spell/en.utf-8.add, from zg) is left alone.
 mkdir -p "${VIMANGO_ROOT}/spell"
 cp runtime/spell/en.utf-8.spl runtime/spell/en.utf-8.sug "${VIMANGO_ROOT}/spell/"
+# vim's table of ex commands, which vimango embeds to resolve command names as
+# this library does (vim/excommands.go). A tracked file: if the fork changed
+# it, commit the new copy.
+cp src/ex_cmds.h "${VIMANGO_ROOT}/vim/ex_cmds.h"
+
+# --- 6. vimango compiles against its own copy of the declarations it uses, not
+# against these headers, so nothing in its build notices when one changes here.
+if command -v go >/dev/null 2>&1; then
+  echo "==> Checking vim/libvim_api.h against ${LIBVIM_DIR}/src"
+  if ! (cd "${VIMANGO_ROOT}" && LIBVIM_DIR="${LIBVIM_DIR}" CGO_ENABLED=1 \
+        go test --tags=fts5 -count=1 -run '^TestHeaderMatchesLibvim$' ./vim); then
+    echo "error: vim/libvim_api.h no longer matches libvim's headers (see the test's output above)." >&2
+    echo "       libvim.a was built and copied, but vimango must not be built against it until" >&2
+    echo "       vim/libvim_api.h is brought into line with ${LIBVIM_DIR}/src/libvim.h." >&2
+    exit 1
+  fi
+else
+  echo "note: go is not installed yet, so vim/libvim_api.h was not checked against the fork;" >&2
+  echo "      'go test ./vim' does that once it is." >&2
+fi
 echo
 echo "Done. ${VIMANGO_ROOT}/libvim.a is libvim ${commit}"
 echo "Now build vimango:"

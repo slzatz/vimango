@@ -7,11 +7,12 @@ import (
 	"sync"
 )
 
-// vim's table of ex commands, straight from the header libvim is built with.
-// Embedding it means the table here cannot drift from the library's: it is the
-// same file the C side compiles against.
+// vim's table of ex commands: the fork's src/ex_cmds.h, the header libvim is
+// built with. scripts/build-libvim.sh copies it here with libvim.a, and
+// TestHeaderMatchesLibvim fails if the two differ, so the table here is the
+// library's.
 //
-//go:embed src/ex_cmds.h
+//go:embed ex_cmds.h
 var exCmdsHeader string
 
 // ExFlags are a command's flags from ex_cmds.h; only the ones the application

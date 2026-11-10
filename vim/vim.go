@@ -2,23 +2,22 @@
 // screen of its own. The application sends it keys and ex commands and reads
 // back the buffer, cursor and mode; drawing is the application's job.
 //
-// This is the only layer between the application and libvim's C API
-// (src/libvim.h). Each function says which C function it calls. libvim is one
+// This is the only layer between the application and libvim's C API. Each
+// function says which C function it calls; libvim_api.h declares them. libvim is one
 // process-wide vim -- one current buffer, one mode, one cursor -- and is not
 // thread-safe, so everything here must be called from one goroutine (the main
 // loop).
 //
 // The static library is linked by bare filename, so libvim.a must be in the
 // directory the go command is run from: the project root. It is built from
-// the slzatz/libvim fork by scripts/build-libvim.sh; src/, proto/ and auto/
-// here are that fork's headers.
+// the slzatz/libvim fork by scripts/build-libvim.sh. libvim_api.h is this
+// package's own copy of the declarations it uses, checked against the fork's
+// headers by TestHeaderMatchesLibvim.
 package vim
 
 /*
-#include "src/libvim.h"
-#cgo CFLAGS: -Iproto -DHAVE_CONFIG_H
+#include "libvim_api.h"
 #cgo linux LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
-#cgo darwin CFLAGS: -I/opt/homebrew/include
 #cgo darwin LDFLAGS: libvim.a -lm -lncurses /opt/homebrew/opt/gettext/lib/libintl.a -liconv -L/opt/homebrew/lib -framework CoreServices -framework AppKit
 */
 import "C"
