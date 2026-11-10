@@ -305,8 +305,6 @@ it can hold secrets):
 - **Remote sync (PostgreSQL)** — sync notes across machines. Fill in the
   `postgres` block; leave it empty to stay local-only. vimango works fully
   offline; connectivity is only checked when you run a sync.
-- **Claude deep research** — stores research results as notes. Add
-  `"claude": { "api_key": "..." }` or set `VIMANGO_CLAUDE_API_KEY`.
 
 ---
 

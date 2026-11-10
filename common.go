@@ -33,7 +33,6 @@ type Window interface {
 //   - VIMANGO_PG_PASSWORD: overrides postgres.password
 //   - VIMANGO_PG_SSL_MODE: overrides postgres.ssl_mode (disable, require, verify-ca, verify-full)
 //   - VIMANGO_PG_SSL_CA_CERT: overrides postgres.ssl_ca_cert (path to CA certificate)
-//   - VIMANGO_CLAUDE_API_KEY: overrides claude.api_key
 type dbConfig struct {
 	Postgres struct {
 		Host      string `json:"host"`
@@ -59,10 +58,6 @@ type dbConfig struct {
 	Chroma struct {
 		Style string `json:"style"`
 	} `json:"chroma"`
-
-	Claude struct {
-		ApiKey string `json:"api_key"` // Can be overridden by VIMANGO_CLAUDE_API_KEY env var
-	} `json:"claude"`
 
 	Glamour struct {
 		Style string `json:"style"`

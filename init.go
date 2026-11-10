@@ -261,7 +261,6 @@ func runInit() {
 	fmt.Println("Setup complete! You can now run vimango normally.")
 	fmt.Println()
 	fmt.Println("Optional next steps:")
-	fmt.Println("  - Edit config.json to add Claude API key for deep research")
 	fmt.Println("  - Edit config.json to add PostgreSQL settings for remote sync")
 	fmt.Println("  - Set up Google Drive credentials (see README.md)")
 }

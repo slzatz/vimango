@@ -16,7 +16,6 @@ There are a few semi-notable features:
 - Note editing supports full vim keybindings via libvim, which was originally develeped to support the Onivim 2 editor
 - There is full-text search via sqlite's fts5 extension
 - Spell checking with vim's own spell checker (from libvim): misspellings are highlighted as you type, and `]s`, `zg`, `z=` work as in vim
-- You can launch deep research via Claude and the results will be stored as a note
 
 This wasn't developed thinking anyone else would use it so there isn't an installable package. You'll need to clone the repository and build it yourself. On macOS, [MACOS_SETUP.md](./MACOS_SETUP.md) walks a completely fresh machine (no git/Homebrew/Go) through the whole setup; [INSTALL.md](./INSTALL.md) is the condensed build guide. There are a few dependencies that you'll need to have installed first.  These are:
 
@@ -131,9 +130,6 @@ The `config.json` file structure (copy from `config.json.example`):
   "chroma": {
     "style": "gruvbox_mod.xml"
   },
-  "claude": {
-    "api_key": ""
-  },
   "glamour": {
     "style": "darkslz.json"
   }
@@ -147,7 +143,6 @@ The `config.json` file structure (copy from `config.json.example`):
 - **sqlite3**: Local database settings - these files will be created automatically
 - **chroma**: Syntax highlighting style for code blocks in markdown
 - **glamour**: Markdown rendering style - `darkslz.json` and `default.json` are included
-- **claude**: API key for deep research feature (optional)
 
 The full application makes heavy use of CGO to access various C libraries (libvim, sqlite3); CGO is required — pure-Go builds are unsupported.
 

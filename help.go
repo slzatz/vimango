@@ -170,7 +170,6 @@ FEATURES:
     - Organizer mode for browsing and managing notes
     - Markdown rendering
     - Context, folder, and keyword organization
-    - AI-powered deep research with web search and fetch
     - Spell checking (CGO builds only)
 
 For more information, see the readme file in the project directory.

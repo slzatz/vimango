@@ -17,9 +17,6 @@
   "chroma": {
     "style": "gruvbox_mod.xml"
   },
-  "claude": {
-    "api_key": ""
-  },
   "glamour": {
     "style": "darkslz.json"
   },

@@ -225,16 +225,6 @@ This writes `config.json` (pointing at `vimango.db` / `fts5_vimango.db`) and
 creates the databases. Style files `default.json` / `darkslz.json` **are** in the
 repo and are required at startup.
 
-Add your Claude API key to `config.json` if you want the deep-research feature
-(or set `VIMANGO_CLAUDE_API_KEY`):
-
-```json
-{
-  "claude": { "api_key": "your-claude-api-key" },
-  "glamour": { "style": "darkslz.json" }
-}
-```
-
 Run it:
 
 ```bash

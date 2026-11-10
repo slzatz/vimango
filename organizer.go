@@ -36,7 +36,7 @@ type Organizer struct {
 	command_line    string
 	message         string
 	note            []string // the preview
-	notice          []string // e.g., synch results, help test, research notification
+	notice          []string // e.g., sync results, help text
 	command         string
 	show_deleted    bool
 	show_completed  bool

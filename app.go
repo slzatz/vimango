@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	"github.com/slzatz/vimango/rawmode"
@@ -23,15 +22,12 @@ type App struct {
 	Organizer *Organizer // Organizer manages tasks and their display
 	Database  *Database  // Database handles database connections and queries
 
-	// Research system
-	ResearchManager *ResearchManager  // Manages background research tasks
-	RenderManager   *RenderManager    // Manages async note rendering
-	notifications   []string          // Queue of user notifications
-	notificationMux sync.RWMutex      // Mutex for notifications
-	notificationCh  chan struct{}     // Signals pending notifications
-	keyEvents       chan terminal.Key // Key events from reader goroutine
-	keyErrors       chan error        // Key read errors
-	resizeCh        chan struct{}     // Terminal resized (SIGWINCH); handled on the main loop
+	RenderManager *RenderManager // Renders the organizer's preview; loads images in the background
+
+	// Events for MainLoop, each posted by another goroutine
+	keyEvents chan terminal.Key // Key events from reader goroutine
+	keyErrors chan error        // Key read errors
+	resizeCh  chan struct{}     // Terminal resized (SIGWINCH)
 
 	// Database connections and other config
 	Config *dbConfig
@@ -65,13 +61,11 @@ func CreateApp() *App {
 			Screen:   screen,
 			Database: db,
 		},
-		notifications:  make([]string, 0),
-		notificationCh: make(chan struct{}, 1),
-		keyEvents:      make(chan terminal.Key, 16),
-		keyErrors:      make(chan error, 1),
-		resizeCh:       make(chan struct{}, 1),
-		Run:            true,
-		kitty:          kitty, // default to false
+		keyEvents: make(chan terminal.Key, 16),
+		keyErrors: make(chan error, 1),
+		resizeCh:  make(chan struct{}, 1),
+		Run:       true,
+		kitty:     kitty, // default to false
 	}
 }
 
@@ -108,7 +102,6 @@ func (a *App) NewEditor() *Editor {
 // FromFile returns a dbConfig struct parsed from a file.
 // Sensitive credentials can be overridden via environment variables:
 //   - VIMANGO_PG_PASSWORD: PostgreSQL password
-//   - VIMANGO_CLAUDE_API_KEY: Claude API key
 func (a *App) FromFile(path string) (*dbConfig, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -129,9 +122,6 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 	}
 	if sslCACert := os.Getenv("VIMANGO_PG_SSL_CA_CERT"); sslCACert != "" {
 		cfg.Postgres.SSLCACert = sslCACert
-	}
-	if claudeKey := os.Getenv("VIMANGO_CLAUDE_API_KEY"); claudeKey != "" {
-		cfg.Claude.ApiKey = claudeKey
 	}
 
 	return &cfg, nil
@@ -711,16 +701,11 @@ func (a *App) startKeyReader() {
 
 // MainLoop is the one goroutine that draws, changes editor and organizer
 // state, and calls libvim (which is not thread-safe). Everything else -- the
-// key reader, the resize signal, image loading, research -- runs elsewhere
-// and reaches the UI only as an event on one of the channels selected here.
+// key reader, the resize signal, image loading -- runs elsewhere and reaches
+// the UI only as an event on one of the channels selected here.
 func (a *App) MainLoop() {
 	org := a.Organizer
 	a.startKeyReader()
-
-	if a.HasNotifications() {
-		a.processNotifications(org)
-		a.returnCursor()
-	}
 
 	// a nil channel is never ready, so no RenderManager means no such events
 	var renderResults <-chan RenderResult
@@ -786,8 +771,6 @@ func (a *App) MainLoop() {
 			if err != nil {
 				org.ShowMessage(BL, "Readkey problem %v", err)
 			}
-		case <-a.notificationCh:
-			a.processNotifications(org)
 		case <-a.resizeCh:
 			a.handleResize()
 		case res := <-renderResults:
@@ -797,58 +780,6 @@ func (a *App) MainLoop() {
 		a.returnCursor()
 	}
 	a.Cleanup()
-}
-
-// addNotification adds a notification message to the queue
-func (a *App) addNotification(message string) {
-	a.notificationMux.Lock()
-	a.notifications = append(a.notifications, message)
-	a.notificationMux.Unlock()
-
-	select {
-	case a.notificationCh <- struct{}{}:
-	default:
-	}
-}
-
-// GetNotification retrieves and removes the next notification from the queue
-func (a *App) GetNotification() string {
-	a.notificationMux.Lock()
-	defer a.notificationMux.Unlock()
-
-	if len(a.notifications) == 0 {
-		return ""
-	}
-
-	message := a.notifications[0]
-	a.notifications = a.notifications[1:]
-	return message
-}
-
-func (a *App) processNotifications(org *Organizer) {
-	for {
-		notification := a.GetNotification()
-		if notification == "" {
-			return
-		}
-		org.drawNotice(notification)
-		org.altRowoff = 0
-		org.mode = NAVIGATE_NOTICE
-	}
-}
-
-// HasNotifications returns true if there are pending notifications
-func (a *App) HasNotifications() bool {
-	a.notificationMux.RLock()
-	defer a.notificationMux.RUnlock()
-	return len(a.notifications) > 0
-}
-
-// InitResearchManager initializes the research manager with API key
-func (a *App) InitResearchManager(apiKey string) {
-	if apiKey != "" {
-		a.ResearchManager = NewResearchManager(a, apiKey)
-	}
 }
 
 // InitRenderManager initializes the async render manager

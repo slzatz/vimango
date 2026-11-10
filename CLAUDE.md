@@ -199,7 +199,6 @@ The application now supports full Windows cross-compilation from Linux/Unix syst
 - key reader → `keyEvents`
 - SIGWINCH → `resizeCh` → `handleResize()`
 - image loading for the preview (`prepareImages`, `organizer_render.go`: Drive download, disk read, decode — nothing else) → `RenderManager.resultCh` → `applyResult()`, which transmits the images to the terminal, runs glamour and draws
-- anything that wants to show a notice → `addNotification`
 
 New background work follows the same shape: do the slow part off the loop, hand back data, and let the loop touch the UI. Until 2026-11-10 the SIGWINCH goroutine redrew the screen itself (reaching libvim through brace matching and spell errors while a key might be in progress), and the render goroutines transmitted images, ran glamour and replaced `o.note` — which also blanked the editor pane when a note's images finished loading after it had been opened with `:e`. `applyResult` now drops a result the pane cannot show (editor open, a notice up, another row selected); every way back to the preview calls `displayNote`, which renders afresh.
 
@@ -215,14 +214,13 @@ The command system is loosely based on the vim command system and the existence 
 - `:h` - Short alias for help command
 
 ### Ex Command Organization
-**Organizer Ex Commands (37 commands in 10 categories):**
+**Organizer Ex Commands (34 commands in 9 categories):**
 - **Navigation**: open, opencontext, openfolder, openkeyword
 - **Entry Management**: new, write, refresh, set context, set folder, add keyword, e (edit), copy, deletekeywords, deletemarks
 - **Search & Filter**: find, recent
 - **Container Management**: contexts, newc, newf, folders, keywords
 - **View Management**: sort, showall
 - **Images**: convertgdrive, toggleimages, showimageinfo, refreshimageinfo, imagescale, cachewidth, clearcache, imagereset
-- **Research**: research, researchdebug, researchtest
 - **Data Management**: sync
 - **System**: quit
 - **Help**: help
@@ -323,42 +321,6 @@ command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
 - **Key Display**: Human-readable key representations in help (e.g., `\x04` displayed as `Ctrl-D`)
 - **Extensible**: New commands require help metadata, ensuring documentation stays current
 
-## Deep Research System
-The application includes an AI-powered deep research capability that leverages Claude API with combined web search and web fetch tools to generate comprehensive research reports with significantly enhanced depth and quality.
-
-### Research Commands
-- `:research` - Perform deep research on current entry content and save results as new note
-- `:researchdebug` (`:rd`) - Same as research but includes debug information and API response analysis
-
-### Enhanced Research Features
-- **Dual-Tool Approach**: Combines web search (breadth) with web fetch (depth) for comprehensive coverage
-  - **Web Search**: Discovers and evaluates sources (15 max uses)
-  - **Web Fetch**: Accesses complete content from promising sources (8 max uses)
-  - **Intelligent Workflow**: Search → evaluate → fetch → deep analysis
-- **Asynchronous Processing**: Research runs in background without blocking the user interface
-- **Advanced Quality Tiers**:
-  - "Premium Deep Research" - Extensive search + full document analysis
-  - "Comprehensive" - Thorough web research with document analysis
-  - "Detailed" - Moderate web research
-  - "Standard" - Basic research
-  - "Limited" - Minimal research
-- **Enhanced Metrics**: Separate tracking of web searches vs web fetches performed
-- **Automatic Note Creation**: Results are automatically saved as new vimango entries
-- **Usage Statistics**: Tracks and reports token usage, search count, fetch count, duration, and quality ratings
-- **Citations**: Web fetch enables accurate citations from complete documents
-- **Error Recovery**: Comprehensive panic recovery and error handling with web fetch specific diagnostics
-- **Debug Mode**: Optional detailed logging for troubleshooting and analysis with tool usage summaries
-
-### Configuration
-Research functionality requires Claude API key configuration in `config.json`:
-```json
-{
-  "claude": {
-    "api_key": "your-claude-api-key"
-  }
-}
-```
-
 ## Markdown Rendering Configuration
 The application uses the glamour library to render markdown with custom styling for previews and note display.
 
@@ -393,14 +355,6 @@ Error: glamour style files not found:
   Fallback style: default.json
 Please ensure at least one of these files exists
 ```
-
-#### Web Fetch Requirements
-For enhanced deep research with web fetch capabilities:
-- **API Key Permissions**: Ensure your Claude API key has web search and web fetch permissions enabled
-- **Model Compatibility**: Uses Claude Sonnet 4 (`claude-sonnet-4-20250514`) for web fetch support
-- **Beta Access**: Web fetch requires beta feature access with header `anthropic-beta: web-fetch-2025-09-10`
-- **Content Limits**: Configured with 100,000 token limit for large document processing
-- **Citations**: Automatically enabled for fetched content to provide accurate source attribution
 
 ## Terminal Graphics Protocol Support
 
