@@ -79,12 +79,35 @@ func (a *App) setFilterList() []FilterNames {
 	return fnlist
 }
 
-func (o *Organizer) FilterEntries(max int) {
-	var err error
-	o.rows, err = o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, max)
+// entries returns the notes the current filter asks for -- a context's, a
+// folder's, a keyword's, or the recent ones -- and says so if the query fails.
+func (o *Organizer) entries() []Row {
+	rows, err := o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
 	if err != nil {
 		o.showMessage("Error filtering entries: %v", err)
 	}
+	return rows
+}
+
+// setRows makes rows the organizer's list, with the first row current: the
+// rows, vim's buffer of their titles, and the cursor in both. Everything else
+// assumes there is a current row, so a list with nothing in it gets one blank
+// row; empty reports that, for the caller to say what it wants to about it.
+//
+// Every way of changing what is listed ends here. Drawing the right pane for
+// the new current row is the caller's.
+func (o *Organizer) setRows(rows []Row) (empty bool) {
+	o.rows = rows
+	o.fc, o.fr, o.rowoff = 0, 0, 0
+	empty = len(o.rows) == 0
+	if empty {
+		o.insertRow(0, "", true, false, false, BASE_DATE)
+		o.rows[0].dirty = false
+	}
+	o.readRowsIntoBuffer()
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
+	return empty
 }
 
 func (o *Organizer) getId() int {

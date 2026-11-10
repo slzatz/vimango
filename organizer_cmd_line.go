@@ -335,84 +335,55 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	return registry.GetFunctionMap()
 }
 
-// help displays help information for organizer commands
+// help is ":help": every ex command, or what was asked for.
 func (o *Organizer) help(ex exArgs) {
-
-	var helpText string
-
-	if ex.arg == "" {
-		// No arguments - show all ex commands
-		helpText = o.commandRegistry.FormatAllHelp()
-	} else {
-		// Get the argument after "help "
-		arg := ex.arg
-
-		// Check if it's request for normal mode help
-		if arg == "normal" {
-			if o.normalCommandRegistry != nil {
-				helpText = o.formatNormalModeHelp()
-			} else {
-				helpText = "Normal mode help not available"
-			}
-		} else if _, exists := o.commandRegistry.GetCommandInfo(arg); exists {
-			// Check if it's a specific ex command
-			helpText = o.commandRegistry.FormatCommandHelp(arg)
-		} else if o.normalCommandRegistry != nil {
-			// Check if it's a normal mode command (by display name)
-			if key, exists := o.normalCommandRegistry.KeyFor(arg); exists {
-				helpText = o.normalCommandRegistry.FormatCommandHelp(key)
-			} else {
-				// Check if it's a category (ex commands first, then normal)
-				exCategories := o.commandRegistry.GetAllCommands()
-				if _, exists := exCategories[arg]; exists {
-					helpText = o.commandRegistry.FormatCategoryHelp(arg)
-				} else if o.normalCommandRegistry != nil {
-					normalCategories := o.normalCommandRegistry.GetAllCommands()
-					if _, exists := normalCategories[arg]; exists {
-						helpText = o.normalCommandRegistry.FormatCategoryHelp(arg)
-					} else {
-						// Not found - suggest similar commands from both registries
-						exSuggestions := o.commandRegistry.SuggestCommand(arg)
-						normalSuggestions := o.normalCommandRegistry.SuggestCommand(arg)
-						allSuggestions := append(exSuggestions, normalSuggestions...)
-						if len(allSuggestions) > 0 {
-							helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(allSuggestions, ", "))
-						} else {
-							helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' for ex commands or ':help normal' for normal mode commands.", arg)
-						}
-					}
-				} else {
-					// Normal command registry not available
-					suggestions := o.commandRegistry.SuggestCommand(arg)
-					if len(suggestions) > 0 {
-						helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
-					} else {
-						helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
-					}
-				}
-			}
-		} else {
-			// Check if it's a category
-			categories := o.commandRegistry.GetAllCommands()
-			if _, exists := categories[arg]; exists {
-				helpText = o.commandRegistry.FormatCategoryHelp(arg)
-			} else {
-				// Not found - suggest similar commands
-				suggestions := o.commandRegistry.SuggestCommand(arg)
-				if len(suggestions) > 0 {
-					helpText = fmt.Sprintf("Command or category '%s' not found.\nDid you mean: %s", arg, strings.Join(suggestions, ", "))
-				} else {
-					helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' to see all available commands.", arg)
-				}
-			}
-		}
-	}
-
 	o.mode = HELP
-	o.drawNotice(helpText)
+	o.drawNotice(o.helpFor(ex.arg))
 	o.altRowoff = 0
 	o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }
+
+// helpFor is the help text for arg: nothing (every ex command), "normal", an
+// ex command, a normal-mode key by its name ("Ctrl-D"), or a category of
+// either kind, looked for in that order. Anything else gets the commands with
+// names like it.
+func (o *Organizer) helpFor(arg string) string {
+	ex, normal := o.commandRegistry, o.normalCommandRegistry
+	if arg == "" {
+		return ex.FormatAllHelp()
+	}
+	if arg == "normal" {
+		return o.formatNormalModeHelp()
+	}
+	if _, found := ex.GetCommandInfo(arg); found {
+		return ex.FormatCommandHelp(arg)
+	}
+	if normal != nil {
+		if key, found := normal.KeyFor(arg); found {
+			return normal.FormatCommandHelp(key)
+		}
+	}
+	if _, found := ex.GetAllCommands()[arg]; found {
+		return ex.FormatCategoryHelp(arg)
+	}
+	if normal != nil {
+		if _, found := normal.GetAllCommands()[arg]; found {
+			return normal.FormatCategoryHelp(arg)
+		}
+	}
+
+	suggestions := ex.SuggestCommand(arg)
+	hint := "Use ':help' to see all available commands."
+	if normal != nil {
+		suggestions = append(suggestions, normal.SuggestCommand(arg)...)
+		hint = "Use ':help' for ex commands or ':help normal' for normal mode commands."
+	}
+	if len(suggestions) > 0 {
+		hint = "Did you mean: " + strings.Join(suggestions, ", ")
+	}
+	return fmt.Sprintf("Command or category '%s' not found.\n%s", arg, hint)
+}
+
 func (o *Organizer) newContext(ex exArgs) {
 	o.altView = CONTEXT
 	o.command = ""
@@ -517,20 +488,11 @@ func (o *Organizer) generateNoteList() {
 	o.ShowMessage(BL, "'%s' will be opened", o.filter)
 	o.clearMarkedEntries()
 	o.view = TASK
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.FilterEntries(MAX)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
+	if o.setRows(o.entries()) {
 		o.showMessage("No results were returned")
 	}
-	o.readRowsIntoBuffer()
-	vim.SetCursorPosition(1, 0)
-	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.altRowoff = 0
 	o.displayNote()
-	//o.mode = NORMAL
-	//o.command = ""
 }
 
 func (o *Organizer) open(ex exArgs) {
@@ -812,49 +774,25 @@ func (o *Organizer) refreshView(containerInfo bool) {
 				o.ShowMessage(BL, "Error searching for %s: %v", o.Session.fts_search_terms, err)
 				return
 			}
-			o.rows = rows
-			o.fc, o.fr, o.rowoff = 0, 0, 0
-			if len(o.rows) == 0 {
-				o.insertRow(0, "", true, false, false, BASE_DATE)
-				o.rows[0].dirty = false
+			if o.setRows(rows) {
 				o.ShowMessage(BL, "No results were returned")
 			}
-			o.readRowsIntoBuffer()
-			vim.SetCursorPosition(1, 0)
-			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.displayNote()
 		} else {
-			//o.mode = o.last_mode
 			o.mode = NORMAL
-			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.FilterEntries(MAX)
-			if len(o.rows) == 0 {
-				o.insertRow(0, "", true, false, false, BASE_DATE)
-				o.rows[0].dirty = false
+			if o.setRows(o.entries()) {
 				o.ShowMessage(BL, "No results were returned")
 			}
-			o.readRowsIntoBuffer()
-			vim.SetCursorPosition(1, 0)
-			o.bufferTick = o.vbuf.GetLastChangedTick()
 			o.ShowMessage(BL, "View refreshed")
 			o.displayNote()
 		}
 	} else {
-		//o.mode = o.last_mode
 		o.mode = NORMAL
 		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-		o.rows = o.Database.getContainers(o.view)
-		if len(o.rows) == 0 {
-			//o.mode = NO_ROWS  //I don't think NO_ROWS exists any more
-			o.insertRow(0, "", true, false, false, BASE_DATE)
-			o.rows[0].dirty = false
+		if o.setRows(o.Database.getContainers(o.view)) {
 			o.ShowMessage(BL, "No results were returned")
 		}
-		o.fc, o.fr, o.rowoff = 0, 0, 0
 		o.filter = ""
-		o.readRowsIntoBuffer()
-		vim.SetCursorPosition(1, 0)
-		o.bufferTick = o.vbuf.GetLastChangedTick()
 		if containerInfo {
 			o.displayContainerInfo()
 		}
@@ -892,17 +830,8 @@ func (o *Organizer) find(ex exArgs) {
 	o.filter = ""
 	o.taskview = BY_FIND
 	o.view = TASK
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.rows = rows
-
 	o.ShowMessage(BL, "Search for '%s'", searchTerms)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-	}
-	o.readRowsIntoBuffer()
-	vim.SetCursorPosition(1, 0)
-	o.bufferTick = o.vbuf.GetLastChangedTick()
+	o.setRows(rows)
 	o.displayNote()
 }
 
@@ -947,17 +876,10 @@ func (o *Organizer) containers(ex exArgs) {
 
 	o.Screen.eraseRightScreen()
 	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-	o.rows = o.Database.getContainers(o.view)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
+	if o.setRows(o.Database.getContainers(o.view)) {
 		o.ShowMessage(BL, "No results were returned")
 	}
-	o.fc, o.fr, o.rowoff = 0, 0, 0
 	o.filter = ""
-	o.readRowsIntoBuffer()
-	vim.SetCursorPosition(1, 0)
-	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.displayContainerInfo()
 	o.ShowMessage(BL, "Retrieved %s", containerType)
 }
@@ -1021,16 +943,9 @@ func (o *Organizer) recent(ex exArgs) {
 	o.taskview = BY_RECENT
 	o.view = TASK
 	o.mode = NORMAL
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.FilterEntries(MAX)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
+	if o.setRows(o.entries()) {
 		o.ShowMessage(BL, "No results were returned")
 	}
-	o.readRowsIntoBuffer()
-	vim.SetCursorPosition(1, 0)
-	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.displayNote()
 }
 

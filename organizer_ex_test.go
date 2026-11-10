@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -39,6 +40,8 @@ func newDBOrganizer(t *testing.T, titles ...string) (o *Organizer, ids []int) {
 	vim.SetCursorPosition(1, 0)
 
 	a := &App{Session: sess, Screen: scr, Database: db, Organizer: o, Run: true}
+	a.RenderManager = NewRenderManager(a) // the preview of the current row
+	t.Cleanup(a.RenderManager.Stop)
 	o.exCmds = a.setOrganizerExCmds(o)
 	o.normalCmds = a.setOrganizerNormalCmds(o)
 	prev := app
@@ -171,5 +174,132 @@ func TestSetContextWithASpaceInTheName(t *testing.T) {
 	}
 	if got != uuid {
 		t.Errorf("after :set context my context the note's context is %s, want %s", got, uuid)
+	}
+}
+
+// titles is the list as vim holds it and as the organizer holds it; the two
+// must agree.
+func (o *Organizer) listed(t *testing.T) []string {
+	t.Helper()
+	var titles []string
+	for _, r := range o.rows {
+		titles = append(titles, r.title)
+	}
+	if got := o.vbuf.Lines(); strings.Join(got, "\n") != strings.Join(titles, "\n") {
+		t.Errorf("vim's buffer holds %q, the organizer's rows %q", got, titles)
+	}
+	return titles
+}
+
+// Every command that changes what is listed leaves the list in one state: the
+// rows, vim's buffer of their titles, and the cursor on the first of them.
+func TestCommandsThatChangeTheList(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha", "bravo", "charlie")
+	atTop := func(after string) {
+		t.Helper()
+		if o.fr != 0 || o.fc != 0 || o.rowoff != 0 || vim.GetCursorPosition() != [2]int{1, 0} {
+			t.Errorf("after :%s the cursor is at row %d col %d (vim %v), want the first row", after, o.fr, o.fc, vim.GetCursorPosition())
+		}
+		if o.mode != NORMAL {
+			t.Errorf("after :%s the mode is %v", after, o.mode)
+		}
+	}
+	sorted := func(titles []string) string {
+		s := slices.Clone(titles)
+		slices.Sort(s)
+		return strings.Join(s, " ")
+	}
+	move := func() { // off the first row, so that a command has something to reset
+		o.fr = len(o.rows) - 1
+		vim.SetCursorPosition(o.fr+1, 0)
+	}
+
+	for _, cmd := range []string{"recent", "open none", "openfolder none", "opencontext none", "refresh", "showall", "showall", "sort added"} {
+		move()
+		o.ex(t, cmd)
+		if got := sorted(o.listed(t)); got != "alpha bravo charlie" {
+			t.Errorf(":%s lists %q, want the three notes", cmd, got)
+		}
+		if o.view != TASK {
+			t.Errorf(":%s left view %v", cmd, o.view)
+		}
+		atTop(cmd)
+	}
+
+	move()
+	o.ex(t, "find bravo")
+	if got := o.listed(t); len(got) != 1 || got[0] != "bravo" {
+		t.Errorf(":find bravo lists %q", got)
+	}
+	atTop("find bravo")
+	o.ex(t, "refresh") // a refresh of a search runs the search again
+	if got := o.listed(t); len(got) != 1 || got[0] != "bravo" || o.taskview != BY_FIND {
+		t.Errorf(":refresh after :find lists %q (taskview %d)", got, o.taskview)
+	}
+
+	// containers, and back
+	for cmd, want := range map[string]View{"contexts": CONTEXT, "folders": FOLDER} {
+		o.ex(t, cmd)
+		if got := o.listed(t); len(got) != 1 || got[0] != "none" || o.view != want {
+			t.Errorf(":%s lists %q in view %v", cmd, got, o.view)
+		}
+		atTop(cmd)
+		o.ex(t, "refresh")
+		if got := o.listed(t); len(got) != 1 || got[0] != "none" || o.view != want {
+			t.Errorf(":refresh in :%s lists %q in view %v", cmd, got, o.view)
+		}
+	}
+	o.ex(t, "recent")
+	if got := sorted(o.listed(t)); got != "alpha bravo charlie" {
+		t.Errorf(":recent after a container view lists %q", got)
+	}
+}
+
+// A list with nothing in it still has a current row: one blank, unsaved row
+// that is not counted as an edit.
+func TestAnEmptyListHasOneBlankRow(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha")
+	for _, cmd := range []string{"keywords", "find zzzznothinghasthis"} {
+		out := o.ex(t, cmd)
+		if len(o.rows) != 1 || o.rows[0].id != -1 || o.rows[0].title != "" || o.rows[0].dirty {
+			t.Errorf(":%s with nothing to list left rows %+v", cmd, o.rows)
+		}
+		o.listed(t)
+		if cmd == "keywords" && !strings.Contains(out, "No results were returned") {
+			t.Errorf(":%s did not say the list is empty: %q", cmd, out)
+		}
+		// the key that needs a current row
+		captureStdout(t, func() { o.organizerProcessKey('j') })
+	}
+}
+
+func TestOrganizerHelp(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha")
+	a := &App{}
+	a.setOrganizerNormalCmds(o) // fills o.normalCommandRegistry
+	for _, tc := range []struct{ arg, want, not string }{
+		{"", "open", "not found"},                          // every ex command
+		{"normal", "Normal Mode Commands", "not found"},    // the normal-mode keys
+		{"find", "find <search_terms>", "not found"},       // an ex command
+		{"o", "open <name>", "not found"},                  // by an alias
+		{"Ctrl-D", "Ctrl-D", "not found"},                  // a normal-mode key, by name
+		{"Images", "imagescale", "not found"},              // a category of ex commands
+		{"Entry Actions", "Ctrl-A", "not found"},           // a category of normal commands
+		{"opn", "Did you mean: ", "Use ':help'"},           // a typo
+		{"zzzzqqqq", "Use ':help' for ex commands", "Did"}, // nothing like it
+	} {
+		got := o.helpFor(tc.arg)
+		if !strings.Contains(got, tc.want) || strings.Contains(got, tc.not) {
+			t.Errorf(":help %s = %q\n  want it to contain %q and not %q", tc.arg, got, tc.want, tc.not)
+		}
+	}
+	if got := o.helpFor("zzzzqqqq"); !strings.HasPrefix(got, "Command or category 'zzzzqqqq' not found.\n") {
+		t.Errorf("help for an unknown name is %q", got)
+	}
+
+	// :help shows it and stays up; the command line is left behind
+	o.ex(t, "help find")
+	if o.mode != HELP || o.command_line != "" {
+		t.Errorf("after :help find the mode is %v and the command line %q", o.mode, o.command_line)
 	}
 }

@@ -379,15 +379,9 @@ func (a *App) LoadInitialData() {
 	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 1
 	a.Screen.eraseScreenRedrawLines()
 
-	a.Organizer.FilterEntries(MAX)
-	if len(a.Organizer.rows) == 0 {
-		a.Organizer.insertRow(0, "", true, false, false, BASE_DATE)
-		a.Organizer.rows[0].dirty = false
+	if a.Organizer.setRows(a.Organizer.entries()) {
 		a.Organizer.ShowMessage(BL, "No results were returned")
 	}
-
-	a.Organizer.readRowsIntoBuffer()
-	a.Organizer.bufferTick = a.Organizer.vbuf.GetLastChangedTick()
 
 	// editor-only mode: the organizer is never rendered (divider = 1), so
 	// its boot draw would paint fragments into the editor's screen area —
