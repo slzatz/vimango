@@ -263,9 +263,6 @@ func (a *App) InitDatabases(configPath string) error {
 	if _, err := os.Stat(config.Sqlite3.DB); os.IsNotExist(err) {
 		return fmt.Errorf("%w: %s not found - run './vimango --init' to create databases", ErrDatabaseNotFound, config.Sqlite3.DB)
 	}
-	if _, err := os.Stat(config.Sqlite3.FTS_DB); os.IsNotExist(err) {
-		return fmt.Errorf("%w: %s not found - run './vimango --init' to create databases", ErrDatabaseNotFound, config.Sqlite3.FTS_DB)
-	}
 
 	// Initialize main database
 	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
@@ -277,15 +274,11 @@ func (a *App) InitDatabases(configPath string) error {
 	if err != nil {
 		return err
 	}
-	// Bring the database up to date with how this build stores it. Quiet,
-	// and a failure is not fatal: it means another process was mid-write,
-	// and the next start does it. `vimango --migrate` reports.
+	// Bring the database up to date with how this build stores it (WAL, the
+	// search index). Quiet, and a failure is not fatal: it means another
+	// process was mid-write, and the next start does it. Until then :find
+	// may report that task_fts is missing. `vimango --migrate` reports.
 	_, _ = localdb.Migrate(a.Database.MainDB)
-	// Initialize FTS database
-	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
-	if err != nil {
-		return err
-	}
 	// Postgres is optional - only connect if host is configured
 	if config.Postgres.Host != "" {
 		// Default SSL mode to "disable" for backward compatibility
@@ -339,15 +332,6 @@ func (a *App) ValidateDatabaseSchema() error {
 		if err != nil {
 			return fmt.Errorf("required table '%s' not found in main database", table)
 		}
-	}
-
-	// Check FTS database
-	var ftsName string
-	err := a.Database.FtsDB.QueryRow(
-		"SELECT name FROM sqlite_master WHERE type='table' AND name='fts'",
-	).Scan(&ftsName)
-	if err != nil {
-		return fmt.Errorf("FTS table not found in FTS database")
 	}
 
 	return nil
@@ -655,9 +639,6 @@ func (a *App) Cleanup() {
 
 	if a.Database.MainDB != nil {
 		a.Database.MainDB.Close()
-	}
-	if a.Database.FtsDB != nil {
-		a.Database.FtsDB.Close()
 	}
 	if a.Database.PG != nil {
 		a.Database.PG.Close()

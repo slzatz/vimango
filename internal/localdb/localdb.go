@@ -26,6 +26,14 @@ func Migrate(db *sql.DB) (changes []string, err error) {
 	if switched {
 		changes = append(changes, "journal mode: delete -> wal (write-ahead log; readers and the writer no longer block each other)")
 	}
+
+	indexed, err := ensureSearchIndex(db)
+	if err != nil {
+		return changes, fmt.Errorf("building the search index: %w", err)
+	}
+	if indexed >= 0 {
+		changes = append(changes, fmt.Sprintf("search index: built %s from %d notes, with triggers that keep it current (fts5_vimango.db is no longer used)", SearchTable, indexed))
+	}
 	return changes, nil
 }
 

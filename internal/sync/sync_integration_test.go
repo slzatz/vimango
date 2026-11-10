@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/slzatz/vimango/internal/localdb"
+
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -114,15 +116,11 @@ func newClient(t *testing.T, name string, pg *sql.DB, tidDefault string) *testCl
 	if _, err := mainDB.Exec("PRAGMA foreign_keys=ON;"); err != nil {
 		t.Fatal(err)
 	}
-	ftsDB, err := sql.Open("sqlite3", filepath.Join(dir, "fts5_vimango.db"))
-	if err != nil {
-		t.Fatal(err)
+	// the search index and its triggers, as every client database has them
+	if _, err := localdb.Migrate(mainDB); err != nil {
+		t.Fatalf("migrating client: %v", err)
 	}
-	t.Cleanup(func() { ftsDB.Close() })
-	if _, err := ftsDB.Exec("CREATE VIRTUAL TABLE fts USING fts5 (title, note, tag, tid UNINDEXED);"); err != nil {
-		t.Fatal(err)
-	}
-	return &testClient{t: t, name: name, s: New(mainDB, ftsDB, pg, "test", "test")}
+	return &testClient{t: t, name: name, s: New(mainDB, pg, "test", "test")}
 }
 
 func (c *testClient) exec(query string, args ...interface{}) sql.Result {
@@ -422,26 +420,59 @@ func TestKeywordDeletePropagates(t *testing.T) {
 	}
 }
 
-// Issue 6: deletes remove the FTS row on both the deleting and the
-// receiving client.
-func TestDeleteRemovesFTSRow(t *testing.T) {
+// The client's search index is not sync's job any more: triggers in the client
+// database follow what sync writes. This runs a note through its life on two
+// clients and checks each one's index at every step. (Issue 6 was sync leaving
+// index rows behind for deleted notes, back when it maintained the index.)
+func TestSearchIndexFollowsSync(t *testing.T) {
 	pg := newServer(t)
 	a, b := newClient(t, "A", pg, "DEFAULT 1"), newClient(t, "B", pg, "DEFAULT 1")
-
-	id := a.addNote("gone", "x")
-	a.sync()
-	tid := a.tidOf(id)
-	b.sync()
-	if b.count(b.s.FtsDB, "SELECT COUNT(*) FROM fts WHERE tid=?;", tid) != 1 {
-		t.Fatal("B has no FTS row to begin with")
+	hits := func(c *testClient, q string) int {
+		return c.count(c.s.MainDB, "SELECT COUNT(*) FROM task_fts WHERE task_fts MATCH ?;", q)
 	}
+	want := func(c *testClient, q string, n int, when string) {
+		t.Helper()
+		if got := hits(c, q); got != n {
+			t.Errorf("%s, %s: search %q finds %d notes, want %d", c.name, when, q, got, n)
+		}
+	}
+
+	id := a.addNote("heron", "wading bird")
+	want(a, "wading", 1, "before the note has synced")
+
+	a.sync()
+	b.sync()
+	want(a, "heron", 1, "after pushing")
+	want(b, "heron", 1, "after pulling a new note")
+	want(b, "wading", 1, "after pulling a new note")
+
+	a.edit(id, "long legs")
+	a.sync()
+	b.sync()
+	want(b, "wading", 0, "after pulling an edit")
+	want(b, "legs", 1, "after pulling an edit")
+
+	// a keyword, which is the index's tag column
+	a.exec("INSERT INTO keyword (title, uuid) VALUES ('wetland', 'kw-wetland');")
+	a.sync()
+	a.exec("INSERT INTO task_keyword (task_tid, keyword_tid, keyword_uuid) SELECT ?, tid, uuid FROM keyword WHERE uuid='kw-wetland';", a.tidOf(id))
+	a.exec("UPDATE task SET modified=datetime('now') WHERE id=?;", id)
+	want(a, "wetland", 1, "after attaching a keyword")
+	a.sync()
+	b.sync()
+	want(b, "wetland", 1, "after pulling a keyword")
 
 	a.remove(id)
 	a.sync()
 	b.sync()
 	for _, c := range []*testClient{a, b} {
-		if n := c.count(c.s.FtsDB, "SELECT COUNT(*) FROM fts WHERE tid=?;", tid); n != 0 {
-			t.Errorf("%s still has %d FTS rows for deleted tid %d", c.name, n, tid)
+		want(c, "heron", 0, "after the delete")
+		want(c, "wetland", 0, "after the delete")
+		if n := c.count(c.s.MainDB, "SELECT (SELECT COUNT(*) FROM task_fts WHERE rowid NOT IN (SELECT id FROM task)) + (SELECT COUNT(*) FROM task WHERE id NOT IN (SELECT rowid FROM task_fts));"); n != 0 {
+			t.Errorf("%s: %d index rows without a note, or notes without an index row", c.name, n)
+		}
+		if _, err := c.s.MainDB.Exec("INSERT INTO task_fts(task_fts) VALUES ('integrity-check');"); err != nil {
+			t.Errorf("%s: index integrity check: %v", c.name, err)
 		}
 	}
 }
@@ -741,6 +772,10 @@ func (c *testClient) legacyTidForeignKeys() {
 	FOREIGN KEY(folder_tid) REFERENCES folder (tid), FOREIGN KEY(context_tid) REFERENCES context (tid),
 	FOREIGN KEY(folder_uuid) REFERENCES folder (uuid), FOREIGN KEY(context_uuid) REFERENCES context (uuid));`)
 	c.exec("PRAGMA foreign_keys=ON;")
+	// dropping the table dropped the search index's triggers on it
+	if _, err := localdb.Migrate(c.s.MainDB); err != nil {
+		c.t.Fatal(err)
+	}
 }
 
 // A container delete must not be blocked by a task whose stale context_tid

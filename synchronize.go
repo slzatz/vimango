@@ -36,7 +36,6 @@ func (a *App) Synchronize(reportOnly bool) string {
 
 	syncer := sync.New(
 		a.Database.MainDB,
-		a.Database.FtsDB,
 		a.Database.PG,
 		a.Config.Postgres.Host,
 		a.Config.Postgres.DB,

@@ -6,7 +6,7 @@
 // Usage:
 //
 //	echo '{"host":"...","port":"...","user":"...","password":"...","db":"...","ssl_mode":"require"}' \
-//	  | vimango-sync --db /path/to/main.db [--fts-db /path/to/fts.db] [--report-only]
+//	  | vimango-sync --db /path/to/main.db [--report-only]
 //
 // stdout receives the formatted markdown sync log on completion. stderr
 // receives a one-line error message on fatal failure. Exit code 0 means
@@ -43,16 +43,16 @@ type postgresConfig struct {
 
 func main() {
 	dbPath := flag.String("db", "", "path to SQLite main database (required)")
-	ftsDBPath := flag.String("fts-db", "", "path to SQLite FTS database (defaults to --db)")
+	// The search index was a second database file until 2026-11-10; it is now
+	// a table in --db, maintained by triggers. The flag is still accepted so a
+	// host built before that keeps working.
+	flag.String("fts-db", "", "ignored (the search index is in --db now)")
 	reportOnly := flag.Bool("report-only", false, "only report changes; do not apply them")
 	probe := flag.Bool("probe", false, "print the number of server changes since the last sync and exit")
 	flag.Parse()
 
 	if *dbPath == "" {
 		fatal("--db is required")
-	}
-	if *ftsDBPath == "" {
-		*ftsDBPath = *dbPath
 	}
 	if _, err := os.Stat(*dbPath); err != nil {
 		fatal("--db path not accessible: %v", err)
@@ -77,21 +77,12 @@ func main() {
 	}
 
 	// Keep the database current with how this build stores it (see
-	// internal/localdb): hybrid can start a sync before any vimango process
+	// internal/localdb): WAL, and the search index whose triggers follow
+	// what sync writes. Hybrid can start a sync before any vimango process
 	// has run. Not in a probe, which writes nothing; and a failure here --
 	// another process mid-write -- is not a reason to skip the sync.
 	if !*probe {
 		_, _ = localdb.Migrate(mainDB)
-	}
-
-	// The probe never touches FTS — don't even open it.
-	var ftsDB *sql.DB
-	if !*probe {
-		ftsDB, err = sql.Open("sqlite3", *ftsDBPath)
-		if err != nil {
-			fatal("opening FTS SQLite db: %v", err)
-		}
-		defer ftsDB.Close()
 	}
 
 	pgDB, err := sql.Open("postgres", buildPGConnString(pg))
@@ -103,7 +94,7 @@ func main() {
 		fatal("postgres ping failed: %v", err)
 	}
 
-	syncer := syncpkg.New(mainDB, ftsDB, pgDB, pg.Host, pg.DB)
+	syncer := syncpkg.New(mainDB, pgDB, pg.Host, pg.DB)
 
 	// Probe mode: one integer on stdout, no log, no writes.
 	if *probe {

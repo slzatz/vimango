@@ -30,19 +30,22 @@ const (
 
 // Syncer holds DB connections and Postgres metadata used to format the
 // final log header. Construct via New.
+//
+// Sync does not maintain the client's search index. It is the task_fts
+// table in the client database, and triggers there (internal/localdb) follow
+// every row sync inserts, updates or deletes, and every keyword it attaches.
+// Until 2026-11-10 sync wrote the index itself, in a second database file.
 type Syncer struct {
 	MainDB *sql.DB
-	FtsDB  *sql.DB
 	PG     *sql.DB
 	PGHost string
 	PGDB   string
 }
 
 // New creates a Syncer.
-func New(mainDB, ftsDB, pg *sql.DB, pgHost, pgDB string) *Syncer {
+func New(mainDB, pg *sql.DB, pgHost, pgDB string) *Syncer {
 	return &Syncer{
 		MainDB: mainDB,
-		FtsDB:  ftsDB,
 		PG:     pg,
 		PGHost: pgHost,
 		PGDB:   pgDB,
@@ -107,29 +110,11 @@ type newEntry struct {
 	taskwarriorUUID sql.NullString
 }
 
-// EntryPlusTag represents an entry with associated tag information
-type EntryPlusTag struct {
-	newEntry
-	tag sql.NullString
-}
-
 // TaskKeywordPairs represents the relationship between tasks and keywords
 type TaskKeywordPairs struct {
 	taskTid     int
 	keywordTid  int
 	keywordUUID string
-}
-
-// TaskTag represents a task with its associated tags
-type TaskTag struct {
-	taskTid int
-	tag     sql.NullString
-}
-
-// TaskKeyword3 represents a task-keyword relationship with keyword title
-type TaskKeyword3 struct {
-	taskTid int
-	keyword string
 }
 
 // KeywordTidUUID holds both tid and uuid for a keyword
@@ -146,7 +131,7 @@ type syncChanges struct {
 	serverDeletedFolders  []container
 	serverUpdatedKeywords []container
 	serverDeletedKeywords []container
-	serverUpdatedEntries  []EntryPlusTag
+	serverUpdatedEntries  []newEntry
 	serverDeletedEntries  []entry
 	clientUpdatedContexts []container
 	clientDeletedContexts []container
@@ -200,22 +185,6 @@ func bulkInsert(dbase *sql.DB, query string, args []interface{}) (err error) {
 		return fmt.Errorf("Error in bulkInsert Exec: %v", err)
 	}
 
-	return
-}
-
-func createBulkInsertQueryFTS3(n int, entries []EntryPlusTag) (query string, args []interface{}) {
-	values := make([]string, n)
-	args = make([]interface{}, n*4)
-	pos := 0
-	for i, e := range entries {
-		values[i] = "(?, ?, ?, ?)"
-		args[pos] = e.title
-		args[pos+1] = e.note
-		args[pos+2] = e.tag
-		args[pos+3] = e.tid
-		pos += 4
-	}
-	query = fmt.Sprintf("INSERT INTO fts (title, note, tag, tid) VALUES %s;", strings.Join(values, ", "))
 	return
 }
 
@@ -288,66 +257,6 @@ func insertTaskKeywordTids(dbase *sql.DB, plg io.Writer, keywordTid, entryTid in
 	}
 	fmt.Fprintf(plg, "Inserted into task_keyword entry tid **%d**, keyword_tid **%d**, keyword_uuid %s\n", entryTid, keywordTid, keywordUUID)
 	return nil
-}
-
-func getTagsPQ(dbase *sql.DB, tids []int, plg io.Writer) []TaskTag {
-	rows, err := dbase.Query("SELECT task_keyword.task_tid, keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid = ANY($1) ORDER BY task_keyword.task_tid;", pq.Array(tids))
-	if err != nil {
-		fmt.Fprintf(plg, "Error in getTagsPQ: %v\n", err)
-		return []TaskTag{}
-	}
-	taskkeywords := make([]TaskKeyword3, 0)
-	for rows.Next() {
-		var tk TaskKeyword3
-		rows.Scan(
-			&tk.taskTid,
-			&tk.keyword,
-		)
-		taskkeywords = append(taskkeywords, tk)
-	}
-	if len(taskkeywords) == 0 {
-		return []TaskTag{}
-	}
-	tasktags := make([]TaskTag, 0, 1000)
-	keywords := make([]string, 0, 5)
-	var tt TaskTag
-	var tid int
-	prevTid := taskkeywords[0].taskTid
-	for _, tk := range taskkeywords {
-		tid = tk.taskTid
-		if tid == prevTid {
-			keywords = append(keywords, tk.keyword)
-		} else {
-			tt.taskTid = prevTid
-			tt.tag.String = strings.Join(keywords, ",")
-			tt.tag.Valid = true
-			tasktags = append(tasktags, tt)
-			prevTid = tid
-			keywords = keywords[:0]
-			keywords = append(keywords, tk.keyword)
-		}
-	}
-	tt.taskTid = tid
-	tt.tag.String = strings.Join(keywords, ",")
-	tt.tag.Valid = true
-	tasktags = append(tasktags, tt)
-
-	return tasktags
-}
-
-func getTagSQ(dbase *sql.DB, tid int, plg io.Writer) string {
-	rows, err := dbase.Query("SELECT keyword.title FROM task_keyword LEFT OUTER JOIN keyword ON keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid = ?;", tid)
-	if err != nil {
-		fmt.Fprintf(plg, "Error in getTagSQ: %v\n", err)
-		return ""
-	}
-	tag := []string{}
-	for rows.Next() {
-		var kn string
-		rows.Scan(&kn)
-		tag = append(tag, kn)
-	}
-	return strings.Join(tag, ",")
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +368,7 @@ func (s *Syncer) fetchAllChanges(serverTime, clientTime string, lg io.Writer) (*
 		return nil, fmt.Errorf("Error in SELECT for server_updated_entries: %v", err)
 	}
 	for rows.Next() {
-		var e EntryPlusTag
+		var e newEntry
 		var contextUUID, folderUUID sql.NullString
 		if err = rows.Scan(&e.tid, &e.title, &e.star, &e.note, &e.modified, &e.added, &e.archived, &e.context_tid, &e.folder_tid, &contextUUID, &folderUUID, &e.taskwarriorUUID); err != nil {
 			rows.Close()
@@ -618,7 +527,7 @@ func (s *Syncer) dropSeen(changes *syncChanges) error {
 		*set.updated, *set.deleted = updated, deleted
 	}
 
-	var entries []EntryPlusTag
+	var entries []newEntry
 	for _, e := range changes.serverUpdatedEntries {
 		keep, err := keepUpdated("task", e.tid, e.modified)
 		if err != nil {
@@ -1311,7 +1220,7 @@ func (s *Syncer) localTaskByTid(tid int) (*localTask, error) {
 // Taskwarrior link is left out on purpose: the pull merges links instead of
 // picking a winner (see applyServerEntry), so a row differing only in its
 // link needs no conflict copy, which would just duplicate the text.
-func sameContent(t *localTask, e EntryPlusTag) bool {
+func sameContent(t *localTask, e newEntry) bool {
 	return t.title == e.title && t.note.String == e.note.String && t.star == e.star &&
 		t.archived == e.archived && t.contextUUID == e.context_uuid && t.folderUUID == e.folder_uuid
 }
@@ -1359,9 +1268,9 @@ func (s *Syncer) withTx(fn func(tx *sql.Tx) (bool, error)) (bool, error) {
 }
 
 // syncEntriesToClient applies entries the server changed, then refreshes
-// their keywords and FTS rows.
-func (s *Syncer) syncEntriesToClient(entries []EntryPlusTag, r *run, lg io.Writer) {
-	var applied []EntryPlusTag
+// their keywords. (The search index follows by trigger.)
+func (s *Syncer) syncEntriesToClient(entries []newEntry, r *run, lg io.Writer) {
+	var applied []newEntry
 	for _, e := range entries {
 		ok, err := s.applyServerEntry(e, r, lg)
 		if err != nil {
@@ -1385,18 +1294,12 @@ func (s *Syncer) syncEntriesToClient(entries []EntryPlusTag, r *run, lg io.Write
 		tidsIf[i] = applied[i].tid
 	}
 
-	// Delete existing keywords and FTS entries for updated tasks
+	// Delete existing keywords for updated tasks
 	in := "?" + strings.Repeat(",?", len(tids)-1)
 	stmt := fmt.Sprintf("DELETE FROM task_keyword WHERE task_tid IN (%s);", in)
 	_, err := s.MainDB.Exec(stmt, tidsIf...)
 	if err != nil {
 		fmt.Fprintf(lg, "Error deleting from client task_keyword for tids: %v: %v\n", tids, err)
-	}
-
-	stmt = fmt.Sprintf("DELETE FROM fts WHERE tid IN (%s);", in)
-	_, err = s.FtsDB.Exec(stmt, tidsIf...)
-	if err != nil {
-		fmt.Fprintf(lg, "Error deleting from fts for tids: %v: %v\n", tids, err)
 	}
 
 	// Update keywords
@@ -1409,31 +1312,12 @@ func (s *Syncer) syncEntriesToClient(entries []EntryPlusTag, r *run, lg io.Write
 		} else {
 			fmt.Fprintf(lg, "Keywords updated for task tids: %v\n", tids)
 		}
-
-		tagMap := make(map[int]sql.NullString)
-		for _, tag := range getTagsPQ(s.PG, tids, lg) {
-			tagMap[tag.taskTid] = tag.tag
-		}
-		for i := range applied {
-			if tag, ok := tagMap[applied[i].tid]; ok {
-				applied[i].tag = tag
-				fmt.Fprintf(lg, "FTS tag will be updated for tid: %d, tag: %s\n", applied[i].tid, tag.String)
-			}
-		}
-	}
-
-	query, args := createBulkInsertQueryFTS3(len(applied), applied)
-	err = bulkInsert(s.FtsDB, query, args)
-	if err != nil {
-		fmt.Fprintf(lg, "%v", err)
-	} else {
-		fmt.Fprintf(lg, "FTS entries updated for task tids: %v\n", tids)
 	}
 }
 
 // applyServerEntry writes one pulled entry to the client. It returns false,
 // without error, for an echo of our own push.
-func (s *Syncer) applyServerEntry(e EntryPlusTag, r *run, lg io.Writer) (bool, error) {
+func (s *Syncer) applyServerEntry(e newEntry, r *run, lg io.Writer) (bool, error) {
 	// A server task can reference a container uuid with no row anywhere
 	// (SYNC_ISSUES.md, "Data finding"); the local foreign key would reject
 	// it on every run. Show it under "none" instead.
@@ -1639,19 +1523,8 @@ func (s *Syncer) pushEntry(e newEntry, r *run, lg io.Writer) (deferred bool, err
 			fmt.Fprintf(lg, "Error recording server stamp for local task id %d: %v\n", e.id, err)
 		}
 
-		// Create FTS entry for new entries
-		taskTag := getTagSQ(s.MainDB, tid, lg)
-		var tag sql.NullString
-		if len(taskTag) > 0 {
-			tag.String = taskTag
-			tag.Valid = true
-		}
-		_, err = s.FtsDB.Exec("INSERT INTO fts (title, tag, note, tid) VALUES (?, ?, ?, ?);", e.title, tag, e.note, tid)
-		if err != nil {
-			fmt.Fprintf(lg, "Error in INSERT INTO fts: %v\n", err)
-		}
 		fmt.Fprintf(lg, "Created new server entry *%q* with tid **%d** context_uuid: %s folder_uuid: %s\n", truncate(e.title, 15), tid, e.context_uuid, e.folder_uuid)
-		fmt.Fprintf(lg, "and set tid for client entry with id **%d** and created fts entry\n", e.id)
+		fmt.Fprintf(lg, "and set tid for client entry with id **%d**\n", e.id)
 	} else {
 		// Only overwrite the version this client last saw. Rows synced
 		// before server_modified existed have none; for those the server
@@ -1746,9 +1619,6 @@ func (s *Syncer) removeServerDeleted(e entry, r *run, lg io.Writer) error {
 			r.copies = append(r.copies, cp)
 			fmt.Fprintf(lg, "Server won: tid %d was changed here but deleted on the server; the local version was saved as %q\n", e.tid, cp.title)
 		}
-		if _, err = s.FtsDB.Exec("DELETE FROM fts WHERE tid=?;", e.tid); err != nil {
-			fmt.Fprintf(lg, "Error deleting fts row for tid %d: %v\n", e.tid, err)
-		}
 		fmt.Fprintf(lg, "Deleted client entry %q with tid %d and its task_keyword rows\n", truncate(e.title, 15), e.tid)
 		return nil
 	}
@@ -1803,9 +1673,6 @@ func (s *Syncer) pushDelete(e entry, r *run, lg io.Writer) (deferred bool, err e
 		}
 		if _, err = s.MainDB.Exec("DELETE FROM task_keyword WHERE task_tid=?;", e.tid); err != nil {
 			return false, fmt.Errorf("deleting client task_keyword rows: %v", err)
-		}
-		if _, err = s.FtsDB.Exec("DELETE FROM fts WHERE tid=?;", e.tid); err != nil {
-			fmt.Fprintf(lg, "Error deleting fts row for tid %d: %v\n", e.tid, err)
 		}
 	} else {
 		fmt.Fprintf(lg, "There is no server entry to delete for client id %d\n", e.id)

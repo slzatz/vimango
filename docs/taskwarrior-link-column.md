@@ -99,7 +99,7 @@ overwrites it. That makes the rollout order flexible.
 One Postgres database and about half a dozen local SQLite databases need the column. They are:
 - **Postgres:** migrated by hand once (step 1).
 - **The desktop `vimango.db` on every machine running the vimango CLI and/or vimango_hybrid** (Macs and Linux).
-  The local `fts5_vimango.db` doesn't need it.
+  The local search index doesn't need it.
 - **The iOS VimNotes `vimango.sqlite`** on each device.
 
 The local migration is built into the apps, not a script you run per machine. That's how `server_modified`

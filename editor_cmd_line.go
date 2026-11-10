@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -173,31 +172,24 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 
 // save writes the buffer to the database. Once the note is in, the buffer is
 // clean (saveTick) and its text is the baseline :checkstale compares against
-// (dbText). An error wrapping errSearchIndex still means saved; any other
-// error means the database does not hold this text, and the buffer stays
-// modified so nothing treats it as safe to discard.
+// (dbText). On an error the database does not hold this text, and the buffer
+// stays modified so nothing treats it as safe to discard.
 func (e *Editor) save() error {
 	text := e.bufferToString()
-	err := e.Database.updateNote(e.id, text)
-	if err != nil && !errors.Is(err, errSearchIndex) {
+	if err := e.Database.updateNote(e.id, text); err != nil {
 		return err
 	}
 	e.dbText = text
 	e.saveTick = e.vbuf.GetLastChangedTick()
-	return err
+	return nil
 }
 
 func (e *Editor) writeNote() {
-	err := e.save()
-	switch {
-	case err == nil:
-		e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id)
-	case errors.Is(err, errSearchIndex):
-		e.ShowMessage(BL, "Saved note %d, but %v", e.id, err)
-	default:
+	if err := e.save(); err != nil {
 		e.ShowMessage(BL, "Note %d NOT saved: %v", e.id, err)
 		return
 	}
+	e.ShowMessage(BL, "Saved note %d", e.id)
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 }
 
@@ -245,7 +237,7 @@ func (e *Editor) quitActions() {
 		// queuing a sync push for nothing -- and, if a sync had changed the
 		// row since it was read, overwrite the newer text with the old.
 		if e.isModified() {
-			if err := e.save(); err != nil && !errors.Is(err, errSearchIndex) {
+			if err := e.save(); err != nil {
 				e.mode = NORMAL
 				e.command_line = ""
 				e.ShowMessage(BR, "\x1b[41mNote %d NOT saved: %v\x1b[0m", e.id, err)

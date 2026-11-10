@@ -265,8 +265,8 @@ Generate the config file and local databases:
 ./vimango --init
 ```
 
-This writes `config.json` and creates `vimango.db` (notes) and
-`fts5_vimango.db` (search index). Then, **inside kitty or Ghostty**, from the
+This writes `config.json` and creates `vimango.db` (notes and their search
+index). Then, **inside kitty or Ghostty**, from the
 vimango directory:
 
 ```bash

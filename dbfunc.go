@@ -1,12 +1,9 @@
 package main
 
 import (
-	"cmp"
 	"database/sql"
 	"errors"
 	"fmt"
-	"slices"
-	"strconv"
 	"strings"
 
 	//"github.com/lib/pq"
@@ -14,9 +11,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Database is the local SQLite database (vimango.db) and, when sync is
+// configured, the PostgreSQL server.
+//
+// The full-text index is the task_fts table inside vimango.db, kept current
+// by triggers (internal/localdb): nothing here writes it. A change to a
+// note's title, text or keywords is one statement on the row, and the index
+// changes in the same transaction.
 type Database struct {
-	MainDB *sql.DB // Main database connection
-	FtsDB  *sql.DB
+	MainDB *sql.DB
 	PG     *sql.DB
 }
 
@@ -110,17 +113,9 @@ func (db *Database) updateTaskFolderByUUID(uuid string, id int) error {
 	return err
 }
 
-// errSearchIndex marks an updateNote that wrote the note but could not update
-// the search index (a separate database file). The note is saved; only search
-// is stale. Callers that must know whether the text is safe -- the editor,
-// deciding whether it may close -- test for it with errors.Is.
-var errSearchIndex = errors.New("search index not updated")
-
-// updateNote writes a note's text. A nil error means the row was written; so
-// does an error wrapping errSearchIndex. Any other error means the database
-// does not hold this text -- including an UPDATE that matched no row, which
-// SQLite reports as success: the note was deleted (a sync, another window)
-// while it was open.
+// updateNote writes a note's text. An error means the database does not hold
+// this text -- including an UPDATE that matched no row, which SQLite reports
+// as success: the note was deleted (a sync, another window) while it was open.
 func (db *Database) updateNote(id int, text string) error {
 
 	var nullableText sql.NullString
@@ -136,12 +131,6 @@ func (db *Database) updateNote(id int, text string) error {
 	}
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return fmt.Errorf("note %d is no longer in the database", id)
-	}
-
-	/***************fts virtual table update*********************/
-	entry_tid := db.entryTidFromId(id)
-	if _, err = db.FtsDB.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid); err != nil {
-		return fmt.Errorf("%w: %v", errSearchIndex, err)
 	}
 	return nil
 }
@@ -224,18 +213,7 @@ func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted 
 
 func (db *Database) updateTitle(row *Row) error {
 	_, err := db.MainDB.Exec("UPDATE task SET title=?, modified=datetime('now') WHERE id=?", row.title, row.id)
-	if err != nil {
-		return err
-	}
-
-	/***************fts virtual table update*********************/
-	entry_tid := db.entryTidFromId(row.id)
-
-	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (db *Database) insertTitle(row *Row, context_uuid, folder_uuid string) error { // should return err
@@ -363,11 +341,17 @@ func (db *Database) getTaskKeywords(id int) string {
 	return strings.Join(kk, ",")
 }
 
+// The escape sequences highlight() wraps a matched term in, in the title
+// column of a search result.
+const ftsMark, ftsUnmark = "\x1b[48;5;31m", "\x1b[49m"
+
+// updateFtsTitle refreshes a search-result row's highlighted title after the
+// title was edited. An error (sql.ErrNoRows) means the row no longer matches
+// the search.
 func (db *Database) updateFtsTitle(st string, row *Row) error {
-	tid := db.entryTidFromId(row.id)
-	r := db.FtsDB.QueryRow("SELECT highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') FROM fts WHERE fts MATCH ? and tid=?;", st, tid)
 	var ftsTitle string
-	err := r.Scan(&ftsTitle)
+	err := db.MainDB.QueryRow("SELECT highlight(task_fts, 0, ?, ?) FROM task_fts WHERE task_fts MATCH ? AND rowid=?;",
+		ftsMark, ftsUnmark, st, row.id).Scan(&ftsTitle)
 	if err != nil {
 		return err
 	}
@@ -376,52 +360,18 @@ func (db *Database) updateFtsTitle(st string, row *Row) error {
 }
 
 // searchEntries returns the notes matching a full-text query, best match
-// first, and at most MAX of them, like every other list.
-//
-// The ranking comes from the search index, the rows from the main database (a
-// different file), so the rows have to be put back in rank order. That is done
-// here in Go. It used to be done in SQL with one ORDER BY term per hit, and
-// SQLite allows 2,000: a search matching more notes than that -- "the" --
-// failed with "too many terms in ORDER BY clause".
+// first, and at most MAX of them, like every other list. Notes that have not
+// synced yet are found too: the index is keyed by the local id.
 func (db *Database) searchEntries(st, sort string, showDeleted bool) ([]Row, error) {
-	hits, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
-		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
-	if err != nil {
-		return nil, err
-	}
-	defer hits.Close()
-
-	rank := make(map[int]int) // tid -> position in the ranking, 0 best
-	ftsTitles := make(map[int]string)
-	var tids []string
-	for hits.Next() {
-		var tid int
-		var title string
-		if err := hits.Scan(&tid, &title); err != nil {
-			return nil, err
-		}
-		if _, seen := rank[tid]; seen {
-			continue
-		}
-		rank[tid] = len(rank)
-		ftsTitles[tid] = title
-		tids = append(tids, strconv.Itoa(tid))
-	}
-	if err := hits.Err(); err != nil {
-		return nil, err
-	}
-	if len(tids) == 0 {
-		return nil, nil
-	}
-
-	// A note deleted from the main database can still be in the index; it
-	// simply finds no row here.
-	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.note, task.%s "+
-		"FROM task WHERE task.tid IN (%s)", sort, strings.Join(tids, ", "))
+	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.note, task.%s, "+
+		"highlight(task_fts, 0, ?, ?) "+
+		"FROM task_fts JOIN task ON task.id = task_fts.rowid WHERE task_fts MATCH ?", sort)
 	if !showDeleted {
 		stmt += " AND task.archived=false AND task.deleted=false"
 	}
-	rows, err := db.MainDB.Query(stmt)
+	stmt += " ORDER BY bm25(task_fts, 2.0, 1.0, 5.0) LIMIT ?;"
+
+	rows, err := db.MainDB.Query(stmt, ftsMark, ftsUnmark, st, MAX)
 	if err != nil {
 		return nil, err
 	}
@@ -430,28 +380,22 @@ func (db *Database) searchEntries(st, sort string, showDeleted bool) ([]Row, err
 	var orgRows []Row
 	for rows.Next() {
 		var row Row
-		var stamp, note sql.NullString
-		if err := rows.Scan(&row.id, &row.tid, &row.title, &row.star, &row.deleted, &row.archived, &note, &stamp); err != nil {
+		var tid sql.NullInt64
+		var stamp, note, ftsTitle sql.NullString
+		if err := rows.Scan(&row.id, &tid, &row.title, &row.star, &row.deleted, &row.archived, &note, &stamp, &ftsTitle); err != nil {
 			return nil, err
 		}
+		row.tid = int(tid.Int64)
 		if note.Valid && note.String != "" {
 			row.hasImage = containsGoogleDriveImage(note.String)
 		}
 		if stamp.Valid {
 			row.sort = timeDelta(stamp.String)
 		}
-		row.ftsTitle = ftsTitles[row.tid]
+		row.ftsTitle = ftsTitle.String
 		orgRows = append(orgRows, row)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	slices.SortFunc(orgRows, func(a, b Row) int { return cmp.Compare(rank[a.tid], rank[b.tid]) })
-	if len(orgRows) > MAX {
-		orgRows = orgRows[:MAX]
-	}
-	return orgRows, nil
+	return orgRows, rows.Err()
 }
 
 func (db *Database) getContainers(view View) []Row {
@@ -536,7 +480,7 @@ func (db *Database) getContainerInfo(id int, view View) Container {
 // by server tids, so both the task and the keyword must have synced first:
 // a NULL tid would be stored as 0 and the association silently lost on the
 // next sync (SYNC_ISSUES.md #5).
-func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, update_fts bool) error {
+func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int) error {
 	entry_tid := db.entryTidFromId(entry_id)
 	if entry_tid < 1 {
 		return fmt.Errorf("entry %d has not been synced yet - sync before adding keywords", entry_id)
@@ -562,15 +506,6 @@ func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, upda
 		return fmt.Errorf("updating task modified: %v", err)
 	}
 
-	// *************fts virtual table update**********************
-	if !update_fts {
-		return nil
-	}
-	s := db.getTaskKeywords(entry_id)
-	_, err = db.FtsDB.Exec("UPDATE fts SET tag=? WHERE tid=?;", s, entry_tid)
-	if err != nil {
-		return fmt.Errorf("fts update: %v", err)
-	}
 	return nil
 }
 
@@ -613,13 +548,6 @@ func (db *Database) deleteKeywords(id int) int {
 		app.Organizer.ShowMessage(BL, "Error updating entry modified column in deleteKeywords: %v", err)
 		return -1
 	}
-
-	//_, err = fts_db.Exec("UPDATE fts SET tag='' WHERE lm_id=?", id)
-	_, err = db.FtsDB.Exec("UPDATE fts SET tag='' WHERE tid=?", entry_tid)
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error updating fts in deleteKeywords: %v", err)
-		return -1
-	}
 	return int(rowsAffected)
 }
 
@@ -628,17 +556,19 @@ func (db *Database) highlightTerms2(id int) string {
 	if id == -1 {
 		return "" // id given to new and unsaved entries
 	}
-	entry_tid := db.entryTidFromId(id)
 
-	//row := fts_db.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
-	//	"FROM fts WHERE lm_id=$1 AND fts MATCH $2;", id, sess.fts_search_terms)
-	row := db.FtsDB.QueryRow("SELECT highlight(fts, 1, 'qx', 'qy') "+
-		"FROM fts WHERE tid=$1 AND fts MATCH $2;", entry_tid, app.Session.fts_search_terms)
+	// qx and qy mark the matched terms; the renderer turns them into colour
+	row := db.MainDB.QueryRow("SELECT highlight(task_fts, 1, 'qx', 'qy') FROM task_fts WHERE rowid=? AND task_fts MATCH ?;",
+		id, app.Session.fts_search_terms)
 
 	var note sql.NullString
 	err := row.Scan(&note)
+	if errors.Is(err, sql.ErrNoRows) {
+		// the note no longer matches the search (it was edited since): show it plain
+		return db.readNoteIntoString(id)
+	}
 	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in SELECT highlight(fts ...:%v", err)
+		app.Organizer.ShowMessage(BL, "Error highlighting search terms: %v", err)
 		return ""
 	}
 	return note.String
@@ -660,10 +590,9 @@ func (db *Database) highlightTerms2(id int) string {
 // a server row and assign one), folder_tid/context_tid (left at their
 // column defaults, as insertTitle does — sync re-derives them from the
 // uuids), archived/deleted, and keywords (task_keyword keys off tid,
-// which the new row does not have yet). Like insertTitle this writes no
-// fts row: there is no tid to key one on until the entry syncs, and
-// sync inserts it then. modified takes its CURRENT_TIMESTAMP default,
-// which is what makes the copy a sync candidate.
+// which the new row does not have yet). The search index needs nothing
+// here: its trigger indexes the new row. modified takes its
+// CURRENT_TIMESTAMP default, which is what makes the copy a sync candidate.
 func (db *Database) copyEntry(sourceID int) (int, error) {
 	var newID int
 	err := db.MainDB.QueryRow(

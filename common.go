@@ -37,9 +37,10 @@ type dbConfig struct {
 		SSLCACert string `json:"ssl_ca_cert"` // Path to CA certificate (overridden by VIMANGO_PG_SSL_CA_CERT)
 	} `json:"postgres"`
 
+	// An older config.json also has "fts_db" here: the search index was a
+	// second file until 2026-11-10. The key is ignored.
 	Sqlite3 struct {
-		DB     string `json:"db"`
-		FTS_DB string `json:"fts_db"`
+		DB string `json:"db"`
 	} `json:"sqlite3"`
 
 	Options struct {

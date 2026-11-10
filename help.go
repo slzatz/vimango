@@ -99,7 +99,7 @@ OPTIONS:
 
     --init
         Run first-time setup. Creates config.json with default settings and
-        initializes the SQLite databases (vimango.db and fts5_vimango.db).
+        initializes the SQLite database (vimango.db).
         Use this when running vimango for the first time after cloning.
 
     --editor

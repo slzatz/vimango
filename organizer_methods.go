@@ -89,14 +89,11 @@ func (o *Organizer) writeTitle() {
 			} else {
 				o.ShowMessage(BL, "Updated title for id: %d", row.id)
 			}
-			// update fts title
 			if o.taskview == BY_FIND {
-				err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row)
-				if err != nil {
+				// the list shows the highlighted title; plain if the new
+				// title no longer matches the search
+				if err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row); err != nil {
 					row.ftsTitle = row.title
-					o.ShowMessage(BL, "Error updating fts title: id %d: %v", row.id, err)
-				} else {
-					o.ShowMessage(BL, "Updated fts title for id: %d", row.id)
 				}
 			}
 		} else {
@@ -119,12 +116,10 @@ func (o *Organizer) writeTitle() {
 				o.ShowMessage(BL, "New (new) title written to db with id: %d", row.id)
 			}
 			if o.taskview == BY_FIND {
-				err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row)
-				if err != nil {
+				// the list shows the highlighted title; plain if the new
+				// title no longer matches the search
+				if err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row); err != nil {
 					row.ftsTitle = row.title
-					o.ShowMessage(BL, "Error updating fts title: id %d: %v", row.id, err)
-				} else {
-					o.ShowMessage(BL, "Updated fts title for id: %d", row.id)
 				}
 			}
 		}

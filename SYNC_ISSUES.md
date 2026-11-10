@@ -133,7 +133,7 @@ refuse to add keywords until the task has synced.
 
 ## 6. Deletes never clean the FTS index
 
-**Fixed 2026-10-06** for future deletes. The existing orphans (74 rows, plus one tid with a duplicate row) still need the one-off cleanup.
+**Fixed 2026-10-06** for future deletes, and **gone as a class 2026-11-10**: the index is now the `task_fts` table inside `vimango.db`, kept current by triggers and rebuilt from the notes by the migration, so sync no longer touches it and the old orphans went with `fts5_vimango.db`. The rest of this section describes the old arrangement.
 
 The local delete paths (`sync.go:907-962`) remove `task_keyword` and `task`
 rows but never touch `fts5_vimango.db`. Orphaned FTS rows build up: about

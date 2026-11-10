@@ -130,7 +130,7 @@ func CheckForInit(args []string) bool {
 	return false
 }
 
-// runInit performs first-time setup: creates config.json and SQLite databases
+// runInit performs first-time setup: creates config.json and the SQLite database
 func runInit() {
 	fmt.Println("Vimango First-Time Setup")
 	fmt.Println("=========================")
@@ -149,11 +149,6 @@ func runInit() {
 		fmt.Println("If you want to reinitialize, please remove or rename the database first.")
 		os.Exit(1)
 	}
-	if _, err := os.Stat("fts5_vimango.db"); err == nil {
-		fmt.Println("Error: fts5_vimango.db already exists.")
-		fmt.Println("If you want to reinitialize, please remove or rename the database first.")
-		os.Exit(1)
-	}
 
 	// Check for required glamour style file
 	if _, err := os.Stat("default.json"); os.IsNotExist(err) {
@@ -167,11 +162,9 @@ func runInit() {
 	// Create default config
 	config := &dbConfig{
 		Sqlite3: struct {
-			DB     string `json:"db"`
-			FTS_DB string `json:"fts_db"`
+			DB string `json:"db"`
 		}{
-			DB:     "vimango.db",
-			FTS_DB: "fts5_vimango.db",
+			DB: "vimango.db",
 		},
 		Options: struct {
 			Type  string `json:"type"`
@@ -247,21 +240,7 @@ func runInit() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Created vimango.db with schema and default data")
-
-	// Create FTS database
-	ftsDB, err := sql.Open("sqlite3", "fts5_vimango.db")
-	if err != nil {
-		fmt.Printf("Error creating FTS database: %v\n", err)
-		os.Exit(1)
-	}
-	defer ftsDB.Close()
-
-	if _, err := ftsDB.Exec("CREATE VIRTUAL TABLE fts USING fts5 (title, note, tag, tid UNINDEXED);"); err != nil {
-		fmt.Printf("Error creating FTS table: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("Created fts5_vimango.db with FTS5 virtual table")
+	fmt.Println("Created vimango.db with schema, search index and default data")
 
 	fmt.Println()
 	fmt.Println("Setup complete! You can now run vimango normally.")

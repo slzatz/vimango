@@ -2,13 +2,14 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"path/filepath"
 	"testing"
+
+	"github.com/slzatz/vimango/internal/localdb"
 )
 
-// newTestDatabase is a throwaway pair of SQLite files with vimango's own
-// schema (the --init one) and the search index beside it.
+// newTestDatabase is a throwaway vimango.db as --init makes one: the schema,
+// then the migrations (WAL, the search index and its triggers).
 func newTestDatabase(t *testing.T) *Database {
 	t.Helper()
 	dir := t.TempDir()
@@ -29,15 +30,10 @@ func newTestDatabase(t *testing.T) *Database {
 		}
 	}
 
-	ftsDB, err := sql.Open("sqlite3", filepath.Join(dir, "fts5_vimango.db"))
-	if err != nil {
-		t.Fatal(err)
+	if _, err := localdb.Migrate(mainDB); err != nil {
+		t.Fatalf("migrating: %v", err)
 	}
-	t.Cleanup(func() { ftsDB.Close() })
-	if _, err := ftsDB.Exec("CREATE VIRTUAL TABLE fts USING fts5 (title, note, tag, tid UNINDEXED);"); err != nil {
-		t.Fatalf("creating fts: %v", err)
-	}
-	return &Database{MainDB: mainDB, FtsDB: ftsDB}
+	return &Database{MainDB: mainDB}
 }
 
 // oldStamp is a modified time no test run can produce, so a write shows up as
@@ -45,7 +41,7 @@ func newTestDatabase(t *testing.T) *Database {
 const oldStamp = "2000-01-01 00:00:00"
 
 // savedNoteEditor opens a synced note holding text in an editor -- in the
-// database, in the search index and in the buffer, as editNote leaves it --
+// database and in the buffer, as editNote leaves it --
 // with the app in --editor mode, the way vimango_hybrid runs it.
 func savedNoteEditor(t *testing.T, text string) (*Editor, *App) {
 	t.Helper()
@@ -56,9 +52,6 @@ func savedNoteEditor(t *testing.T, text string) (*Editor, *App) {
 		"INSERT INTO task (tid, title, note, added, modified) VALUES (?, 'a note', ?, datetime('now'), ?) RETURNING id;",
 		tid, text, oldStamp).Scan(&id)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.FtsDB.Exec("INSERT INTO fts (title, note, tag, tid) VALUES ('a note', ?, '', ?);", text, tid); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,9 +87,12 @@ func TestExitSavesAndQuits(t *testing.T) {
 	if note, modified := noteInDB(t, e); note != "lpha" || modified == oldStamp {
 		t.Errorf("after :x the database holds %q (modified %s), want \"lpha\" freshly stamped", note, modified)
 	}
-	var indexed string
-	if err := e.Database.FtsDB.QueryRow("SELECT note FROM fts WHERE tid=7;").Scan(&indexed); err != nil || indexed != "lpha" {
-		t.Errorf("search index holds %q (%v), want \"lpha\"", indexed, err)
+	// the index follows by trigger: the new text is found, the old is not
+	var found, stale int
+	e.Database.MainDB.QueryRow("SELECT count(*) FROM task_fts WHERE task_fts MATCH 'lpha' AND rowid=?;", e.id).Scan(&found)
+	e.Database.MainDB.QueryRow("SELECT count(*) FROM task_fts WHERE task_fts MATCH 'alpha' AND rowid=?;", e.id).Scan(&stale)
+	if found != 1 || stale != 0 {
+		t.Errorf("after :x the search index finds the new text %d times and the old %d; want 1 and 0", found, stale)
 	}
 	if a.Run {
 		t.Error(":x saved but did not end the app")
@@ -184,30 +180,6 @@ func TestExitLeavesACleanNoteAlone(t *testing.T) {
 	}
 	if a.Run {
 		t.Error(":x on a clean buffer did not end the app")
-	}
-}
-
-// The search index is a second database file. Failing to update it does not
-// put the text at risk, so the note counts as saved and :x closes.
-func TestExitQuitsWhenOnlyTheSearchIndexFails(t *testing.T) {
-	e, a := savedNoteEditor(t, "alpha")
-	e.sendKeys("x")
-	e.Database.FtsDB.Close()
-
-	if err := e.Database.updateNote(e.id, "probe"); !errors.Is(err, errSearchIndex) {
-		t.Fatalf("updateNote with the index closed returned %v, want errSearchIndex", err)
-	}
-
-	e.exCommand("x")
-
-	if note, _ := noteInDB(t, e); note != "lpha" {
-		t.Errorf("database holds %q, want \"lpha\"", note)
-	}
-	if e.isModified() {
-		t.Error("buffer still marked modified after the note was written")
-	}
-	if a.Run {
-		t.Error(":x did not end the app although the note was saved")
 	}
 }
 

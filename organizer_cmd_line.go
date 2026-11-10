@@ -991,7 +991,7 @@ func (o *Organizer) addKeyword(pos int) {
 		failed := 0
 		var lastErr error
 		for entry_id := range o.marked_entries {
-			if err := o.Database.addTaskKeywordByUUID(keywordUUID, entry_id, true); err != nil { //true = update fts_db
+			if err := o.Database.addTaskKeywordByUUID(keywordUUID, entry_id); err != nil {
 				failed++
 				lastErr = err
 			}
@@ -1005,7 +1005,7 @@ func (o *Organizer) addKeyword(pos int) {
 	}
 
 	// get here if no marked entries
-	if err := o.Database.addTaskKeywordByUUID(keywordUUID, o.rows[o.fr].id, true); err != nil {
+	if err := o.Database.addTaskKeywordByUUID(keywordUUID, o.rows[o.fr].id); err != nil {
 		o.ShowMessage(BL, "Keyword %s not added: %v", input, err)
 		return
 	}

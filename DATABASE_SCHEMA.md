@@ -1,11 +1,11 @@
 # Vimango Database Schema
 
-This document describes the **actual** schema of the vimango SQLite databases as they exist in production. Note that this may differ from the initialization SQL files in `cmd/create_sqlite_db/` and `cmd/create_dbs/`.
+This document describes the schema of a machine's vimango SQLite database. The definitions in code are `sqliteSchema` in `init.go` (what `--init` creates) and `internal/localdb` (the search index, and write-ahead-log mode); databases older than a given column were brought up to date by migrations, so column order and some constraints differ between machines.
 
 ## Database Files
 
-- **vimango.db** - Main application database containing tasks/notes, contexts, folders, keywords, and sync data
-- **fts5_vimango.db** - Separate database containing the FTS5 virtual table for full-text search
+- **vimango.db** - The one database: tasks/notes, contexts, folders, keywords, sync data, and the full-text search index (`task_fts`). It is in write-ahead-log mode, so `vimango.db-wal` and `vimango.db-shm` sit beside it while it is open; copy it with `sqlite3 vimango.db ".backup copy.db"`, not `cp`.
+- **fts5_vimango.db** - No longer used. It held the search index until 2026-11-10.
 
 ## Main Database: vimango.db
 
@@ -212,31 +212,26 @@ CREATE TABLE sync_log (
 - `modified` - Timestamp
 - `note` - Log details/content
 
-## FTS Database: fts5_vimango.db
-
-### Virtual Table: fts
-
-Full-text search index using SQLite's FTS5 extension.
+## Search index: task_fts
 
 ```sql
-CREATE VIRTUAL TABLE fts USING fts5 (
-    title,
-    note,
-    tag,
-    tid UNINDEXED
-);
+CREATE VIRTUAL TABLE task_fts USING fts5(title, note, tag);
 ```
 
-**Columns:**
-- `title` - Task title (indexed for full-text search)
-- `note` - Task note content (indexed for full-text search)
-- `tag` - Task tags (indexed for full-text search)
-- `tid` - Task ID (UNINDEXED, used for linking back to task.tid)
+One row per note, with `rowid` = `task.id`.
 
-**Notes:**
-- The `tid` column is not indexed for search but allows linking FTS results back to the main task table
-- FTS5 automatically creates internal tables: `fts_data`, `fts_idx`, `fts_content`, `fts_docsize`, `fts_config`
-- Uses `tid` (not `lm_id` as shown in some init SQL files)
+- `title` - the note's title
+- `note` - the note's text
+- `tag` - the note's keywords, joined with commas
+
+Eight triggers keep it current, named `task_fts_*`: on `task` (after insert, after delete, after update of `title`, `note` or `tid`), on `task_keyword` (after insert, update, delete) and on `keyword` (after a rename, after delete). Nothing writes the table directly. Search it with:
+
+```sql
+SELECT task.* FROM task_fts JOIN task ON task.id = task_fts.rowid
+WHERE task_fts MATCH ? ORDER BY bm25(task_fts, 2.0, 1.0, 5.0);
+```
+
+FTS5 creates its own internal tables: `task_fts_data`, `task_fts_idx`, `task_fts_content`, `task_fts_docsize`, `task_fts_config`. The definitions and the migration that builds the index are in `internal/localdb/searchindex.go`; see "Search index" in `CLAUDE.md`.
 
 ## Important Schema Characteristics
 
@@ -279,7 +274,8 @@ These serve as default containers when no specific context or folder is assigned
 ## Schema Initialization
 
 The schemas in code:
-- `init.go` (`sqliteSchema`, `runInit`) - what `vimango --init` creates: `vimango.db`, and `fts5_vimango.db` with its FTS table
+- `init.go` (`sqliteSchema`, `runInit`) - what `vimango --init` creates
+- `internal/localdb` - what every start then ensures: write-ahead-log mode, and the `task_fts` index with its triggers
 - `schema/postgres.sql` - the PostgreSQL server schema; the sync integration tests build their databases from it
 
 ## Build Requirements

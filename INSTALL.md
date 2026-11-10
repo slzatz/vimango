@@ -221,8 +221,8 @@ Generate a default one plus the local SQLite databases:
 ./vimango --init
 ```
 
-This writes `config.json` (pointing at `vimango.db` / `fts5_vimango.db`) and
-creates the databases. Style files `default.json` / `darkslz.json` **are** in the
+This writes `config.json` (pointing at `vimango.db`) and creates the database,
+search index included. Style files `default.json` / `darkslz.json` **are** in the
 repo and are required at startup.
 
 Run it:

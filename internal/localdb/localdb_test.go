@@ -20,13 +20,20 @@ func open(t *testing.T, path string) *sql.DB {
 	return db
 }
 
+// testSchema is the part of vimango's schema the migrations touch.
+const testSchema = `
+CREATE TABLE keyword (id INTEGER PRIMARY KEY, tid INTEGER UNIQUE, uuid TEXT UNIQUE, title TEXT NOT NULL UNIQUE);
+CREATE TABLE task (id INTEGER PRIMARY KEY, tid INTEGER UNIQUE, title TEXT NOT NULL, note TEXT, star BOOLEAN DEFAULT FALSE);
+CREATE TABLE task_keyword (task_tid INTEGER NOT NULL, keyword_tid INTEGER, keyword_uuid TEXT);
+`
+
 // newDB is a fresh database in SQLite's default journal mode, like every
 // vimango.db made before this package existed.
 func newDB(t *testing.T) (db *sql.DB, path string) {
 	t.Helper()
 	path = filepath.Join(t.TempDir(), "vimango.db")
 	db = open(t, path)
-	if _, err := db.Exec("CREATE TABLE task (id INTEGER PRIMARY KEY, note TEXT); INSERT INTO task (note) VALUES ('one');"); err != nil {
+	if _, err := db.Exec(testSchema + "INSERT INTO task (title, note) VALUES ('first', 'one');"); err != nil {
 		t.Fatal(err)
 	}
 	if got := journalMode(t, db); got != "delete" {
@@ -66,8 +73,8 @@ func TestMigrateSwitchesToWALOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(changes) != 1 || journalMode(t, db) != "wal" {
-		t.Fatalf("first Migrate: changes %q, mode %q; want one change and wal", changes, journalMode(t, db))
+	if len(changes) != 2 || journalMode(t, db) != "wal" {
+		t.Fatalf("first Migrate: changes %q, mode %q; want two changes (wal, search index) and wal", changes, journalMode(t, db))
 	}
 
 	changes, err = Migrate(db)
@@ -89,7 +96,7 @@ func TestWALSwitchWithAnotherConnectionOpen(t *testing.T) {
 	if _, err := Migrate(db); err != nil {
 		t.Fatalf("Migrate with an idle connection open: %v", err)
 	}
-	if _, err := other.Exec("INSERT INTO task (note) VALUES ('from the other connection')"); err != nil {
+	if _, err := other.Exec("INSERT INTO task (title, note) VALUES ('second', 'from the other connection')"); err != nil {
 		t.Fatalf("the connection that was already open cannot write after the switch: %v", err)
 	}
 	if err := db.QueryRow("SELECT count(*) FROM task").Scan(&n); err != nil || n != 2 {
@@ -111,7 +118,7 @@ func TestWALSwitchFailsCleanlyWhenBusy(t *testing.T) {
 	}
 
 	release()
-	if changes, err := Migrate(db); err != nil || len(changes) != 1 {
+	if changes, err := Migrate(db); err != nil || len(changes) != 2 {
 		t.Errorf("Migrate after the reader finished: changes %q, err %v", changes, err)
 	}
 }
@@ -121,7 +128,7 @@ func TestWriterIsNotBlockedByAReaderInWAL(t *testing.T) {
 	db, path := newDB(t)
 
 	release := holdReadTransaction(t, path)
-	if _, err := db.Exec("INSERT INTO task (note) VALUES ('blocked')"); err == nil {
+	if _, err := db.Exec("INSERT INTO task (title) VALUES ('blocked')"); err == nil {
 		t.Fatal("in rollback-journal mode a write went through with a reader open; the premise of this test is wrong")
 	}
 	release()
@@ -131,7 +138,7 @@ func TestWriterIsNotBlockedByAReaderInWAL(t *testing.T) {
 	}
 	release = holdReadTransaction(t, path)
 	defer release()
-	if _, err := db.Exec("INSERT INTO task (note) VALUES ('not blocked')"); err != nil {
+	if _, err := db.Exec("INSERT INTO task (title) VALUES ('not blocked')"); err != nil {
 		t.Errorf("in WAL mode a write still waited on a reader: %v", err)
 	}
 }

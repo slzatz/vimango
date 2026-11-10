@@ -124,8 +124,7 @@ The `config.json` file structure (copy from `config.json.example`):
     "db": "vimango"
   },
   "sqlite3": {
-    "db": "vimango.db",
-    "fts_db": "fts5_vimango.db"
+    "db": "vimango.db"
   },
   "chroma": {
     "style": "gruvbox_mod.xml"
