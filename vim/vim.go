@@ -49,11 +49,20 @@ func goString(s *C.uchar) string {
 // a habit from vim should not be able to run one. Restricted mode also turns
 // off vimscript's delete(), rename() and mkdir().
 //
+// And vim writes no file. A note is a row in the database, saved by vimango;
+// nothing here is a file for vim to write. With file writes off (the fork's
+// vimSetFileWritesEnabled) every open-for-writing inside vim fails, so this
+// too holds by any route: ":w name" and ":saveas" inside :execute or a
+// mapping, ":redir > name", ":mksession", writefile(), a swap file after
+// ":set swapfile". The one exception is vim's own: the word list in
+// 'spellfile', which zg and zw write.
+//
 // void vimInit(int argc, char **argv);
 func InitializeVim(argc int) {
 	var c *C.char
 	C.vimInit(C.int(argc), &c)
 	C.restricted = 1
+	C.vimSetFileWritesEnabled(0)
 	enableSpellSuggestCallback()
 	enableMessageCallback()
 }

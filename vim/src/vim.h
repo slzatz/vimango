@@ -1867,9 +1867,20 @@ typedef enum
 /* This must come after including proto.h.
  * For VMS this is defined in macros.h. */
 #if !defined(MSWIN) && !defined(VMS)
-#define mch_open(n, m, p) open((n), (m), (p))
-#define mch_fopen(n, p) fopen((n), (p))
+/* libvim: every file vim opens is opened by one of these two, so this is where
+ * an embedder's vimSetFileWritesEnabled(FALSE) is enforced (libvim.c). */
+int libvim_open(const char *name, int flags, int perm);
+FILE *libvim_fopen(const char *name, const char *mode);
+#define mch_open(n, m, p) libvim_open((const char *)(n), (m), (int)(p))
+#define mch_fopen(n, p) libvim_fopen((const char *)(n), (p))
 #endif
+
+/* TRUE, with an error message, when the embedder has turned file writes off:
+ * for a command whose whole purpose is to write a file. */
+int check_file_writes(void);
+/* Lets vim write a file of its own -- the 'spellfile' word list -- while file
+ * writes are off. Calls nest: TRUE to start, FALSE to end. */
+void libvim_own_file_write(int start);
 
 #include "globals.h" /* global variables and messages */
 

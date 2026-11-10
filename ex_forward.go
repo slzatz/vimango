@@ -32,10 +32,12 @@ import (
 // :execute, :normal and :call run whatever they are given. That is on
 // purpose; the list guards against habit (:w notes.txt), not against intent.
 //
-// Starting a program is the exception, and is not decided here at all: vim
-// runs in restricted mode (vim.InitializeVim), so ":r !cmd", a `cmd` in a file
-// name, system() and ":!cmd" from a mapping or a script are refused by vim
-// itself, with E145, wherever they come from.
+// Starting a program and writing a file are the exceptions, and are not decided
+// here at all. vim runs in restricted mode with file writes off
+// (vim.InitializeVim), so ":r !cmd", a `cmd` in a file name, system() and
+// ":!cmd" from a mapping or a script are refused by vim itself, with E145, and
+// so are ":execute 'w name'", ":redir > name" and writefile(), wherever they
+// come from. This list still refuses ":w name" by name, with a better message.
 
 type exAction int
 

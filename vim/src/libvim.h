@@ -242,6 +242,30 @@ void vimSetInputUnmapCallback(InputUnmapCallback unmapCallback);
 void vimSetMappingsEnabled(int enabled);
 int vimGetMappingsEnabled(void);
 
+/*
+ * vimSetFileWritesEnabled
+ *
+ * With FALSE, vim writes no file, whatever asks: `:w name`, `:saveas`,
+ * `:redir > name`, `:mksession` and its relatives, `:mkspell`, `writefile()`,
+ * a swap file after `:set swapfile`, and anything else that opens a file for
+ * writing. Each fails with an error and the file is not created or changed.
+ * For an embedder whose buffers are not files (it stores the text itself):
+ * every one of those is otherwise an `:execute` away from any script, mapping
+ * or autocommand.
+ *
+ * One file is still written: the word list in 'spellfile', and the `.spl`
+ * built from it, when a word is added or removed (`zg`, `zw`, `:spellgood`
+ * ...). `zG` and `zW` keep their words in a temporary file, also allowed.
+ *
+ * Reading is not affected. Together with restricted mode (`restricted = 1`),
+ * which stops vim starting programs and turns off delete(), rename() and
+ * mkdir(), vim then changes nothing on disk but the spell file.
+ *
+ * vimInit turns file writes back on.
+ */
+void vimSetFileWritesEnabled(int enabled);
+int vimGetFileWritesEnabled(void);
+
 /***
  * Messages
  ***/

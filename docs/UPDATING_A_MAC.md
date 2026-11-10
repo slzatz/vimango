@@ -67,8 +67,11 @@ longer a safe way to copy this file; see "Afterwards".)
 
 ## 1. Pull vimango
 
-The changes are on `dev`. (`main` has them only if it has been fast-forwarded
-since this guide was written; the check below says which.)
+The changes are on `dev`. `main` was fast-forwarded to it on 2026-11-10 (at
+`0556725`), so it has everything this guide was first written for; what came
+later that day (libvim writing no files, the organizer's `:e <id>`) is on
+`dev` until the next merge. The check below says whether `main` has the
+first part.
 
 ```bash
 cd ~/vimango
@@ -130,14 +133,15 @@ pulls `main`, builds, and copies `libvim.a` and the spell dictionary into
 `~/vimango`. The last lines should be:
 
 ```
-Done. /Users/<you>/vimango/libvim.a is libvim 77fc72a6d fix(messages): ...
+Done. /Users/<you>/vimango/libvim.a is libvim 31301666c feat(api): ...
 Now build vimango:
 ```
 
-The commit must be **`77fc72a6d` or later**. To check afterwards:
+The commit must be **`31301666c` or later** (`77fc72a6d` is enough for a
+vimango at `0556725` or earlier). To check afterwards:
 
 ```bash
-git -C ~/libvim merge-base --is-ancestor 77fc72a6d HEAD && echo "libvim is new enough"
+git -C ~/libvim merge-base --is-ancestor 31301666c HEAD && echo "libvim is new enough"
 ```
 
 The script refuses to build from a checkout that would give the wrong library,
@@ -179,6 +183,7 @@ checkout:
 | `undefined: vimSetMappingsEnabled` | fork `ed0f2e241` |
 | `undefined: vimSpellGetErrors` | the fork's spell API |
 | `undefined: vimSearchGetHighlightEnabled` | fork `a036ecafe` |
+| `undefined: vimSetFileWritesEnabled` (or `_vimSetFileWritesEnabled` from the linker) | fork `31301666c` |
 
 A `libvim.a` between `a036ecafe` and `77fc72a6d` links without complaint and
 is still too old (vim's errors show, its reports — "5 lines yanked" — do
@@ -352,7 +357,7 @@ cd ~/vimango
 sqlite3 vimango.db ".backup vimango-before-update.db.bak"
 git switch dev && git pull --ff-only
 rm -f go.work go.work.sum
-./scripts/build-libvim.sh --clean          # must end: libvim 77fc72a6d or later
+./scripts/build-libvim.sh --clean          # must end: libvim 31301666c or later
 CGO_ENABLED=1 go build --tags=fts5
 ./vimango --migrate                        # two lines; a second run: already up to date
 cd ~/vimango_hybrid

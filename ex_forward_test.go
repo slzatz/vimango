@@ -284,8 +284,12 @@ func TestVimStartsNoProgram(t *testing.T) {
 		"echo system('touch by-system')", "call system('touch by-call')", "let x = systemlist('touch by-systemlist')",
 		"execute 'r !touch by-execute'", "execute '!touch by-execute-bang'",
 		"call delete('in.txt')", "call rename('in.txt', 'moved.txt')", "call mkdir('made')",
+		// ran the patch program until libvim checked where the shell starts
+		// (src/apitest/file_writes.c there); here it stops sooner, at the
+		// temporary file it would write
+		"execute 'diffpatch in.txt'",
 	} {
-		if msg := exMessage(t, e, line); !strings.Contains(msg, "E145") && !strings.Contains(msg, "vimango") {
+		if msg := exMessage(t, e, line); !strings.Contains(msg, "not allowed") && !strings.Contains(msg, "vimango") {
 			t.Errorf(":%s was answered with %q, want a refusal", line, msg)
 		}
 	}
@@ -686,4 +690,67 @@ func TestForwardedCommandReports(t *testing.T) {
 		t.Errorf(":marks did not open the overlay (mode %v)", e.mode)
 	}
 	e.editorProcessKey('\x1b')
+}
+
+// vim writes no file, by whatever route: the check on what was typed
+// (classifyEx) refuses ":w name" and its relatives by name, but does not look
+// inside vimscript, where ":execute 'w name'" and writefile() used to write.
+// libvim now refuses where a file would be opened for writing.
+func TestVimWritesNoFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile("kept.txt", []byte("original\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	script := "w by-script\ncall writefile(['x'], 'by-script-writefile')\nredir > by-script-redir\nsilent echo 1\nredir END\n"
+	if err := os.WriteFile("script.vim", []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	e := newTestEditor(t, "alpha", "bravo")
+	withOrganizer(t, e)
+	e.Session.editorOnly = true
+
+	// typed: refused by vimango's list or by vim, and either says so
+	for _, line := range []string{
+		"w by-w", "1,2w by-range", "saveas by-saveas", "update by-update", "wq by-wq", "x by-x",
+		"call writefile(['x'], 'by-writefile')", "call writefile(['x'], 'kept.txt')", "call writefile(['x'], 'kept.txt', 'a')",
+		"execute 'w by-execute'", "execute 'w! kept.txt'", "execute 'saveas by-execute-saveas'", "execute '1,2w by-execute-range'",
+		"execute 'redir > by-redir'", "execute 'mksession by-mksession'", "execute 'mkexrc by-mkexrc'", "execute 'mkview by-mkview'",
+		"execute 'mkspell by-mkspell kept.txt'",
+	} {
+		if msg := exMessage(t, e, line); !strings.Contains(msg, "not allowed") && !strings.Contains(msg, "vimango") {
+			t.Errorf(":%s was answered with %q, want a refusal", line, msg)
+		}
+		e.exCommand("redir END")
+	}
+	// and by routes that never pass the command line
+	e.exCommand(`normal :w by-normal` + "\r")
+	e.exCommand("source script.vim")
+	e.exCommand("nnoremap Q :w by-mapping<CR>")
+	e.sendKeys("Q")
+	e.exCommand("nnoremap Q :call writefile(['x'], 'by-mapping-writefile')<CR>")
+	e.sendKeys("Q")
+	e.exCommand("set swapfile directory=.")
+	e.sendKeys("ix\x1b")
+	e.exCommand("set verbosefile=by-verbosefile verbose=1")
+	e.exCommand("set verbose=0 verbosefile=")
+
+	entries, _ := os.ReadDir(dir)
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	if got := strings.Join(names, " "); got != "kept.txt script.vim" {
+		t.Errorf("the directory now holds %q; vim wrote a file", got)
+	}
+	if kept, _ := os.ReadFile("kept.txt"); string(kept) != "original\n" {
+		t.Errorf("vim changed a file that was there: %q", kept)
+	}
+	if got := vim.GetCurrentBuffer(); got.GetID() != e.vbuf.GetID() {
+		t.Error("vim is no longer on the note's buffer")
+	}
+	// reading is untouched
+	if msg := exMessage(t, e, "echo readfile('kept.txt')[0]"); !strings.Contains(msg, "original") {
+		t.Errorf("readfile() with writes off answered %q", msg)
+	}
 }
