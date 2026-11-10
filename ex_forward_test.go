@@ -531,7 +531,7 @@ func TestVimMessagesForKeysAreShown(t *testing.T) {
 
 	// vim has nothing to say about most keys, and then the message line is
 	// left alone: nothing is written at all
-	for _, keys := range []string{"l", "w", "j", "k", "x", "u", "yy", "p"} {
+	for _, keys := range []string{"l", "w", "j", "k", "x", "yy", "p", "J", "r!"} {
 		if msg := keyMessage(t, e, keys); msg != "" {
 			t.Errorf("%q wrote %q to the screen", keys, msg)
 		}
@@ -542,6 +542,87 @@ func TestVimMessagesForKeysAreShown(t *testing.T) {
 	}
 	if msg := keyMessage(t, e, "abc"); msg != "" {
 		t.Errorf("typing in INSERT wrote %q to the screen", msg)
+	}
+	e.editorProcessKey('\x1b')
+}
+
+// vim's reports and warnings for keys: how many lines a yank or delete took,
+// what undo did, a search going round the end of the note.
+func TestVimReportsForKeysAreShown(t *testing.T) {
+	lines := make([]string, 30)
+	for i := range lines {
+		lines[i] = "row"
+	}
+	lines[4], lines[14], lines[24] = "row 5 foo", "row 15 foo", "row 25 foo"
+	e := newTestEditor(t, lines...)
+	withOrganizer(t, e)
+
+	for _, tc := range []struct{ keys, want string }{
+		{"gg5yy", "5 lines yanked"},
+		{"p", "5 more lines"},
+		{"u", "5 fewer lines"},
+		{"4dd", "4 fewer lines"},
+		{"u", "4 more lines"},
+		{"3>>", "3 lines >ed 1 time"},
+		{"u", "before #"},
+		{"g\x07", "Line 1 of 30"}, // g Ctrl-G
+	} {
+		if msg := keyMessage(t, e, tc.keys); !strings.Contains(msg, tc.want) {
+			t.Errorf("%q showed %q, want %q", tc.keys, msg, tc.want)
+		}
+	}
+
+	// a search that goes round the end says so, once, on n and N
+	keyMessage(t, e, "gg/foo\r")
+	if msg := keyMessage(t, e, "n"); strings.Contains(msg, "search hit") {
+		t.Errorf("n without a wrap showed %q", msg)
+	}
+	keyMessage(t, e, "n")
+	if msg := keyMessage(t, e, "n"); strings.Count(msg, "search hit BOTTOM, continuing at TOP") != 1 {
+		t.Errorf("n round the end showed %q", msg)
+	}
+	if msg := keyMessage(t, e, "N"); !strings.Contains(msg, "search hit TOP, continuing at BOTTOM") {
+		t.Errorf("N round the top showed %q", msg)
+	}
+
+	// libvim's wrap warning on the Enter of a typed search is wrong -- here it
+	// reports both directions for a search that does not wrap -- so it is not shown
+	if msg := keyMessage(t, e, "20G/foo\r"); strings.Contains(msg, "search hit") {
+		t.Errorf("a typed search that did not wrap showed %q", msg)
+	}
+	if e.fr != 24 {
+		t.Errorf("the search landed on row %d, want 24", e.fr)
+	}
+}
+
+// A forwarded command's report goes on the message line; only a listing
+// takes the overlay.
+func TestForwardedCommandReports(t *testing.T) {
+	e := newTestEditor(t, "alpha", "alpha", "alpha", "bravo", "bravo", "bravo")
+	withOrganizer(t, e)
+
+	if msg := exMessage(t, e, "%s/alpha/x/"); !strings.Contains(msg, "3 substitutions on 3 lines") || e.mode == HELP {
+		t.Errorf(":%%s showed %q (mode %v)", msg, e.mode)
+	}
+	if msg := exMessage(t, e, "1,3co$ | 4,6co$"); strings.Count(msg, "3 more lines") != 2 || e.mode == HELP {
+		t.Errorf("two reports showed %q (mode %v); want both on the message line", msg, e.mode)
+	}
+	if msg := exMessage(t, e, "u"); !strings.Contains(msg, "6 fewer lines") {
+		t.Errorf(":u showed %q", msg)
+	}
+	// a report does not silence the next one (libvim used to "keep" the :s count)
+	if msg := exMessage(t, e, "4,6d"); !strings.Contains(msg, "3 fewer lines") {
+		t.Errorf(":4,6d after a :s showed %q", msg)
+	}
+	if msg := keyMessage(t, e, "u"); !strings.Contains(msg, "3 more lines") {
+		t.Errorf("u showed %q", msg)
+	}
+	if msg := exMessage(t, e, "silent %s/x/y/"); strings.Contains(msg, "substitutions") {
+		t.Errorf(":silent still showed %q", msg)
+	}
+	e.sendKeys("ma")
+	if exMessage(t, e, "marks"); e.mode != HELP {
+		t.Errorf(":marks did not open the overlay (mode %v)", e.mode)
 	}
 	e.editorProcessKey('\x1b')
 }

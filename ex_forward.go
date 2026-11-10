@@ -409,13 +409,17 @@ func (e *Editor) forwardEx(line string) (redraw bool) {
 	return redraw
 }
 
-// showVimMessages puts what vim said where the user can see it: an error or a
-// single line on the message line, anything longer (:marks, :ls) in the same
-// overlay :help uses.
+// showVimMessages puts what vim said about a forwarded command where the user
+// can see it: an error, or a report or two, on the message line; a listing
+// (:marks, :ls) in the same overlay :help uses.
 func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 	var lines, errors []string
+	listing := false
 	for _, m := range msgs {
-		for _, l := range strings.Split(m.Title+m.Text, "\n") {
+		text := strings.Trim(m.Title+m.Text, "\n")
+		// a title, or several lines in one message, is a table: keep its shape
+		listing = listing || (!m.Error && (m.Title != "" || strings.Contains(text, "\n")))
+		for _, l := range strings.Split(text, "\n") {
 			if l = strings.TrimRight(l, " \t\r"); strings.TrimSpace(l) == "" {
 				continue
 			} else if m.Error {
@@ -427,13 +431,24 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 	}
 	errors = append(errors, problems...)
 
+	// what fits on the message line: one report, or a few short ones
+	oneLine := ""
+	if !listing {
+		parts := make([]string, len(lines))
+		for i, l := range lines {
+			parts[i] = strings.TrimSpace(l)
+		}
+		oneLine = strings.Join(parts, "; ")
+	}
+	width := e.Screen.screenCols - e.Screen.divider
+
 	switch {
 	case len(errors) > 0:
 		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", strings.Join(errors, "; "))
 	case len(lines) == 0:
 		e.ShowMessage(BR, "")
-	case len(lines) == 1:
-		e.ShowMessage(BR, "%s", strings.TrimSpace(lines[0]))
+	case !listing && len(oneLine) <= width:
+		e.ShowMessage(BR, "%s", oneLine)
 	default:
 		// as a code block, so markdown rendering leaves vim's columns alone
 		e.mode = HELP
@@ -443,28 +458,36 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 }
 
 // showKeyMessages shows what vim said about a key typed in the editor, on the
-// message line. Nothing is shown, and the line is left as it is, when vim said
-// nothing -- which is nearly every key.
+// message line: an error ("E486: Pattern not found", "E20: Mark not set"), a
+// report ("5 lines yanked", "4 fewer lines", what undo did, g Ctrl-G's word
+// count) or a warning ("search hit BOTTOM, continuing at TOP"). Nothing is
+// shown, and the line is left as it is, when vim said nothing -- which is
+// most keys.
 //
-// Until 2026-11-10 none of this reached the user. It was not a decision:
-// libvim has no screen and hands its messages to a callback, and vimango had
-// never registered one, so a search that found nothing, a jump to a mark that
-// was not set and a put from an empty register all failed in silence.
+// Until 2026-11-10 none of this reached the user, and it was not a decision.
+// libvim has no screen and hands its messages to a callback: vimango had
+// never registered one, and libvim itself dropped everything but errors
+// until the fork's 2da770b06.
 //
-// libvim sends errors and a few reports (Ctrl-G). It does not send vim's
-// counts ("3 lines yanked", "search hit BOTTOM"): those go through a part of
-// vim's message code that libvim turned into a no-op.
-func (e *Editor) showKeyMessages(msgs []vim.Message) {
+// endsSearch says the key was the Enter that completes a typed /pattern.
+// libvim's wrap warning is not to be trusted there -- it searches again from
+// where the incremental search left the cursor, reporting a wrap that did not
+// happen and missing one that did (the fork's PATCHES.md) -- so warnings are
+// dropped for that one key. n, N, * and # report wraps correctly.
+func (e *Editor) showKeyMessages(msgs []vim.Message, endsSearch bool) {
 	var texts []string
 	isError := false
 	for _, m := range msgs {
+		if m.Warning && endsSearch {
+			continue
+		}
 		for _, l := range strings.Split(m.Title+m.Text, "\n") {
 			// Ctrl-G leads with vim's idea of the file -- "[No Name]"
 			// [Modified] -- which means nothing here: the note has no file,
 			// and vim thinks every buffer it never wrote is modified.
 			l = strings.TrimPrefix(strings.TrimSpace(l), `"[No Name]" `)
 			l = strings.TrimPrefix(l, "[Modified] ")
-			if l == "" || slices.Contains(texts, l) { // vim reports a failed search twice
+			if l == "" || slices.Contains(texts, l) { // vim says some things twice
 				continue
 			}
 			texts = append(texts, l)

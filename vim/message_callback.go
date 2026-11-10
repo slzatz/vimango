@@ -10,7 +10,10 @@ import "C"
 import "unsafe"
 
 // libvim's msgPriority_T: MSG_INFO, MSG_WARNING, MSG_ERROR
-const msgError = 2
+const (
+	msgWarning = 1
+	msgError   = 2
+)
 
 var (
 	capturing bool
@@ -25,7 +28,7 @@ func goMessageCallback(title *C.uchar, msg *C.uchar, priority C.int) {
 	if !capturing {
 		return
 	}
-	m := Message{Error: priority == msgError}
+	m := Message{Warning: priority == msgWarning, Error: priority == msgError}
 	if title != nil {
 		m.Title = C.GoString((*C.char)(unsafe.Pointer(title)))
 	}

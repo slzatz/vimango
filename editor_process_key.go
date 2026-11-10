@@ -82,10 +82,11 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	// What vim would have put on its message line for this key -- mostly
 	// errors: "E486: Pattern not found", "E20: Mark not set". Shown last, when
 	// this function returns, so it is not overwritten by a message of ours.
+	endsSearch := e.mode == SEARCH && c == '\r'
 	msgs := vim.CaptureMessages(func() {
 		vim.SendUserKey(func() { sendToVim(c) })
 	})
-	defer e.showKeyMessages(msgs)
+	defer e.showKeyMessages(msgs, endsSearch)
 	// zg, zw etc. change what is misspelled without changing the buffer
 	spellRedraw := spellOn && spellListKey(e.spellKeys, c)
 	e.spellKeys = (e.spellKeys + string(rune(c)))[max(0, len(e.spellKeys)+len(string(rune(c)))-2):]
