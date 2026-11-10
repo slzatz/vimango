@@ -41,8 +41,11 @@ func setupSignalHandling(app *App) {
 
 				// Check if size has changed
 				if currentWs.Row != prevRows || currentWs.Col != prevCols {
-					// Size changed, call the signal handler
-					app.signalHandler()
+					// Size changed: tell the main loop (see signals_unix.go)
+					select {
+					case app.resizeCh <- struct{}{}:
+					default:
+					}
 
 					// Update previous size
 					prevRows = currentWs.Row

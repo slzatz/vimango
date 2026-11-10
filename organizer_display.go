@@ -33,7 +33,7 @@ var (
 	filledImageMarker = padImageMarker(IMAGE_MARKER_SYMBOL)
 
 	// In-memory map of imageID -> dimensions for current render
-	// Cleared at start of each renderMarkdown() call
+	// Cleared at the start of each renderWithImages() call (main loop only)
 	currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
 	currentRenderImageMux  sync.RWMutex
 	// Track which image IDs have been transmitted in this process (kitty session)
@@ -598,8 +598,9 @@ func extractImageURLs(markdown string) []string {
 }
 
 // prepareKittyImage loads and encodes an image (possibly from cache) without transmitting it.
-// It is safe to run concurrently.
-func prepareKittyImage(url string) *preparedImage {
+// It is safe to run concurrently, off the main loop: it reads no UI state (lim
+// carries what it needs from the screen) and writes nothing to the terminal.
+func prepareKittyImage(url string, lim imageLimits) *preparedImage {
 	initImageCache()
 
 	res := &preparedImage{
@@ -638,7 +639,7 @@ func prepareKittyImage(url string) *preparedImage {
 	}
 
 	// Load fresh
-	img, err := loadImageForGlamour(url)
+	img, err := loadImageForGlamour(url, lim)
 	if err != nil {
 		res.err = err
 		return res
@@ -870,8 +871,6 @@ func seedKittySessionFromCache() {
 // We don't actually look up by URL - glamour passes the URL but we need to return
 // dimensions for ALL images that were just transmitted. Since glamour processes
 // images in order, we'll track the "next" imageID to return.
-var nextImageLookupID uint32 = 1
-
 func kittyImageCacheLookup(url string) (uint32, int, int, bool) {
 	currentRenderImageMux.Lock()
 	defer currentRenderImageMux.Unlock()
@@ -971,16 +970,9 @@ func getImageInfoLine(imageID uint32) string {
 
 // loadImageForGlamour loads images for glamour's kitty renderer
 // It handles local files, Google Drive, and web URLs
-func loadImageForGlamour(url string) (image.Image, error) {
+func loadImageForGlamour(url string, lim imageLimits) (image.Image, error) {
 	parsed, _ := net_url.Parse(url)
-	maxW := int(app.Screen.ws.Xpixel)
-	maxH := int(app.Screen.ws.Ypixel)
-	if maxW == 0 {
-		maxW = app.Screen.totaleditorcols * 8
-	}
-	if maxH == 0 {
-		maxH = app.Session.imgSizeY
-	}
+	maxW, maxH := lim.maxW, lim.maxH
 
 	isHTTP := parsed.Scheme == "http" || parsed.Scheme == "https"
 	isFile := parsed.Scheme == "file"

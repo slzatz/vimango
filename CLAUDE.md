@@ -191,8 +191,17 @@ The application now supports full Windows cross-compilation from Linux/Unix syst
 ## Terminal Resize Handling
 - **Unix/Linux**: Uses SIGWINCH signal for immediate resize detection
 - **Windows**: Implements polling-based resize detection that checks terminal size every 100ms
-- Both platforms call the same `signalHandler()` method to update screen layout
+- Both platforms post to `app.resizeCh`; `MainLoop` then calls `handleResize()` to update screen layout (see "Threading" below)
 - Automatic screen redraw and layout adjustment on terminal resize
+
+## Threading
+**Only `MainLoop` (`app.go`) draws, changes editor/organizer/screen state, or calls libvim** — libvim is not thread-safe and the drawing code keeps no locks. Every other goroutine computes and posts an event to a channel that `MainLoop` selects on:
+- key reader → `keyEvents`
+- SIGWINCH → `resizeCh` → `handleResize()`
+- image loading for the preview (`prepareImages`, `organizer_render.go`: Drive download, disk read, decode — nothing else) → `RenderManager.resultCh` → `applyResult()`, which transmits the images to the terminal, runs glamour and draws
+- anything that wants to show a notice → `addNotification`
+
+New background work follows the same shape: do the slow part off the loop, hand back data, and let the loop touch the UI. Until 2026-11-10 the SIGWINCH goroutine redrew the screen itself (reaching libvim through brace matching and spell errors while a key might be in progress), and the render goroutines transmitted images, ran glamour and replaced `o.note` — which also blanked the editor pane when a note's images finished loading after it had been opened with `:e`. `applyResult` now drops a result the pane cannot show (editor open, a notice up, another row selected); every way back to the preview calls `displayNote`, which renders afresh.
 
 ## Command System
 The command system is loosely based on the vim command system and the existence of modes. The "super" modes of Organizer and Editor each have normal commands and Ex Commands.  For editing both of Organizer note titles and Editor notes, the use of libvim provides a wide range of vim commands including essentially all vim normal mode commands. The application features a comprehensive command registry system with full discoverability for both ex commands and non-vim normal mode commands:

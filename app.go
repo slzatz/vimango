@@ -31,6 +31,7 @@ type App struct {
 	notificationCh  chan struct{}     // Signals pending notifications
 	keyEvents       chan terminal.Key // Key events from reader goroutine
 	keyErrors       chan error        // Key read errors
+	resizeCh        chan struct{}     // Terminal resized (SIGWINCH); handled on the main loop
 
 	// Database connections and other config
 	Config *dbConfig
@@ -68,6 +69,7 @@ func CreateApp() *App {
 		notificationCh: make(chan struct{}, 1),
 		keyEvents:      make(chan terminal.Key, 16),
 		keyErrors:      make(chan error, 1),
+		resizeCh:       make(chan struct{}, 1),
 		Run:            true,
 		kitty:          kitty, // default to false
 	}
@@ -209,7 +211,11 @@ func (a *App) SavePreferences() error {
 	return nil
 }
 
-func (a *App) signalHandler() {
+// handleResize refits the screen to the terminal's new size and redraws.
+// Called from MainLoop when resizeCh fires -- never from the signal goroutine
+// itself: the redraw reaches libvim (brace matching, spell errors) and the
+// same Screen, Editor and Organizer state a key in progress is using.
+func (a *App) handleResize() {
 	err := a.Screen.GetWindowSize()
 	if err != nil {
 		//SafeExit(fmt.Errorf("couldn't get window size: %v", err))
@@ -703,6 +709,10 @@ func (a *App) startKeyReader() {
 	}()
 }
 
+// MainLoop is the one goroutine that draws, changes editor and organizer
+// state, and calls libvim (which is not thread-safe). Everything else -- the
+// key reader, the resize signal, image loading, research -- runs elsewhere
+// and reaches the UI only as an event on one of the channels selected here.
 func (a *App) MainLoop() {
 	org := a.Organizer
 	a.startKeyReader()
@@ -710,6 +720,12 @@ func (a *App) MainLoop() {
 	if a.HasNotifications() {
 		a.processNotifications(org)
 		a.returnCursor()
+	}
+
+	// a nil channel is never ready, so no RenderManager means no such events
+	var renderResults <-chan RenderResult
+	if a.RenderManager != nil {
+		renderResults = a.RenderManager.resultCh
 	}
 
 	for a.Run {
@@ -771,7 +787,12 @@ func (a *App) MainLoop() {
 				org.ShowMessage(BL, "Readkey problem %v", err)
 			}
 		case <-a.notificationCh:
-			a.processNotificationsWithRedraw(org)
+			a.processNotifications(org)
+		case <-a.resizeCh:
+			a.handleResize()
+		case res := <-renderResults:
+			// a note's images finished loading in the background
+			a.RenderManager.applyResult(res)
 		}
 		a.returnCursor()
 	}
@@ -810,29 +831,6 @@ func (a *App) processNotifications(org *Organizer) {
 		if notification == "" {
 			return
 		}
-		org.drawNotice(notification)
-		org.altRowoff = 0
-		org.mode = NAVIGATE_NOTICE
-	}
-}
-
-// processNotificationsWithRedraw handles notifications including special redraw requests
-func (a *App) processNotificationsWithRedraw(org *Organizer) {
-	for {
-		notification := a.GetNotification()
-		if notification == "" {
-			return
-		}
-
-		// Handle special preview redraw notification from async renderer
-		if notification == "_REDRAW_PREVIEW_" {
-			if !a.Session.editorMode && org.view == TASK {
-				org.drawRenderedNote()
-			}
-			continue
-		}
-
-		// Handle regular notifications (research results, etc.)
 		org.drawNotice(notification)
 		org.altRowoff = 0
 		org.mode = NAVIGATE_NOTICE
