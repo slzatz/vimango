@@ -288,6 +288,23 @@ In vimango_hybrid:
 
 In a terminal, `cd ~/vimango && ./vimango` should start as before.
 
+**If the sync says `password authentication failed for user … (28P01)`** and
+the password in `~/vimango/config.json` is right, an environment variable is
+overriding it: `VIMANGO_PG_PASSWORD`, when set, wins over the file in vimango,
+`vimango-sync` and hybrid alike. `run.sh` starts hybrid from a terminal, and
+hybrid started that way carries that terminal's variables — a stale line in a
+shell profile that the Dock-launched app never saw. (This happened on the
+first Mac updated: an old password in `~/.secrets`.) Builds from `0c7acc5` on
+end the error with a note naming the variable. To find it:
+
+```bash
+echo "${VIMANGO_PG_PASSWORD:+set}"        # in the terminal run.sh was started from
+grep -l VIMANGO_PG_PASSWORD ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin ~/.bash_profile ~/.bashrc ~/.profile ~/.secrets 2>/dev/null
+```
+
+Delete the line, open a new terminal, quit hybrid and run `./scripts/run.sh`
+again.
+
 ---
 
 ## Afterwards
