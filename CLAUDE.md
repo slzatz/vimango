@@ -192,8 +192,13 @@ The matches of the last search are highlighted in the note editor, as with vim's
 - `:noh` and `n` change what is highlighted without changing the text, so the tick check cannot see them: `editorProcessKey` compares `searchState()` (the pattern, or "" when hidden) with what `drawSearchMatches` last drew and asks for a redraw when they differ. The same comparison gives incremental highlighting for free — libvim searches as the pattern is typed.
 - Matches are drawn with `highlightRowRange`, like the visual selection, so one that crosses a wrap or contains a tab lands correctly; a match is plain black-on-yellow, losing the markdown colors under it.
 - **libvim had to be fixed first.** Its `vimSearchGetHighlights` skipped a match at the first column of the first line asked for and any match starting within two columns of the end of the previous one: the middle `foo` of `foo foo foo`. See the fork's `PATCHES.md`.
-- Not done: a failed search shows no message (`E486: Pattern not found` is dropped, as vim's messages for normal-mode keys all are — only ex commands are captured); the match under the cursor is not marked differently.
+- A search that finds nothing says so (`E486: Pattern not found`), like every other message vim has for a key — see "vim's messages" below. Not done: the match under the cursor is not marked differently.
 - Tests: `searchhl_test.go`, `vim/search_test.go`; `src/apitest/search_highlights.c` in libvim.
+
+## vim's messages
+libvim has no screen; what vim would write on its message line goes to a callback (`vimSetMessageCallback`), which `vim.CaptureMessages` collects around a call. The editor shows them on its message line in two places: for a forwarded ex command (`forwardEx`: output and errors; several lines go to the `:help` overlay), and for **every key typed in the editor** (`processKey` → `showKeyMessages`, `ex_forward.go`) — `E486: Pattern not found`, `E20: Mark not set`, `E353: Nothing in register`, Ctrl-G's position report. When vim says nothing, which is nearly every key, the message line is left untouched, so `-- INSERT --` and vimango's own messages stay.
+
+Until 2026-11-10 none of these were shown. That was not a choice: vimango had never registered the callback, so they were never received. What libvim does *not* send is vim's informational counts — "3 lines yanked", "4 fewer lines", "search hit BOTTOM, continuing at TOP", undo's summary, "recording @a": those go through a part of vim's message code that libvim made a no-op, and getting them back would be a change to the fork. The organizer's title editing does not show vim's messages.
 
 ## Spell Checking
 Spell checking is vim's, from libvim (restored in the slzatz/libvim fork; see its CLAUDE.md for the C API). libvim finds the misspellings; vimango only draws them and shows the suggestion list. Code: `spellcheck.go`; bindings: `vim/spell.go`, `spell_callback.go`.

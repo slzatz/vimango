@@ -484,3 +484,64 @@ func TestCommandLineOpensWithVimsRange(t *testing.T) {
 		t.Errorf("a plain ':' opened with %q", e.command_line)
 	}
 }
+
+// keyMessage returns what the editor showed while handling keys, without escapes.
+func keyMessage(t *testing.T, e *Editor, keys string) string {
+	t.Helper()
+	out := captureStdout(t, func() {
+		for _, r := range keys {
+			e.editorProcessKey(int(r))
+		}
+	})
+	var b strings.Builder
+	for i := 0; i < len(out); i++ {
+		if out[i] == 0x1b {
+			for i < len(out) && !(out[i] >= 'A' && out[i] <= 'Z' || out[i] >= 'a' && out[i] <= 'z') {
+				i++
+			}
+			continue
+		}
+		b.WriteByte(out[i])
+	}
+	return b.String()
+}
+
+// What vim says about a normal-mode key reaches the message line: a search
+// that finds nothing, a mark that is not set, an empty register.
+func TestVimMessagesForKeysAreShown(t *testing.T) {
+	e := newTestEditor(t, "alpha bravo", "charlie")
+	withOrganizer(t, e)
+
+	msg := keyMessage(t, e, "/nowhere\r")
+	if !strings.Contains(msg, "E486: Pattern not found: nowhere") {
+		t.Errorf("a failed search showed %q", msg)
+	}
+	if strings.Count(msg, "E486") != 1 {
+		t.Errorf("the failed search was reported %d times: %q", strings.Count(msg, "E486"), msg)
+	}
+	if msg := keyMessage(t, e, "'z"); !strings.Contains(msg, "E20: Mark not set") {
+		t.Errorf("a jump to an unset mark showed %q", msg)
+	}
+	if msg := keyMessage(t, e, `"zp`); !strings.Contains(msg, "E353: Nothing in register z") {
+		t.Errorf("a put from an empty register showed %q", msg)
+	}
+	if msg := keyMessage(t, e, "\x07"); !strings.Contains(msg, "line 1 of 2") || strings.Contains(msg, "No Name") { // Ctrl-G
+		t.Errorf("Ctrl-G showed %q", msg)
+	}
+
+	// vim has nothing to say about most keys, and then the message line is
+	// left alone: nothing is written at all
+	for _, keys := range []string{"l", "w", "j", "k", "x", "u", "yy", "p"} {
+		if msg := keyMessage(t, e, keys); msg != "" {
+			t.Errorf("%q wrote %q to the screen", keys, msg)
+		}
+	}
+	// in INSERT the mode message stays until Esc
+	if msg := keyMessage(t, e, "i"); !strings.Contains(msg, "-- INSERT --") {
+		t.Errorf("entering INSERT showed %q", msg)
+	}
+	if msg := keyMessage(t, e, "abc"); msg != "" {
+		t.Errorf("typing in INSERT wrote %q to the screen", msg)
+	}
+	e.editorProcessKey('\x1b')
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/slzatz/vimango/vim"
@@ -438,5 +439,44 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 		e.mode = HELP
 		app.Organizer.drawNotice("```\n" + strings.Join(lines, "\n") + "\n```")
 		app.Organizer.altRowoff = 0
+	}
+}
+
+// showKeyMessages shows what vim said about a key typed in the editor, on the
+// message line. Nothing is shown, and the line is left as it is, when vim said
+// nothing -- which is nearly every key.
+//
+// Until 2026-11-10 none of this reached the user. It was not a decision:
+// libvim has no screen and hands its messages to a callback, and vimango had
+// never registered one, so a search that found nothing, a jump to a mark that
+// was not set and a put from an empty register all failed in silence.
+//
+// libvim sends errors and a few reports (Ctrl-G). It does not send vim's
+// counts ("3 lines yanked", "search hit BOTTOM"): those go through a part of
+// vim's message code that libvim turned into a no-op.
+func (e *Editor) showKeyMessages(msgs []vim.Message) {
+	var texts []string
+	isError := false
+	for _, m := range msgs {
+		for _, l := range strings.Split(m.Title+m.Text, "\n") {
+			// Ctrl-G leads with vim's idea of the file -- "[No Name]"
+			// [Modified] -- which means nothing here: the note has no file,
+			// and vim thinks every buffer it never wrote is modified.
+			l = strings.TrimPrefix(strings.TrimSpace(l), `"[No Name]" `)
+			l = strings.TrimPrefix(l, "[Modified] ")
+			if l == "" || slices.Contains(texts, l) { // vim reports a failed search twice
+				continue
+			}
+			texts = append(texts, l)
+			isError = isError || m.Error
+		}
+	}
+	if len(texts) == 0 {
+		return
+	}
+	if isError {
+		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", strings.Join(texts, "; "))
+	} else {
+		e.ShowMessage(BR, "%s", strings.Join(texts, "; "))
 	}
 }

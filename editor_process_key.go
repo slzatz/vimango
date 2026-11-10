@@ -79,7 +79,13 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	// mappings apply to what the user types (and only to that; see vimrc.go)
 	wasVisual := e.mode == VISUAL
 	vim.TakeSpellSuggestRequest() // drop a z= typed outside the editor (organizer)
-	vim.SendUserKey(func() { sendToVim(c) })
+	// What vim would have put on its message line for this key -- mostly
+	// errors: "E486: Pattern not found", "E20: Mark not set". Shown last, when
+	// this function returns, so it is not overwritten by a message of ours.
+	msgs := vim.CaptureMessages(func() {
+		vim.SendUserKey(func() { sendToVim(c) })
+	})
+	defer e.showKeyMessages(msgs)
 	// zg, zw etc. change what is misspelled without changing the buffer
 	spellRedraw := spellOn && spellListKey(e.spellKeys, c)
 	e.spellKeys = (e.spellKeys + string(rune(c)))[max(0, len(e.spellKeys)+len(string(rune(c)))-2):]
