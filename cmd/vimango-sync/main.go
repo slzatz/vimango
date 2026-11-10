@@ -91,6 +91,9 @@ func main() {
 	}
 	defer pgDB.Close()
 	if err := pgDB.Ping(); err != nil {
+		if note := syncpkg.EnvOverrideNote(); note != "" {
+			fatal("postgres ping failed: %v. %s", err, note)
+		}
 		fatal("postgres ping failed: %v", err)
 	}
 

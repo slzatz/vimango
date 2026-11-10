@@ -28,7 +28,11 @@ func (a *App) Synchronize(reportOnly bool) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := a.Database.PG.PingContext(ctx); err != nil {
-		return fmt.Sprintf("### Remote sync unavailable\n\nCould not reach the PostgreSQL server at %s: %v\n\nCheck your network connection. Local changes are safe and will sync once the server is reachable.", a.Config.Postgres.Host, err)
+		msg := fmt.Sprintf("### Remote sync unavailable\n\nCould not reach the PostgreSQL server at %s: %v\n\nCheck your network connection. Local changes are safe and will sync once the server is reachable.", a.Config.Postgres.Host, err)
+		if note := sync.EnvOverrideNote(); note != "" {
+			msg += "\n\n" + note
+		}
+		return msg
 	}
 
 	a.SyncInProcess = true
