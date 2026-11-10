@@ -34,6 +34,7 @@ type Editor struct {
 	searchPrefix string
 	suggestions  []string // spelling suggestions offered in SPELLING mode
 	spellKeys    string   // last NORMAL keys typed, to spot zg/zw (spellListKey)
+	searchDrawn  string   // vim's search state when the text was last drawn (searchState)
 	bufferTick   int
 	saveTick     int
 	// dbText is the note exactly as this editor last read it from — or

@@ -10,8 +10,22 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// note that bool returned is whether to redraw
+// editorProcessKey handles one key in the note editor and reports whether the
+// text needs redrawing.
 func (e *Editor) editorProcessKey(c int) (redraw bool) {
+	redraw = e.processKey(c)
+	// Search highlighting can change with no change to the text: a new
+	// pattern (each character typed after "/", n, *), :noh, :set nohlsearch.
+	// Not while an overlay (:help, :marks) is up: drawing the text would wipe
+	// it, and closing it redraws anyway.
+	if e.mode != HELP && searchState() != e.searchDrawn {
+		redraw = true
+	}
+	return redraw
+}
+
+// note that bool returned is whether to redraw
+func (e *Editor) processKey(c int) (redraw bool) {
 
 	//No matter what mode you are in an escape puts you in NORMAL mode
 	if c == '\x1b' {

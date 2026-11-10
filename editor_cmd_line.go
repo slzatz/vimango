@@ -181,6 +181,8 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"`  - (visual)     ` - toggle the selected lines as a bulleted list\n" +
 	"`  # (visual)     ` - toggle the selected lines as a numbered list\n\n" +
 	"The same key again removes a decoration or list; the other one swaps it.\n" +
+	"\nSearch with `/` `?` `n` `N` `*` `#`: the matches are highlighted until `:noh`\n" +
+	"(`set nohlsearch` in vimango.vim turns that off).\n" +
 	"Mappings live in vimango.vim, next to config.json.\n"
 
 // save writes the buffer to the database. Once the note is in, the buffer is

@@ -151,6 +151,10 @@ func main() {
 	// Configure Vim settings
 	vim.ExecuteCommand("set iskeyword+=*")
 	vim.ExecuteCommand("set iskeyword+=`")
+	// Highlight search matches (searchhl.go). vim's default is off; here there
+	// is no other way to see where the matches are. vimango.vim can turn it
+	// back off with "set nohlsearch".
+	vim.ExecuteCommand("set hlsearch")
 
 	// Registers saved by the previous run (see registers.go)
 	restoreRegisters()

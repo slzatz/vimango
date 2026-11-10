@@ -383,7 +383,16 @@ pos_T *vimSearchGetMatchingPair(int initc);
 /*
  * vimSearchGetHighlights
  *
- * Get highlights for the current search
+ * Get the matches of the last search pattern in lines start_lnum..end_lnum of
+ * buf, in order, as an array the caller frees with vim_free(). start_lnum 0
+ * means from the first line and end_lnum 0 to the last. Each highlight's end
+ * is the position just past the match.
+ *
+ * Every match is returned, including one at the first column of start_lnum
+ * and ones that start where the previous match ended or a column later
+ * ("foofoo", "foo foo"); until Nov 2026 those were skipped. Matches are
+ * returned whether or not highlighting is on -- see
+ * vimSearchGetHighlightEnabled.
  */
 void vimSearchGetHighlights(buf_T *buf, linenr_T start_lnum, linenr_T end_lnum,
                             int *num_highlights,
@@ -395,6 +404,17 @@ void vimSearchGetHighlights(buf_T *buf, linenr_T start_lnum, linenr_T end_lnum,
  * Get the current search pattern
  */
 char_u *vimSearchGetPattern();
+
+/*
+ * vimSearchGetHighlightEnabled
+ *
+ * TRUE when vim would be highlighting the matches of the last search:
+ * 'hlsearch' is set and `:nohlsearch` has not hidden them since the last
+ * search command. This is what v:hlsearch reports. A search ("/", "n", "*")
+ * turns it back on after `:nohlsearch`; an embedder that draws highlights
+ * asks this instead of tracking those commands itself.
+ */
+int vimSearchGetHighlightEnabled(void);
 
 void vimSetStopSearchHighlightCallback(VoidCallback callback);
 

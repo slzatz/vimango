@@ -177,7 +177,8 @@ func (e *Editor) drawText() {
 	} else {
 		e.drawPlainRows(&ab)
 	}
-	e.drawSpellErrors(&ab) // no-op unless :spell is on
+	e.drawSpellErrors(&ab)   // no-op unless :spell is on
+	e.drawSearchMatches(&ab) // no-op unless a search is being highlighted
 	if e.mode == VISUAL {
 		e.drawVisual(&ab)
 	}
