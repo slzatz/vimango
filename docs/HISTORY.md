@@ -1,0 +1,269 @@
+# HISTORY.md
+
+What changed in vimango, when and why: the dated record that used to be spread
+through CLAUDE.md, moved here on 2026-11-10 so that CLAUDE.md holds only the
+rules and how-tos that result. Oldest first; add new entries at the bottom.
+An entry says what landed, the commits involved where they are known, what was
+measured, and anything learned the hard way. A lesson that should guard future
+work is *also* a rule in CLAUDE.md.
+
+The CLAUDE.md that this was taken from is in git at `2e8d4fc`. vimango_hybrid
+keeps the same kind of log in its own `HISTORY.md`.
+
+## Before 2026-07
+
+- **Visual-block `I` / `A` (libvim fork, 2026-01).** Upstream libvim reported
+  one cursor per block line through `cursorAddCallback` and did a single plain
+  insert, leaving replication to the embedder (Onivim 2). vimango never
+  registered that callback, so the block insert was silently dropped. The fork
+  makes them vim's `OP_INSERT` / `OP_APPEND` operators again.
+- **The glamour fork through `go.work` (2026-03-27, `54ccf51`).** A local-path
+  `replace` (`../glamour`) gave way to a gitignored per-machine `go.work`, so
+  that no local path was committed.
+
+## 2026-07
+
+- **Offline startup (2026-07-06, `debda68`).** `InitDatabases` stopped pinging
+  PostgreSQL; the handle is opened lazily and reachability is checked when a
+  sync is asked for.
+- **libvim became the only vim engine (2026-07-07, `f537fe7`).** The pure-Go
+  `govim` engine, the adapter layer that switched between the two, and the
+  Windows and `CGO_ENABLED=0` stubs were removed. From then on cgo is required
+  and Windows builds are unsupported.
+- **One SQLite driver (2026-07-12).** `mattn/go-sqlite3` everywhere; the
+  modernc.org/sqlite pure-Go driver and the `--go-sqlite` / `--cgo-sqlite`
+  selection layer went. mattn's built-in 5000 ms busy timeout matters because
+  several processes share `vimango.db`. This made the `fts5` build tag
+  mandatory, and the `fts5_guard.go` files were added to turn a tag-less build
+  into a compile error instead of a runtime "no such module: fts5".
+
+## 2026-08
+
+- **`vimango-sync --probe`, and a bounded connect (2026-08-02, `1ad16fe`).**
+  The probe answers "how many changes would a sync apply?" without running
+  one. `connect_timeout` went into the Postgres DSN at the same time: without
+  it lib/pq falls back to OS TCP behavior — wifi-off, DNS failure and
+  connection-refused fail fast, but a blackholed route retried SYNs for 75 s,
+  measured on macOS. That stranded vimango_hybrid's quit path, which awaits an
+  in-flight sync unbounded. Set to 10 s. Later `fetchAllChanges` gained
+  `dropSeen`, so that the count a sync reports agrees with the probe's.
+
+## 2026-09
+
+- **No leader key (2026-09-13).** The `<leader>` prefix matcher and the
+  `<C-w>>` / `<C-w><` pair were removed. `<Space>` is a real vim motion (`l`):
+  the leader swallowed it, and swallowed the following key too when the pair
+  did not match a registered command.
+
+## 2026-10
+
+- **libvim on GCC 14+ (2026-10-10).** Verified on GCC 16.2, Arch:
+  `./configure`'s probe programs need `-Wno-error=implicit-int
+  -Wno-error=implicit-function-declaration`; with plain `CFLAGS=-fPIC`
+  configure stops at `checking for tgetent()... NOT FOUND!` even with ncurses
+  installed. Older checkouts also failed to compile `ex_cmds.c` under the
+  Makefile's `-Werror` and raced under `make -j`. The recipes are in the
+  fork's CLAUDE.md now.
+- **Taskwarrior link column (2026-10-16).** A task note's Taskwarrior uuid is
+  `task.taskwarrior_uuid`, synced in both directions by `internal/sync`, and
+  no longer in the note's text. Written once and never cleared: push and pull
+  both COALESCE it, and every sync starts with a backfill. The design and how
+  it rolled out are in `docs/taskwarrior-link-column.md`. The Linux machines
+  never got that rebuild.
+- **Local timestamps are SQLite's format (2026-10-17).** Until then the pull
+  selected a bare `added`, which database/sql turns into RFC 3339 (`…T…Z`,
+  variable fraction); the space-versus-`T` at position 11 sorted every pulled
+  note after every local note from the same UTC day. The pull now uses
+  `to_char`, and `normalizeAdded`, run by every sync, rewrites the old values
+  in place — `modified` untouched, so nothing pushes — and skips anything
+  `strftime` cannot parse, since `added` is NOT NULL and a failed UPDATE would
+  stop every sync.
+
+## 2026-11-07
+
+- **`:open <id>` removed from the editor.** The host once injected it to
+  switch notes in a warm editor; every host editor became a one-session cold
+  spawn chosen by `--open <id>`, so there is no command to switch notes.
+
+## 2026-11-08
+
+A day of removing what the TUI no longer needs, now that vimango_hybrid is the
+daily driver.
+
+- **One note at a time.** The TUI once let several notes be open side by side
+  (Ctrl-H / Ctrl-L moved between them and back to the organizer). Removed;
+  `Session.editor` is the open note's editor or nil. With it went the editor's
+  `normalCmds`, `NormalModeKeyHandler` and its normal-command registry: the
+  editor intercepts no normal-mode keys.
+- **The webview window.** Organizer `:webview` / `:closewebview`, Ctrl-W /
+  Ctrl-Q, the editor's `:webview`, the `webview_worker` binary,
+  `third_party/webview_go` and the GTK/webkit2gtk build dependency on Linux
+  all went. `RenderNoteAsHTML` had rendered two styles — an `<h1>` and a
+  centered column for the webview, neither for a host pane — and kept the
+  second. `config.json`'s `webview.accent` / `webview.code_accent` keep their
+  names and still style `--render-html`.
+- **The editor's in-terminal `:preview`**, and the never-entered VIEW_LOG mode
+  that shared its scrolling; `:vertical resize` in both panes. The divider
+  still follows terminal resizes (`moveDividerPct`) and `preferences.json`'s
+  `edPct`.
+- **Code notes.** Notes in the folder named `code` used to be treated as
+  source in the language their context named (`Languages`): chroma-highlighted
+  in the editor and organizer, mirrored to a hard-coded file on `:w`
+  (`updateCodeFile`), with `:compile` / `:run`, `:style` (the chroma theme)
+  and `:template` (`go.template`). All removed; every note is markdown.
+- **PDF and printing.** Editor `:pdf`, `:pdf-goldmark`, `:print`, `:ha`,
+  `:save`; organizer `:print`, `:ha`, `:printlist`, `:save`; and the
+  `mdtopdf`, `goldmark-pdf` and `gofpdf` dependencies. They belong in hybrid.
+- **hunspell.** Spell checking became vim's own, restored in the libvim fork
+  (fork `b00827d76`), and the `spell` build tag went. The suggestion search is
+  exponential in the word's length; before the fork's cap, `z=` on a word like
+  `llllllllllll` froze the editor for minutes.
+- **The Python HEIC decoder.** `heic_pillow.go`, `heic_convert.py` and a
+  `.venv` with Pillow and pillow-heif: only a `CGO_ENABLED=0` build compiled
+  it. An old `.venv` in the vimango directory can be deleted.
+- **vim mappings work.** Until then `:map` did nothing: upstream libvim's
+  `vimInit` raised `no_mapping` because Onivim 2 owned keybindings itself, so
+  mappings were stored (`maparg()` read them back) but never expanded. The
+  fork's `vimSetMappingsEnabled()` lifts that (fork `ed0f2e241`). Ctrl-B / E /
+  I, which had been Go intercepts with `:bold` / `:italic` / `:code` ex forms,
+  moved into `vimango.vim` and the ex commands were dropped.
+- **Ctrl-I under the kitty keyboard protocol (`3619010`).** Ghostty sends
+  Ctrl-I as `ESC [105;5u`. Before `terminal.ReadKey` decoded CSI-u keys, the
+  unparsed tail `;5u` reached vim as keys: "undo five times". It now drops any
+  sequence it cannot use whole.
+- **The glamour fork is a remote `replace`.** A committed `replace` pinned to
+  a commit of slzatz/glamour superseded the `go.work`, so new machines no
+  longer clone the fork.
+- **`scripts/build-libvim.sh` builds the fork.** Until then it cloned upstream
+  onivim/libvim and never pulled an existing checkout; a machine set up from
+  the old INSTALL.md / MACOS_SETUP.md may have an upstream or stale
+  `../libvim`, which the script now refuses.
+- **Decided, not done:** moving markdown→HTML out of vimango into hybrid (see
+  CLAUDE.md, "Open items").
+
+## 2026-11-09
+
+- **The fork's branch is `main`.** It was `master`; the build script moves an
+  old `master` checkout across when that is a fast-forward. `spelling_restore`
+  was merged into it the same day; a `../libvim` still on that branch must
+  `git fetch && git switch main` first.
+- **`'spelloptions'`** in the fork (`e0553a273` `noallcaps`, `bca64b35e`
+  `nomixedcase`): acronyms and mixed-case words are not spelling errors.
+  Skipping words capitalized only at their start, mid-sentence, was considered
+  and deferred: it would leave Title Case headings and misspelled names
+  unchecked.
+- **A stale `spellfile.o`.** Until fork `532f73b8d` the fork's `src/Makefile`
+  had no header dependencies for `spell.o` and `spellfile.o`, so an
+  incremental build after the `structs.h` change in `e0553a273` kept a
+  `spellfile.o` compiled against the old `synblock_T`. It linked and spell
+  checking mostly worked, but `zg` segfaulted in `spell_add_word`. Pulling the
+  fix did not repair such a checkout — `structs.h` was no newer than the stale
+  object — so any machine whose `libvim.a` was built between those two commits
+  needed `./scripts/build-libvim.sh --clean` once.
+- **Rex is detected** by `TERM_PROGRAM=rex`; before that it needed
+  `TERM=xterm-ghostty ./vimango`.
+- **`--render-html --title`** (vimango `8205c8e`), and print styles, for
+  vimango_hybrid's `:export` to PDF, which pages vimango's HTML with WebKit.
+
+## 2026-11-10
+
+The first part of the day's work was merged into `main` at `0556725`.
+
+- **The `vim` package is the whole binding.** It had been three layers — `vim`
+  forwarded to an `Engine` interface (`vim/interfaces`), implemented by a
+  wrapper that called a separate `vim/cvim` package — left over from switching
+  between libvim and the pure-Go engine.
+- **Write-ahead logging**, as the first step in the new
+  `internal/localdb.Migrate`. In the default rollback-journal mode a reader
+  blocked the writer's commit and a committing writer blocked readers, so a
+  sync and a preview render waited on each other.
+- **The search index moved into `vimango.db`.** Until then it was the table
+  `fts` in a second file, `fts5_vimango.db`, keyed by the server `tid`, and
+  each writer updated it by hand in a separate, non-atomic write. Hybrid never
+  wrote it (so its title edits were unsearchable), a note had no row until its
+  first sync, and the two files drifted: on this machine 13 indexed titles and
+  15 indexed bodies no longer matched their notes, and 74 rows belonged to
+  notes that were gone. `errSearchIndex`, sync's FTS statements,
+  `FTS_CLEANUP.md` and `vimango-sync --fts-db` (still accepted, ignored) went
+  with it. Search results on the migrated copy matched the old index's for
+  fifteen test terms, plus the notes the old index had gone stale on.
+- **Markdown highlighting by chunk.** Every redraw had run the lexer from the
+  first line of the note to the bottom of the window: 45 ms a keystroke at the
+  end of an 860-line note, measured in a pty; 2.6 ms afterwards. Against the
+  real database, 5,552 of 5,574 notes looked identical under the two methods;
+  the other 22 each had a stray backtick, which chroma lets run on across
+  blank lines. A marker at the very start of a note (`**Title**` on row 1) is
+  also highlighted now, which the whole-note pass missed.
+- **Stray backticks fixed in 24 notes**; the originals are in
+  `backtick-fix-originals.json.bak`. Nine were left as they are (listed in
+  CLAUDE.md's open items).
+- **Search highlighting.** libvim had to be fixed first: its
+  `vimSearchGetHighlights` skipped a match at the first column of the first
+  line asked for and any match starting within two columns of the end of the
+  previous one — the middle `foo` of `foo foo foo` (fork `a036ecafe`).
+- **vim's messages are shown.** None had been, and nothing had decided to hide
+  them: vimango had never registered the message callback, and libvim itself
+  sent only errors and a few converted commands, dropping everything that went
+  through vim's `msg()` (fork `2da770b06`, `77fc72a6d`).
+- **vim's ex commands are forwarded**, from a list of what is safe
+  (`exAllowed`). Measured before deciding on a list of the allowed rather than
+  of the forbidden: `:w name` wrote the file; `:e x` and `:bn` left the note's
+  buffer; `:cd` moved the process's working directory; bare `:let` never
+  returned from libvim. `TestForwardedCommandsDoNotHang` is how the `:let`
+  hang was found.
+- **vim starts no program** (`8d1e246`): libvim runs in restricted mode. Until
+  then only `:!` and its relatives were refused, by name, and the rest ran
+  (`:r !touch x` made the file).
+- **`:x` stays open when the write fails.** It had reported a failed write and
+  quit anyway, and a process exit is the host's only "saved" signal.
+- **Only `MainLoop` touches the UI and libvim.** The SIGWINCH goroutine had
+  redrawn the screen itself (reaching libvim through brace matching and spell
+  errors while a key might be in progress), and the render goroutines
+  transmitted images, ran glamour and replaced `o.note` — which also blanked
+  the editor pane when a note's images finished loading after it had been
+  opened with `:e`.
+- **Deleted:** the last Windows-only files (resize polling, raw mode, ANSI
+  colors, the HEIC stub); the one-shot tools under `cmd/` (`migrate_local`,
+  `fix_uuid_sync`, and others) and `postgres_migrate_uuid.sql`. Every
+  machine's database and the PostgreSQL server were migrated to UUID
+  containers long ago.
+- **`docs/UPDATING_A_MAC.md`** written, for bringing another Mac to this
+  state. The Linux machines are being retired.
+
+Later the same day, after a review of the open items in all three
+repositories:
+
+- **Seven small fixes** (`022008d`):
+  - Organizer ex commands take parsed arguments (`exArgs`). They had been
+    handed the position of the last space in the line and sliced the line
+    themselves, so `:e 123` opened note 1 (the position, taken for an id), and
+    a name with a space in it worked for `:open` but not for `:set context`.
+    A bare `:sort` had left the organizer in command-line mode.
+    `setContext` / `setContextNew` and the folder pair became one function
+    each.
+  - Foreign keys are enforced on every pooled connection (`localdb.Open`).
+    vimango and vimango-sync had run `PRAGMA foreign_keys=ON` once on the
+    pool, which reached one connection; a statement that landed on another —
+    a query made while a result set was still being read, anything from a
+    second goroutine — was not checked.
+  - A killed vimango takes its `heic_worker` along. Hybrid's SIGTERM to a
+    `--render-html` it no longer wanted ran no defers and left the worker
+    behind with its 136 MB.
+  - `registers.json` was written in place, and `preferences.json` and the
+    image cache through one fixed `.tmp` name that two processes could both be
+    writing. All go through `writeFileAtomic` now.
+  - The image cache's index was rewritten on every cache hit.
+  - Status bars, messages and the info pane were cut by byte length, which
+    could split a multi-byte character; Backspace on a command line removed a
+    byte.
+  - vim's modes were bare numbers (`1`, `8`, `257`).
+- **vim writes no file** (`1fbaa0b`, fork `31301666c`). The ex list refused
+  `:w name` when typed and did not look inside vimscript, where
+  `:execute 'w name'`, `:saveas`, `:redir > name`, `:mksession` and
+  `writefile()` all wrote. The fork's `vimSetFileWritesEnabled(0)` refuses at
+  the point where vim opens a file. Found on the way: `:execute 'diffpatch f'`
+  ran the `patch` program in restricted mode; `call_shell()` checks now.
+- **vimango_ghostty is retired**; the references to it were removed (`2e8d4fc`
+  here, and in vimango_hybrid).
+- **This file.** CLAUDE.md had grown to 70 KB, loaded every session and mostly
+  history; it was rewritten as rules and how-tos, and the history moved here.

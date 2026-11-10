@@ -11,7 +11,15 @@ libvim and a pure-Go engine, `govim`, which was removed in 2026-07.)
 
 ## Layout
 
-- `vim.go` — buffers, input, cursor, mode, selection, command line
+- `vim.go` — buffers, input, cursor, mode, selection, command line; and
+  `InitializeVim`, which puts libvim in restricted mode with file writes off
+  (no program is started and no file written, by any route)
+- `search.go` — where the matches of the last search are, and whether they
+  should be showing
+- `messages.go`, `message_callback.go` — what vim would write on its message
+  line
+- `excommands.go` — vim's command table, for resolving an ex command's name
+  as vim does (`FindExCommand`)
 - `spell.go`, `spell_callback.go` — spell checking (the callback has to live
   in its own file: a file with `//export` may only have declarations in its
   cgo preamble)
@@ -38,7 +46,7 @@ vim.SendKey("<esc>")       // a key in <> notation
 
 lines := buf.Lines()               // ["Hello, world!"]
 pos := vim.GetCursorPosition()     // {line (1-based), byte column (0-based)}
-mode := vim.GetCurrentMode()       // 1 = NORMAL
+mode := vim.GetCurrentMode()       // vim.ModeNormal
 ```
 
 libvim is one process-wide vim and is not thread-safe: call it from one

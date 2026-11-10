@@ -43,7 +43,7 @@ func TestKilledProcessTakesItsHEICWorkerAlong(t *testing.T) {
 		t.Skip("spawns processes")
 	}
 	if _, err := os.Stat("heic_worker"); err != nil {
-		t.Skip("no heic_worker binary here (see CLAUDE.md, Building heic_worker)")
+		t.Skip("no heic_worker binary here (see CLAUDE.md, heic_worker)")
 	}
 
 	// run starts a vimango with a worker, kills it with SIGTERM and reports

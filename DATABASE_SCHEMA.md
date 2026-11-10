@@ -280,15 +280,16 @@ The schemas in code:
 
 ## Build Requirements
 
-To enable FTS5 full-text search support, build with the `fts5` tag:
+Every binary that writes `vimango.db` is built with the `fts5` tag, because
+the search index's triggers run inside the writer:
 
 ```bash
-# Pure Go build
-CGO_ENABLED=0 go build --tags=fts5
-
-# CGO build
-CGO_ENABLED=1 go build --tags="fts5,cgo"
+CGO_ENABLED=1 go build --tags=fts5
 ```
+
+`fts5` is the only tag. cgo is required (`CGO_ENABLED=0` builds are
+unsupported), and `cgo` does not belong in the tag list: the toolchain sets
+that constraint itself.
 
 ## Database Driver Selection
 

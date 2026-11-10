@@ -156,9 +156,9 @@ and says what to do. What each refusal means:
 | `has uncommitted changes to tracked files` | edits in `~/libvim` | `git -C ~/libvim stash`, or commit them |
 | `Homebrew not found` | — | install from https://brew.sh |
 
-If the compile itself fails, see "Building libvim.a" in
-[CLAUDE.md](../CLAUDE.md) for the configure flags current clang needs; the
-fork's `build-macos.sh` already passes them.
+If the compile itself fails, see "Building by hand" in the fork's `CLAUDE.md`
+(`~/libvim/CLAUDE.md`) for the configure flags current clang needs; the fork's
+`build-macos.sh` already passes them.
 
 ---
 
