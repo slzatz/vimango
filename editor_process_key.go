@@ -100,10 +100,15 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 				// editor; ExModeKeyHandler intercepts Enter so vim never
 				// executes anything
 				e.mode = EX_COMMAND
-				e.cmdLineCursor = 0
+				// vim may have put a range on the line already: "'<,'>"
+				// when ':' is pressed in VISUAL, ".,.+2" after a count
+				// (3:). Show it at once, with the cursor after it -- it
+				// used to appear only when the next key was typed.
+				e.command_line = vim.CommandLineGetText()
+				e.cmdLineCursor = vim.CommandLineGetPosition()
 				e.tabCompletion.index = 0
 				e.tabCompletion.list = nil
-				e.ShowMessage(BR, ":")
+				e.ShowMessage(BR, ":%s", e.command_line)
 			} else {
 				e.mode = SEARCH
 				e.searchPrefix = string(rune(c))

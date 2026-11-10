@@ -451,3 +451,36 @@ func TestForwardedListIsSafeInLibvim(t *testing.T) {
 	}
 	t.Logf("%d forwarded commands checked", len(names))
 }
+
+// Pressing ':' with a selection, or after a count, opens the command line with
+// the range vim puts there, and it is on screen before anything is typed.
+func TestCommandLineOpensWithVimsRange(t *testing.T) {
+	e := newTestEditor(t, "alpha", "bravo", "charlie", "delta")
+	withOrganizer(t, e)
+
+	e.sendKeys("Vj")
+	out := captureStdout(t, func() { e.editorProcessKey(':') })
+	if e.mode != EX_COMMAND || e.command_line != "'<,'>" || e.cmdLineCursor != len("'<,'>") {
+		t.Errorf("':' in VISUAL: mode %v, line %q, cursor %d; want EX_COMMAND, \"'<,'>\", 5", e.mode, e.command_line, e.cmdLineCursor)
+	}
+	if !strings.Contains(out, ":'<,'>") {
+		t.Errorf("the range was not drawn when the line opened: %q", out)
+	}
+	e.sendKeys("d")
+	e.editorProcessKey('\r')
+	if got := strings.Join(e.vbuf.Lines(), " "); got != "charlie delta" {
+		t.Errorf("after :'<,'>d the note is %q", got)
+	}
+
+	e.sendKeys("2")
+	captureStdout(t, func() { e.editorProcessKey(':') })
+	if e.command_line != ".,.+1" {
+		t.Errorf("':' after a count of 2 opened with %q, want \".,.+1\"", e.command_line)
+	}
+	e.editorProcessKey('\x1b')
+
+	captureStdout(t, func() { e.editorProcessKey(':') })
+	if e.command_line != "" {
+		t.Errorf("a plain ':' opened with %q", e.command_line)
+	}
+}
