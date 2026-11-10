@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
@@ -36,7 +35,7 @@ func RunMigrate() int {
 		fmt.Fprintf(os.Stderr, "Error: %s not found (run './vimango --init' for a new installation)\n", path)
 		return 1
 	}
-	db, err := sql.Open("sqlite3", path)
+	db, err := localdb.Open(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: opening %s: %v\n", path, err)
 		return 1

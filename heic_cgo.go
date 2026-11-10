@@ -22,8 +22,14 @@ var (
 
 	// Guards ShutdownHEICDecoder: libheif.DeInit unconditionally calls
 	// Kill on the plugin client, which is nil until a successful Init.
+	//
+	// Held across the worker's start, so a shutdown that arrives while it
+	// is starting (a signal: see killHEICWorkerOnSignal) waits and then
+	// kills it, rather than finding nothing to kill and leaving it behind.
+	// Once shut down, no worker is started: the process is on its way out.
 	heicWorkerMu      sync.Mutex
 	heicWorkerStarted bool
+	heicShutDown      bool
 )
 
 func init() {
@@ -114,14 +120,17 @@ func createHEICDecoder() HEICDecoder {
 			},
 		}
 
+		heicWorkerMu.Lock()
+		defer heicWorkerMu.Unlock()
+		if heicShutDown {
+			heicInitErr = fmt.Errorf("the HEIC decoder has been shut down")
+			return
+		}
 		if err := libheif.Init(config); err != nil {
 			heicInitErr = fmt.Errorf("failed to initialize libheif: %v", err)
 			return
 		}
-
-		heicWorkerMu.Lock()
 		heicWorkerStarted = true
-		heicWorkerMu.Unlock()
 
 		decoder.initialized = true
 	})
@@ -140,6 +149,7 @@ func createHEICDecoder() HEICDecoder {
 func shutdownHEICDecoder() {
 	heicWorkerMu.Lock()
 	defer heicWorkerMu.Unlock()
+	heicShutDown = true
 	if !heicWorkerStarted {
 		return
 	}

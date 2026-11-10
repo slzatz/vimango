@@ -379,6 +379,6 @@ func (e *Editor) synchronize() {
 	e.Session.editorMode = false
 	vim.SetCurrentBuffer(app.Organizer.vbuf)
 	app.Organizer.command_line = e.command_line // dry-run detection (:test / :sync?)
-	app.Organizer.synchronize(0)
+	app.Organizer.synchronize(exArgs{name: "sync"})
 	app.returnCursor()
 }

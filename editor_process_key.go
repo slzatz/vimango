@@ -105,12 +105,12 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	// below, so no case should assign it. The two early returns are the
 	// exceptions, and each says why it skips the buffer/cursor resync.
 	switch mode {
-	case 4: //OP_PENDING delete, change, yank, etc
+	case vim.ModeOpPending: // delete, change, yank, etc
 		// half of an operator (the "d" of "d3w"): the buffer has not changed
 		// and the cursor has not settled, so there is nothing to resync yet
 		e.mode = PENDING
 		return false
-	case 8: //SEARCH and EX_COMMAND
+	case vim.ModeCmdline: // SEARCH and EX_COMMAND
 		// reached only on the ':' or '/' that opens the line: once e.mode is
 		// EX_COMMAND or SEARCH those handlers send keys to vim themselves and
 		// never fall through to here
@@ -137,17 +137,17 @@ func (e *Editor) processKey(c int) (redraw bool) {
 			}
 			return false
 		}
-	case 16: //INSERT
+	case vim.ModeInsert:
 		if e.mode != INSERT {
 			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
 		}
-	case 2: //VISUAL_MODE
+	case vim.ModeVisual:
 		e.vmode = visualModeMap[vim.GetVisualType()]
 		e.highlightInfo()
 		redraw = true
 	}
 
-	if m, ok := modeMap[mode]; ok { //note that 8 => SEARCH (8 is also COMMAND)
+	if m, ok := modeMap[mode]; ok { // note that ModeCmdline => SEARCH (it is also COMMAND)
 		e.mode = m
 	} else {
 		e.mode = OTHER // not sure this ever happens
@@ -311,7 +311,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	}
 
 	// backspacing over the ':' (or Ctrl-C) makes vim leave cmdline mode
-	if vim.GetCurrentMode() != 8 {
+	if vim.GetCurrentMode() != vim.ModeCmdline {
 		e.command_line = ""
 		e.cmdLineCursor = 0
 		e.mode = NORMAL
@@ -423,9 +423,7 @@ func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
 	// Below is purely for displaying command line correctly
 	// vim is actually handling the keystrokes whether we do this or not
 	if c == DEL_KEY || c == BACKSPACE {
-		if len(e.command_line) > 0 {
-			e.command_line = e.command_line[:len(e.command_line)-1]
-		}
+		e.command_line = dropLastRune(e.command_line)
 	} else if !isSyntheticKey(c) {
 		// sendToVim drops the other reader codes, so mirroring one here would
 		// show a character vim never received

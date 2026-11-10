@@ -100,7 +100,10 @@ func saveRegisters() {
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(registersFile, data, 0600)
+	// atomically: every editor writes this file as it closes, and two that
+	// close together (hybrid quitting with two pop-outs open) must leave
+	// one's registers or the other's, not an interleaving of both
+	_ = writeFileAtomic(registersFile, data, 0600)
 }
 
 // restoreRegisters loads registers.json (if any) into vim's registers.

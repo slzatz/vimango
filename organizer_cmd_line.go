@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"os"
@@ -15,8 +16,42 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organizer, int) {
-	registry := NewCommandRegistry[func(*Organizer, int)]()
+// exArgs is an organizer ex command line, parsed: what a command is handed
+// instead of the line. ":set context work" is {name: "set context", arg:
+// "work"}; ":rii!" is {name: "rii", bang: true}.
+type exArgs struct {
+	name string // the command as typed, alias or not, without a trailing "!"
+	bang bool   // the name was followed by "!"
+	arg  string // the rest of the line, trimmed; "" when there is none
+}
+
+// parseEx splits an ex command line into the command and its argument. Two
+// commands have a space in their names ("set context", "add keyword"), so the
+// first two words are tried as a name before the first one alone; everything
+// after the name is the argument, spaces included (":find two words", ":open
+// my folder").
+func (o *Organizer) parseEx(line string) (exArgs, func(*Organizer, exArgs), bool) {
+	words := strings.SplitN(strings.TrimSpace(line), " ", 3)
+	for n := min(2, len(words)); n >= 1; n-- {
+		ex := exArgs{
+			name: strings.Join(words[:n], " "),
+			arg:  strings.TrimSpace(strings.Join(words[n:], " ")),
+		}
+		if cmd, found := o.exCmds[ex.name]; found {
+			return ex, cmd, true
+		}
+		if bare, bang := strings.CutSuffix(ex.name, "!"); bang {
+			if cmd, found := o.exCmds[bare]; found {
+				ex.name, ex.bang = bare, true
+				return ex, cmd, true
+			}
+		}
+	}
+	return exArgs{name: strings.TrimSpace(line)}, nil, false
+}
+
+func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organizer, exArgs) {
+	registry := NewCommandRegistry[func(*Organizer, exArgs)]()
 
 	// Navigation commands
 	// Note that the name in Register is the command that is recognized.
@@ -246,10 +281,10 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 	// Entry Management commands
 	registry.Register("e", (*Organizer).editNote, CommandInfo{
-		Description: "Edit the current note",
-		Usage:       "e",
+		Description: "Edit the current note, or the note with the given id",
+		Usage:       "e [id]",
 		Category:    "Entry Management",
-		Examples:    []string{":e"},
+		Examples:    []string{":e", ":e 123"},
 	})
 
 	registry.Register("copy", (*Organizer).copyEntry, CommandInfo{
@@ -278,7 +313,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	// Container Management commands
 	// System commands
 	registry.Register("quit", (*Organizer).quitApp, CommandInfo{
-		Aliases:     []string{"q", "q!"},
+		Aliases:     []string{"q"},
 		Description: "Exit application (q! forces quit without saving)",
 		Usage:       "quit",
 		Category:    "System",
@@ -301,16 +336,16 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 }
 
 // help displays help information for organizer commands
-func (o *Organizer) help(pos int) {
+func (o *Organizer) help(ex exArgs) {
 
 	var helpText string
 
-	if pos == -1 {
+	if ex.arg == "" {
 		// No arguments - show all ex commands
 		helpText = o.commandRegistry.FormatAllHelp()
 	} else {
 		// Get the argument after "help "
-		arg := o.command_line[pos+1:]
+		arg := ex.arg
 
 		// Check if it's request for normal mode help
 		if arg == "normal" {
@@ -378,7 +413,7 @@ func (o *Organizer) help(pos int) {
 	o.altRowoff = 0
 	o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }
-func (o *Organizer) newContext(pos int) {
+func (o *Organizer) newContext(ex exArgs) {
 	o.altView = CONTEXT
 	o.command = ""
 	o.command_line = ""
@@ -399,7 +434,7 @@ func (o *Organizer) newContext(pos int) {
 	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }
 
-func (o *Organizer) newFolder(pos int) {
+func (o *Organizer) newFolder(ex exArgs) {
 	o.altView = FOLDER
 	o.command = ""
 	o.command_line = ""
@@ -498,12 +533,12 @@ func (o *Organizer) generateNoteList() {
 	//o.command = ""
 }
 
-func (o *Organizer) open(pos int) {
+func (o *Organizer) open(ex exArgs) {
 	if o.view != TASK {
 		o.openContainerSelection()
 		return
 	}
-	if pos == -1 {
+	if ex.arg == "" {
 		o.ShowMessage(BL, "You did not provide a context or folder!")
 		//o.mode = o.last_mode
 		// It might be necessary or prudent to also sendvim an <esc> here
@@ -511,7 +546,7 @@ func (o *Organizer) open(pos int) {
 		return
 	}
 	var ok bool
-	input := o.command_line[pos+1:]
+	input := ex.arg
 	if _, ok = o.Database.contextExists(input); ok {
 		o.taskview = BY_CONTEXT
 	}
@@ -537,14 +572,14 @@ func (o *Organizer) open(pos int) {
 	o.command = ""
 }
 
-func (o *Organizer) openContext(pos int) {
-	if pos == -1 {
+func (o *Organizer) openContext(ex exArgs) {
+	if ex.arg == "" {
 		o.ShowMessage(BL, "You did not provide a context!")
 		//o.mode = o.last_mode
 		o.mode = NORMAL
 		return
 	}
-	input := o.command_line[pos+1:]
+	input := ex.arg
 	if _, ok := o.Database.contextExists(input); !ok {
 		o.ShowMessage(BL, "%s is either not a valid context or has not been synced!", input)
 		o.mode = NORMAL
@@ -557,13 +592,13 @@ func (o *Organizer) openContext(pos int) {
 	o.command = ""
 }
 
-func (o *Organizer) openFolder(pos int) {
-	if pos == -1 {
+func (o *Organizer) openFolder(ex exArgs) {
+	if ex.arg == "" {
 		o.ShowMessage(BL, "You did not provide a folder!")
 		o.mode = NORMAL
 		return
 	}
-	input := o.command_line[pos+1:]
+	input := ex.arg
 	if _, ok := o.Database.folderExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		o.mode = NORMAL
@@ -577,14 +612,14 @@ func (o *Organizer) openFolder(pos int) {
 	o.command = ""
 }
 
-func (o *Organizer) openKeyword(pos int) {
-	if pos == -1 {
+func (o *Organizer) openKeyword(ex exArgs) {
+	if ex.arg == "" {
 		o.ShowMessage(BL, "You did not provide a keyword!")
 		//o.mode = o.last_mode
 		o.mode = NORMAL
 		return
 	}
-	input := o.command_line[pos+1:]
+	input := ex.arg
 	if _, ok := o.Database.keywordExists(input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
 		//o.mode = o.last_mode
@@ -599,7 +634,7 @@ func (o *Organizer) openKeyword(pos int) {
 	o.command = ""
 }
 
-func (o *Organizer) write(pos int) {
+func (o *Organizer) write(ex exArgs) {
 	var updated_rows []int
 	if o.view != TASK {
 		return
@@ -645,8 +680,8 @@ func (o *Organizer) write(pos int) {
 	o.command_line = ""
 }
 
-func (o *Organizer) quitApp(_ int) {
-	if o.command_line == "q!" {
+func (o *Organizer) quitApp(ex exArgs) {
+	if ex.bang {
 		app.Run = false
 		return
 	}
@@ -665,7 +700,23 @@ func (o *Organizer) quitApp(_ int) {
 	}
 }
 
-func (o *Organizer) editNote(id int) {
+// editNote is ":e": the current note, or ":e 123" for the note with that id.
+func (o *Organizer) editNote(ex exArgs) {
+	id := -1
+	if ex.arg != "" {
+		n, err := strconv.Atoi(ex.arg)
+		if err != nil || !o.Database.entryExists(n) {
+			o.mode = NORMAL
+			o.ShowMessage(BL, "There is no note with id %q", ex.arg)
+			return
+		}
+		id = n
+	}
+	o.openInEditor(id)
+}
+
+// openInEditor opens note id in the editor; -1 is the current row's note.
+func (o *Organizer) openInEditor(id int) {
 	if o.view != TASK {
 		o.command = ""
 		//o.mode = o.last_mode
@@ -674,7 +725,6 @@ func (o *Organizer) editNote(id int) {
 		return
 	}
 
-	//pos is zero if no space and command modifier
 	if id == -1 {
 		id = o.getId()
 	}
@@ -723,7 +773,7 @@ func (o *Organizer) editNote(id int) {
 	o.mode = NORMAL
 }
 
-func (o *Organizer) newEntry(_ int) {
+func (o *Organizer) newEntry(ex exArgs) {
 	row := Row{
 		id:    -1,
 		star:  false,
@@ -745,8 +795,14 @@ func (o *Organizer) newEntry(_ int) {
 	vim.SendInput("i")
 }
 
-// flag is -1 if called as an ex command and 0 if called by another Organizer method
-func (o *Organizer) refresh(flag int) {
+// refresh is ":refresh". In a container view it leaves the right pane as it is.
+func (o *Organizer) refresh(ex exArgs) {
+	o.refreshView(false)
+}
+
+// refreshView reloads the rows of the current view from the database. With
+// containerInfo, a container view also redraws the first container's details.
+func (o *Organizer) refreshView(containerInfo bool) {
 	if o.view == TASK {
 		if o.taskview == BY_FIND {
 			o.mode = NORMAL
@@ -799,7 +855,7 @@ func (o *Organizer) refresh(flag int) {
 		o.readRowsIntoBuffer()
 		vim.SetCursorPosition(1, 0)
 		o.bufferTick = o.vbuf.GetLastChangedTick()
-		if flag != -1 {
+		if containerInfo {
 			o.displayContainerInfo()
 		}
 		o.ShowMessage(BL, "view refreshed")
@@ -807,15 +863,15 @@ func (o *Organizer) refresh(flag int) {
 	o.clearMarkedEntries()
 }
 
-func (o *Organizer) find(pos int) {
-	if pos == -1 {
+func (o *Organizer) find(ex exArgs) {
+	if ex.arg == "" {
 		o.ShowMessage(BL, "You did not enter something to find!")
 		//o.mode = o.last_mode
 		o.mode = NORMAL
 		return
 	}
 
-	searchTerms := strings.ToLower(o.command_line[pos+1:])
+	searchTerms := strings.ToLower(ex.arg)
 	o.mode = NORMAL
 	if len(searchTerms) < 3 {
 		o.ShowMessage(BL, "You need to provide at least 3 characters to search on")
@@ -850,10 +906,10 @@ func (o *Organizer) find(pos int) {
 	o.displayNote()
 }
 
-func (o *Organizer) synchronize(_ int) {
+func (o *Organizer) synchronize(ex exArgs) {
 	var log string
 	var err error
-	if o.command_line == "test" || o.command_line == "sync?" {
+	if ex.name == "test" || ex.name == "sync?" {
 		// true => reportOnly
 		log = app.Synchronize(true) //Synchronize should return an error
 		err = nil                   //FIXME
@@ -872,8 +928,8 @@ func (o *Organizer) synchronize(_ int) {
 	o.mode = NAVIGATE_NOTICE
 }
 
-func (o *Organizer) containers(_ int) {
-	cmd := o.command_line
+func (o *Organizer) containers(ex exArgs) {
+	cmd := ex.name
 	var containerType string
 	if cmd == "contexts" || cmd == "c" {
 		o.view = CONTEXT
@@ -906,79 +962,25 @@ func (o *Organizer) containers(_ int) {
 	o.ShowMessage(BL, "Retrieved %s", containerType)
 }
 
-func (o *Organizer) setContext(pos int) {
-	var input string
-	if pos == -1 {
-		input = "none"
-	} else {
-		input = o.command_line[pos+1:]
-	}
-	var contextUUID string
-	var ok bool
+// setContext is ":set context <name>"; with no name, the default context.
+func (o *Organizer) setContext(ex exArgs) {
 	o.mode = NORMAL
-	if contextUUID, ok = o.Database.contextExists(input); !ok {
-		o.ShowMessage(BL, "%s is not a valid context!", input)
-		return
-	}
-
-	if len(o.marked_entries) > 0 {
-		for id := range o.marked_entries {
-			err := o.Database.updateTaskContextByUUID(contextUUID, id)
-			if err != nil {
-				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
-				return
-			}
-		}
-		o.ShowMessage(BL, "Marked entries moved into context %q", input)
-		return
-	}
-	id := o.rows[o.fr].id
-	err := o.Database.updateTaskContextByUUID(contextUUID, id)
-	if err != nil {
-		o.showMessage("Error updating context for entry %d: %v", id, err)
-		return
-	}
-	o.ShowMessage(BL, "Moved current entry into context %q", input)
+	o.moveToContext(cmp.Or(ex.arg, "none"))
 }
 
-func (o *Organizer) setFolder(pos int) {
-	var input string
-	if pos == -1 {
-		input = "none"
-	} else {
-		input = o.command_line[pos+1:]
-	}
-	var folderUUID string
-	var ok bool
+// setFolder is ":set folder <name>"; with no name, the default folder.
+func (o *Organizer) setFolder(ex exArgs) {
 	o.mode = NORMAL
-	if folderUUID, ok = o.Database.folderExists(input); !ok {
-		o.ShowMessage(BL, "%q is not a valid folder!", input)
-		return
-	}
-
-	if len(o.marked_entries) > 0 {
-		for id := range o.marked_entries {
-			err := o.Database.updateTaskFolderByUUID(folderUUID, id)
-			if err != nil {
-				o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
-				return
-			}
-		}
-		o.ShowMessage(BL, "Marked entries moved into folder %q", input)
-		return
-	}
-	id := o.rows[o.fr].id
-	err := o.Database.updateTaskFolderByUUID(folderUUID, id)
-	if err != nil {
-		o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
-		return
-	}
-	o.ShowMessage(BL, "Moved current entry into folder %q", input)
+	o.moveToFolder(cmp.Or(ex.arg, "none"))
 }
 
-func (o *Organizer) addKeyword(pos int) {
+func (o *Organizer) addKeyword(ex exArgs) {
 	o.mode = NORMAL
-	input := o.command_line[pos+1:]
+	input := ex.arg
+	if input == "" {
+		o.ShowMessage(BL, "You did not provide a keyword!")
+		return
+	}
 	var ok bool
 	var keywordUUID string
 	if keywordUUID, ok = o.Database.keywordExists(input); !ok {
@@ -1012,7 +1014,7 @@ func (o *Organizer) addKeyword(pos int) {
 	o.ShowMessage(BL, "Added keyword %s to current entry", input)
 }
 
-func (o *Organizer) recent(_ int) {
+func (o *Organizer) recent(ex exArgs) {
 	o.ShowMessage(BL, "Will retrieve recent items")
 	o.clearMarkedEntries()
 	o.filter = ""
@@ -1032,7 +1034,7 @@ func (o *Organizer) recent(_ int) {
 	o.displayNote()
 }
 
-func (o *Organizer) deleteKeywords(_ int) {
+func (o *Organizer) deleteKeywords(ex exArgs) {
 	id := o.getId()
 	res := o.Database.deleteKeywords(id)
 	//o.mode = o.last_mode
@@ -1042,13 +1044,13 @@ func (o *Organizer) deleteKeywords(_ int) {
 	}
 }
 
-func (o *Organizer) showAll(_ int) {
+func (o *Organizer) showAll(ex exArgs) {
 
 	if o.view != TASK {
 		return
 	}
 	o.show_deleted = !o.show_deleted
-	o.refresh(0)
+	o.refreshView(true)
 	if o.show_deleted {
 		o.ShowMessage(BL, "Showing completed/deleted")
 	} else {
@@ -1056,14 +1058,14 @@ func (o *Organizer) showAll(_ int) {
 	}
 }
 
-func (o *Organizer) deleteMarks(_ int) {
+func (o *Organizer) deleteMarks(ex exArgs) {
 	o.clearMarkedEntries()
 	o.mode = NORMAL
 	o.command_line = ""
 	o.ShowMessage(BL, "Marks cleared")
 }
 
-func (o *Organizer) copyEntry(_ int) {
+func (o *Organizer) copyEntry(ex exArgs) {
 	// Validate we're in task view with entries
 	if o.view != TASK || len(o.rows) == 0 {
 		o.ShowMessage(BL, "No entry to copy")
@@ -1091,16 +1093,16 @@ func (o *Organizer) copyEntry(_ int) {
 
 	o.mode = NORMAL
 	o.command_line = ""
-	o.refresh(0) // Refresh to show the new entry
+	o.refreshView(true) // Refresh to show the new entry
 	o.ShowMessage(BL, "Entry copied (new id: %d)", newID)
 }
 
-func (o *Organizer) sortEntries(pos int) {
-	if pos == -1 {
+func (o *Organizer) sortEntries(ex exArgs) {
+	if ex.arg == "" {
 		o.ShowMessage(BL, "You need to provide a column to sort by")
 		return
 	}
-	sort := o.command_line[pos+1:]
+	sort := ex.arg
 	if _, OK := sortColumns[sort]; OK {
 		if sort == "priority" {
 			o.sortPriority = !o.sortPriority
@@ -1111,11 +1113,11 @@ func (o *Organizer) sortEntries(pos int) {
 		o.ShowMessage(BL, "The sort columns are modified, added, and priority")
 		return
 	}
-	o.refresh(0)
+	o.refreshView(true)
 }
 
 // toggleImages toggles inline image display on/off
-func (o *Organizer) toggleImages(_ int) {
+func (o *Organizer) toggleImages(ex exArgs) {
 	o.mode = NORMAL
 	o.command_line = ""
 
@@ -1131,7 +1133,7 @@ func (o *Organizer) toggleImages(_ int) {
 }
 
 // showImageInfo toggles display of Google Drive folder/filename above images
-func (o *Organizer) showImageInfo(_ int) {
+func (o *Organizer) showImageInfo(ex exArgs) {
 	o.mode = NORMAL
 	o.command_line = ""
 
@@ -1148,9 +1150,9 @@ func (o *Organizer) showImageInfo(_ int) {
 
 // refreshImageInfo refreshes Google Drive metadata for images in the current note
 // With ! suffix, also re-downloads the image bytes
-func (o *Organizer) refreshImageInfo(pos int) {
+func (o *Organizer) refreshImageInfo(ex exArgs) {
 	// Check for ! suffix (force re-download)
-	redownload := strings.HasSuffix(o.command_line, "!")
+	redownload := ex.bang
 
 	o.mode = NORMAL
 	o.command_line = ""
@@ -1222,11 +1224,11 @@ func (o *Organizer) refreshImageInfo(pos int) {
 }
 
 // scaleImages changes the image scale (width in columns)
-func (o *Organizer) scaleImages(pos int) {
+func (o *Organizer) scaleImages(ex exArgs) {
 	// Parse argument from command line
 	var argStr string
-	if pos != -1 {
-		argStr = strings.TrimSpace(o.command_line[pos+1:])
+	if ex.arg != "" {
+		argStr = strings.TrimSpace(ex.arg)
 	}
 
 	o.mode = NORMAL
@@ -1280,10 +1282,10 @@ func (o *Organizer) scaleImages(pos int) {
 }
 
 // cacheWidth sets or displays the max pixel width for cached Google Drive images
-func (o *Organizer) cacheWidth(pos int) {
+func (o *Organizer) cacheWidth(ex exArgs) {
 	var argStr string
-	if pos != -1 {
-		argStr = strings.TrimSpace(o.command_line[pos+1:])
+	if ex.arg != "" {
+		argStr = strings.TrimSpace(ex.arg)
 	}
 
 	o.mode = NORMAL
@@ -1322,7 +1324,7 @@ func (o *Organizer) cacheWidth(pos int) {
 }
 
 // clearImageCache removes all files from the disk image cache
-func (o *Organizer) clearImageCache(pos int) {
+func (o *Organizer) clearImageCache(ex exArgs) {
 	o.mode = NORMAL
 	o.command_line = ""
 
@@ -1364,7 +1366,7 @@ func (o *Organizer) clearImageCache(pos int) {
 
 // imageReset clears terminal graphics cache and local caches, then rerenders current note.
 // Works with any terminal supporting the kitty graphics protocol (kitty, ghostty, etc.)
-func (o *Organizer) imageReset(pos int) {
+func (o *Organizer) imageReset(ex exArgs) {
 	deleteAllKittyImages()
 	kittySessionImageMux.Lock()
 	kittySessionImages = make(map[uint32]kittySessionEntry)
@@ -1382,7 +1384,7 @@ func (o *Organizer) imageReset(pos int) {
 }
 
 // convertGoogleDriveURLs converts Google Drive URLs to gdrive:ID format in the current note
-func (o *Organizer) convertGoogleDriveURLs(pos int) {
+func (o *Organizer) convertGoogleDriveURLs(ex exArgs) {
 	if o.view != TASK || len(o.rows) == 0 {
 		o.ShowMessage(BL, "No entry selected")
 		return

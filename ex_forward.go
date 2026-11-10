@@ -392,7 +392,7 @@ func (e *Editor) forwardEx(line string) (redraw bool) {
 	msgs := vim.CaptureMessages(func() { vim.SendInput(":" + line + "\r") })
 
 	var problems []string
-	if m := vim.GetCurrentMode(); m != 1 && m != 257 { // not NORMAL: insert, visual, an unfinished command line
+	if m := vim.GetCurrentMode(); m != vim.ModeNormal && m != vim.ModeNormalBusy { // not NORMAL: insert, visual, an unfinished command line
 		vim.SendKey("<esc>")
 	}
 	if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {

@@ -67,9 +67,8 @@ func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //
 		loc = BR
 	}
 	max_length := e.Screen.PositionMessage(loc)
-	str := fmt.Sprintf(format, a...)
-	if len(str) > max_length {
-		str = str[:max_length]
-	}
+	// by columns: cutting at a byte count split multi-byte characters, and
+	// counted the bytes of an escape sequence ("-- INSERT --" is sent bold)
+	str, _ := clipColumns(fmt.Sprintf(format, a...), 0, max_length)
 	fmt.Print(str)
 }

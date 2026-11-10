@@ -44,11 +44,18 @@ type CacheIndex struct {
 // several MB, so a count alone is a 20x-loose proxy for disk use.
 // maxCacheEntries is only a backstop against an index of pathologically
 // tiny images: every entry costs ~440 bytes of cache_index.json, which is
-// rewritten in full on every cache hit.
+// rewritten in full on every change.
 const (
 	maxCacheBytes   int64 = 500 * 1024 * 1024
 	maxCacheEntries       = 2000
 )
+
+// accessGranularity is how stale an entry's recorded last use may get before
+// a cache hit writes the index to update it. Eviction picks the least recently
+// used of hundreds of images, used days or months apart, so an hour loses
+// nothing; writing on every hit, as was done until 2026-11-10, rewrote the
+// whole index once per image per preview, from every process showing one.
+const accessGranularity = time.Hour
 
 // ImageCache manages the disk-based image cache
 type ImageCache struct {
@@ -101,6 +108,8 @@ func NewImageCache() (*ImageCache, error) {
 	if err := cache.ensureCacheDirectory(); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %v", err)
 	}
+
+	removeStaleTempFiles(cacheDir)
 
 	// Load existing cache index
 	if err := cache.loadIndex(); err != nil {
@@ -212,15 +221,8 @@ func (c *ImageCache) saveIndex() error {
 		return fmt.Errorf("failed to marshal index: %v", err)
 	}
 
-	// Atomic write: write to temp file then rename
-	tempFile := c.indexFile + ".tmp"
-	if err := os.WriteFile(tempFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temp index file: %v", err)
-	}
-
-	if err := os.Rename(tempFile, c.indexFile); err != nil {
-		os.Remove(tempFile) // Clean up temp file on failure
-		return fmt.Errorf("failed to rename temp index file: %v", err)
+	if err := writeFileAtomic(c.indexFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write index file: %v", err)
 	}
 
 	return nil
@@ -291,9 +293,12 @@ func (c *ImageCache) UpdateGDriveMeta(url, gdriveName, gdriveFolder string) erro
 // day was otherwise evicted purely for being old, so a note's images went
 // cold on a timetable that ignored how often it was read, and the next
 // preview paid a full Drive round trip again. LastAccessed is written
-// through to the index on every cache hit (GetCachedImageData), which is
+// through to the index on a cache hit (GetCachedImageData), which is
 // what makes this work across processes — each `--render-html` is its own
 // short-lived process and sees only what the previous one persisted.
+//
+// Not on every hit: when the time already recorded is under an hour old
+// (accessGranularity), which is as fine as eviction needs.
 //
 // Entries predating that bookkeeping can carry a zero LastAccessed; fall
 // back to Created for those so they age normally instead of all tying at
@@ -429,11 +434,16 @@ func (c *ImageCache) GetCachedImageData(url string) (string, int, int, bool) {
 		return "", 0, 0, false
 	}
 
-	// Update last accessed time
+	// Record the use, for eviction -- in the index file only when what is
+	// recorded there has gone stale (see accessGranularity).
 	c.mutex.Lock()
-	entry.LastAccessed = time.Now()
+	now := time.Now()
+	persist := now.Sub(entry.LastAccessed) >= accessGranularity
+	entry.LastAccessed = now
 	c.index.Entries[key] = entry
-	c.saveIndex() // Best effort, ignore errors
+	if persist {
+		c.saveIndex() // Best effort, ignore errors
+	}
 	c.mutex.Unlock()
 
 	return string(data), entry.Width, entry.Height, true
@@ -448,15 +458,8 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 	cacheFile := filepath.Join(c.cacheDir, filename)
 	fingerprint := hashString(base64Data)
 
-	// Write image data to cache file atomically
-	tempFile := cacheFile + ".tmp"
-	if err := os.WriteFile(tempFile, []byte(base64Data), 0644); err != nil {
+	if err := writeFileAtomic(cacheFile, []byte(base64Data), 0644); err != nil {
 		return fmt.Errorf("failed to write cache file: %v", err)
-	}
-
-	if err := os.Rename(tempFile, cacheFile); err != nil {
-		os.Remove(tempFile) // Clean up temp file
-		return fmt.Errorf("failed to rename cache file: %v", err)
 	}
 
 	// Get file size for index

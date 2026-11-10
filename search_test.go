@@ -130,7 +130,7 @@ func TestFailedSearchKeepsTheList(t *testing.T) {
 	if _, err := db.searchEntries(`"unbalanced`, "modified", false); err == nil {
 		t.Fatal("the premise of this test is wrong: the query did not fail")
 	}
-	captureStdout(t, func() { o.find(4) })
+	captureStdout(t, func() { o.find(exArgs{name: "find", arg: `"unbalanced`}) })
 
 	if len(o.rows) != 2 || o.fr != 1 {
 		t.Fatalf("after a failed search: %d rows, fr=%d; want the 2 rows and fr=1 untouched", len(o.rows), o.fr)

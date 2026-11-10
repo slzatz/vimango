@@ -167,13 +167,13 @@ const (
 	OTHER // Just in case
 )
 
-var modeMap = map[int]Mode{
-	1:   NORMAL, // seems to be only after an escape
-	2:   VISUAL, //VISUAL_MODE,
-	4:   PENDING,
-	8:   SEARCH, // Also COMMAND
-	16:  INSERT,
-	257: NORMAL_BUSY, // just about any keystroke when in NORMAL mode
+var modeMap = map[vim.Mode]Mode{
+	vim.ModeNormal:     NORMAL, // seems to be only after an escape
+	vim.ModeVisual:     VISUAL,
+	vim.ModeOpPending:  PENDING,
+	vim.ModeCmdline:    SEARCH, // also COMMAND
+	vim.ModeInsert:     INSERT,
+	vim.ModeNormalBusy: NORMAL_BUSY, // just about any keystroke when in NORMAL mode
 }
 
 // v -> 118; V -> 86; ctrl-v -> 22

@@ -308,7 +308,7 @@ func TestVimStartsNoProgram(t *testing.T) {
 	if got := strings.Join(e.vbuf.Lines(), "|"); got != "alpha|bravo" {
 		t.Errorf("the note changed: %q", got)
 	}
-	if m := vim.GetCurrentMode(); m != 1 && m != 257 { // NORMAL, or NORMAL just after a key
+	if m := vim.GetCurrentMode(); m != vim.ModeNormal && m != vim.ModeNormalBusy { // NORMAL, or NORMAL just after a key
 		t.Errorf("vim was left in mode %d", m)
 	}
 
@@ -495,7 +495,7 @@ func TestForwardedListIsSafeInLibvim(t *testing.T) {
 		if id := vim.GetCurrentBuffer().GetID(); id != e.vbuf.GetID() {
 			t.Fatalf(":%s (%q) left vim on buffer %d", name, line, id)
 		}
-		if m := vim.GetCurrentMode(); m != 1 && m != 257 {
+		if m := vim.GetCurrentMode(); m != vim.ModeNormal && m != vim.ModeNormalBusy {
 			t.Errorf(":%s (%q) left vim in mode %d", name, line, m)
 			vim.SendKey("<esc>")
 		}

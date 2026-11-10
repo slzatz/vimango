@@ -60,6 +60,9 @@ func RunRenderHTML(id int, linkNotes, showTitle bool) int {
 	// the end: every return below is an early one, and main() calls
 	// os.Exit on our result, which runs no defers of its own.
 	defer ShutdownHEICDecoder()
+	// ...and a host that no longer wants this render kills it (SIGTERM),
+	// which runs no defers either.
+	killHEICWorkerOnSignal()
 
 	app = CreateApp()
 

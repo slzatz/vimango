@@ -217,18 +217,25 @@ func SetCursorPosition(row, col int) {
 	C.vimCursorSetPosition(p)
 }
 
-// GetCurrentMode returns vim's mode, the values vim.h defines:
-//
-//	  1  NORMAL
-//	  2  VISUAL (GetVisualType says which kind)
-//	  4  OP_PENDING: an operator waiting for its motion, as after "d" or "2d"
-//	  8  CMDLINE: typing after ':', '/' or '?'
-//	 16  INSERT
-//	257  NORMAL with a command in progress (e.g. after "r")
+// Mode is the state vim is in, as GetCurrentMode reports it.
+type Mode int
+
+// vim's modes, with the values vim.h gives them. These are the ones a key can
+// leave vim in here; vim.h has more (Replace is ModeInsert with a flag).
+const (
+	ModeNormal     Mode = C.NORMAL      // 1
+	ModeVisual     Mode = C.VISUAL      // 2; GetVisualType says which kind
+	ModeOpPending  Mode = C.OP_PENDING  // 4: an operator waiting for its motion, as after "d" or "2d"
+	ModeCmdline    Mode = C.CMDLINE     // 8: typing after ':', '/' or '?'
+	ModeInsert     Mode = C.INSERT      // 16
+	ModeNormalBusy Mode = C.NORMAL_BUSY // 257: NORMAL with a command in progress, as after "r"
+)
+
+// GetCurrentMode returns vim's mode.
 //
 // int vimGetMode(void);
-func GetCurrentMode() int {
-	return int(C.vimGetMode())
+func GetCurrentMode() Mode {
+	return Mode(C.vimGetMode())
 }
 
 // GetVisualRange returns the two ends of the visual selection, each as

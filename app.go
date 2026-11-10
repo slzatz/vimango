@@ -188,17 +188,9 @@ func (a *App) SavePreferences() error {
 		return fmt.Errorf("marshal preferences: %w", err)
 	}
 
-	// Atomic write pattern
-	tmpPath := a.preferencesPath + ".tmp"
-	if err := ioutil.WriteFile(tmpPath, data, 0644); err != nil {
-		return fmt.Errorf("write temp file: %w", err)
+	if err := writeFileAtomic(a.preferencesPath, data, 0644); err != nil {
+		return fmt.Errorf("write preferences: %w", err)
 	}
-
-	if err := os.Rename(tmpPath, a.preferencesPath); err != nil {
-		os.Remove(tmpPath) // Clean up temp file on error
-		return fmt.Errorf("rename temp file: %w", err)
-	}
-
 	return nil
 }
 
@@ -265,12 +257,7 @@ func (a *App) InitDatabases(configPath string) error {
 	}
 
 	// Initialize main database
-	a.Database.MainDB, err = sql.Open("sqlite3", config.Sqlite3.DB)
-	if err != nil {
-		return err
-	}
-	// Enable foreign keys
-	_, err = a.Database.MainDB.Exec("PRAGMA foreign_keys=ON;")
+	a.Database.MainDB, err = localdb.Open(config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
@@ -571,7 +558,7 @@ func (a *App) LoadInitialData() {
 	// its boot draw would paint fragments into the editor's screen area —
 	// the status bar's first column, the current-row marker, and a BL
 	// message truncated to divider width (one char). The data loads above
-	// still run: editNote() reads o.rows / o.fr.
+	// still run: openInEditor() reads o.rows / o.fr.
 	if a.Session.editorOnly {
 		return
 	}

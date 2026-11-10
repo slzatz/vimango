@@ -147,6 +147,7 @@ func main() {
 
 	// Set up platform-specific signal handling
 	setupSignalHandling(app)
+	killHEICWorkerOnSignal()
 
 	// Configure Vim settings
 	vim.ExecuteCommand("set iskeyword+=*")
@@ -198,14 +199,14 @@ func main() {
 
 	if editorOnly {
 		// openId == -1 opens the current (most recently modified) row
-		app.Organizer.editNote(openId)
+		app.Organizer.openInEditor(openId)
 		if app.Session.editor == nil {
 			// e.g. empty database: nothing to edit
 			rawmode.Restore(app.origTermCfg)
 			fmt.Println("Error: no note to open (database has no saved entries)")
 			os.Exit(1)
 		}
-		// editNote's draw ends wherever its last cell was — the bottom
+		// openInEditor's draw ends wherever its last cell was — the bottom
 		// of the right border — and nothing places the cursor until the
 		// first key or resize. A host that spawns an editor and shows it
 		// at once (a VimangoHybrid pop-out) would show it there.

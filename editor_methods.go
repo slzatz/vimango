@@ -282,19 +282,15 @@ func (e *Editor) drawStatusBar() {
 	fmt.Fprintf(&ab, "\x1b[%dX", e.screencols)
 
 	ab.WriteString("\x1b[7m ") //switches to inverted colors
-	title := e.title
-	if len(title) > 30 {
-		title = title[:30]
-	}
+	// cut and padded by screen columns, not bytes: a title can hold
+	// characters of several bytes, and of two columns
+	title, _ := clipColumns(e.title, 0, 30)
 	if e.isModified() {
 		title += "[+]"
 	}
-	status := fmt.Sprintf("%d - %s ...", e.id, title)
-
-	if len(status) > e.screencols-1 {
-		status = status[:e.screencols-1]
-	}
-	fmt.Fprintf(&ab, "%-*s", e.screencols, status)
+	status, cols := clipColumns(fmt.Sprintf("%d - %s ...", e.id, title), 0, e.screencols-1)
+	ab.WriteString(status)
+	ab.WriteString(strings.Repeat(" ", max(e.screencols-cols, 0)))
 	ab.WriteString("\x1b[0m") //switches back to normal formatting
 	fmt.Print(ab.String())
 }

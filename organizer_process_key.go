@@ -149,11 +149,11 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 	}
 
 	mode := vim.GetCurrentMode()
-	if mode == 4 { // OP_PENDING like 4da
+	if mode == vim.ModeOpPending { // like 4da
 		return
 	}
 
-	if mode == 8 { // COMMAND or SEARCH
+	if mode == vim.ModeCmdline { // COMMAND or SEARCH
 		o.ShowMessage(BL, ":")
 		vim.SendKey("<esc>") // park in NORMAL mode
 		o.command_line = ""
@@ -188,10 +188,10 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 	//firstLine := vim.WindowGetTopLine() // doesn't seem to work
 	//o.updateRowStatus()
 	o.command = ""
-	if mode == 16 && o.mode != INSERT {
+	if mode == vim.ModeInsert && o.mode != INSERT {
 		o.showMessage("\x1b[1m-- INSERT --\x1b[0m")
 	}
-	o.mode = modeMap[mode] //note that 8 => SEARCH (8 is also COMMAND)
+	o.mode = modeMap[mode] // note that ModeCmdline => SEARCH (it is also COMMAND)
 	if o.mode == VISUAL {
 		o.setVisualHighlight(s, vim.GetVisualRange())
 		redraw = RedrawPartial
@@ -224,7 +224,7 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 	}
 	o.updateRowStatus()
 	mode := vim.GetCurrentMode() // I think just a few possibilities - stay in VISUAL or something like 'x' switches to NORMAL and : to command
-	o.mode = modeMap[mode]       //note that 8 => SEARCH (8 is also COMMAND)
+	o.mode = modeMap[mode]       // note that ModeCmdline => SEARCH (it is also COMMAND)
 	o.command = ""
 	o.setVisualHighlight(s, vim.GetVisualRange())
 	o.showMessage("visual %s; %d %d", s, o.highlight[0], o.highlight[1])
@@ -247,35 +247,19 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 	switch c {
 
 	case '\r':
-		var cmd func(*Organizer, int)
-		var found bool
-		var s string
 		o.command = "" ////////there must be a better place!
-		pos := strings.LastIndexByte(o.command_line, ' ')
-		if pos == -1 {
-			//s = o.command_line
-			// allow for commands with no arguments to have a variant ending with !
-			s = strings.TrimSuffix(o.command_line, "!")
-		} else {
-			s = o.command_line[:pos]
-		}
-		if cmd, found = o.exCmds[s]; found {
-			cmd(o, pos)
+		ex, cmd, found := o.parseEx(o.command_line)
+		if found {
+			cmd(o, ex)
+			// a command that changes the mode has said so (:help, :new);
+			// the rest are finished, and the command line with them
+			if o.mode == COMMAND_LINE {
+				o.mode = NORMAL
+			}
 			redraw = RedrawFull
-			//o.mode = NORMAl - could be NAVIGATE_RENDER
 			return
 		}
-		// to catch find with more than one find term
-		if !found && pos != -1 && strings.Count(o.command_line, " ") > 1 {
-			pos := strings.IndexByte(o.command_line, ' ')
-			if cmd, found = o.exCmds[o.command_line[:pos]]; found {
-				// pass the position of the first space
-				cmd(o, pos)
-				redraw = RedrawFull
-				o.mode = NORMAL
-				return
-			}
-		}
+		s := ex.name
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
 
@@ -333,10 +317,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 		return
 
 	case DEL_KEY, BACKSPACE:
-		length := len(o.command_line)
-		if length > 0 {
-			o.command_line = o.command_line[:length-1]
-		}
+		o.command_line = dropLastRune(o.command_line)
 
 	default:
 		// the organizer's command line is its own buffer, not a mirror of
@@ -388,10 +369,10 @@ func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
 		index, _ := strconv.Atoi(o.command)
 		index-- // to convert to 0 based
 		if o.altView == CONTEXT {
-			o.setContextNew(o.containerList[index])
+			o.moveToContext(o.containerList[index])
 		}
 		if o.altView == FOLDER {
-			o.setFolderNew(o.containerList[index])
+			o.moveToFolder(o.containerList[index])
 		}
 		o.command = ""
 		vim.SendKey("<esc>")

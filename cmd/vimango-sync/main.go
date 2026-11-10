@@ -67,14 +67,11 @@ func main() {
 		fatal("postgres config missing 'host'")
 	}
 
-	mainDB, err := sql.Open("sqlite3", *dbPath)
+	mainDB, err := localdb.Open(*dbPath)
 	if err != nil {
 		fatal("opening main SQLite db: %v", err)
 	}
 	defer mainDB.Close()
-	if _, err := mainDB.Exec("PRAGMA foreign_keys=ON;"); err != nil {
-		fatal("enabling foreign keys on main db: %v", err)
-	}
 
 	// Keep the database current with how this build stores it (see
 	// internal/localdb): WAL, and the search index whose triggers follow

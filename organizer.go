@@ -44,8 +44,8 @@ type Organizer struct {
 	bufferTick     int
 	//saveTick              int
 	normalCmds            map[string]func(*Organizer)
-	exCmds                map[string]func(*Organizer, int)
-	commandRegistry       *CommandRegistry[func(*Organizer, int)]
+	exCmds                map[string]func(*Organizer, exArgs)
+	commandRegistry       *CommandRegistry[func(*Organizer, exArgs)]
 	normalCommandRegistry *CommandRegistry[func(*Organizer)]
 	filterList            []FilterNames
 	containerList         []string
@@ -116,10 +116,7 @@ func (o *Organizer) readRowsIntoBuffer() {
 
 func (o *Organizer) showMessage(format string, a ...interface{}) {
 	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.Screen.textLines+2+TOP_MARGIN, o.Screen.divider, o.Screen.textLines+2+TOP_MARGIN)
-	str := fmt.Sprintf(format, a...)
-	if len(str) > o.Screen.divider {
-		str = str[:o.Screen.divider]
-	}
+	str, _ := clipColumns(fmt.Sprintf(format, a...), 0, o.Screen.divider)
 	fmt.Print(str)
 }
 
@@ -140,7 +137,9 @@ func (o *Organizer) ShowMessage(loc Location, format string, a ...interface{}) {
 	fmt.Print(str)
 }
 
-func (o *Organizer) setContextNew(input string) {
+// moveToContext puts the marked entries, or else the current one, in the
+// context named input. moveToFolder is the same for a folder.
+func (o *Organizer) moveToContext(input string) {
 	var contextUUID string
 	var ok bool
 	//o.mode = NORMAL
@@ -169,7 +168,7 @@ func (o *Organizer) setContextNew(input string) {
 	o.ShowMessage(BL, "Moved current entry into context %q", input)
 }
 
-func (o *Organizer) setFolderNew(input string) {
+func (o *Organizer) moveToFolder(input string) {
 	var folderUUID string
 	var ok bool
 	//o.mode = NORMAL

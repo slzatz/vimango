@@ -446,8 +446,9 @@ func (o *Organizer) drawStatusBar() {
 
 		row := &o.rows[o.fr]
 
-		if len(row.title) > 16 {
-			title = row.title[:12] + "..."
+		if runewidth.StringWidth(row.title) > 16 {
+			title, _ = clipColumns(row.title, 0, 12)
+			title += "..."
 		} else {
 			title = row.title
 		}
@@ -474,7 +475,7 @@ func (o *Organizer) drawStatusBar() {
 	// klugy way of finding length of string without the escape characters
 	plain := fmt.Sprintf("%s %s %s %d %d/%d   sort: %s ",
 		str, title, keywords, id, o.fr+1, len(o.rows), o.sort)
-	length := len(plain)
+	length := runewidth.StringWidth(plain)
 
 	if length+len(fmt.Sprintf("%s", o.mode)) <= o.Screen.divider {
 		/*
@@ -488,13 +489,14 @@ func (o *Organizer) drawStatusBar() {
 			str, title, keywords, id, o.fr+1, len(o.rows))
 		plain = fmt.Sprintf("%s %s %s %d %d/%d",
 			str, title, keywords, id, o.fr+1, len(o.rows))
-		length := len(plain)
+		length := runewidth.StringWidth(plain)
 		if length < o.Screen.divider {
 			fmt.Fprintf(&ab, "%s%-*s", status, o.Screen.divider-length, " ")
 		} else {
 			status = fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s %s %d %d/%d",
 				str, title, keywords, id, o.fr+1, len(o.rows))
-			ab.WriteString(status[:o.Screen.divider+10])
+			status, _ = clipColumns(status, 0, o.Screen.divider)
+			ab.WriteString(status)
 		}
 	}
 	ab.WriteString("\x1b[0m") //switches back to normal formatting
@@ -1133,4 +1135,12 @@ func nextSmallKittyID(url string) uint32 {
 	kittyIDMap[url] = id
 	kittyIDReverse[id] = url
 	return id
+}
+
+// dropLastRune is s without its last character: what Backspace does to a
+// command line. A character may be several bytes; dropping one byte of an é
+// left half of it.
+func dropLastRune(s string) string {
+	_, size := utf8.DecodeLastRuneInString(s)
+	return s[:len(s)-size]
 }

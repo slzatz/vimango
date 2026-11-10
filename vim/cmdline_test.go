@@ -14,7 +14,7 @@ func TestCommandLineAPI(t *testing.T) {
 
 	// ':' should put vim in cmdline mode (mode 8), type ':'
 	SendInput(":")
-	if m := GetCurrentMode(); m != 8 {
+	if m := GetCurrentMode(); m != ModeCmdline {
 		t.Fatalf("after ':' expected mode 8 (cmdline), got %d", m)
 	}
 	if ty := CommandLineGetType(); ty != ':' {
@@ -55,7 +55,7 @@ func TestCommandLineAPI(t *testing.T) {
 	t.Logf("after <c-u>: GetText = %q, pos = %d", CommandLineGetText(), CommandLineGetPosition())
 
 	// still in cmdline mode; buffer untouched (nothing executed without CR)
-	if m := GetCurrentMode(); m != 8 {
+	if m := GetCurrentMode(); m != ModeCmdline {
 		t.Errorf("still expected mode 8, got %d", m)
 	}
 
@@ -67,7 +67,7 @@ func TestCommandLineAPI(t *testing.T) {
 
 	// Esc cancels: back to normal mode, buffer still untouched
 	SendKey("<esc>")
-	if m := GetCurrentMode(); m == 8 {
+	if m := GetCurrentMode(); m == ModeCmdline {
 		t.Errorf("after <esc> still in cmdline mode")
 	}
 	if line := vbuf.Line(1); line != "alpha bravo" {

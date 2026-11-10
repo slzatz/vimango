@@ -12,7 +12,29 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 )
+
+// Open opens the vimango.db at path, with foreign keys enforced. Every
+// program that opens the database opens it here.
+//
+// SQLite's foreign_keys setting belongs to a connection, not to the file, and
+// is off until asked for; a *sql.DB is a pool that opens connections as it
+// needs them. So it is asked for in the DSN, which the driver applies to each
+// connection it opens. Running "PRAGMA foreign_keys=ON" on the pool, as
+// vimango and vimango-sync did until 2026-11-10, reached whichever one
+// connection ran it: a statement that landed on another -- any query made
+// while a result set was still being read, anything from a second goroutine --
+// was not checked.
+//
+// Like sql.Open, this validates nothing and creates the file if it is missing.
+func Open(path string) (*sql.DB, error) {
+	// not a "file:" URI, where a path with %, # or a space would need
+	// escaping: the driver takes its own parameters off after the "?" and
+	// hands SQLite the path as written
+	return sql.Open("sqlite3", path+"?_foreign_keys=on")
+}
 
 // Migrate brings the database up to date and returns one line per change it
 // made; none means it was already current. An error means a step could not

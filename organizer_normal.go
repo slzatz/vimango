@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mattn/go-runewidth"
 	"maps"
 	"slices"
 	"sort"
@@ -289,8 +290,9 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) string {
 	fmt.Fprintf(&ab, "tid: %d%s", e.tid, "\n")
 
 	title := fmt.Sprintf("title: %s", e.title)
-	if len(title) > width {
-		title = title[:width-3] + "..."
+	if runewidth.StringWidth(title) > width {
+		title, _ = clipColumns(title, 0, width-3)
+		title += "..."
 	}
 	fmt.Fprintf(&ab, "%s%s", title, "\n")
 

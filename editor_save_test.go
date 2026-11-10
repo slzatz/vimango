@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -13,7 +12,7 @@ import (
 func newTestDatabase(t *testing.T) *Database {
 	t.Helper()
 	dir := t.TempDir()
-	mainDB, err := sql.Open("sqlite3", filepath.Join(dir, "vimango.db"))
+	mainDB, err := localdb.Open(filepath.Join(dir, "vimango.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

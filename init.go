@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -199,7 +198,7 @@ func runInit() {
 	fmt.Println("Created config.json")
 
 	// Create main database
-	mainDB, err := sql.Open("sqlite3", "vimango.db")
+	mainDB, err := localdb.Open("vimango.db")
 	if err != nil {
 		fmt.Printf("Error creating main database: %v\n", err)
 		os.Exit(1)
