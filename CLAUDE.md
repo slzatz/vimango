@@ -123,7 +123,7 @@ NOTE: Generally we have not been running tests but have tested key functionality
 
 ## Runtime Options
 - `--help`, `-h`: Display help message with all available options and exit
-- `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer. One note per process, chosen by `--open <id>` at boot: there is no ex command to switch notes (the `:open <id>` the host once injected was removed 2026-11-07, once every host editor became a one-session cold spawn). The host drives the editor over the pty with ex commands such as `:checkstale`, `:q` and `:x`. **A process exit after `:q` or `:x` is the host's only "saved" signal**, so the editor must close only when the buffer's text is in the database (or on `:q!`): `:x` writes a modified buffer and stays open, buffer still modified, if the write fails — a database error, or an `UPDATE` that matched no row because the note was deleted underneath (`quitActions`, `Editor.save`, `updateNote`; tests in `editor_save_test.go`). Until 2026-11-10 `:x` reported a failed write and quit anyway.
+- `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer. One note per process, chosen by `--open <id>` at boot: there is no ex command to switch notes (the `:open <id>` the host once injected was removed 2026-11-07, once every host editor became a one-session cold spawn). The host drives the editor over the pty with ex commands such as `:checkstale`, `:q` and `:x`. **A process exit after `:q` or `:x` is the host's only "saved" signal**, so the editor must close only when the buffer's text is in the database (or on `:q!`): `:x` writes a modified buffer and stays open, buffer still modified, if the write fails — a database error, or an `UPDATE` that matched no row because the note was deleted underneath (`closeNote`, `Editor.save`, `updateNote`; tests in `editor_save_test.go`). Until 2026-11-10 `:x` reported a failed write and quit anyway.
 - `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
 - `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
 - `--migrate`: Bring this machine's `vimango.db` up to date with how this build stores it, print what changed, and exit. Optional — every start does the same quietly; see "Local database migrations".
@@ -241,6 +241,18 @@ The command system is loosely based on the vim command system and the existence 
 - **System**: quit, exit
 - **Help**: help
 
+Those are vimango's own. **Every other ex command typed in the editor is vim's, and is forwarded to libvim if it is on the list in `ex_forward.go`** (`exAllowed`, 138 of vim's 558 commands): `:s` `:g` `:v` `:d` `:y` `:pu` `:m` `:t` `:j` `:>` `:<` `:normal` `:sort` `:retab` `:u` `:red` `:noh` `:set` `:let` `:echo` `:call` `:execute` `:map` and its relatives, `:command`, `:autocmd`, `:marks`, `:source`, `:read`, a bare line number, and more, with ranges, modifiers such as `:silent` and `|` chaining. What vim says back — output or its own error — is captured (`vim.CaptureMessages`) and shown: one line on the message line, several in the overlay `:help` uses. `runExLine` (`editor_process_key.go`) is the dispatcher; in order:
+1. **Save, close and help, in any spelling vim accepts** (`:w` `:wri` `:up` `:wa` `:wq` `:x` `:exi` `:q` `:q!` `:qa` `:clo` `:h`). A note is a database row, so these write the row or close the editor (`closeNote`) and never a file. With a file name or a range they are refused (`:w notes.txt`). `:wq` is `:x`: it writes only a modified buffer.
+2. **vimango's own commands, by exact name** — the registry above.
+3. **vim's**, forwarded or refused by `classifyEx`.
+
+Why a list of what is allowed rather than of what is not: libvim is vim with no screen, one window and one buffer, and commands outside that do real harm, quietly. Measured: `:w name` writes the file; `:e x` and `:bn` leave the note's buffer, after which every command edits some other buffer; `:cd` moves the process's working directory, which vimango finds `config.json` and the database relative to; bare `:let` (list variables) never returns from libvim — it waits inside the C call for a key to page with, freezing the editor. So any built-in command not on the list is refused with a reason (files, windows, programs, needs a prompt). A name vim's table does not have — a user-defined `:Command`, a typo — is forwarded, and vim answers (`E492`).
+- Names are resolved as vim resolves them: `vim.FindExCommand` is a port of vim's `find_command` over the command table in `vim/src/ex_cmds.h`, which is embedded in the binary, so `:wri`, `:sav`, `:bn` mean here what they mean in vim and the table cannot drift from the library.
+- The check covers every command on a line joined with `|` and the command given to `:g`. It does not look inside vimscript: `:execute`, `:normal` and `:call` run what they are given. The list guards against habit, not intent.
+- After every forwarded command `forwardEx` verifies vim is still on the note's buffer, in normal mode, and in the same working directory, and puts back whatever is not.
+- **To forward another command**, add it to `exAllowed` and run the tests: `TestForwardedCommandsDoNotHang` (`ex_hang_test.go`) runs every forwarded command, bare and with arguments, each in its own process with a time limit — that is how the `:let` hang was found — and `TestForwardedListIsSafeInLibvim` checks buffer, mode, directory and disk afterwards. `TestExPolicyCoversVimsTable` fails if a command that takes file names lands on the list. Keep `editorVimExHelp` (the tail of the editor's `:help`) in step.
+- Known gaps, all libvim's: `:registers`, `:history`, `:messages`, `:version` and a bare `:map` produce no output through the message callback (they do no harm); `:s` with the `c` flag is refused, having no prompt.
+
 Removed 2026-11-08 as TUI holdovers (PDF and printing belong in vimango_hybrid): editor `:pdf`, `:pdf-goldmark`, `:print`, `:ha`, `:save`; organizer `:print`, `:ha`, `:printlist`, `:save` — and with them the `mdtopdf`, `goldmark-pdf` and `gofpdf` dependencies.
 
 ### Key Interception
@@ -302,8 +314,9 @@ never expands mappings. Limits, from libvim:
 
 Ctrl-B/E/I were Go intercepts with `:bold`/`:italic`/`:code` ex forms until
 2026-11-08; both moved into `vimango.vim` and the ex commands were dropped.
-`ExModeKeyHandler` still strips a leading `'<,'>` (`splitExRange`) before the
-command lookup, which is what lets `:'<,'>s/…` typed from VISUAL reach vim.
+A range in front of a command (`'<,'>` is what vim writes when `:` is pressed in VISUAL) is
+skipped the way vim skips it (`skipExRange`) to find the command name, and the whole line,
+range included, is what reaches vim.
 
 ### Normal Mode Command Organization
 **Editor:** none. The editor intercepts no normal-mode keys (`normalCmds`, `NormalModeKeyHandler` and the editor's normal-command registry were removed with Ctrl-H/Ctrl-L on 2026-11-08); every key goes to vim. Markup and list shortcuts are vim mappings in `vimango.vim`, and the editor's `:help normal` lists them (`editorNormalModeHelp` — keep it in step with that file).

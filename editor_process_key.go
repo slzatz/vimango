@@ -217,102 +217,9 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		// history on a concluded cmdline, and we never forward the CR)
 		vim.ExecuteCommand("call histadd(':', '" + strings.ReplaceAll(e.command_line, "'", "''") + "')")
 
-		// vim writes its own "'<,'>" range in front of the command when ':'
-		// is pressed from VISUAL mode. Peel any range off so the lookup below
-		// matches on the command name; fullLine keeps the range for the
-		// commands forwarded to vim (:'<,'>s/a/b/), which want it.
-		fullLine := e.command_line
-		_, e.command_line = splitExRange(e.command_line)
-
-		// we want libvim to handle the following Ex-Commands:
-		use_vim := []string{"s/", "%s/", "g/", "g!/", "v/"}
-		for _, p := range use_vim {
-			if strings.HasPrefix(e.command_line, p) {
-				if strings.HasSuffix(e.command_line, "/c") {
-					e.ShowMessage(BR, "We don't support [c]onfirm")
-					e.mode = NORMAL
-					return false, true
-				}
-
-				// forward the line with its range intact -- ":'<,'>s/a/b/"
-				// means something to vim
-				vim.SendInput(":" + fullLine + "\r")
-				e.mode = NORMAL
-				e.ss = e.vbuf.Lines()
-				pos := vim.GetCursorPosition() //set screen cx and cy from pos
-				e.fr = pos[0] - 1
-				e.fc = pos[1]
-				e.ShowMessage(BL, "search and replace: %s", fullLine)
-				return true, true
-			}
-		}
-
-		var cmd string
-		pos := strings.Index(e.command_line, " ")
-		if pos != -1 {
-			cmd = e.command_line[:pos]
-		} else {
-			cmd = e.command_line
-		}
-
-		//if cmd0, found := e_lookup_C[cmd]; found
-		if cmd0, found := e.exCmds[cmd]; found {
-			cmd0(e)
-			e.command_line = ""
-			// a command that put up its own screen (:help) or is waiting
-			// for a choice (:suggest) owns the mode from here; everything
-			// else lands back in NORMAL
-			if e.mode != HELP && e.mode != SPELLING {
-				e.mode = NORMAL
-			}
-			e.tabCompletion.index = 0
-			e.tabCompletion.list = nil
-			if cmd == "read" || cmd == "r" {
-				return true, false
-			}
-			// A command that changed the buffer has to be drawn now. The
-			// caller only redraws when this returns true, and dispatch ends
-			// the keystroke, so otherwise the edit sits invisible until the
-			// next key happens to trip the tick check in editorProcessKey --
-			// which is what the old :bold looked like: correct text, blank screen.
-			if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != HELP {
-				e.bufferTick = tick
-				e.ss = e.vbuf.Lines()
-				if len(e.ss) == 0 {
-					e.ss = []string{""}
-				}
-				pos := vim.GetCursorPosition()
-				e.fr = pos[0] - 1
-				if e.fr >= len(e.ss) {
-					e.fr = len(e.ss) - 1
-				}
-				if e.fr < 0 {
-					e.fr = 0
-				}
-				if pos[1] > len(e.ss[e.fr]) {
-					pos[1] = len(e.ss[e.fr])
-				}
-				e.fc = pos[1]
-				return true, true
-			}
-			return false, true
-		}
-
-		// Try to provide helpful suggestions using command registry
-		if e.commandRegistry != nil {
-			suggestions := e.commandRegistry.SuggestCommand(cmd)
-			if len(suggestions) > 0 {
-				e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Did you mean: %s?\x1b[0m", cmd, strings.Join(suggestions, ", "))
-			} else {
-				e.ShowMessage(BR, "\x1b[41mCommand '%s' not found. Use ':help' to see available commands.\x1b[0m", cmd)
-			}
-		} else {
-			// Fallback if registry not available
-			e.ShowMessage(BR, "\x1b[41mNot an editor command: %s\x1b[0m", cmd)
-		}
-		e.mode = NORMAL
-		e.command_line = ""
-		return false, true
+		e.tabCompletion.index = 0
+		e.tabCompletion.list = nil
+		return e.runExLine(e.command_line), true
 	} //end 'r'
 
 	if c == '\t' {
@@ -395,6 +302,94 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 
 	e.ShowMessage(BR, ":%s", e.command_line)
 	return false, true
+}
+
+// runExLine carries out an ex command line the user has entered (without its
+// ':') and reports whether the text needs redrawing. Three kinds of command,
+// tried in this order:
+//
+//  1. Saving, closing and help, in any spelling vim accepts (:w :wri :up :wq
+//     :x :exi :q :q! :clo :h ...). They are vimango's: a note is a database
+//     row, so nothing here writes a file.
+//  2. vimango's own commands, by exact name (:sync, :spell, :number, ...).
+//  3. Everything else is vim's. classifyEx (ex_forward.go) decides whether it
+//     is forwarded or refused.
+func (e *Editor) runExLine(line string) (redraw bool) {
+	e.exLine = line
+	decision := classifyEx(line)
+
+	switch decision.action {
+	case exSave:
+		e.writeNote()
+	case exSaveIfModified:
+		if e.isModified() {
+			e.writeNote()
+		} else {
+			e.ShowMessage(BR, "No changes to save")
+		}
+	case exSaveQuit:
+		e.closeNote(true, false)
+	case exQuit:
+		e.closeNote(false, false)
+	case exQuitForce:
+		e.closeNote(false, true)
+	case exHelp:
+		e.command_line = strings.TrimSpace("help " + decision.arg)
+		e.help()
+	}
+	if decision.action != exForward && decision.action != exRefuse {
+		e.command_line = ""
+		if e.mode != HELP {
+			e.mode = NORMAL
+		}
+		return false
+	}
+
+	// vimango's own commands. The lookup is on the first word after any range
+	// ("'<,'>" is what vim puts there when ':' is pressed in VISUAL mode).
+	// Not for a refused spelling of save or close (":w notes.txt"): "w" is in
+	// the registry too, and would save while ignoring the file name.
+	e.command_line = skipExRange(line)
+	name, _, _ := strings.Cut(e.command_line, " ")
+	if cmd, found := e.exCmds[name]; found && !decision.owned {
+		cmd(e)
+		e.command_line = ""
+		// a command that put up its own screen (:help) or is waiting for a
+		// choice (:suggest) owns the mode from here; everything else lands
+		// back in NORMAL
+		if e.mode != HELP && e.mode != SPELLING {
+			e.mode = NORMAL
+		}
+		// A command that changed the buffer has to be drawn now: dispatch
+		// ends the keystroke, so otherwise the edit sits invisible until the
+		// next key happens to trip the tick check in editorProcessKey.
+		if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != HELP {
+			e.bufferTick = tick
+			e.resyncFromVim()
+			return true
+		}
+		return false
+	}
+
+	e.command_line = ""
+	e.mode = NORMAL
+	if decision.action == exRefuse {
+		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", decision.reason)
+		return false
+	}
+	redraw = e.forwardEx(line)
+	return redraw && e.mode != HELP // an overlay (:marks) is up: draw the text when it closes
+}
+
+// resyncFromVim copies vim's buffer and cursor into the editor, clamped.
+func (e *Editor) resyncFromVim() {
+	e.ss = e.vbuf.Lines()
+	if len(e.ss) == 0 {
+		e.ss = []string{""}
+	}
+	pos := vim.GetCursorPosition()
+	e.fr = min(max(pos[0]-1, 0), len(e.ss)-1)
+	e.fc = min(max(pos[1], 0), len(e.ss[e.fr]))
 }
 
 // case SEARCH:

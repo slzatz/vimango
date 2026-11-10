@@ -133,7 +133,7 @@ func (e *Editor) help() {
 
 	if pos == -1 {
 		// No arguments - show all ex commands
-		helpText = e.commandRegistry.FormatAllHelp()
+		helpText = e.commandRegistry.FormatAllHelp() + editorVimExHelp
 	} else {
 		arg := e.command_line[pos+1:]
 		categories := e.commandRegistry.GetAllCommands()
@@ -154,6 +154,19 @@ func (e *Editor) help() {
 	app.Organizer.altRowoff = 0
 	e.command_line = ""
 }
+
+// editorVimExHelp follows the list of vimango's own commands in ":help". What
+// is and is not forwarded is decided in ex_forward.go; keep this in step.
+const editorVimExHelp = "\n## vim's ex commands\n\n" +
+	"Any other command is vim's and goes to vim, with ranges and `|` as usual:\n" +
+	"`:s` `:g` `:v` `:d` `:m` `:t` `:j` `:>` `:<` `:normal` `:sort` `:u` `:red` `:noh`\n" +
+	"`:set` `:let` `:echo` `:map` `:marks` `:source`, and a line number (`:42`).\n" +
+	"What vim says back is shown on the message line.\n\n" +
+	"`:w` `:up` `:wq` `:x` `:q` `:q!` save and close the note in the database, in\n" +
+	"any spelling vim accepts (`:wri`, `:exi`, `:clo`).\n\n" +
+	"Not available: commands that write or open files (`:w name`, `:sav`, `:e`,\n" +
+	"`:cd`), that need another window or buffer (`:sp`, `:bn`, `:tabnew`), that\n" +
+	"run programs (`:!`), or that need a prompt (`:s/a/b/c`, `:append`).\n"
 
 // editorNormalModeHelp is ":help normal" in the editor. The editor intercepts
 // no normal-mode keys, so there is no registry to list: normal mode is vim's,
@@ -193,8 +206,9 @@ func (e *Editor) writeNote() {
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 }
 
+// readFile is :read, vim's own: the lines of a file, inserted below the cursor.
 func (e *Editor) readFile() {
-	vim.SendInput(":" + e.command_line + "\r")
+	e.forwardEx(e.exLine)
 }
 
 func (e *Editor) paste() {
@@ -216,26 +230,34 @@ func (e *Editor) syntax() {
 	e.ShowMessage(BR, "Syntax highlighting is %v", e.highlightSyntax)
 }
 
+// exit and quitActions are the registry's entries for :x and :q. runExLine
+// reaches closeNote directly for every spelling of them, so these run only
+// if something calls the registry's functions by name.
 func (e *Editor) exit() {
-	e.quitActions()
+	e.closeNote(true, false)
 }
 
-// quitActions is :q, :q!, :x and their long forms. The rule for all of them:
-// the editor closes only when the buffer's text is in the database or the user
-// has said to throw it away (:q!).
+func (e *Editor) quitActions() {
+	e.closeNote(false, strings.HasSuffix(e.command_line, "!"))
+}
+
+// closeNote closes the editor: :q (save and force both false), :q! (force),
+// :x and :wq (save). The rule for all of them: the editor closes only when
+// the buffer's text is in the database or the user has said to throw it away.
 //
 // A host app leans on this. vimango_hybrid cannot see the buffer, so it
 // injects ":q" or ":x" and watches whether the process exits: an editor still
 // running means "not saved", and the host keeps the window open on it. Until
 // 2026-11-10 :x reported a failed write and quit anyway, which the host read
 // as "saved" -- the edits were gone with nothing to show for it.
-func (e *Editor) quitActions() {
-	switch e.command_line {
-	case "x", "exit":
+func (e *Editor) closeNote(save, force bool) {
+	switch {
+	case save:
 		// As in vim, :x writes only a modified buffer. Writing a clean one
 		// would bump the note's modified time -- reordering the list and
 		// queuing a sync push for nothing -- and, if a sync had changed the
 		// row since it was read, overwrite the newer text with the old.
+		// :wq does the same here, for the same reason.
 		if e.isModified() {
 			if err := e.save(); err != nil {
 				e.mode = NORMAL
@@ -244,15 +266,13 @@ func (e *Editor) quitActions() {
 				return
 			}
 		}
-	case "q!", "quit!":
+	case force:
 		// the user's call: close without saving
-	default:
-		if e.isModified() {
-			e.mode = NORMAL
-			e.command_line = ""
-			e.ShowMessage(BR, "No write since last change")
-			return
-		}
+	case e.isModified():
+		e.mode = NORMAL
+		e.command_line = ""
+		e.ShowMessage(BR, "No write since last change")
+		return
 	}
 
 	if e.Session.editorOnly {

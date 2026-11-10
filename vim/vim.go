@@ -46,6 +46,7 @@ func InitializeVim(argc int) {
 	var c *C.char
 	C.vimInit(C.int(argc), &c)
 	enableSpellSuggestCallback()
+	enableMessageCallback()
 }
 
 // ---- Buffers

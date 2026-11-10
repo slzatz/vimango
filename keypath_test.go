@@ -162,17 +162,29 @@ func TestKeyConstantsTrackTheReader(t *testing.T) {
 	}
 }
 
-func TestSplitExRange(t *testing.T) {
-	for _, tc := range []struct{ in, rng, rest string }{
-		{"bold", "", "bold"},
-		{"'<,'>bold", "'<,'>", "bold"},
-		{"%s/a/b/", "%", "s/a/b/"},
-		{"'<,'>s/a/b/", "'<,'>", "s/a/b/"},
-		{"write", "", "write"},
+// The range in front of a command is skipped the way vim skips it, so the
+// command name is found where vim will find it.
+func TestSkipExRange(t *testing.T) {
+	for _, tc := range []struct{ in, rest string }{
+		{"write", "write"},
+		{"'<,'>sort", "sort"},
+		{"%s/a/b/", "s/a/b/"},
+		{"1,5d", "d"},
+		{".,$j", "j"},
+		{".,+3>", ">"},
+		{"'a,'bm0", "m0"},
+		{"/start/,/end/d", "d"},
+		{`/a\/b/d`, "d"},
+		{"?back?d", "d"},
+		{`\/,\?d`, "d"},
+		{"42", ""},
+		{"$", ""},
+		{"3 d", "d"},
+		{"1,3 : d", "d"},
+		{"1;/x/normal dd", "normal dd"},
 	} {
-		rng, rest := splitExRange(tc.in)
-		if rng != tc.rng || rest != tc.rest {
-			t.Errorf("splitExRange(%q) = (%q, %q), want (%q, %q)", tc.in, rng, rest, tc.rng, tc.rest)
+		if got := skipExRange(tc.in); got != tc.rest {
+			t.Errorf("skipExRange(%q) = %q, want %q", tc.in, got, tc.rest)
 		}
 	}
 }
