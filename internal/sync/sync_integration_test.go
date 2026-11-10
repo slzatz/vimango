@@ -9,7 +9,7 @@ package sync
 //	  CGO_ENABLED=1 go test --tags=fts5 ./internal/sync/
 //
 // and are skipped when VIMANGO_TEST_PG is unset. Every test gets a fresh
-// database built from cmd/create_dbs/postgres_init4.sql.
+// database built from schema/postgres.sql.
 
 import (
 	"database/sql"
@@ -87,7 +87,7 @@ func newServer(t *testing.T) *sql.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { pg.Close() })
-	schema, err := os.ReadFile(filepath.Join("..", "..", "cmd", "create_dbs", "postgres_init4.sql"))
+	schema, err := os.ReadFile(filepath.Join("..", "..", "schema", "postgres.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}

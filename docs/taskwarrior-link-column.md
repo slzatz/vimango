@@ -1,5 +1,7 @@
 # Store a note's Taskwarrior link in a column instead of the note body
 
+> Paths below are as they were at the time. `cmd/create_dbs/postgres_init4.sql` is now `schema/postgres.sql`, and `cmd/migrate_taskwarrior_links` was deleted 2026-11-10 once it had run on every database (it is in git history).
+
 ## Context
 
 A task note is linked to its Taskwarrior task by a `taskwarrior: <uuid>` frontmatter line. The note body

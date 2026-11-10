@@ -1,8 +1,11 @@
--- PostgreSQL Schema v4 with UUID Support
--- This schema is for new installations that include UUID columns from the start.
+-- The PostgreSQL server schema: the one every client syncs with, and the one
+-- the sync integration tests (internal/sync) build their throwaway databases
+-- from. Change the server and this file together.
 --
--- Usage:
---   psql -h your_host -U your_user -d your_db -f postgres_init4.sql
+-- For a new server:
+--   psql -h your_host -U your_user -d your_db -f schema/postgres.sql
+--
+-- (Until 2026-11-10 this was cmd/create_dbs/postgres_init4.sql.)
 
 SET search_path = public;
 SET check_function_bodies = false;

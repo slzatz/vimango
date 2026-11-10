@@ -278,12 +278,9 @@ These serve as default containers when no specific context or folder is assigned
 
 ## Schema Initialization
 
-While the actual schema is documented above, initialization code can be found at:
-- `cmd/create_sqlite_db/sqlite_init.sql` - SQL initialization script
-- `cmd/create_sqlite_db/main.go` - Database creation code including FTS table
-- `cmd/create_dbs/sqlite_init.sql` - Alternative initialization script
-
-**Warning:** These initialization files may not exactly match the production schema documented above. The production database has evolved beyond the initial schema definitions.
+The schemas in code:
+- `init.go` (`sqliteSchema`, `runInit`) - what `vimango --init` creates: `vimango.db`, and `fts5_vimango.db` with its FTS table
+- `schema/postgres.sql` - the PostgreSQL server schema; the sync integration tests build their databases from it
 
 ## Build Requirements
 

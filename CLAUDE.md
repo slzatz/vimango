@@ -157,7 +157,7 @@ The application supports standard `--help` and `-h` flags to display comprehensi
   processes share vimango.db — the TUI, `--editor`, `--render-html`,
   vimango-sync, and vimango_hybrid's GRDB side). This makes the `fts5` build
   tag mandatory for every binary touching the FTS database; `fts5_guard.go`
-  files (project root, cmd/vimango-sync, cmd/create_*) turn a tag-less build
+  files (project root, cmd/vimango-sync) turn a tag-less build
   into a compile error (`undefined: thisBinaryRequiresBuildTagFts5`) instead
   of a runtime "no such module: fts5" failure.
 - The application uses vim editor functionality (libvim via CGO) for editing notes.
@@ -464,25 +464,7 @@ CREATE TABLE task (
 - Default folder UUID: `00000000-0000-0000-0000-000000000002` (title: "none")
 
 ### Migration
-
-**New Installations**: Databases created with `--init` include UUID columns from the start.
-
-**Existing Local Databases**: Use the standalone migration utility:
-```bash
-cd cmd/migrate_local && go build
-./migrate_local /path/to/listmanager.db
-```
-
-**Existing PostgreSQL Databases**: Run the migration script:
-```bash
-# Backup first!
-pg_dump -h host -U user -d db > backup.sql
-
-# Then migrate
-psql -h host -U user -d db -f cmd/create_dbs/postgres_migrate_uuid.sql
-```
-
-**Automatic Migration** (app.go): The application also runs `MigrateToUUID()` on startup, which is idempotent and safe to run multiple times.
+Databases created with `--init` have the UUID columns from the start, and `MigrateToUUID()` (`app.go`) runs at every startup: idempotent, a no-op once a database has them. Every machine's database and the PostgreSQL server were migrated long ago; the standalone tools for it (`cmd/migrate_local`, `cmd/fix_uuid_sync`, `postgres_migrate_uuid.sql`) and the other one-shot commands under `cmd/` were deleted 2026-11-10 and are in git history.
 
 ### PostgreSQL Synchronization with UUIDs
 
@@ -509,12 +491,10 @@ The sync system now supports full UUID synchronization between SQLite and Postgr
 - `common.go` - Container and Entry structs with uuid fields
 - `organizer_cmd_line.go` - Container assignment commands
 - `synchronize.go` - Full UUID sync support for containers, tasks, and keywords
-- `cmd/migrate_local/main.go` - Standalone local database migration utility
-- `cmd/create_dbs/postgres_migrate_uuid.sql` - PostgreSQL migration script
-- `cmd/create_dbs/postgres_init4.sql` - New PostgreSQL schema with UUID support
+- `schema/postgres.sql` - the PostgreSQL server schema (with the UUID columns); the sync integration tests load it
 
 ## Pending Follow-ups
 
 - **Move markdown→HTML into vimango_hybrid, together with PDF export (noted 2026-11-08).** `--render-html` (`render_html.go`, `note_html.go`, plus the `callout.go` / `frontmatter.go` / `wikilink.go` goldmark extensions — ~1500 lines and the goldmark dependency) now has exactly one user: hybrid's preview pane, which spawns `vimango --render-html <id>` per preview (`PreviewRenderer.swift`). The TUI never used it; it renders with glamour (`organizer_render.go`). It lives in vimango for history (it was written for the TUI's webview window, removed 2026-11-08) and because Google Drive images — OAuth token, download, the disk cache shared with the TUI's inline images, HEIC conversion — are Go-side. Decided: not now; do it as one piece of hybrid work with PDF export, which was removed from the TUI the same day as belonging in hybrid. Once hybrid makes its own HTML (`swift-markdown`, or client-side in the WKWebView with markdown-it so the CSS carries over), WebKit's own PDF export gives PDF output from the same HTML with no PDF library. Suggested split: markdown→HTML (and the three extensions and stylesheet) moves to Swift; images stay in vimango behind a narrow interface (a command that returns a Drive image's cached file, or hybrid reading `./image_cache/` directly) so Drive access stays single-sourced while the TUI still shows images. Gains: vimango sheds the render path and goldmark, no process spawn per preview, preview changes stop needing a vimango rebuild.
-- **Taskwarrior link column: done 2026-10-16, except the Linux machines.** A task note's Taskwarrior uuid is `task.taskwarrior_uuid`, synced in both directions by `internal/sync`, and no longer in the note's text. It is written once and never cleared: push and pull both COALESCE it, and every sync starts with a backfill. vimango itself never reads it. The design, the decisions taken along the way, and how it rolled out are in `docs/taskwarrior-link-column.md`. Still open: rebuild vimango on the Linux machines. Until then they sync fine but carry no links.
-- **Linux machines: rebuild order changed (noted 2026-11-08).** The next vimango rebuild there (the item above) is: pull vimango, run `./scripts/build-libvim.sh` (it pulls the fork and rebuilds `libvim.a`, which must be fork `ed0f2e241` or later — an older one fails to link with `undefined: vimSetMappingsEnabled`; it also refuses a `../libvim` that is upstream or off `main`, and moves one still on the old `master` across), then `CGO_ENABLED=1 go build --tags=fts5`. The same applies to the other Macs. Use `./scripts/build-libvim.sh --clean` if that machine already built the fork at `e0553a273` or later before `532f73b8d` (see "Building libvim.a": a stale `spellfile.o` makes `zg` segfault); `--clean` is always safe, just slower. GTK 3 / webkit2gtk are no longer build dependencies, and any old `webview_worker` binary in the vimango directory can be deleted (its source and the webview are gone). Also delete the machine's `go.work` (glamour now comes from the `replace` in `go.mod`; a leftover workspace silently overrides the pin with whatever `../glamour` holds), after which `../glamour` itself is no longer needed.
+- **Taskwarrior link column: done 2026-10-16.** A task note's Taskwarrior uuid is `task.taskwarrior_uuid`, synced in both directions by `internal/sync`, and no longer in the note's text. It is written once and never cleared: push and pull both COALESCE it, and every sync starts with a backfill. vimango itself never reads it. The design, the decisions taken along the way, and how it rolled out are in `docs/taskwarrior-link-column.md`. The Linux machines never got that rebuild and are being retired (2026-11-10).
+- **Rebuilding on a machine not rebuilt since 2026-11-08 (the other Macs; the Linux machines are being retired).** The order is: pull vimango, run `./scripts/build-libvim.sh` (it pulls the fork and rebuilds `libvim.a`, which must be fork `ed0f2e241` or later — an older one fails to link with `undefined: vimSetMappingsEnabled`; it also refuses a `../libvim` that is upstream or off `main`, and moves one still on the old `master` across), then `CGO_ENABLED=1 go build --tags=fts5`. Use `./scripts/build-libvim.sh --clean` if that machine already built the fork at `e0553a273` or later before `532f73b8d` (see "Building libvim.a": a stale `spellfile.o` makes `zg` segfault); `--clean` is always safe, just slower. GTK 3 / webkit2gtk are no longer build dependencies, and any old `webview_worker` binary in the vimango directory can be deleted (its source and the webview are gone). Also delete the machine's `go.work` (glamour now comes from the `replace` in `go.mod`; a leftover workspace silently overrides the pin with whatever `../glamour` holds), after which `../glamour` itself is no longer needed.
