@@ -13,6 +13,9 @@ Time estimate: 30–60 minutes, most of it waiting for downloads and compiles.
 > command; skip steps that already pass. The build-from-source details live in
 > [INSTALL.md](./INSTALL.md) — this guide covers the same ground plus the
 > from-zero bootstrapping around it.
+>
+> **Updating a Mac that already runs vimango?** That is a different job:
+> see [docs/UPDATING_A_MAC.md](./docs/UPDATING_A_MAC.md).
 
 ---
 
