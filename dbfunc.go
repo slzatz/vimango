@@ -1,9 +1,11 @@
 package main
 
 import (
+	"cmp"
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -373,91 +375,81 @@ func (db *Database) updateFtsTitle(st string, row *Row) error {
 	return nil
 }
 
+// searchEntries returns the notes matching a full-text query, best match
+// first, and at most MAX of them, like every other list.
+//
+// The ranking comes from the search index, the rows from the main database (a
+// different file), so the rows have to be put back in rank order. That is done
+// here in Go. It used to be done in SQL with one ORDER BY term per hit, and
+// SQLite allows 2,000: a search matching more notes than that -- "the" --
+// failed with "too many terms in ORDER BY clause".
 func (db *Database) searchEntries(st, sort string, showDeleted bool) ([]Row, error) {
-	rows, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
+	hits, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
 		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
 	if err != nil {
-		return []Row{}, err
+		return nil, err
+	}
+	defer hits.Close()
+
+	rank := make(map[int]int) // tid -> position in the ranking, 0 best
+	ftsTitles := make(map[int]string)
+	var tids []string
+	for hits.Next() {
+		var tid int
+		var title string
+		if err := hits.Scan(&tid, &title); err != nil {
+			return nil, err
+		}
+		if _, seen := rank[tid]; seen {
+			continue
+		}
+		rank[tid] = len(rank)
+		ftsTitles[tid] = title
+		tids = append(tids, strconv.Itoa(tid))
+	}
+	if err := hits.Err(); err != nil {
+		return nil, err
+	}
+	if len(tids) == 0 {
+		return nil, nil
+	}
+
+	// A note deleted from the main database can still be in the index; it
+	// simply finds no row here.
+	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.note, task.%s "+
+		"FROM task WHERE task.tid IN (%s)", sort, strings.Join(tids, ", "))
+	if !showDeleted {
+		stmt += " AND task.archived=false AND task.deleted=false"
+	}
+	rows, err := db.MainDB.Query(stmt)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 
-	var ftsTids []int
-	var ftsTitles = make(map[int]string)
-
-	for rows.Next() {
-		var ftsTid int
-		var ftsTitle string
-
-		err = rows.Scan(
-			&ftsTid,
-			&ftsTitle,
-		)
-
-		if err != nil {
-			return []Row{}, err
-		}
-		ftsTids = append(ftsTids, ftsTid)
-		ftsTitles[ftsTid] = ftsTitle
-	}
-
-	if len(ftsTids) == 0 {
-		return []Row{}, nil
-	}
-
-	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
-	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.note, task.%s FROM task WHERE ", sort)
-	stmt += "task.tid IN ("
-
-	max := len(ftsTids) - 1
-	for i := 0; i < max; i++ {
-		stmt += strconv.Itoa(ftsTids[i]) + ", "
-	}
-
-	stmt += strconv.Itoa(ftsTids[max]) + ")"
-	if showDeleted {
-		stmt += " ORDER BY "
-	} else {
-		stmt += " AND task.archived=false AND task.deleted=false ORDER BY "
-	}
-
-	for i := 0; i < max; i++ {
-		stmt += "task.tid = " + strconv.Itoa(ftsTids[i]) + " DESC, "
-	}
-	stmt += "task.tid = " + strconv.Itoa(ftsTids[max]) + " DESC"
-
-	rows, err = db.MainDB.Query(stmt)
-	if err != nil {
-		return []Row{}, err
-	}
 	var orgRows []Row
 	for rows.Next() {
 		var row Row
-		var sort string
-		var note sql.NullString
-
-		err = rows.Scan(
-			&row.id,
-			&row.tid,
-			&row.title,
-			&row.star,
-			&row.deleted,
-			&row.archived,
-			&note,
-			&sort,
-		)
-
-		if err != nil {
-			return []Row{}, err
+		var stamp, note sql.NullString
+		if err := rows.Scan(&row.id, &row.tid, &row.title, &row.star, &row.deleted, &row.archived, &note, &stamp); err != nil {
+			return nil, err
 		}
-
 		if note.Valid && note.String != "" {
 			row.hasImage = containsGoogleDriveImage(note.String)
 		}
-
-		row.sort = timeDelta(sort)
+		if stamp.Valid {
+			row.sort = timeDelta(stamp.String)
+		}
 		row.ftsTitle = ftsTitles[row.tid]
-
 		orgRows = append(orgRows, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	slices.SortFunc(orgRows, func(a, b Row) int { return cmp.Compare(rank[a.tid], rank[b.tid]) })
+	if len(orgRows) > MAX {
+		orgRows = orgRows[:MAX]
 	}
 	return orgRows, nil
 }

@@ -747,17 +747,17 @@ func (o *Organizer) newEntry(_ int) {
 
 // flag is -1 if called as an ex command and 0 if called by another Organizer method
 func (o *Organizer) refresh(flag int) {
-	var err error
 	if o.view == TASK {
 		if o.taskview == BY_FIND {
-			o.mode = NORMAL ///////////////////////////
-			//o.mode = FIND ////////////////////////////////////
-			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows, err = o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted)
+			o.mode = NORMAL
+			// keep the current rows if the search fails (see find)
+			rows, err := o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted)
 			if err != nil {
 				o.ShowMessage(BL, "Error searching for %s: %v", o.Session.fts_search_terms, err)
 				return
 			}
+			o.rows = rows
+			o.fc, o.fr, o.rowoff = 0, 0, 0
 			if len(o.rows) == 0 {
 				o.insertRow(0, "", true, false, false, BASE_DATE)
 				o.rows[0].dirty = false
@@ -808,7 +808,6 @@ func (o *Organizer) refresh(flag int) {
 }
 
 func (o *Organizer) find(pos int) {
-	var err error
 	if pos == -1 {
 		o.ShowMessage(BL, "You did not enter something to find!")
 		//o.mode = o.last_mode
@@ -817,24 +816,30 @@ func (o *Organizer) find(pos int) {
 	}
 
 	searchTerms := strings.ToLower(o.command_line[pos+1:])
-	o.Session.fts_search_terms = searchTerms
+	o.mode = NORMAL
 	if len(searchTerms) < 3 {
 		o.ShowMessage(BL, "You need to provide at least 3 characters to search on")
 		return
 	}
 
+	// Search first and change the view only once there are results to show:
+	// a search that fails (a query FTS5 cannot parse, say) must leave the
+	// list as it was. It used to empty o.rows, and the next key then indexed
+	// into nothing and took the app down.
+	rows, err := o.Database.searchEntries(searchTerms, o.sort, o.show_deleted)
+	if err != nil {
+		o.ShowMessage(BL, "Error searching for %s: %v", searchTerms, err)
+		return
+	}
+
+	o.Session.fts_search_terms = searchTerms
 	o.filter = ""
 	o.taskview = BY_FIND
 	o.view = TASK
-	o.mode = NORMAL
 	o.fc, o.fr, o.rowoff = 0, 0, 0
+	o.rows = rows
 
 	o.ShowMessage(BL, "Search for '%s'", searchTerms)
-	o.rows, err = o.Database.searchEntries(searchTerms, o.sort, o.show_deleted)
-	if err != nil {
-		o.ShowMessage(BL, "Error searching for %s: %v", o.Session.fts_search_terms, err)
-		return
-	}
 	if len(o.rows) == 0 {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
