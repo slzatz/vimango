@@ -54,7 +54,7 @@ func clearStyleBackground(style *chroma.Style) *chroma.Style {
 }
 
 // writeStyledToken resets at the end of every line and re-applies formatting
-// on the next one, as chroma's terminal16m does. drawHighlightedRows splits this
+// on the next one, as chroma's terminal16m does. highlightChunk splits this
 // output on "\n" and draws each line with its own cursor positioning, so no
 // line may depend on styling left open by the line above it.
 func writeStyledToken(w io.Writer, formatting, text string) {

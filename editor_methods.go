@@ -2,7 +2,6 @@ package main
 
 import (
 	//"bufio"
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -95,7 +94,7 @@ func (e *Editor) wrapRowText(r, c int) (string, int) {
 }
 
 // visualRowText returns buffer row r exactly as the drawing code puts it on
-// screen — tabs widened to the four spaces generateWWStringFromBuffer emits —
+// screen — tabs widened to the four spaces wrappedRow emits —
 // so a highlight drawn over it lines up with the text underneath.
 func (e *Editor) visualRowText(r int) string {
 	return strings.ReplaceAll(e.ss[r], "\t", strings.Repeat(" ", tabWidth))
@@ -172,11 +171,7 @@ func (e *Editor) drawText() {
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}
-	if e.highlightSyntax { //includes markdown
-		e.drawHighlightedRows(&ab)
-	} else {
-		e.drawPlainRows(&ab)
-	}
+	e.drawRows(&ab)          // editor_rows.go
 	e.drawSpellErrors(&ab)   // no-op unless :spell is on
 	e.drawSearchMatches(&ab) // no-op unless a search is being highlighted
 	if e.mode == VISUAL {
@@ -269,148 +264,6 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 		y = e.highlightRowRange(pab, row, lo, hi, y)
 	}
 	pab.WriteString(RESET)
-}
-
-func (e *Editor) drawPlainRows(pab *strings.Builder) {
-	note := e.generateWWStringFromBuffer() // need the \t for line num to be correct
-	nnote := strings.Split(note, "\n")
-
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
-	fmt.Fprintf(pab, "\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1) //+1
-
-	var s string
-	if e.numberLines {
-		var numCols strings.Builder
-		// below draws the line number 'rectangle'
-		// can be drawm to pab or &numCols
-		fmt.Fprintf(&numCols, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-			e.top_margin,
-			e.left_margin,
-			e.top_margin+e.screenlines,
-			e.left_margin+e.left_margin_offset)
-		fmt.Fprintf(&numCols, "\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-
-		s = fmt.Sprintf("\x1b[%dC", e.left_margin_offset) + "%s" + lf_ret
-		for n := e.firstVisibleRow; n < len(nnote); n++ {
-			row := nnote[n]
-			fmt.Fprintf(&numCols, "\x1b[48;5;235m\x1b[38;5;245m%3d \x1b[49m", n+1)
-			line := strings.Split(row, "\t")
-			for i := 0; i < len(line); i++ {
-				fmt.Fprintf(pab, s, line[i])
-				numCols.WriteString(lf_ret)
-			}
-		}
-		pab.WriteString(numCols.String())
-	} else {
-		s = "%s" + lf_ret
-		for n := e.firstVisibleRow; n < len(nnote); n++ {
-			row := nnote[n]
-			line := strings.Split(row, "\t")
-			for i := 0; i < len(line); i++ {
-				fmt.Fprintf(pab, s, line[i])
-			}
-		}
-	}
-}
-
-// drawHighlightedRows draws the note with markdown syntax highlighting. Every
-// note is markdown: the per-language "code" notes (folder "code", context
-// naming the language) were dropped 2026-11-08.
-func (e *Editor) drawHighlightedRows(pab *strings.Builder) {
-	note := e.generateWWStringFromBuffer()
-	var buf bytes.Buffer
-	_ = Highlight2(&buf, note, "markdown", MDFormatter, e.Session.markdown_style)
-	note = buf.String()
-	nnote := strings.Split(note, "\n")
-
-	lf_ret := fmt.Sprintf("\r\n\x1b[%dC", e.left_margin)
-	fmt.Fprintf(pab, "\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-
-	if e.numberLines {
-		var numCols strings.Builder
-		// below draws the line number 'rectangle'
-		// cam be drawm to pab or &numCols
-		fmt.Fprintf(&numCols, "\x1b[2*x\x1b[%d;%d;%d;%d;48;5;235$r\x1b[*x",
-			e.top_margin,
-			e.left_margin,
-			e.top_margin+e.screenlines,
-			e.left_margin+e.left_margin_offset)
-		fmt.Fprintf(&numCols, "\x1b[?25l\x1b[%d;%dH", e.top_margin, e.left_margin+1)
-
-		s := fmt.Sprintf("\x1b[%dC", e.left_margin_offset) + "%s" + lf_ret
-		for n := e.firstVisibleRow; n < len(nnote); n++ {
-			row := nnote[n]
-			fmt.Fprintf(&numCols, "\x1b[48;5;235m\x1b[38;5;245m%3d \x1b[49m", n+1)
-			line := strings.Split(row, "\t")
-			for i := 0; i < len(line); i++ {
-				fmt.Fprintf(pab, s, line[i])
-				numCols.WriteString(lf_ret)
-			}
-		}
-		pab.WriteString(numCols.String())
-	} else {
-		s := "%s" + lf_ret
-		for n := e.firstVisibleRow; n < len(nnote); n++ {
-			row := nnote[n]
-			line := strings.Split(row, "\t")
-			for i := 0; i < len(line); i++ {
-				fmt.Fprintf(pab, s, line[i])
-			}
-		}
-	}
-}
-
-/* below exists to create a string that has the proper
- * line breaks based on screen width for syntax highlighting
- * being done in drawcoderows
- * produces a text string that starts at the first line of the
- * file (need to deal with comments where start of comment might be scrolled
- * and ends on the last visible line. Word-wrapped rows are terminated by \t
- * so highlighter deals with them correctly and converted to \n in drawcoderows
- * very similar to dbfunc generateWWString except this uses buffer
- * and only returns as much file as fits the screen
- * and deals with the issue of multi-line comments
- */
-func (e *Editor) generateWWStringFromBuffer() string {
-	numRows := len(e.ss)
-	if numRows == 0 {
-		return ""
-	}
-
-	var ab strings.Builder
-	y := 0
-	maxLines := e.screenlines + e.lineOffset
-	width := e.wrapWidth()
-
-	for filerow := 0; filerow < numRows && y < maxLines; filerow++ {
-		row := strings.ReplaceAll(e.ss[filerow], "\t", "    ")
-
-		if len(row) == 0 {
-			ab.WriteString("\n")
-			y++
-			continue
-		}
-
-		segs := wrapRow(row, width)
-		for i, seg := range segs {
-			ab.WriteString(row[seg.start:seg.end])
-			if i == len(segs)-1 {
-				ab.WriteString("\n")
-				y++
-				break
-			}
-			if y == maxLines-1 {
-				return ab.String()
-			}
-			ab.WriteString("\t")
-			y++
-		}
-	}
-
-	if ab.Len() == 0 {
-		return ""
-	}
-	return ab.String()[:ab.Len()-1] // delete last \n
 }
 
 func (e *Editor) drawStatusBar() {
