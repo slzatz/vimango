@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -107,6 +108,17 @@ func (db *Database) updateTaskFolderByUUID(uuid string, id int) error {
 	return err
 }
 
+// errSearchIndex marks an updateNote that wrote the note but could not update
+// the search index (a separate database file). The note is saved; only search
+// is stale. Callers that must know whether the text is safe -- the editor,
+// deciding whether it may close -- test for it with errors.Is.
+var errSearchIndex = errors.New("search index not updated")
+
+// updateNote writes a note's text. A nil error means the row was written; so
+// does an error wrapping errSearchIndex. Any other error means the database
+// does not hold this text -- including an UPDATE that matched no row, which
+// SQLite reports as success: the note was deleted (a sync, another window)
+// while it was open.
 func (db *Database) updateNote(id int, text string) error {
 
 	var nullableText sql.NullString
@@ -115,16 +127,21 @@ func (db *Database) updateNote(id int, text string) error {
 		nullableText.Valid = true
 	}
 
-	_, err := db.MainDB.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
+	res, err := db.MainDB.Exec("UPDATE task SET note=?, modified=datetime('now') WHERE id=?;",
 		nullableText, id)
 	if err != nil {
 		return err
 	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("note %d is no longer in the database", id)
+	}
 
 	/***************fts virtual table update*********************/
 	entry_tid := db.entryTidFromId(id)
-	_, err = db.FtsDB.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid)
-	return err
+	if _, err = db.FtsDB.Exec("UPDATE fts SET note=? WHERE tid=?;", text, entry_tid); err != nil {
+		return fmt.Errorf("%w: %v", errSearchIndex, err)
+	}
+	return nil
 }
 
 func (db *Database) getSyncItems(sort string, max int) []Row {

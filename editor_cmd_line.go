@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -170,24 +171,33 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"The same key again removes a decoration or list; the other one swaps it.\n" +
 	"Mappings live in vimango.vim, next to config.json.\n"
 
-func (e *Editor) writeNote() {
+// save writes the buffer to the database. Once the note is in, the buffer is
+// clean (saveTick) and its text is the baseline :checkstale compares against
+// (dbText). An error wrapping errSearchIndex still means saved; any other
+// error means the database does not hold this text, and the buffer stays
+// modified so nothing treats it as safe to discard.
+func (e *Editor) save() error {
 	text := e.bufferToString()
-
 	err := e.Database.updateNote(e.id, text)
-	if err != nil {
-		e.ShowMessage(BL, "Error in updating note (updateNote) for entry with id %d: %v", e.id, err)
+	if err != nil && !errors.Is(err, errSearchIndex) {
+		return err
+	}
+	e.dbText = text
+	e.saveTick = e.vbuf.GetLastChangedTick()
+	return err
+}
+
+func (e *Editor) writeNote() {
+	err := e.save()
+	switch {
+	case err == nil:
+		e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id)
+	case errors.Is(err, errSearchIndex):
+		e.ShowMessage(BL, "Saved note %d, but %v", e.id, err)
+	default:
+		e.ShowMessage(BL, "Note %d NOT saved: %v", e.id, err)
 		return
 	}
-	e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
-
-	// The database now holds exactly this text, so it becomes the
-	// baseline :checkstale compares against.
-	e.dbText = text
-
-	//explicitly writes note to set isModified to false
-	//vim.Execute("w")
-	e.saveTick = e.vbuf.GetLastChangedTick()
-
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 }
 
@@ -231,24 +241,39 @@ func (e *Editor) exit() {
 	e.quitActions()
 }
 
+// quitActions is :q, :q!, :x and their long forms. The rule for all of them:
+// the editor closes only when the buffer's text is in the database or the user
+// has said to throw it away (:q!).
+//
+// A host app leans on this. vimango_hybrid cannot see the buffer, so it
+// injects ":q" or ":x" and watches whether the process exits: an editor still
+// running means "not saved", and the host keeps the window open on it. Until
+// 2026-11-10 :x reported a failed write and quit anyway, which the host read
+// as "saved" -- the edits were gone with nothing to show for it.
 func (e *Editor) quitActions() {
-	cmd := e.command_line
-	if cmd == "x" || cmd == "exit" {
-		text := e.bufferToString()
-		err := e.Database.updateNote(e.id, text)
-		if err != nil {
-			e.ShowMessage(BR, "Error in updateNote for entry with id %d: %v", e.id, err)
+	switch e.command_line {
+	case "x", "exit":
+		// As in vim, :x writes only a modified buffer. Writing a clean one
+		// would bump the note's modified time -- reordering the list and
+		// queuing a sync push for nothing -- and, if a sync had changed the
+		// row since it was read, overwrite the newer text with the old.
+		if e.isModified() {
+			if err := e.save(); err != nil && !errors.Is(err, errSearchIndex) {
+				e.mode = NORMAL
+				e.command_line = ""
+				e.ShowMessage(BR, "\x1b[41mNote %d NOT saved: %v\x1b[0m", e.id, err)
+				return
+			}
 		}
-		e.ShowMessage(BL, "Updated note and fts entry for entry %d", e.id) //////
-
-	} else if cmd == "q!" || cmd == "quit!" {
-		// do nothing = allow editor to be closed
-
-	} else if e.isModified() {
-		e.mode = NORMAL
-		e.command_line = ""
-		e.ShowMessage(BR, "No write since last change")
-		return
+	case "q!", "quit!":
+		// the user's call: close without saving
+	default:
+		if e.isModified() {
+			e.mode = NORMAL
+			e.command_line = ""
+			e.ShowMessage(BR, "No write since last change")
+			return
+		}
 	}
 
 	if e.Session.editorOnly {
