@@ -3,16 +3,15 @@ package main
 import (
 	"cmp"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/slzatz/vimango/auth"
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -384,46 +383,26 @@ func (o *Organizer) helpFor(arg string) string {
 	return fmt.Sprintf("Command or category '%s' not found.\n%s", arg, hint)
 }
 
-func (o *Organizer) newContext(ex exArgs) {
-	o.altView = CONTEXT
+// newContext and newFolder are ":newc" and ":newf": pick a context or folder
+// for the current entry from a numbered list.
+func (o *Organizer) newContext(ex exArgs) { o.pickContainer(CONTEXT) }
+func (o *Organizer) newFolder(ex exArgs)  { o.pickContainer(FOLDER) }
+
+// pickContainer lists every context or folder, numbered, and waits in
+// CONTAINER mode for the number of the one to move the current entry into.
+func (o *Organizer) pickContainer(view View) {
+	o.altView = view
 	o.command = ""
 	o.command_line = ""
 
-	context_map := o.Database.contextList()
-	context_slice := slices.Collect(maps.Keys(context_map))
-	sort.Strings(context_slice)
-	o.containerList = context_slice
+	o.containerList = o.containerTitles(view.kind())
 	var sb strings.Builder
-	for i, k := range context_slice {
-		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
+	for i, title := range o.containerList {
+		fmt.Fprintf(&sb, "%d. %s\n", i+1, title)
 	}
-	//contexts := strings.Join(context_slice, "\n")
 	o.mode = CONTAINER
-	//o.drawNotice(contexts)
 	o.drawNotice(sb.String())
 	o.altRowoff = 0
-	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
-}
-
-func (o *Organizer) newFolder(ex exArgs) {
-	o.altView = FOLDER
-	o.command = ""
-	o.command_line = ""
-
-	folder_map := o.Database.folderList()
-	folder_slice := slices.Collect(maps.Keys(folder_map))
-	sort.Strings(folder_slice)
-	o.containerList = folder_slice
-	var sb strings.Builder
-	for i, k := range folder_slice {
-		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
-	}
-	//contexts := strings.Join(context_slice, "\n")
-	o.mode = CONTAINER
-	//o.drawNotice(contexts)
-	o.drawNotice(sb.String())
-	o.altRowoff = 0
-	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
 }
 
 // formatNormalModeHelp returns formatted help for all normal mode commands
@@ -466,14 +445,14 @@ func (o *Organizer) openContainerSelection() {
 	switch o.view {
 	case CONTEXT:
 		o.taskview = BY_CONTEXT
-		_, ok = o.Database.contextExists(row.title)
+		_, ok = o.containerUUID(store.Context, row.title)
 	case FOLDER:
 		o.taskview = BY_FOLDER
-		_, ok = o.Database.folderExists(row.title)
+		_, ok = o.containerUUID(store.Folder, row.title)
 	case KEYWORD:
 		o.taskview = BY_KEYWORD
 		// this guard to see if synced may not be necessary for keyword
-		_, ok = o.Database.keywordExists(row.title)
+		_, ok = o.containerUUID(store.Keyword, row.title)
 	}
 
 	if !ok {
@@ -509,17 +488,17 @@ func (o *Organizer) open(ex exArgs) {
 	}
 	var ok bool
 	input := ex.arg
-	if _, ok = o.Database.contextExists(input); ok {
+	if _, ok = o.containerUUID(store.Context, input); ok {
 		o.taskview = BY_CONTEXT
 	}
 	if !ok {
-		if _, ok = o.Database.folderExists(input); ok {
+		if _, ok = o.containerUUID(store.Folder, input); ok {
 			o.taskview = BY_FOLDER
 		}
 	}
 	if !ok {
 		o.ShowMessage(BL, "%s is not a valid context or folder!", input)
-		if _, ok = o.Database.keywordExists(input); ok {
+		if _, ok = o.containerUUID(store.Keyword, input); ok {
 			o.taskview = BY_KEYWORD
 		}
 	}
@@ -542,7 +521,7 @@ func (o *Organizer) openContext(ex exArgs) {
 		return
 	}
 	input := ex.arg
-	if _, ok := o.Database.contextExists(input); !ok {
+	if _, ok := o.containerUUID(store.Context, input); !ok {
 		o.ShowMessage(BL, "%s is either not a valid context or has not been synced!", input)
 		o.mode = NORMAL
 		return
@@ -561,7 +540,7 @@ func (o *Organizer) openFolder(ex exArgs) {
 		return
 	}
 	input := ex.arg
-	if _, ok := o.Database.folderExists(input); !ok {
+	if _, ok := o.containerUUID(store.Folder, input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		o.mode = NORMAL
 		o.command = ""
@@ -582,7 +561,7 @@ func (o *Organizer) openKeyword(ex exArgs) {
 		return
 	}
 	input := ex.arg
-	if _, ok := o.Database.keywordExists(input); !ok {
+	if _, ok := o.containerUUID(store.Keyword, input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
 		//o.mode = o.last_mode
 		o.mode = NORMAL
@@ -601,36 +580,26 @@ func (o *Organizer) write(ex exArgs) {
 	if o.view != TASK {
 		return
 	}
-	for i, r := range o.rows {
-		if r.dirty {
-			if r.id != -1 {
-				err := o.Database.updateTitle(&r)
-				if err != nil {
-					o.ShowMessage(BL, "Error updating title: id %d: %v", r.id, err)
-					continue
-				}
-			} else {
-				var context_uuid, folder_uuid string
-				switch o.taskview {
-				case BY_CONTEXT:
-					context_uuid, _ = o.Database.contextExists(o.filter)
-					folder_uuid = DefaultFolderUUID
-				case BY_FOLDER:
-					folder_uuid, _ = o.Database.folderExists(o.filter)
-					context_uuid = DefaultContextUUID
-				default:
-					context_uuid = DefaultContextUUID
-					folder_uuid = DefaultFolderUUID
-				}
-				err := o.Database.insertTitle(&r, context_uuid, folder_uuid)
-				if err != nil {
-					o.ShowMessage(BL, "Error inserting title id %d: %v", r.id, err)
-					continue
-				}
-			}
-			o.rows[i].dirty = false
-			updated_rows = append(updated_rows, r.id)
+	for i := range o.rows {
+		// the row itself, not a copy: a new note's id has to land in the list
+		row := &o.rows[i]
+		if !row.dirty {
+			continue
 		}
+		if row.id != -1 {
+			if err := o.Store.SetTitle(row.id, row.title); err != nil {
+				o.ShowMessage(BL, "Error updating title: id %d: %v", row.id, err)
+				continue
+			}
+		} else {
+			contextUUID, folderUUID := o.newEntryContainers()
+			if err := o.addEntry(row, contextUUID, folderUUID); err != nil {
+				o.ShowMessage(BL, "Error inserting title %q: %v", row.title, err)
+				continue
+			}
+		}
+		row.dirty = false
+		updated_rows = append(updated_rows, row.id)
 	}
 	if len(updated_rows) == 0 {
 		o.ShowMessage(BL, "There were no rows to update")
@@ -667,7 +636,7 @@ func (o *Organizer) editNote(ex exArgs) {
 	id := -1
 	if ex.arg != "" {
 		n, err := strconv.Atoi(ex.arg)
-		if err != nil || !o.Database.entryExists(n) {
+		if exists, _ := o.Store.Exists(n); err != nil || !exists {
 			o.mode = NORMAL
 			o.ShowMessage(BL, "There is no note with id %q", ex.arg)
 			return
@@ -709,10 +678,10 @@ func (o *Organizer) openInEditor(id int) {
 	if o.fr < len(o.rows) && o.rows[o.fr].id == id {
 		ae.title = o.rows[o.fr].title
 	} else {
-		ae.title = o.Database.getTitle(id)
+		ae.title, _ = o.Store.Title(id)
 	}
 	ae.top_margin = TOP_MARGIN + 1
-	note := o.Database.readNoteIntoString(id)
+	note := o.noteText(id)
 	ae.dbText = note
 	ae.ss = strings.Split(note, "\n")
 	// Make sure we have at least one line, even if the note was empty
@@ -769,7 +738,7 @@ func (o *Organizer) refreshView(containerInfo bool) {
 		if o.taskview == BY_FIND {
 			o.mode = NORMAL
 			// keep the current rows if the search fails (see find)
-			rows, err := o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted)
+			rows, err := o.search(o.Session.fts_search_terms)
 			if err != nil {
 				o.ShowMessage(BL, "Error searching for %s: %v", o.Session.fts_search_terms, err)
 				return
@@ -789,7 +758,7 @@ func (o *Organizer) refreshView(containerInfo bool) {
 	} else {
 		o.mode = NORMAL
 		o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-		if o.setRows(o.Database.getContainers(o.view)) {
+		if o.setRows(o.containerRows()) {
 			o.ShowMessage(BL, "No results were returned")
 		}
 		o.filter = ""
@@ -820,7 +789,7 @@ func (o *Organizer) find(ex exArgs) {
 	// a search that fails (a query FTS5 cannot parse, say) must leave the
 	// list as it was. It used to empty o.rows, and the next key then indexed
 	// into nothing and took the app down.
-	rows, err := o.Database.searchEntries(searchTerms, o.sort, o.show_deleted)
+	rows, err := o.search(searchTerms)
 	if err != nil {
 		o.ShowMessage(BL, "Error searching for %s: %v", searchTerms, err)
 		return
@@ -876,7 +845,7 @@ func (o *Organizer) containers(ex exArgs) {
 
 	o.Screen.eraseRightScreen()
 	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-	if o.setRows(o.Database.getContainers(o.view)) {
+	if o.setRows(o.containerRows()) {
 		o.ShowMessage(BL, "No results were returned")
 	}
 	o.filter = ""
@@ -905,7 +874,7 @@ func (o *Organizer) addKeyword(ex exArgs) {
 	}
 	var ok bool
 	var keywordUUID string
-	if keywordUUID, ok = o.Database.keywordExists(input); !ok {
+	if keywordUUID, ok = o.containerUUID(store.Keyword, input); !ok {
 		o.ShowMessage(BL, "%s is not a valid keyword!", input)
 		o.mode = NORMAL
 		return
@@ -915,7 +884,7 @@ func (o *Organizer) addKeyword(ex exArgs) {
 		failed := 0
 		var lastErr error
 		for entry_id := range o.marked_entries {
-			if err := o.Database.addTaskKeywordByUUID(keywordUUID, entry_id); err != nil {
+			if err := o.Store.AddKeyword(entry_id, keywordUUID); err != nil {
 				failed++
 				lastErr = err
 			}
@@ -929,7 +898,7 @@ func (o *Organizer) addKeyword(ex exArgs) {
 	}
 
 	// get here if no marked entries
-	if err := o.Database.addTaskKeywordByUUID(keywordUUID, o.rows[o.fr].id); err != nil {
+	if err := o.Store.AddKeyword(o.rows[o.fr].id, keywordUUID); err != nil {
 		o.ShowMessage(BL, "Keyword %s not added: %v", input, err)
 		return
 	}
@@ -951,12 +920,13 @@ func (o *Organizer) recent(ex exArgs) {
 
 func (o *Organizer) deleteKeywords(ex exArgs) {
 	id := o.getId()
-	res := o.Database.deleteKeywords(id)
-	//o.mode = o.last_mode
 	o.mode = NORMAL
-	if res != -1 {
-		o.ShowMessage(BL, "%d keyword(s) deleted from entry %d", res, id)
+	n, err := o.Store.RemoveKeywords(id)
+	if err != nil {
+		o.ShowMessage(BL, "Keywords not deleted from entry %d: %v", id, err)
+		return
 	}
+	o.ShowMessage(BL, "%d keyword(s) deleted from entry %d", n, id)
 }
 
 func (o *Organizer) showAll(ex exArgs) {
@@ -998,7 +968,7 @@ func (o *Organizer) copyEntry(ex exArgs) {
 	}
 
 	// Copy the entry in the database
-	newID, err := o.Database.copyEntry(currentRow.id)
+	newID, err := o.Store.Copy(currentRow.id)
 	if err != nil {
 		o.ShowMessage(BL, "Error copying entry: %v", err)
 		o.mode = NORMAL
@@ -1078,7 +1048,7 @@ func (o *Organizer) refreshImageInfo(ex exArgs) {
 		return
 	}
 	entry := o.rows[o.fr]
-	note := o.Database.readNoteIntoString(entry.id)
+	note := o.noteText(entry.id)
 
 	// Extract image URLs from the note
 	urls := extractImageURLs(note)
@@ -1312,7 +1282,7 @@ func (o *Organizer) convertGoogleDriveURLs(ex exArgs) {
 	}
 
 	// Read the current entry's note content
-	currentNote := o.Database.readNoteIntoString(currentRow.id)
+	currentNote := o.noteText(currentRow.id)
 
 	// Convert URLs
 	convertedNote, count := ConvertGoogleDriveURLsToShort(currentNote)
@@ -1323,7 +1293,7 @@ func (o *Organizer) convertGoogleDriveURLs(ex exArgs) {
 	}
 
 	// Update the note in database
-	err := o.Database.updateNote(currentRow.id, convertedNote)
+	err := o.Store.SetNote(currentRow.id, convertedNote)
 	if err != nil {
 		o.ShowMessage(BL, "Error updating note: %v", err)
 		return

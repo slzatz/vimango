@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -53,9 +54,9 @@ type Organizer struct {
 		list  []FilterNames
 		index int
 	}
-	Database *Database
-	Session  *Session
-	Screen   *Screen
+	Store   *store.Store
+	Session *Session
+	Screen  *Screen
 }
 
 type FilterNames struct {
@@ -65,28 +66,16 @@ type FilterNames struct {
 
 func (a *App) setFilterList() []FilterNames {
 	fnlist := []FilterNames{}
-	filterMap := a.Database.contextList()
-	for v, _ := range filterMap {
-		fnlist = append(fnlist, FilterNames{Text: v, Char: 'c'})
+	for _, title := range a.Organizer.containerTitles(store.Context) {
+		fnlist = append(fnlist, FilterNames{Text: title, Char: 'c'})
 	}
-	filterMap = a.Database.folderList()
-	for v, _ := range filterMap {
-		fnlist = append(fnlist, FilterNames{Text: v, Char: 'f'})
+	for _, title := range a.Organizer.containerTitles(store.Folder) {
+		fnlist = append(fnlist, FilterNames{Text: title, Char: 'f'})
 	}
 	sort.Slice(fnlist, func(i, j int) bool {
 		return fnlist[i].Text < fnlist[j].Text
 	})
 	return fnlist
-}
-
-// entries returns the notes the current filter asks for -- a context's, a
-// folder's, a keyword's, or the recent ones -- and says so if the query fails.
-func (o *Organizer) entries() []Row {
-	rows, err := o.Database.filterEntries(o.taskview, o.filter, o.show_deleted, o.sort, o.sortPriority, MAX)
-	if err != nil {
-		o.showMessage("Error filtering entries: %v", err)
-	}
-	return rows
 }
 
 // setRows makes rows the organizer's list, with the first row current: the
@@ -166,14 +155,14 @@ func (o *Organizer) moveToContext(input string) {
 	var contextUUID string
 	var ok bool
 	//o.mode = NORMAL
-	if contextUUID, ok = o.Database.contextExists(input); !ok {
+	if contextUUID, ok = o.containerUUID(store.Context, input); !ok {
 		o.ShowMessage(BL, "%s is not a valid context!", input)
 		return
 	}
 
 	if len(o.marked_entries) > 0 {
 		for id := range o.marked_entries {
-			err := o.Database.updateTaskContextByUUID(contextUUID, id)
+			err := o.Store.SetContext(id, contextUUID)
 			if err != nil {
 				o.ShowMessage(BL, "Error updating context for entry %d: %v", id, err)
 				return
@@ -183,7 +172,7 @@ func (o *Organizer) moveToContext(input string) {
 		return
 	}
 	id := o.rows[o.fr].id
-	err := o.Database.updateTaskContextByUUID(contextUUID, id)
+	err := o.Store.SetContext(id, contextUUID)
 	if err != nil {
 		o.showMessage("Error updating context for entry %d: %v", id, err)
 		return
@@ -195,14 +184,14 @@ func (o *Organizer) moveToFolder(input string) {
 	var folderUUID string
 	var ok bool
 	//o.mode = NORMAL
-	if folderUUID, ok = o.Database.folderExists(input); !ok {
+	if folderUUID, ok = o.containerUUID(store.Folder, input); !ok {
 		o.ShowMessage(BL, "%s is not a valid folder!", input)
 		return
 	}
 
 	if len(o.marked_entries) > 0 {
 		for id := range o.marked_entries {
-			err := o.Database.updateTaskFolderByUUID(folderUUID, id)
+			err := o.Store.SetFolder(id, folderUUID)
 			if err != nil {
 				o.ShowMessage(BL, "Error updating folder for entry %d: %v", id, err)
 				return
@@ -212,7 +201,7 @@ func (o *Organizer) moveToFolder(input string) {
 		return
 	}
 	id := o.rows[o.fr].id
-	err := o.Database.updateTaskFolderByUUID(folderUUID, id)
+	err := o.Store.SetFolder(id, folderUUID)
 	if err != nil {
 		o.showMessage("Error updating folder for entry %d: %v", id, err)
 		return

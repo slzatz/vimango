@@ -9,7 +9,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
+
 	"github.com/slzatz/vimango/internal/localdb"
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
@@ -18,10 +21,11 @@ import (
 // App encapsulates the global application state
 type App struct {
 	// Core components
-	Session   *Session   // Session handles terminal and screen management
-	Screen    *Screen    // Screen handles screen management
-	Organizer *Organizer // Organizer manages tasks and their display
-	Database  *Database  // Database handles database connections and queries
+	Session   *Session     // Session handles terminal and screen management
+	Screen    *Screen      // Screen handles screen management
+	Organizer *Organizer   // Organizer manages tasks and their display
+	Store     *store.Store // vimango.db: the notes and their containers
+	PG        *sql.DB      // the PostgreSQL server, for sync; nil when none is configured
 
 	RenderManager *RenderManager // Renders the organizer's preview; loads images in the background
 
@@ -50,17 +54,14 @@ type App struct {
 
 // CreateApp creates and initializes the application struct
 func CreateApp() *App {
-	db := &Database{}
 	sess := &Session{}
 	screen := &Screen{Session: sess}
 	kitty := IsTermKitty()
 	return &App{
-		Session:  sess,
-		Screen:   screen,
-		Database: db,
+		Session: sess,
+		Screen:  screen,
 		Organizer: &Organizer{Session: sess,
-			Screen:   screen,
-			Database: db,
+			Screen: screen,
 		},
 		keyEvents: make(chan terminal.Key, 16),
 		keyErrors: make(chan error, 1),
@@ -89,9 +90,9 @@ func (a *App) NewEditor() *Editor {
 			list  []string
 			index int
 		}{list: nil, index: 0},
-		Screen:   a.Screen,
-		Session:  a.Session,
-		Database: a.Database,
+		Screen:  a.Screen,
+		Session: a.Session,
+		Store:   a.Store,
 	}
 
 	// Set up commands after editor creation so help can access registry
@@ -257,15 +258,17 @@ func (a *App) InitDatabases(configPath string) error {
 	}
 
 	// Initialize main database
-	a.Database.MainDB, err = localdb.Open(config.Sqlite3.DB)
+	db, err := localdb.Open(config.Sqlite3.DB)
 	if err != nil {
 		return err
 	}
+	a.Store = store.New(db)
+	a.Organizer.Store = a.Store
 	// Bring the database up to date with how this build stores it (WAL, the
 	// search index). Quiet, and a failure is not fatal: it means another
 	// process was mid-write, and the next start does it. Until then :find
 	// may report that task_fts is missing. `vimango --migrate` reports.
-	_, _ = localdb.Migrate(a.Database.MainDB)
+	_, _ = localdb.Migrate(db)
 	// Postgres is optional - only connect if host is configured
 	if config.Postgres.Host != "" {
 		// Default SSL mode to "disable" for backward compatibility
@@ -293,34 +296,14 @@ func (a *App) InitDatabases(configPath string) error {
 		// happens until the first query, so booting offline works and sync
 		// recovers on its own when connectivity returns. Reachability is
 		// checked in Synchronize, where a failure can be reported usefully.
-		a.Database.PG, err = sql.Open("postgres", connect)
+		a.PG, err = sql.Open("postgres", connect)
 		if err != nil {
 			return err
 		}
-	} else {
-		// No Postgres configured - sync functionality will be disabled
-		a.Database.PG = nil
 	}
+	// (with no Postgres configured a.PG stays nil, and sync says so)
 
 	a.Config = config
-	return nil
-}
-
-// ValidateDatabaseSchema checks that the required tables exist in the databases.
-// Returns an error if the schema is missing or incomplete.
-func (a *App) ValidateDatabaseSchema() error {
-	// Check main database tables
-	requiredTables := []string{"task", "context", "folder", "keyword", "sync", "task_keyword"}
-	for _, table := range requiredTables {
-		var name string
-		err := a.Database.MainDB.QueryRow(
-			"SELECT name FROM sqlite_master WHERE type='table' AND name=?", table,
-		).Scan(&name)
-		if err != nil {
-			return fmt.Errorf("required table '%s' not found in main database", table)
-		}
-	}
-
 	return nil
 }
 
@@ -453,11 +436,11 @@ func (a *App) Cleanup() {
 		a.RenderManager.Stop()
 	}
 
-	if a.Database.MainDB != nil {
-		a.Database.MainDB.Close()
+	if a.Store != nil {
+		a.Store.Close()
 	}
-	if a.Database.PG != nil {
-		a.Database.PG.Close()
+	if a.PG != nil {
+		a.PG.Close()
 	}
 
 	// The kitty image path decodes HEIC, and that leaves a plugin

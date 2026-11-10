@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -53,9 +54,9 @@ type Editor struct {
 	}
 	exCmds          map[string]func(*Editor) // map of ex commands
 	commandRegistry *CommandRegistry[func(*Editor)]
-	Database        *Database // pointer to the database
-	Session         *Session  // pointer to the session
-	Screen          *Screen   // pointer to the screen
+	Store           *store.Store // the database
+	Session         *Session     // pointer to the session
+	Screen          *Screen      // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct

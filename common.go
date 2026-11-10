@@ -250,28 +250,6 @@ func ConvertGoogleDriveURLsToShort(markdown string) (string, int) {
 	return result, count
 }
 
-// NewEntry is what getEntryInfo returns: a note's row without its text.
-type NewEntry struct {
-	id       int
-	tid      int
-	title    string
-	star     bool
-	added    string
-	archived bool
-	deleted  bool
-	modified string
-}
-
-type Container struct {
-	id       int
-	tid      int
-	title    string
-	star     bool
-	deleted  bool
-	modified string
-	count    int
-}
-
 // Keys that produce no character arrive from the key reader as synthetic codes
 // well above any rune a terminal will send. These are aliases for the reader's
 // own constants rather than a second hand-maintained copy: the two blocks used

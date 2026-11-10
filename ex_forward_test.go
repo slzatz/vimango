@@ -392,7 +392,7 @@ func TestVimSpellingsOfSaveAndClose(t *testing.T) {
 	t.Run("a failed wq stays open", func(t *testing.T) {
 		e, a := savedNoteEditor(t, "alpha")
 		e.sendKeys("x")
-		e.Database.MainDB.Close()
+		e.Store.DB().Close()
 		e.exCommand("wq")
 		if !a.Run || !e.isModified() {
 			t.Error(":wq closed the editor although the note was not saved")

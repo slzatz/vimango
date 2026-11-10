@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
@@ -85,10 +84,8 @@ func RunRenderHTML(id int, linkNotes, showTitle bool) int {
 		return 1
 	}
 
-	var title string
-	var note sql.NullString
-	row := app.Database.MainDB.QueryRow("SELECT title, note FROM task WHERE id=?;", id)
-	if err := row.Scan(&title, &note); err != nil {
+	title, note, err := app.Store.TitleAndNote(id)
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: no note with id %d: %v\n", id, err)
 		return 1
 	}
@@ -96,7 +93,7 @@ func RunRenderHTML(id int, linkNotes, showTitle bool) int {
 	// Embedded-pane style: left-aligned content instead of a centered
 	// reading column, and no <h1> unless asked for (--title) — the host
 	// app's panes show the title in their own native header.
-	html, err := RenderNoteAsHTML(title, note.String, linkNotes, showTitle)
+	html, err := RenderNoteAsHTML(title, note, linkNotes, showTitle)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)
 		return 1

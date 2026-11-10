@@ -115,7 +115,7 @@ func main() {
 	}
 
 	// Validate database schema exists
-	if err := app.ValidateDatabaseSchema(); err != nil {
+	if err := app.Store.Validate(); err != nil {
 		fmt.Printf("Error: Database schema is missing or incomplete.\n")
 		fmt.Printf("Details: %v\n", err)
 		fmt.Println()
@@ -125,7 +125,7 @@ func main() {
 	}
 
 	// Validate --open id while we can still print to a cooked terminal
-	if openId != -1 && !app.Database.entryExists(openId) {
+	if exists, _ := app.Store.Exists(openId); openId != -1 && !exists {
 		fmt.Printf("Error: no note with id %d\n", openId)
 		os.Exit(1)
 	}

@@ -4,15 +4,23 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/slzatz/vimango/internal/localdb"
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
 // indexedNotes fills a test database with n synced notes that all contain the
 // word "common"; the search index follows by trigger. Note k (tid k) has the
 // word k%7+1 times, so the ranking is not the insertion order.
-func indexedNotes(t *testing.T, db *Database, n int) {
+// searcher is an organizer with only what a search needs: the store, and the
+// sort column its lists carry.
+func searcher(db *store.Store) *Organizer {
+	return &Organizer{Session: &Session{}, Store: db, sort: "modified"}
+}
+
+func indexedNotes(t *testing.T, db *store.Store, n int) {
 	t.Helper()
-	tx, err := db.MainDB.Begin()
+	tx, err := db.DB().Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,10 +42,10 @@ func indexedNotes(t *testing.T, db *Database, n int) {
 // used to fail outright (the rank order was once rebuilt with a term per hit).
 // It returns the best MAX, in the index's rank order.
 func TestSearchWithMoreHitsThanSQLiteOrderByTerms(t *testing.T) {
-	db := newTestDatabase(t)
+	db := newTestStore(t)
 	indexedNotes(t, db, 2100)
 
-	rows, err := db.searchEntries("common", "modified", false)
+	rows, err := searcher(db).search("common")
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -46,7 +54,7 @@ func TestSearchWithMoreHitsThanSQLiteOrderByTerms(t *testing.T) {
 	}
 
 	// the order the index ranks them in
-	ranked, err := db.MainDB.Query("SELECT rowid FROM task_fts WHERE task_fts MATCH 'common' ORDER BY bm25(task_fts, 2.0, 1.0, 5.0) LIMIT ?;", MAX)
+	ranked, err := db.DB().Query("SELECT rowid FROM task_fts WHERE task_fts MATCH 'common' ORDER BY bm25(task_fts, 2.0, 1.0, 5.0) LIMIT ?;", MAX)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,13 +76,13 @@ func TestSearchWithMoreHitsThanSQLiteOrderByTerms(t *testing.T) {
 // Deleted and archived notes are left out before the cut to MAX, so they do
 // not take the place of live matches.
 func TestSearchSkipsDeletedBeforeTheLimit(t *testing.T) {
-	db := newTestDatabase(t)
+	db := newTestStore(t)
 	indexedNotes(t, db, MAX+50)
-	if _, err := db.MainDB.Exec("UPDATE task SET deleted=true WHERE tid <= 40;"); err != nil {
+	if _, err := db.DB().Exec("UPDATE task SET deleted=true WHERE tid <= 40;"); err != nil {
 		t.Fatal(err)
 	}
 
-	rows, err := db.searchEntries("common", "modified", false)
+	rows, err := searcher(db).search("common")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,24 +99,22 @@ func TestSearchSkipsDeletedBeforeTheLimit(t *testing.T) {
 // A note is searchable from the moment it is written -- title and text, before
 // it has synced and so before it has a tid. The old index was keyed by tid.
 func TestSearchFindsANoteThatHasNotSynced(t *testing.T) {
-	db := newTestDatabase(t)
-	row := &Row{title: "Quokka sightings"}
-	captureStdout(t, func() {
-		if err := db.insertTitle(row, DefaultContextUUID, DefaultFolderUUID); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err := db.updateNote(row.id, "seen near the lighthouse"); err != nil {
+	db := newTestStore(t)
+	id, err := db.Add("Quokka sightings", false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetNote(id, "seen near the lighthouse"); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, q := range []string{"quokka", "lighthouse"} {
-		rows, err := db.searchEntries(q, "modified", false)
-		if err != nil || len(rows) != 1 || rows[0].id != row.id {
+		rows, err := searcher(db).search(q)
+		if err != nil || len(rows) != 1 || rows[0].id != id {
 			t.Errorf("search %q: %d rows (%v), want the new note", q, len(rows), err)
 		}
 	}
-	rows, _ := db.searchEntries("quokka", "modified", false)
+	rows, _ := searcher(db).search("quokka")
 	if len(rows) == 1 && rows[0].ftsTitle != ftsMark+"Quokka"+ftsUnmark+" sightings" {
 		t.Errorf("highlighted title is %q", rows[0].ftsTitle)
 	}
@@ -120,14 +126,14 @@ func TestFailedSearchKeepsTheList(t *testing.T) {
 	vim.InitializeVim(0)
 	sess := &Session{}
 	scr := &Screen{screenCols: 120, screenLines: 40, textLines: 30, divider: 40, totaleditorcols: 78, Session: sess}
-	db := newTestDatabase(t)
-	o := &Organizer{Session: sess, Screen: scr, Database: db, view: TASK, taskview: BY_FOLDER, filter: "none", sort: "modified",
+	db := newTestStore(t)
+	o := &Organizer{Session: sess, Screen: scr, Store: db, view: TASK, taskview: BY_FOLDER, filter: "none", sort: "modified",
 		rows: []Row{{id: 1, title: "one"}, {id: 2, title: "two"}}, fr: 1, vbuf: vim.NewBuffer(0)}
 	vim.SetCurrentBuffer(o.vbuf)
 	o.readRowsIntoBuffer()
 
 	o.command_line = `find "unbalanced` // a query FTS5 cannot parse
-	if _, err := db.searchEntries(`"unbalanced`, "modified", false); err == nil {
+	if _, err := o.search(`"unbalanced`); err == nil {
 		t.Fatal("the premise of this test is wrong: the query did not fail")
 	}
 	captureStdout(t, func() { o.find(exArgs{name: "find", arg: `"unbalanced`}) })

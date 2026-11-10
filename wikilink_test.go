@@ -2,12 +2,13 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/yuin/goldmark"
+
+	"github.com/slzatz/vimango/internal/store"
 )
 
 func TestWikiLinkRendering(t *testing.T) {
@@ -210,7 +211,7 @@ func fakeTitles(titles map[int64]string) titleForTID {
 		if title, ok := titles[tid]; ok {
 			return title, nil
 		}
-		return "", sql.ErrNoRows
+		return "", store.ErrNotFound
 	}
 }
 

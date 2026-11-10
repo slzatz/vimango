@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/slzatz/vimango/internal/localdb"
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -17,29 +19,27 @@ func newDBOrganizer(t *testing.T, titles ...string) (o *Organizer, ids []int) {
 	t.Helper()
 	vim.InitializeVim(0)
 	vim.SendKey("<esc>")
-	db := newTestDatabase(t)
+	db := newTestStore(t)
 	sess := &Session{}
 	scr := &Screen{screenCols: 120, screenLines: 40, textLines: 30, divider: 40, totaleditorcols: 78, Session: sess}
-	o = &Organizer{Session: sess, Screen: scr, Database: db, view: TASK, taskview: BY_FOLDER, filter: "none", sort: "modified",
+	o = &Organizer{Session: sess, Screen: scr, Store: db, view: TASK, taskview: BY_FOLDER, filter: "none", sort: "modified",
 		mode: NORMAL, vbuf: vim.NewBuffer(0), marked_entries: map[int]struct{}{}}
 	for _, title := range titles {
-		row := &Row{title: title}
-		captureStdout(t, func() {
-			if err := db.insertTitle(row, DefaultContextUUID, DefaultFolderUUID); err != nil {
-				t.Fatal(err)
-			}
-		})
-		if err := db.updateNote(row.id, "text of "+title); err != nil {
+		id, err := db.Add(title, false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
+		if err != nil {
 			t.Fatal(err)
 		}
-		o.rows = append(o.rows, Row{id: row.id, title: title})
-		ids = append(ids, row.id)
+		if err := db.SetNote(id, "text of "+title); err != nil {
+			t.Fatal(err)
+		}
+		o.rows = append(o.rows, Row{id: id, title: title})
+		ids = append(ids, id)
 	}
 	vim.SetCurrentBuffer(o.vbuf)
 	o.readRowsIntoBuffer()
 	vim.SetCursorPosition(1, 0)
 
-	a := &App{Session: sess, Screen: scr, Database: db, Organizer: o, Run: true}
+	a := &App{Session: sess, Screen: scr, Store: db, Organizer: o, Run: true}
 	a.RenderManager = NewRenderManager(a) // the preview of the current row
 	t.Cleanup(a.RenderManager.Stop)
 	o.exCmds = a.setOrganizerExCmds(o)
@@ -163,13 +163,13 @@ func TestExCommandLeavesTheCommandLine(t *testing.T) {
 func TestSetContextWithASpaceInTheName(t *testing.T) {
 	o, ids := newDBOrganizer(t, "one")
 	const uuid = "11111111-1111-1111-1111-111111111111"
-	if _, err := o.Database.MainDB.Exec("INSERT INTO context (title, tid, uuid) VALUES ('my context', 2, ?);", uuid); err != nil {
+	if _, err := o.Store.DB().Exec("INSERT INTO context (title, tid, uuid) VALUES ('my context', 2, ?);", uuid); err != nil {
 		t.Fatal(err)
 	}
 
 	o.ex(t, "set context my context")
 	var got string
-	if err := o.Database.MainDB.QueryRow("SELECT context_uuid FROM task WHERE id=?;", ids[0]).Scan(&got); err != nil {
+	if err := o.Store.DB().QueryRow("SELECT context_uuid FROM task WHERE id=?;", ids[0]).Scan(&got); err != nil {
 		t.Fatal(err)
 	}
 	if got != uuid {
@@ -301,5 +301,88 @@ func TestOrganizerHelp(t *testing.T) {
 	o.ex(t, "help find")
 	if o.mode != HELP || o.command_line != "" {
 		t.Errorf("after :help find the mode is %v and the command line %q", o.mode, o.command_line)
+	}
+}
+
+// :w gives a new row the id of the note it became. It worked on a copy of
+// the row, so the list kept id -1: the note could not be opened (":e" asked
+// for the title to be saved first), and the next change to its title was
+// written as a second note.
+func TestWriteGivesANewRowItsNote(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha")
+	count := func() (n int) {
+		t.Helper()
+		if err := o.Store.DB().QueryRow("SELECT count(*) FROM task;").Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	o.rows = append([]Row{{id: -1, title: "brand new", dirty: true}}, o.rows...)
+	o.readRowsIntoBuffer()
+
+	o.ex(t, "w")
+	id := o.rows[0].id
+	if id == -1 || o.rows[0].dirty || count() != 2 {
+		t.Fatalf("after :w the new row has id %d (dirty %v) and there are %d notes", id, o.rows[0].dirty, count())
+	}
+	if title, err := o.Store.Title(id); err != nil || title != "brand new" {
+		t.Errorf("note %d is titled %q (%v)", id, title, err)
+	}
+	if context, folder := o.contextOf(id), o.folderOf(id); context != "none" || folder != "none" {
+		t.Errorf("the new note is in %q / %q; the list is of folder none", context, folder)
+	}
+
+	// changing the title again renames that note
+	o.rows[0].title, o.rows[0].dirty = "renamed", true
+	o.ex(t, "w")
+	if title, _ := o.Store.Title(id); title != "renamed" || count() != 2 || o.rows[0].id != id {
+		t.Errorf("after a second :w: note %d is %q, %d notes, the row's id %d", id, title, count(), o.rows[0].id)
+	}
+}
+
+// A new note goes in the context or folder the list is of.
+func TestNewNoteGoesWhereTheListIs(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha")
+	if _, err := o.Store.AddContainer(store.Context, "work", false); err != nil {
+		t.Fatal(err)
+	}
+	o.ex(t, "opencontext work")
+	o.rows = []Row{{id: -1, title: "at work", dirty: true}}
+	o.readRowsIntoBuffer()
+	o.ex(t, "w")
+	if id := o.rows[0].id; id == -1 || o.contextOf(id) != "work" || o.folderOf(id) != "none" {
+		t.Errorf("the new note (id %d) is in %q / %q, want work / none", id, o.contextOf(id), o.folderOf(id))
+	}
+}
+
+// :newc and :newf (and Ctrl-C, Ctrl-F) list the contexts or folders by
+// number, in order, and wait for one.
+func TestPickingAContainer(t *testing.T) {
+	o, ids := newDBOrganizer(t, "alpha")
+	for _, title := range []string{"zebra", "apple"} {
+		if _, err := o.Store.AddContainer(store.Context, title, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, pick := range map[string]func(){
+		":newc":  func() { o.ex(t, "newc") },
+		"Ctrl-C": func() { captureStdout(t, func() { o.organizerProcessKey(ctrlKey('c')) }) },
+	} {
+		o.mode = NORMAL
+		pick()
+		if o.mode != CONTAINER || o.altView != CONTEXT || strings.Join(o.containerList, " ") != "apple none zebra" {
+			t.Errorf("%s: mode %v, picking a %v from %v", name, o.mode, o.altView, o.containerList)
+		}
+		captureStdout(t, func() { o.organizerProcessKey('\x1b') })
+	}
+
+	// and picking one moves the current entry there
+	o.ex(t, "newc")
+	captureStdout(t, func() {
+		o.organizerProcessKey('3') // zebra
+		o.organizerProcessKey('\r')
+	})
+	if got := o.contextOf(ids[0]); got != "zebra" {
+		t.Errorf("after picking 3 the note's context is %q, want zebra", got)
 	}
 }

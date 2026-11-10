@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"errors"
 	"net/url"
 	"strconv"
@@ -13,6 +12,8 @@ import (
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
+
+	"github.com/slzatz/vimango/internal/store"
 )
 
 // Wiki-style cross references, in exactly two forms:
@@ -149,7 +150,7 @@ const wikiLinkScheme = "vimango://note/"
 const wikiLinkTIDScheme = "vimango://tid/"
 
 // titleForTID resolves a tid reference to the note's current title. It
-// returns sql.ErrNoRows when there is no such live note -- the reference
+// returns store.ErrNotFound when there is no such live note -- the reference
 // is then marked missing -- and any other error when it could not tell,
 // in which case nothing is claimed either way.
 type titleForTID func(tid int64) (string, error)
@@ -158,15 +159,10 @@ type titleForTID func(tid int64) (string, error)
 // there is none (tests, or a render before InitDatabases). A nil resolver
 // shows "tid:N" and never marks a reference missing.
 func dbTitleForTID() titleForTID {
-	if app == nil || app.Database == nil || app.Database.MainDB == nil {
+	if app == nil || app.Store == nil {
 		return nil
 	}
-	db := app.Database.MainDB
-	return func(tid int64) (string, error) {
-		var title string
-		err := db.QueryRow("SELECT title FROM task WHERE tid=? AND deleted=0;", tid).Scan(&title)
-		return title, err
-	}
+	return app.Store.TitleForTID
 }
 
 type wikiLinkRenderer struct {
@@ -225,7 +221,7 @@ func (r wikiLinkRenderer) renderTID(w util.BufWriter, n *wikiLinkNode) {
 		switch {
 		case err == nil && title != "":
 			label = []byte(title)
-		case errors.Is(err, sql.ErrNoRows):
+		case errors.Is(err, store.ErrNotFound):
 			missing = true
 		}
 	}

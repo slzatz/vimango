@@ -1,6 +1,6 @@
 # Vimango Database Schema
 
-This document describes the schema of a machine's vimango SQLite database. The definitions in code are `sqliteSchema` in `init.go` (what `--init` creates) and `internal/localdb` (the search index, and write-ahead-log mode); databases older than a given column were brought up to date by migrations, so column order and some constraints differ between machines.
+This document describes the schema of a machine's vimango SQLite database. The definitions in code are `Schema` in `internal/localdb/create.go` (what `--init` creates) and `internal/localdb` (the search index, and write-ahead-log mode); databases older than a given column were brought up to date by migrations, so column order and some constraints differ between machines.
 
 ## Database Files
 
@@ -42,7 +42,7 @@ CREATE INDEX task_taskwarrior_uuid_idx ON task (taskwarrior_uuid)
     WHERE taskwarrior_uuid IS NOT NULL AND deleted = false;
 ```
 
-This is `sqliteSchema` in `init.go`. Older databases get `server_modified`,
+This is `Schema` in `internal/localdb/create.go`. Older databases get `server_modified`,
 `taskwarrior_uuid` and the index added by `ensureSyncColumns` in
 `internal/sync` on their first sync.
 
@@ -274,7 +274,7 @@ These serve as default containers when no specific context or folder is assigned
 ## Schema Initialization
 
 The schemas in code:
-- `init.go` (`sqliteSchema`, `runInit`) - what `vimango --init` creates
+- `internal/localdb/create.go` (`Schema`, `Create`) - what `vimango --init` creates
 - `internal/localdb` - what every start then ensures: write-ahead-log mode, and the `task_fts` index with its triggers
 - `schema/postgres.sql` - the PostgreSQL server schema; the sync integration tests build their databases from it
 

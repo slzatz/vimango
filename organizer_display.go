@@ -17,6 +17,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/mattn/go-runewidth"
+
 	"github.com/slzatz/vimango/auth"
 )
 
@@ -419,16 +420,16 @@ func (o *Organizer) drawStatusBar() {
 			case BY_FIND:
 				str = "search - " + o.Session.fts_search_terms
 			case BY_FOLDER:
-				//str = fmt.Sprintf("%s[f] (%s[c])", o.filter, o.Database.taskContext(id))
+				//str = fmt.Sprintf("%s[f] (%s[c])", o.filter, o.contextOf(id))
 				//folder could have been changed so show task's folder
-				str = fmt.Sprintf("%s[f] (%s[c])", o.Database.taskFolder(id), o.Database.taskContext(id))
+				str = fmt.Sprintf("%s[f] (%s[c])", o.folderOf(id), o.contextOf(id))
 			case BY_CONTEXT:
-				//str = fmt.Sprintf("%s[c] (%s[f])", o.filter, o.Database.taskFolder(id))
+				//str = fmt.Sprintf("%s[c] (%s[f])", o.filter, o.folderOf(id))
 				//context could have been changed so show task's context
-				str = fmt.Sprintf("%s[c] (%s[f])", o.Database.taskContext(id), o.Database.taskFolder(id))
+				str = fmt.Sprintf("%s[c] (%s[f])", o.contextOf(id), o.folderOf(id))
 			case BY_RECENT:
 				str = fmt.Sprintf("Recent: %s[c] %s[f]",
-					o.Database.taskContext(id), o.Database.taskFolder(id))
+					o.contextOf(id), o.folderOf(id))
 			case BY_KEYWORD:
 				str = o.filter + "[k]"
 			}
@@ -456,7 +457,7 @@ func (o *Organizer) drawStatusBar() {
 		id = row.id
 
 		if o.view == TASK {
-			keywords = o.Database.getTaskKeywords(row.id)
+			keywords = o.keywordsOf(row.id)
 		}
 	} else {
 		title = "   No Results   "
@@ -563,9 +564,9 @@ func (o *Organizer) displayNote() {
 	id := o.rows[o.fr].id
 	var note string
 	if o.taskview != BY_FIND {
-		note = o.Database.readNoteIntoString(id)
+		note = o.noteText(id)
 	} else {
-		note = o.Database.highlightTerms2(id)
+		note = o.markedNoteText(id)
 	}
 	o.Screen.eraseRightScreen()
 

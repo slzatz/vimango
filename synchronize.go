@@ -15,7 +15,7 @@ import (
 // Synchronize synchronizes data between local and remote databases.
 // reportOnly: if true, only reports changes without applying them.
 func (a *App) Synchronize(reportOnly bool) string {
-	if a.Database.PG == nil {
+	if a.PG == nil {
 		return "### Remote sync not available\n\nPostgreSQL is not configured. To enable sync, edit config.json and add your PostgreSQL connection details in the \"postgres\" section."
 	}
 
@@ -27,7 +27,7 @@ func (a *App) Synchronize(reportOnly bool) string {
 	// can start offline); verify the server is reachable before starting.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := a.Database.PG.PingContext(ctx); err != nil {
+	if err := a.PG.PingContext(ctx); err != nil {
 		msg := fmt.Sprintf("### Remote sync unavailable\n\nCould not reach the PostgreSQL server at %s: %v\n\nCheck your network connection. Local changes are safe and will sync once the server is reachable.", a.Config.Postgres.Host, err)
 		if note := sync.EnvOverrideNote(); note != "" {
 			msg += "\n\n" + note
@@ -39,8 +39,8 @@ func (a *App) Synchronize(reportOnly bool) string {
 	defer func() { a.SyncInProcess = false }()
 
 	syncer := sync.New(
-		a.Database.MainDB,
-		a.Database.PG,
+		a.Store.DB(),
+		a.PG,
 		a.Config.Postgres.Host,
 		a.Config.Postgres.DB,
 	)

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -192,7 +194,7 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 // stays modified so nothing treats it as safe to discard.
 func (e *Editor) save() error {
 	text := e.bufferToString()
-	if err := e.Database.updateNote(e.id, text); err != nil {
+	if err := e.Store.SetNote(e.id, text); err != nil {
 		return err
 	}
 	e.dbText = text
@@ -296,12 +298,17 @@ func (e *Editor) closeNote(save, force bool) {
 }
 
 func (e *Editor) checkStale() {
-	if !e.Database.entryExists(e.id) {
+	title, dbText, err := e.Store.TitleAndNote(e.id)
+	if errors.Is(err, store.ErrNotFound) {
 		e.ShowMessage(BR, "Note %d was deleted elsewhere — :w will not bring it back", e.id)
 		return
 	}
-
-	dbText := e.Database.readNoteIntoString(e.id)
+	if err != nil {
+		// Not knowing is not the same as "it changed": a clean buffer is
+		// reloaded with what was read, and nothing was.
+		e.ShowMessage(BR, "Could not check note %d against the database: %v", e.id, err)
+		return
+	}
 	if dbText == e.dbText {
 		// Silence is the point: this runs after every sync, and most
 		// syncs don't touch the note you happen to have open.
@@ -317,7 +324,7 @@ func (e *Editor) checkStale() {
 	}
 
 	e.dbText = dbText
-	e.title = e.Database.getTitle(e.id)
+	e.title = title
 	e.ss = strings.Split(dbText, "\n")
 	if len(e.ss) == 0 {
 		e.ss = []string{""}

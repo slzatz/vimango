@@ -290,3 +290,27 @@ repositories:
     lines in `InitDatabases` and `Synchronize`, and a state the installation
     guides and vimango_hybrid's README describe as supported (sync reports
     itself unavailable and everything else works; keywords are the gap).
+- **The structural split, begun: `internal/store`.** The database layer was
+  `dbfunc.go`, thirty methods on a `Database` type in `package main`, fifteen
+  of which reported an error by calling `app.Organizer.ShowMessage` and then
+  returning an empty answer, so nothing could use the database without an
+  organizer and a terminal, and a caller could not tell "no text" from "could
+  not read". It is now `internal/store`: every method returns data or an
+  error and shows nothing, with types of its own (`Entry`, `Info`,
+  `Container`), and `organizer_store.go` is where the organizer turns its
+  answers into rows and messages. The schema and database creation moved from
+  `init.go` to `internal/localdb` (`Schema`, `Create`). Done first, as
+  warm-ups (`ca88e02`): one `setRows` for the eight places that changed the
+  organizer's list, and a flat `helpFor` in place of a six-deep `help()`.
+  Four near-identical "pick a container" functions became one.
+
+  Bugs it brought out, each now with a test:
+  - `:w` in the organizer worked on a copy of each row, so a new row kept
+    id -1 in the list after its note was written: `:e` asked for the title to
+    be saved first, and the next change to the title was written as a
+    *second* note.
+  - `:checkstale` could blank a clean buffer. A read that failed came back as
+    empty text, which is "the row changed", and a clean buffer is reloaded
+    with what was read. It now says it could not check and touches nothing.
+  - A new note's context and folder were worked out in two places; one
+    function now.

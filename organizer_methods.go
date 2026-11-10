@@ -83,44 +83,25 @@ func (o *Organizer) writeTitle() {
 
 	if o.view == TASK {
 		if row.id != -1 {
-			err := o.Database.updateTitle(row)
+			err := o.Store.SetTitle(row.id, row.title)
 			if err != nil {
 				o.ShowMessage(BL, "Error updating title: id %d: %v", row.id, err)
 			} else {
 				o.ShowMessage(BL, "Updated title for id: %d", row.id)
 			}
 			if o.taskview == BY_FIND {
-				// the list shows the highlighted title; plain if the new
-				// title no longer matches the search
-				if err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row); err != nil {
-					row.ftsTitle = row.title
-				}
+				o.refreshMarkedTitle(row)
 			}
 		} else {
-			var context_uuid, folder_uuid string
-			switch o.taskview {
-			case BY_CONTEXT:
-				context_uuid, _ = o.Database.contextExists(o.filter)
-				folder_uuid = DefaultFolderUUID
-			case BY_FOLDER:
-				folder_uuid, _ = o.Database.folderExists(o.filter)
-				context_uuid = DefaultContextUUID
-			default:
-				context_uuid = DefaultContextUUID
-				folder_uuid = DefaultFolderUUID
-			}
-			err := o.Database.insertTitle(row, context_uuid, folder_uuid)
+			contextUUID, folderUUID := o.newEntryContainers()
+			err := o.addEntry(row, contextUUID, folderUUID)
 			if err != nil {
 				o.ShowMessage(BL, "Error inserting new title id %d: %v", row.id, err)
 			} else {
 				o.ShowMessage(BL, "New (new) title written to db with id: %d", row.id)
 			}
 			if o.taskview == BY_FIND {
-				// the list shows the highlighted title; plain if the new
-				// title no longer matches the search
-				if err := o.Database.updateFtsTitle(o.Session.fts_search_terms, row); err != nil {
-					row.ftsTitle = row.title
-				}
+				o.refreshMarkedTitle(row)
 			}
 		}
 	} else {
@@ -128,7 +109,7 @@ func (o *Organizer) writeTitle() {
 			o.ShowMessage(BL, "Row has not been changed")
 			return
 		}
-		err := o.Database.updateContainerTitle(row, o.view)
+		err := o.saveContainerTitle(row)
 		if err != nil {
 			msg = fmt.Sprintf("Error inserting into DB: %v", err)
 		} else {

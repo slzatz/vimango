@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/mattn/go-runewidth"
-	"maps"
-	"slices"
-	"sort"
 	"strings"
+
+	"github.com/mattn/go-runewidth"
+
+	"github.com/slzatz/vimango/internal/store"
 	//	"github.com/charmbracelet/glamour"
 )
 
@@ -118,7 +118,7 @@ func (o *Organizer) mark() {
 func (o *Organizer) del() {
 	id := o.rows[o.fr].id
 	state := o.rows[o.fr].deleted
-	err := o.Database.toggleDeleted(id, state, o.view.String())
+	err := o.Store.SetDeleted(o.view.kind(), id, !state)
 	if err != nil {
 		o.ShowMessage(BL, "Error toggling %s id %d to deleted: %v", o.view, id, err)
 		return
@@ -130,7 +130,7 @@ func (o *Organizer) del() {
 func (o *Organizer) star() {
 	id := o.rows[o.fr].id
 	state := o.rows[o.fr].star
-	err := o.Database.toggleStar(id, state, o.view.String())
+	err := o.Store.SetStar(o.view.kind(), id, !state)
 	if err != nil {
 		o.showMessage("Error toggling %s id %d to star: %v", o.view, id, err)
 		return
@@ -142,7 +142,7 @@ func (o *Organizer) star() {
 func (o *Organizer) archive() {
 	id := o.rows[o.fr].id
 	state := o.rows[o.fr].archived
-	err := o.Database.toggleArchived(id, state, o.view.String())
+	err := o.Store.SetArchived(id, !state)
 	if err != nil {
 		o.ShowMessage(BL, "Error toggling %s id %d to archived: %v", o.view, id, err)
 		return
@@ -155,7 +155,11 @@ func (o *Organizer) info() {
 	if o.view != TASK {
 		return
 	}
-	e := o.Database.getEntryInfo(o.getId())
+	e, err := o.Store.Info(o.getId())
+	if err != nil {
+		o.ShowMessage(BL, "Error in getEntryInfo for id %d: %v", o.getId(), err)
+		return
+	}
 	info := o.displayEntryInfo(&e)
 	o.drawNotice(info)
 	o.altRowoff = 0
@@ -282,14 +286,14 @@ func (o *Organizer) scrollNoticeUp() {
 	}
 }
 
-func (o *Organizer) displayEntryInfo(e *NewEntry) string {
+func (o *Organizer) displayEntryInfo(e *store.Info) string {
 	width := o.Screen.totaleditorcols - 10
 	var ab strings.Builder
 
-	fmt.Fprintf(&ab, "id: %d%s", e.id, "\n")
-	fmt.Fprintf(&ab, "tid: %d%s", e.tid, "\n")
+	fmt.Fprintf(&ab, "id: %d%s", e.ID, "\n")
+	fmt.Fprintf(&ab, "tid: %d%s", e.TID, "\n")
 
-	title := fmt.Sprintf("title: %s", e.title)
+	title := fmt.Sprintf("title: %s", e.Title)
 	if runewidth.StringWidth(title) > width {
 		title, _ = clipColumns(title, 0, width-3)
 		title += "..."
@@ -297,87 +301,52 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) string {
 	fmt.Fprintf(&ab, "%s%s", title, "\n")
 
 	// Use taskContext/taskFolder which join on uuid
-	context := o.Database.taskContext(e.id)
+	context := o.contextOf(e.ID)
 	fmt.Fprintf(&ab, "**context**: %s%s", context, "\n")
 
-	folder := o.Database.taskFolder(e.id)
+	folder := o.folderOf(e.ID)
 	fmt.Fprintf(&ab, "folder: %s%s", folder, "\n")
 
-	fmt.Fprintf(&ab, "star: %t%s", e.star, "\n")
-	fmt.Fprintf(&ab, "deleted: %t%s", e.deleted, "\n")
+	fmt.Fprintf(&ab, "star: %t%s", e.Star, "\n")
+	fmt.Fprintf(&ab, "deleted: %t%s", e.Deleted, "\n")
 
-	fmt.Fprintf(&ab, "completed: %t%s", e.archived, "\n")
-	fmt.Fprintf(&ab, "modified: %s%s", e.modified, "\n")
-	fmt.Fprintf(&ab, "added: %s%s", e.added, "\n")
+	fmt.Fprintf(&ab, "completed: %t%s", e.Archived, "\n")
+	fmt.Fprintf(&ab, "modified: %s%s", e.Modified, "\n")
+	fmt.Fprintf(&ab, "added: %s%s", e.Added, "\n")
 
-	fmt.Fprintf(&ab, "keywords: %s%s", app.Database.getTaskKeywords(e.id), "\n")
+	fmt.Fprintf(&ab, "keywords: %s%s", o.keywordsOf(e.ID), "\n")
 
 	return ab.String()
 }
 
 func (o *Organizer) displayContainerInfo() {
 
-	c := o.Database.getContainerInfo(o.rows[o.fr].id, o.view)
-
-	if c.id == 0 {
+	id := o.rows[o.fr].id
+	if id == -1 {
+		return // a row not saved yet
+	}
+	c, err := o.Store.Container(o.view.kind(), id)
+	if err != nil {
+		o.ShowMessage(BL, "Error in getContainerInfo: %v", err)
 		return
 	}
 
 	var ab strings.Builder
 
-	fmt.Fprintf(&ab, "id: %d%s", c.id, "\n")
-	fmt.Fprintf(&ab, "tid: %d%s", c.tid, "\n")
+	fmt.Fprintf(&ab, "id: %d%s", c.ID, "\n")
+	fmt.Fprintf(&ab, "tid: %d%s", c.TID, "\n")
 
-	fmt.Fprintf(&ab, "title: %s%s", c.title, "\n")
-	//title := fmt.Sprintf("**title**: %s", c.title)
+	fmt.Fprintf(&ab, "title: %s%s", c.Title, "\n")
 
-	fmt.Fprintf(&ab, "star: %t%s", c.star, "\n")
-	fmt.Fprintf(&ab, "deleted: %t%s", c.deleted, "\n")
+	fmt.Fprintf(&ab, "star: %t%s", c.Star, "\n")
+	fmt.Fprintf(&ab, "deleted: %t%s", c.Deleted, "\n")
 
-	fmt.Fprintf(&ab, "modified: %s%s", c.modified, "\n")
-	fmt.Fprintf(&ab, "note count: %d%s", c.count, "\n")
+	fmt.Fprintf(&ab, "modified: %s%s", c.Modified, "\n")
+	fmt.Fprintf(&ab, "note count: %d%s", c.Count, "\n")
 
 	o.drawNotice(ab.String())
 }
 
-func (o *Organizer) newContextNormal() {
-	o.altView = CONTEXT
-	o.command = ""
-	o.command_line = ""
-
-	context_map := o.Database.contextList()
-	context_slice := slices.Collect(maps.Keys(context_map))
-	sort.Strings(context_slice)
-	o.containerList = context_slice
-	var sb strings.Builder
-	for i, k := range context_slice {
-		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
-	}
-	//contexts := strings.Join(context_slice, "\n")
-	o.mode = CONTAINER
-	//o.drawNotice(contexts)
-	o.drawNotice(sb.String())
-	o.altRowoff = 0
-	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
-}
-
-func (o *Organizer) newFolderNormal() {
-	o.altView = FOLDER
-	o.command = ""
-	o.command_line = ""
-
-	folder_map := o.Database.folderList()
-	folder_slice := slices.Collect(maps.Keys(folder_map))
-	sort.Strings(folder_slice)
-	o.containerList = folder_slice
-	var sb strings.Builder
-	for i, k := range folder_slice {
-		fmt.Fprint(&sb, fmt.Sprintf("%d. %s\n", i+1, k))
-	}
-	//contexts := strings.Join(context_slice, "\n")
-	o.mode = CONTAINER
-	//o.drawNotice(contexts)
-	o.drawNotice(sb.String())
-	o.altRowoff = 0
-	//o.command_line = "" // needed because not going into normal mode right away where it is cleared on typing ":"
-}
+// Ctrl-C and Ctrl-F: pick a context or folder for the current entry.
+func (o *Organizer) newContextNormal() { o.pickContainer(CONTEXT) }
+func (o *Organizer) newFolderNormal()  { o.pickContainer(FOLDER) }
