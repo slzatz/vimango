@@ -17,6 +17,7 @@ var validFlags = map[string]bool{
 	"--open":        true, // takes a value: --open <id>; requires --editor
 	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
 	"--gdrive-auth": true, // sign in to Google Drive (create/refresh token.json) and exit
+	"--migrate":     true, // bring this machine's vimango.db up to date, report, and exit
 	"--wiki-links":  true, // with --render-html: emit [[refs]] as clickable anchors
 	"--title":       true, // with --render-html: put the note's title at the top as an <h1>
 }
@@ -128,6 +129,12 @@ OPTIONS:
         With --render-html, put the note's title at the top of the page
         as a heading. Off by default: a host pane shows the title in its
         own header. For exports (a PDF has nothing else to name it).
+
+    --migrate
+        Bring this machine's vimango.db up to date with the way this build
+        stores it, report what changed, and exit. Every start does the same
+        quietly, so this is optional; use it to see the result. Safe to run
+        again.
 
     --gdrive-auth
         Sign in to Google Drive and exit: runs the OAuth flow (prints a

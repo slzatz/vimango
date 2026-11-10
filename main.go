@@ -35,6 +35,11 @@ func main() {
 		os.Exit(RunRenderHTML(id, DetermineWikiLinks(os.Args), DetermineTitle(os.Args)))
 	}
 
+	// --migrate: bring vimango.db up to date, report, and exit (migrate.go)
+	if CheckForMigrate(os.Args) {
+		os.Exit(RunMigrate())
+	}
+
 	// --gdrive-auth: sign in to Google Drive (create/refresh token.json)
 	// and exit. No terminal UI.
 	if CheckForGDriveAuth(os.Args) {

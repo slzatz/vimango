@@ -8,8 +8,10 @@ preferences.json
 # Runtime state, rewritten on every quit (saveRegisters)
 registers.json
 
-# Database files
+# Database files, and the write-ahead log beside an open one
 *.db
+*.db-wal
+*.db-shm
 
 # Backup and test files
 *.bak

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/slzatz/vimango/internal/localdb"
 )
 
 // Default UUIDs for the "none" containers
@@ -238,6 +239,11 @@ func runInit() {
 	}
 	if _, err := mainDB.Exec("INSERT INTO sync (machine) VALUES ('client');"); err != nil {
 		fmt.Printf("Error inserting sync record: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err := localdb.Migrate(mainDB); err != nil {
+		fmt.Printf("Error preparing vimango.db: %v\n", err)
 		os.Exit(1)
 	}
 

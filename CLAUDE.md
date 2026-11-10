@@ -126,6 +126,7 @@ NOTE: Generally we have not been running tests but have tested key functionality
 - `--editor`: Boot directly into editor-only mode (no organizer). Sets an immutable `editorOnly` session flag that blocks all editor→organizer handoffs. Used by host apps (vimango_hybrid) that provide their own native organizer. One note per process, chosen by `--open <id>` at boot: there is no ex command to switch notes (the `:open <id>` the host once injected was removed 2026-11-07, once every host editor became a one-session cold spawn). The host drives the editor over the pty with ex commands such as `:checkstale`, `:q` and `:x`. **A process exit after `:q` or `:x` is the host's only "saved" signal**, so the editor must close only when the buffer's text is in the database (or on `:q!`): `:x` writes a modified buffer and stays open, buffer still modified, if the write fails — a database error, or an `UPDATE` that matched no row because the note was deleted underneath (`quitActions`, `Editor.save`, `updateNote`; tests in `editor_save_test.go`). A failure to update only the search index (`errSearchIndex`) counts as saved. Until 2026-11-10 `:x` reported a failed write and quit anyway.
 - `--open <id>`: With `--editor`, open note `<id>` at boot (avoids racing pty injection against startup)
 - `--render-html <id>`: Headless: render note `<id>` as a standalone HTML document on stdout and exit. No terminal probes, no vim, no raw mode — safe to spawn with stdout piped (drives vimango_hybrid's preview pane). Google Drive images are inlined as data URIs via vimango's own auth/cache when configured; otherwise image markdown passes through untouched.
+- `--migrate`: Bring this machine's `vimango.db` up to date with how this build stores it, print what changed, and exit. Optional — every start does the same quietly; see "Local database migrations".
 - Spell check: vim's own, via libvim — `:spell` toggles it; see "Spell Checking"
 
 ### Host App Integration (vimango_hybrid)
@@ -165,6 +166,12 @@ The application supports standard `--help` and `-h` flags to display comprehensi
 - The application supports full-text search using the `fts5` extension of SQLite.
 - The application uses a terminal-based user interface for interaction.
 - The application spell checks with vim's own engine; see "Spell Checking".
+
+## Local database migrations
+`vimango.db` is local to each machine — sync carries rows, not the file — so a change to how it is stored has to happen once per machine. `internal/localdb.Migrate` is where such changes go. Each step checks the database's actual state and does nothing if it is already there, so it runs quietly at every start of vimango (`InitDatabases`: the TUI, `--editor`, `--render-html`) and of `vimango-sync` (not `--probe`, which writes nothing), and `--init` runs it on a new database. `./vimango --migrate` runs it by hand and reports. A step that cannot be done because another process is mid-transaction returns an error and leaves nothing half-done; startup ignores that and the next start retries. Tests: `internal/localdb/localdb_test.go`.
+
+Steps so far:
+- **Write-ahead logging (2026-11-10).** `PRAGMA journal_mode=WAL`, recorded in the file, so every program that opens it — including vimango_hybrid's GRDB connection, which needs no change — uses it from then on. In the default rollback-journal mode a reader blocked the writer's commit and a committing writer blocked readers, so a sync and a preview render waited on each other; in WAL readers see a snapshot and neither blocks the other. Writers still take turns, so the busy timeout still matters. While the database is open there are two more files beside it, `vimango.db-wal` and `vimango.db-shm` (gitignored): recent commits live in the `-wal` file until a checkpoint, so **never back up or copy `vimango.db` with `cp`** — use `sqlite3 vimango.db ".backup copy.db"`.
 
 ## Spell Checking
 Spell checking is vim's, from libvim (restored in the slzatz/libvim fork; see its CLAUDE.md for the C API). libvim finds the misspellings; vimango only draws them and shows the suggestion list. Code: `spellcheck.go`; bindings: `vim/spell.go`, `spell_callback.go`.

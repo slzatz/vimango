@@ -27,6 +27,7 @@ import (
 
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/slzatz/vimango/internal/localdb"
 	syncpkg "github.com/slzatz/vimango/internal/sync"
 )
 
@@ -73,6 +74,14 @@ func main() {
 	defer mainDB.Close()
 	if _, err := mainDB.Exec("PRAGMA foreign_keys=ON;"); err != nil {
 		fatal("enabling foreign keys on main db: %v", err)
+	}
+
+	// Keep the database current with how this build stores it (see
+	// internal/localdb): hybrid can start a sync before any vimango process
+	// has run. Not in a probe, which writes nothing; and a failure here --
+	// another process mid-write -- is not a reason to skip the sync.
+	if !*probe {
+		_, _ = localdb.Migrate(mainDB)
 	}
 
 	// The probe never touches FTS — don't even open it.

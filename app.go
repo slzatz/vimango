@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/slzatz/vimango/internal/localdb"
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
@@ -276,6 +277,10 @@ func (a *App) InitDatabases(configPath string) error {
 	if err != nil {
 		return err
 	}
+	// Bring the database up to date with how this build stores it. Quiet,
+	// and a failure is not fatal: it means another process was mid-write,
+	// and the next start does it. `vimango --migrate` reports.
+	_, _ = localdb.Migrate(a.Database.MainDB)
 	// Initialize FTS database
 	a.Database.FtsDB, err = sql.Open("sqlite3", config.Sqlite3.FTS_DB)
 	if err != nil {
