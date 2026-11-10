@@ -22,8 +22,8 @@ import (
 // formatters emit only those, so no style XML can ask for strikethrough --
 // which is why GenericDeleted in gruvbox_mod.xml used to fake it with a red
 // background. ghostty draws SGR 9 natively (its terminfo advertises
-// smxx=\E[9m, rmxx=\E[29m), and ghostty is what runs the plain terminal,
-// vimango_ghostty, and the hybrid app's embedded surface.
+// smxx=\E[9m, rmxx=\E[29m), and ghostty is what runs the plain terminal
+// and the hybrid app's embedded surface.
 const MDFormatter = "terminal16m-md"
 
 const (
