@@ -10,23 +10,6 @@ import (
 // U+10EEEE in UTF-8: F4 8E BB BE
 var kittyPlaceholderRune = string(rune(0x10EEEE))
 
-const (
-	kittyZeroDiacritic = "\u0305" // row/col = 0
-)
-
-// kittyImageTxOptions controls a kitty graphics transmission.
-type kittyImageTxOptions struct {
-	ImageID          uint32
-	PlacementID      uint32
-	Cols             int
-	Rows             int
-	Quiet            bool
-	VirtualPlacement bool // set U=1 to create a virtual placement during transmit
-	ZIndex           int
-}
-
-var kittyImageCounter uint32 = 100 // fallback counter if cache not available
-
 // buildPlaceholderGrid emits a rows x cols block of placeholder cells with explicit row/col diacritics.
 func buildPlaceholderGrid(imgID, placementID uint32, cols, rows int) string {
 	var b strings.Builder

@@ -37,17 +37,15 @@ var (
 	currentRenderImageDims = make(map[uint32]struct{ cols, rows int })
 	currentRenderImageMux  sync.RWMutex
 	// Track which image IDs have been transmitted in this process (kitty session)
-	kittySessionImageMux   sync.RWMutex
-	kittySessionImages     = make(map[uint32]kittySessionEntry) // imageID -> metadata
-	seededKittyCache       bool
-	trustKittyCache        bool
-	kittyPurgeBeforeRender bool
-	kittyClearedOnStart    bool
-	kittyIDMap                    = make(map[string]uint32) // url -> small kitty ID
-	kittyIDReverse                = make(map[uint32]string)
-	kittyIDNext            uint32 = 1
-	kittyImagesSent        uint64
-	kittyBytesSent         uint64
+	kittySessionImageMux sync.RWMutex
+	kittySessionImages   = make(map[uint32]kittySessionEntry) // imageID -> metadata
+	seededKittyCache     bool
+	trustKittyCache      bool
+	kittyIDMap                  = make(map[string]uint32) // url -> small kitty ID
+	kittyIDReverse              = make(map[uint32]string)
+	kittyIDNext          uint32 = 1
+	kittyImagesSent      uint64
+	kittyBytesSent       uint64
 )
 
 type kittySessionEntry struct {
@@ -86,9 +84,6 @@ type preparedImage struct {
 }
 
 var (
-	// Track if transparent placeholder has been transmitted
-	transparentPlaceholderTransmitted = false
-
 	// Ordered list of image IDs for this render (to give deterministic lookups)
 	currentRenderImageOrder []uint32
 	currentRenderOrderIdx   int
@@ -98,14 +93,6 @@ var (
 
 	// Regex to extract markdown images
 	markdownImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
-
-	// Diacritic table for encoding row/column positions in kitty placeholders
-	kittyDiacritics = []rune{
-		'\u0305', '\u030D', '\u030E', '\u0310', '\u0312', '\u033D', '\u033E', '\u033F',
-		'\u0346', '\u034A', '\u034B', '\u034C', '\u0350', '\u0351', '\u0352', '\u0357',
-		'\u035B', '\u0363', '\u0364', '\u0365', '\u0366', '\u0367', '\u0368', '\u0369',
-		'\u036A', '\u036B', '\u036C', '\u036D', '\u036E', '\u036F', '\u0483', '\u0484',
-	}
 )
 
 func (o *Organizer) sortColumnStart() int {

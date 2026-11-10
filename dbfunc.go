@@ -144,36 +144,6 @@ func (db *Database) updateNote(id int, text string) error {
 	return nil
 }
 
-func (db *Database) getSyncItems(sort string, max int) []Row {
-	rows, err := db.MainDB.Query(fmt.Sprintf("SELECT id, title, %s FROM sync_log ORDER BY %s DESC LIMIT %d", sort, sort, max))
-	if err != nil {
-		app.Organizer.ShowMessage(BL, "Error in getSyncItems: %v", err)
-		return []Row{}
-	}
-
-	defer rows.Close()
-
-	//org.rows = nil
-	var orgRows []Row
-	for rows.Next() {
-		var row Row
-		var sort string
-
-		err = rows.Scan(&row.id, &row.title, &sort)
-
-		if err != nil {
-			app.Organizer.ShowMessage(BL, "Error in getSyncItems: %v", err)
-			return []Row{}
-		}
-
-		row.sort = timeDelta(sort)
-		orgRows = append(orgRows, row)
-		//org.rows = append(org.rows, row)
-
-	}
-	return orgRows
-}
-
 func (db *Database) filterEntries(taskView int, filter interface{}, showDeleted bool, sort string, sortPriority bool, max int) ([]Row, error) {
 
 	s := fmt.Sprintf("SELECT task.id, task.title, task.star, task.deleted, task.archived, task.note, task.%s FROM task ", sort)
@@ -280,15 +250,6 @@ func (db *Database) insertTitle(row *Row, context_uuid, folder_uuid string) erro
 	row.id = id
 	row.dirty = false
 
-	/**** note if we are inserting a new entry that there is nothing in the fts table to update
-	/***************fts virtual table update*********************
-	entry_tid := db.entryTidFromId(id)
-
-	_, err = db.FtsDB.Exec("UPDATE fts SET title=? WHERE tid=?;", row.title, entry_tid)
-	if err != nil {
-		return err
-	}
-	*/
 	return nil
 }
 
@@ -356,18 +317,6 @@ func (db *Database) taskContext(id int) string {
 	return title
 }
 
-/*
-func getContextTid(id int) int {
-	row := db.QueryRow("SELECT context_tid FROM task WHERE id=?;", id)
-	var tid int
-	err := row.Scan(&tid)
-	if err != nil {
-		return -1
-	}
-	return tid
-}
-*/
-// not currently in use
 func (db *Database) entryExists(id int) bool {
 	var exists bool
 	err := db.MainDB.QueryRow("SELECT EXISTS(SELECT 1 FROM task WHERE id=?);", id).Scan(&exists)
@@ -412,30 +361,6 @@ func (db *Database) getTaskKeywords(id int) string {
 	return strings.Join(kk, ",")
 }
 
-/*
-	Doesn't appear to be used
-
-func getTaskKeywordTids(id int) []int {
-
-		entry_tid := entryTidFromId(id) /////////////////////////////////////////////////////
-
-		keyword_tids := []int{}
-		rows, err := db.Query("SELECT keyword_tid FROM task_keyword LEFT OUTER JOIN keyword ON "+
-			"keyword.tid=task_keyword.keyword_tid WHERE task_keyword.task_tid=?;", entry_tid)
-		if err != nil {
-			sess.showOrgMessage("Error in getTaskKeywordIds for entry id %d: %v", id, err)
-			return keyword_tids
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var tid int
-			err = rows.Scan(&tid)
-			keyword_tids = append(keyword_tids, tid)
-		}
-		return keyword_tids
-	}
-*/
 func (db *Database) updateFtsTitle(st string, row *Row) error {
 	tid := db.entryTidFromId(row.id)
 	r := db.FtsDB.QueryRow("SELECT highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') FROM fts WHERE fts MATCH ? and tid=?;", st, tid)
@@ -448,7 +373,7 @@ func (db *Database) updateFtsTitle(st string, row *Row) error {
 	return nil
 }
 
-func (db *Database) searchEntries(st, sort string, showDeleted, help bool) ([]Row, error) {
+func (db *Database) searchEntries(st, sort string, showDeleted bool) ([]Row, error) {
 	rows, err := db.FtsDB.Query("SELECT tid, highlight(fts, 0, '\x1b[48;5;31m', '\x1b[49m') "+
 		"FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 2.0, 1.0, 5.0);", st)
 	if err != nil {
@@ -481,11 +406,7 @@ func (db *Database) searchEntries(st, sort string, showDeleted, help bool) ([]Ro
 
 	// As noted above, if the item is deleted (gone) from the db it's id will not be found if it's still in fts
 	stmt := fmt.Sprintf("SELECT task.id, task.tid, task.title, task.star, task.deleted, task.archived, task.note, task.%s FROM task WHERE ", sort)
-	if help {
-		stmt += "task.context_tid = 16 and task.tid IN ("
-	} else {
-		stmt += "task.tid IN ("
-	}
+	stmt += "task.tid IN ("
 
 	max := len(ftsTids) - 1
 	for i := 0; i < max; i++ {
@@ -568,19 +489,6 @@ func (db *Database) getContainers(view View) []Row {
 }
 
 func (db *Database) getContainerInfo(id int, view View) Container {
-
-	/*
-		type Container struct {
-			id       int
-			tid      int
-			title    string
-			star     bool
-			created  string
-			deleted  bool
-			modified string
-			count    int
-		}
-	*/
 
 	if id == -1 {
 		return Container{}
@@ -673,39 +581,6 @@ func (db *Database) addTaskKeywordByUUID(keyword_uuid string, entry_id int, upda
 	}
 	return nil
 }
-
-/*
-// not in use but worked
-func getNoteSearchPositions__(id int) [][]int {
-	row := fts_db.QueryRow("SELECT rowid FROM fts WHERE lm_id=?;", id)
-	var rowid int
-	err := row.Scan(&rowid)
-	if err != nil {
-		return [][]int{}
-	}
-	var word_positions [][]int
-	for i, term := range strings.Split(app.Session.fts_search_terms, " ") {
-		word_positions = append(word_positions, []int{})
-		rows, err := fts_db.Query("SELECT offset FROM fts_v WHERE doc=? AND term=? AND col='note';", rowid, term)
-		if err != nil {
-			app.Organizer.ShowMessage(BL, "Error in getNoteSearchPositions - 'SELECT offset FROM fts_v': %v", err)
-			return [][]int{}
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var offset int
-			err = rows.Scan(&offset)
-			if err != nil {
-				app.Organizer.ShowMessage(BL, "Error in getNoteSearchPositions - 'rows.Scan(&offset)': %v", err)
-				continue
-			}
-			word_positions[i] = append(word_positions[i], offset)
-		}
-	}
-	return word_positions
-}
-*/
 
 func (db *Database) updateContainerTitle(row *Row, view View) error {
 	if row.id == -1 {

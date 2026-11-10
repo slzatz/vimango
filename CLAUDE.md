@@ -175,24 +175,11 @@ Spell checking is vim's, from libvim (restored in the slzatz/libvim fork; see it
 - **`z=` without a count** would block on vim's numbered prompt, so libvim calls a callback instead (`TakeSpellSuggestRequest`). `editorProcessKey` then calls `spellSuggest`, which shows the list on the message line and enters `SPELLING` mode; a digit sends vim `{n}z=` (undo, `.` and `:spellrepall` work), any other key cancels. `:suggest` is the same thing by name, and the ex dispatcher leaves `SPELLING` in place for it.
 - **Tests**: `spellcheck_test.go` (editor key paths, drawing) and `vim/cvim/spell_test.go` (bindings). Both skip when `spell/en.utf-8.spl` is absent, and point `'spellfile'` at a temp file so `zg` never writes the real word list.
 
-## Platform-Specific Behavior
-- **Linux/macOS**: the supported platforms (CGO builds only)
-- **Windows**: unsupported (support was dropped along with the pure-Go vim engine)
-
-## Cross-Compilation Support
-The application now supports full Windows cross-compilation from Linux/Unix systems:
-- Platform-specific signal handling:
-  - Unix: SIGWINCH signal detection for terminal resize events
-  - Windows: Polling-based terminal resize detection (100ms intervals)
-- Platform-agnostic terminal window size detection via rawmode package
-- Conditional compilation for Unix-specific filesystem operations
-- All platform-specific code isolated using build constraints
+## Platforms
+macOS and Linux, CGO builds only. Windows is unsupported — support went with the pure-Go vim engine, and the last Windows-only files (resize polling, raw mode, ANSI colors, the HEIC stub) were deleted 2026-11-10.
 
 ## Terminal Resize Handling
-- **Unix/Linux**: Uses SIGWINCH signal for immediate resize detection
-- **Windows**: Implements polling-based resize detection that checks terminal size every 100ms
-- Both platforms post to `app.resizeCh`; `MainLoop` then calls `handleResize()` to update screen layout (see "Threading" below)
-- Automatic screen redraw and layout adjustment on terminal resize
+SIGWINCH is forwarded to `app.resizeCh` (`signals.go`); `MainLoop` then calls `handleResize()`, which re-reads the window size (`rawmode.GetWindowSize`) and redraws. See "Threading".
 
 ## Threading
 **Only `MainLoop` (`app.go`) draws, changes editor/organizer/screen state, or calls libvim** — libvim is not thread-safe and the drawing code keeps no locks. Every other goroutine computes and posts an event to a channel that `MainLoop` selects on:
@@ -421,7 +408,6 @@ HEIC files are detected by magic bytes (ftyp box with heic/heix/hevc/hevx/mif1/m
 - `heic.go` - Shared interface, magic-byte detection, `ShutdownHEICDecoder`
 - `heic_cgo.go` (`cgo && !windows`) - the `heic_worker` decoder; the one every supported build uses
 - `cmd/heic_worker/main.go` - the worker: go-libheif plugin over libheif
-- `heic_nocgo.go` (`!cgo || windows`) - stub for the complement of `heic_cgo.go`; neither case is a supported build
 
 A Python pillow-heif decoder (`heic_pillow.go`, `heic_convert.py`, a `.venv` with Pillow and pillow-heif) was removed 2026-11-08: only a `CGO_ENABLED=0` build compiled it, and those have been unsupported since libvim became the only vim engine. An old `.venv` in the vimango directory can be deleted.
 

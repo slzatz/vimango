@@ -7,5 +7,5 @@ package main
 // binary builds cleanly and then breaks at runtime — note-saving fails
 // when the FTS index is updated. Fail at compile time instead:
 //
-//	CGO_ENABLED=1 go build --tags="fts5,cgo"
+//	CGO_ENABLED=1 go build --tags=fts5
 var _ = thisBinaryRequiresBuildTagFts5

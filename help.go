@@ -79,8 +79,6 @@ func DetermineEditorBoot(args []string) (editorOnly bool, openId int) {
 	return editorOnly, openId
 }
 
-const version = "0.1.0"
-
 // ShowHelp displays the help message for vimango
 func ShowHelp() {
 	helpText := `vimango - A vim-based note-taking application with SQLite storage
@@ -160,7 +158,7 @@ BUILD INFORMATION:
     Architecture: %s
     Go Version: %s
 
-    Build (CGO is required — vim editing is libvim; Windows is unsupported):
+    Build (macOS and Linux; CGO is required — vim editing is libvim):
         ./scripts/build-libvim.sh            # libvim.a from the slzatz/libvim fork
         CGO_ENABLED=1 go build --tags=fts5
 
@@ -170,7 +168,7 @@ FEATURES:
     - Organizer mode for browsing and managing notes
     - Markdown rendering
     - Context, folder, and keyword organization
-    - Spell checking (CGO builds only)
+    - Spell checking (vim's own, via libvim)
 
 For more information, see the readme file in the project directory.
 `

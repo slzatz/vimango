@@ -315,17 +315,6 @@ func (o *Organizer) displayEntryInfo(e *NewEntry) string {
 
 func (o *Organizer) displayContainerInfo() {
 
-	/*
-		type Container struct {
-			id       int
-			tid      int
-			title    string
-			star     bool
-			deleted  bool
-			modified string
-			count    int
-		}
-	*/
 	c := o.Database.getContainerInfo(o.rows[o.fr].id, o.view)
 
 	if c.id == 0 {

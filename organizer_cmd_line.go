@@ -77,25 +77,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":sync", ":test (dry-run)", ":sync? (dry-run)"},
 	})
 
-	/*
-		registry.Register("bulkload", (*Organizer).initialBulkLoad, CommandInfo{
-			Name:        "bulkload",
-			Aliases:     []string{"bulktest"},
-			Description: "Perform initial bulk data load",
-			Usage:       "bulkload",
-			Category:    "Data Management",
-			Examples:    []string{":bulkload", ":bulktest (dry-run)"},
-		})
-
-		registry.Register("reverseload", (*Organizer).reverse, CommandInfo{
-			Name:        "reverseload",
-			Aliases:     []string{"reversetest"},
-			Description: "Perform reverse bulk data load",
-			Usage:       "reverseload",
-			Category:    "Data Management",
-			Examples:    []string{":reverseload", ":reversetest (dry-run)"},
-		})
-	*/
 	registry.Register("refresh", (*Organizer).refresh, CommandInfo{
 		Aliases:     []string{"r"},
 		Description: "Refresh current view",
@@ -191,15 +172,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":recent"},
 	})
 
-	/*
-		registry.Register("log", (*Organizer).log, CommandInfo{
-			Name:        "log",
-			Description: "Show synchronization log entries",
-			Usage:       "log",
-			Category:    "Search & Filter",
-			Examples:    []string{":log"},
-		})
-	*/
 	// View Management commands
 	registry.Register("sort", (*Organizer).sortEntries, CommandInfo{
 		Description: "Sort entries by column",
@@ -215,17 +187,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Category:    "View Management",
 		Examples:    []string{":showall", ":show"},
 	})
-
-	/*
-		registry.Register("image", (*Organizer).setImage, CommandInfo{
-			Name:        "image",
-			Aliases:     []string{"images"},
-			Description: "Toggle image preview on/off",
-			Usage:       "image <on|off>",
-			Category:    "View Control",
-			Examples:    []string{":image on", ":images off"},
-		})
-	*/
 
 	registry.Register("toggleimages", (*Organizer).toggleImages, CommandInfo{
 		Aliases:     []string{"ti"},
@@ -315,40 +276,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// Container Management commands
-	/*
-			registry.Register("cc", (*Organizer).updateContainer, CommandInfo{
-				Name:        "cc",
-				Description: "Update context for marked or current entry",
-				Usage:       "cc",
-				Category:    "Container Management",
-				Examples:    []string{":cc"},
-			})
-
-		registry.Register("ff", (*Organizer).updateContainer, CommandInfo{
-			Name:        "ff",
-			Description: "Update folder for marked or current entry",
-			Usage:       "ff",
-			Category:    "Container Management",
-			Examples:    []string{":ff"},
-		})
-
-		registry.Register("kk", (*Organizer).updateContainer, CommandInfo{
-			Name:        "kk",
-			Description: "Update keyword for marked or current entry",
-			Usage:       "kk",
-			Category:    "Container Management",
-			Examples:    []string{":kk"},
-		})
-	*/
-	/*
-		registry.Register("savelog", (*Organizer).savelog, CommandInfo{
-			Name:        "savelog",
-			Description: "Save current sync log to database",
-			Usage:       "savelog",
-			Category:    "Output & Export",
-			Examples:    []string{":savelog"},
-		})
-	*/
 	// System commands
 	registry.Register("quit", (*Organizer).quitApp, CommandInfo{
 		Aliases:     []string{"q", "q!"},
@@ -375,13 +302,6 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 // help displays help information for organizer commands
 func (o *Organizer) help(pos int) {
-	/*
-		if o.commandRegistry == nil {
-			o.ShowMessage(BL, "Help system not available")
-			o.mode = o.last_mode
-			return
-		}
-	*/
 
 	var helpText string
 
@@ -569,7 +489,6 @@ func (o *Organizer) generateNoteList() {
 		o.rows[0].dirty = false
 		o.showMessage("No results were returned")
 	}
-	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.SetCursorPosition(1, 0)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
@@ -834,7 +753,7 @@ func (o *Organizer) refresh(flag int) {
 			o.mode = NORMAL ///////////////////////////
 			//o.mode = FIND ////////////////////////////////////
 			o.fc, o.fr, o.rowoff = 0, 0, 0
-			o.rows, err = o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted, false)
+			o.rows, err = o.Database.searchEntries(o.Session.fts_search_terms, o.sort, o.show_deleted)
 			if err != nil {
 				o.ShowMessage(BL, "Error searching for %s: %v", o.Session.fts_search_terms, err)
 				return
@@ -844,7 +763,6 @@ func (o *Organizer) refresh(flag int) {
 				o.rows[0].dirty = false
 				o.ShowMessage(BL, "No results were returned")
 			}
-			o.Session.imagePreview = false
 			o.readRowsIntoBuffer()
 			vim.SetCursorPosition(1, 0)
 			o.bufferTick = o.vbuf.GetLastChangedTick()
@@ -859,7 +777,6 @@ func (o *Organizer) refresh(flag int) {
 				o.rows[0].dirty = false
 				o.ShowMessage(BL, "No results were returned")
 			}
-			o.Session.imagePreview = false
 			o.readRowsIntoBuffer()
 			vim.SetCursorPosition(1, 0)
 			o.bufferTick = o.vbuf.GetLastChangedTick()
@@ -913,7 +830,7 @@ func (o *Organizer) find(pos int) {
 	o.fc, o.fr, o.rowoff = 0, 0, 0
 
 	o.ShowMessage(BL, "Search for '%s'", searchTerms)
-	o.rows, err = o.Database.searchEntries(searchTerms, o.sort, o.show_deleted, false)
+	o.rows, err = o.Database.searchEntries(searchTerms, o.sort, o.show_deleted)
 	if err != nil {
 		o.ShowMessage(BL, "Error searching for %s: %v", o.Session.fts_search_terms, err)
 		return
@@ -922,7 +839,6 @@ func (o *Organizer) find(pos int) {
 		o.insertRow(0, "", true, false, false, BASE_DATE)
 		o.rows[0].dirty = false
 	}
-	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.SetCursorPosition(1, 0)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
@@ -950,40 +866,6 @@ func (o *Organizer) synchronize(_ int) {
 	o.altRowoff = 0
 	o.mode = NAVIGATE_NOTICE
 }
-
-/*
-func (o *Organizer) initialBulkLoad(_ int) {
-	var log string
-	if o.command_line == "bulktest" {
-		// true => reportOnly
-		log = bulkLoad(true)
-	} else {
-		log = bulkLoad(false)
-	}
-	o.command_line = ""
-	o.Screen.eraseRightScreen()
-	note := generateWWString(log, o.Screen.totaleditorcols)
-	o.drawNotice(note)
-	o.altRowoff = 0
-	o.mode = NAVIGATE_NOTICE
-}
-
-func (o *Organizer) reverse(_ int) {
-	var log string
-	if o.command_line == "reversetest" {
-		// true => reportOnly
-		log = reverseBulkLoad(true)
-	} else {
-		log = reverseBulkLoad(false)
-	}
-	o.command_line = ""
-	o.Screen.eraseRightScreen()
-	note := generateWWString(log, o.Screen.totaleditorcols)
-	o.drawNotice(note)
-	o.altRowoff = 0
-	o.mode = NAVIGATE_NOTICE
-}
-*/
 
 func (o *Organizer) containers(_ int) {
 	cmd := o.command_line
@@ -1017,50 +899,6 @@ func (o *Organizer) containers(_ int) {
 	o.bufferTick = o.vbuf.GetLastChangedTick()
 	o.displayContainerInfo()
 	o.ShowMessage(BL, "Retrieved %s", containerType)
-}
-
-func (o *Organizer) contexts(_ int) {
-	o.mode = NORMAL
-	o.view = CONTEXT
-	o.command_line = ""
-
-	o.Screen.eraseRightScreen()
-	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-	o.rows = o.Database.getContainers(o.view)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-		o.ShowMessage(BL, "No results were returned")
-	}
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.filter = ""
-	o.readRowsIntoBuffer()
-	vim.SetCursorPosition(1, 0)
-	o.bufferTick = o.vbuf.GetLastChangedTick()
-	o.displayContainerInfo()
-	o.ShowMessage(BL, "Retrieved contexts")
-}
-
-func (o *Organizer) folders(_ int) {
-	o.mode = NORMAL
-	o.view = FOLDER
-	o.command_line = ""
-
-	o.Screen.eraseRightScreen()
-	o.sort = "modified" //It's actually sorted by alpha but displays the modified field
-	o.rows = o.Database.getContainers(o.view)
-	if len(o.rows) == 0 {
-		o.insertRow(0, "", true, false, false, BASE_DATE)
-		o.rows[0].dirty = false
-		o.ShowMessage(BL, "No results were returned")
-	}
-	o.fc, o.fr, o.rowoff = 0, 0, 0
-	o.filter = ""
-	o.readRowsIntoBuffer()
-	vim.SetCursorPosition(1, 0)
-	o.bufferTick = o.vbuf.GetLastChangedTick()
-	o.displayContainerInfo()
-	o.ShowMessage(BL, "Retrieved folders")
 }
 
 func (o *Organizer) setContext(pos int) {
@@ -1183,7 +1021,6 @@ func (o *Organizer) recent(_ int) {
 		o.rows[0].dirty = false
 		o.ShowMessage(BL, "No results were returned")
 	}
-	o.Session.imagePreview = false
 	o.readRowsIntoBuffer()
 	vim.SetCursorPosition(1, 0)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
@@ -1206,7 +1043,6 @@ func (o *Organizer) showAll(_ int) {
 		return
 	}
 	o.show_deleted = !o.show_deleted
-	o.show_completed = !o.show_completed
 	o.refresh(0)
 	if o.show_deleted {
 		o.ShowMessage(BL, "Showing completed/deleted")
@@ -1214,27 +1050,6 @@ func (o *Organizer) showAll(_ int) {
 		o.ShowMessage(BL, "Hiding completed/deleted")
 	}
 }
-
-/*
-func (o *Organizer) updateContainer(_ int) {
-	//o.current_task_id = o.rows[o.fr].id
-	o.Screen.eraseRightScreen()
-	switch o.command_line {
-	case "cc":
-		o.altView = CONTEXT
-	case "ff":
-		o.altView = FOLDER
-	case "kk":
-		o.altView = KEYWORD
-	}
-	o.altRows = o.Database.getAltContainers(o.altView) //O.mode = NORMAL is in get_containers
-	if len(o.altRows) != 0 {
-		o.altFr = 0
-		o.mode = ADD_CHANGE_FILTER
-		o.ShowMessage(BL, "Select context to add to marked or current entry")
-	}
-}
-*/
 
 func (o *Organizer) deleteMarks(_ int) {
 	o.clearMarkedEntries()
@@ -1274,22 +1089,6 @@ func (o *Organizer) copyEntry(_ int) {
 	o.refresh(0) // Refresh to show the new entry
 	o.ShowMessage(BL, "Entry copied (new id: %d)", newID)
 }
-
-/*
-func (o *Organizer) savelog(_ int) {
-	if o.last_mode == NAVIGATE_NOTICE {
-		title := fmt.Sprintf("%v", time.Now().Format("Mon Jan 2 15:04:05"))
-		o.Database.insertSyncEntry(title, strings.Join(o.note, "\n"))
-		o.ShowMessage(BL, "Sync log save to database")
-		o.command_line = ""
-		o.mode = NAVIGATE_NOTICE
-	} else {
-		o.ShowMessage(BL, "There is no sync log to save")
-		o.command_line = ""
-		o.mode = o.last_mode
-	}
-}
-*/
 
 func (o *Organizer) sortEntries(pos int) {
 	if pos == -1 {

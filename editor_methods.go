@@ -61,17 +61,6 @@ func (e *Editor) drawHighlightedBraces() {
 
 func (e *Editor) setLinesMargins() { //also sets top margin
 
-	/*
-		if e.output != nil {
-			if e.output.is_below {
-				e.screenlines = e.Screen.textLines - LINKED_NOTE_HEIGHT - 1
-				e.top_margin = TOP_MARGIN + 1
-			} else {
-				e.screenlines = e.Screen.textLines
-				e.top_margin = TOP_MARGIN + 1
-			}
-		} else {
-	*/
 	// editor-only mode: no top border row (native title bar above) and no
 	// status-bar row (native status bar below) — but keep one blank row
 	// between the text and the message/cmdline line as a visual separator,
@@ -369,80 +358,6 @@ func (e *Editor) drawHighlightedRows(pab *strings.Builder) {
 		}
 	}
 }
-
-/*
-* simplified version of generateWWStringFromBuffer
-* used by editor.showMarkdown and editor.spellCheck in editor_normal
-* we know we want the whole buffer not just what is visible
-* unlike the situation with syntax highlighting for code and markdown
-* we don't have to handle word-wrapped lines in a special way
-* had been in use in showMarkdownPreview in editor_normal.go
-func (e *Editor) generateWWStringFromBuffer2() string {
-	numRows := len(e.ss)
-	if numRows == 0 {
-		return ""
-	}
-
-	var ab strings.Builder
-	y := 0
-	filerow := 0
-	//width := e.screencols - e.left_margin_offset
-	width := e.screencols //05042021
-
-	for {
-		if filerow == numRows {
-			return ab.String()
-		}
-
-		row := e.ss[filerow]
-
-		if len(row) == 0 {
-			ab.WriteString("\n")
-			filerow++
-			y++
-			continue
-		}
-
-		// added 04052022 so urls that word wrap handled correctly`
-		// question if might cause issue for spellcheck
-		if strings.Index(row, "](http") != -1 {
-			ab.WriteString(row)
-			ab.WriteString("\n")
-			filerow++
-			y++
-			continue
-		}
-
-		start := 0
-		end := 0
-		for {
-			// if remainder of line is less than screen width
-			if start+width > len(row)-1 {
-				//ab.WriteString(row[start:])
-				//ab.WriteString("\n")
-				fmt.Fprintf(&ab, "%s%s", row[start:], "\n")
-				y++
-				filerow++
-				break
-			}
-
-			pos := strings.LastIndex(row[start:start+width], " ")
-			if pos == -1 {
-				end = start + width - 1
-			} else {
-				end = start + pos
-			}
-
-			//ab.WriteString(row[start : end+1])
-			//ab.WriteString("\n")
-			//fmt.Fprintf(&ab, "%s%s", row[start:end+1], "\n")
-			fmt.Fprintf(&ab, "%s%s", row[start:end+1], "^^^") //04052022
-			y++
-			start = end + 1
-		}
-	}
-}
-*/
 
 /* below exists to create a string that has the proper
  * line breaks based on screen width for syntax highlighting

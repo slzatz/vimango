@@ -9,7 +9,6 @@ type Session struct {
 	editor           *Editor // the open note's editor; nil when none is open. One note at a time
 	editorMode       bool
 	editorOnly       bool // --editor boot mode: set once at startup, never cleared
-	imagePreview     bool
 	imgSizeY         int
 	fts_search_terms string
 	markdown_style   *chroma.Style

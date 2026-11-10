@@ -518,7 +518,6 @@ func (a *App) InitApp() {
 
 	markdown_style, _ := selectMDStyle(a.Config.Chroma.Style)
 	a.Session.markdown_style = markdown_style
-	a.Session.imagePreview = false
 	a.Session.imgSizeY = 800
 
 	a.Organizer.cx = 0
@@ -529,8 +528,6 @@ func (a *App) InitApp() {
 	a.Organizer.coloff = 0
 	a.Organizer.sort = "modified"
 	a.Organizer.show_deleted = false
-	a.Organizer.show_completed = false
-	a.Organizer.message = ""
 	a.Organizer.highlight[0], a.Organizer.highlight[1] = -1, -1
 	a.Organizer.mode = NORMAL
 	//a.Organizer.last_mode = NORMAL

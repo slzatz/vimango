@@ -7,20 +7,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-/*
-func (o *Organizer) changeCase() {
-	t := &o.rows[o.fr].title
-	char := rune((*t)[o.fc])
-	if unicode.IsLower(char) {
-		char = unicode.ToUpper(char)
-	} else {
-		char = unicode.ToLower(char)
-	}
-	*t = (*t)[:o.fc] + string(char) + (*t)[o.fc+1:]
-	o.rows[o.fr].dirty = true
-}
-*/
-
 // func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, modified string) {
 func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, archived bool, sort string) {
 	/* note since only inserting blank line at top, don't really need at, s and also don't need size_t*/

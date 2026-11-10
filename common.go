@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"regexp"
@@ -21,13 +20,6 @@ const (
 	TR
 )
 
-/*
-type Window interface {
-	drawText()
-	drawFrame()
-	drawStatusBar()
-}
-*/
 // dbConfig holds application configuration loaded from config.json.
 // Sensitive credentials can be overridden via environment variables:
 //   - VIMANGO_PG_PASSWORD: overrides postgres.password
@@ -207,33 +199,10 @@ const (
 	BOLD  string = "\x1b[1m"
 	// IMAGE_MARKER_SYMBOL is printed next to the age column when a note has image links
 	IMAGE_MARKER_SYMBOL = "\uf03e"
-
-	maxUint = ^uint(0)
-	maxInt  = int(maxUint >> 1)
 )
 
 func ctrlKey(b byte) int {
 	return int(b & 0x1f)
-}
-
-func truncate(s string, length int) string {
-	if len(s) > length {
-		return s[:length] + "..."
-	} else {
-		return s
-	}
-}
-
-func tc(s string, l int, b bool) string {
-	if len(s) > l {
-		e := ""
-		if b {
-			e = "..."
-		}
-		return s[:l] + e
-	} else {
-		return s
-	}
 }
 
 var googleDriveRegex = regexp.MustCompile(`!\[([^\]]*)\]\((https://drive\.google\.com/file/d/[^)]+)\)`)
@@ -280,61 +249,21 @@ func ConvertGoogleDriveURLsToShort(markdown string) (string, int) {
 	return result, count
 }
 
-type AltRow struct {
-	id    int
-	title string
-	star  bool
-}
-
-// used in synchronize and getEntryInfo
+// NewEntry is what getEntryInfo returns: a note's row without its text.
 type NewEntry struct {
-	id           int
-	tid          int
-	title        string
-	folder_tid   int
-	context_tid  int
-	folder_uuid  string
-	context_uuid string
-	star         bool
-	note         sql.NullString //string
-	added        string
-	archived     bool
-	deleted      bool
-	modified     string
-}
-
-type Entry struct {
-	id           int
-	tid          int
-	title        string
-	folder_tid   int
-	context_tid  int
-	folder_uuid  string
-	context_uuid string
-	star         bool
-	note         sql.NullString //string
-	added        sql.NullString
-	completed    sql.NullString
-	deleted      bool
-	modified     string
-}
-type serverEntry struct {
-	id         int
-	title      string
-	folder_id  int
-	context_id int
-	star       bool
-	note       sql.NullString //string
-	added      sql.NullString //string
-	completed  sql.NullString //sql.NullTime since sqlite doesn't have datetime type
-	deleted    bool
-	modified   string
+	id       int
+	tid      int
+	title    string
+	star     bool
+	added    string
+	archived bool
+	deleted  bool
+	modified string
 }
 
 type Container struct {
 	id       int
 	tid      int
-	uuid     string // Primary identifier for containers
 	title    string
 	star     bool
 	deleted  bool
@@ -461,15 +390,3 @@ func timeDelta(t string) string {
 		return fmt.Sprintf("%d years ago", diff/3600/24/30/12)
 	}
 }
-
-/*
-type BufLinesEvent struct {
-	Buffer nvim.Buffer
-	//Changetick  int64
-	Changetick  interface{} //int64
-	FirstLine   interface{} //int64
-	LastLine    interface{} //int64
-	LineData    string
-	IsMultipart bool
-}
-*/

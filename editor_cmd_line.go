@@ -224,19 +224,6 @@ func (e *Editor) syntax() {
 	e.ShowMessage(BR, "Syntax highlighting is %v", e.highlightSyntax)
 }
 
-/*
-// debugging
-func (e *Editor) modified() {
-	var result bool
-	err := v.BufferOption(0, "modified", &result) //or e.vbuf
-	if err != nil {
-		e.ShowMessage(BL, "%s", err)
-		return
-	}
-	e.ShowMessage(BL, "Modified = %t", result)
-}
-*/
-
 func (e *Editor) exit() {
 	e.quitActions()
 }

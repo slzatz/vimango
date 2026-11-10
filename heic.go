@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"image"
 	"io"
 	"sync"
@@ -84,22 +83,7 @@ func IsHEICData(data []byte) bool {
 // machine is up.
 //
 // Safe to call unconditionally: a no-op when no decoder was ever
-// created, when this build has no worker (the stub), or when called twice.
+// created, or when called twice.
 func ShutdownHEICDecoder() {
 	shutdownHEICDecoder()
-}
-
-// StubHEICDecoder provides a no-op implementation for platforms without HEIC support
-type StubHEICDecoder struct{}
-
-func (s *StubHEICDecoder) IsAvailable() bool {
-	return false
-}
-
-func (s *StubHEICDecoder) Decode(r io.Reader) (image.Image, error) {
-	return nil, fmt.Errorf("HEIC decoding not available in this build (requires cgo and the heic_worker binary)")
-}
-
-func createStubHEICDecoder() HEICDecoder {
-	return &StubHEICDecoder{}
 }

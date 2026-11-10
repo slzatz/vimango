@@ -20,7 +20,6 @@ func (o *Organizer) organizerProcessKey(c int) (redraw RedrawScope) {
 		o.altRowoff = 0
 		o.tabCompletion.index = 0
 		o.tabCompletion.list = nil
-		o.Session.imagePreview = false
 		if o.view == TASK {
 			o.displayNote()
 		} else {
@@ -204,12 +203,6 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 }
 
 func (o *Organizer) VisualModeKeyHandler(c int) {
-	/*
-		if c == 'J' || c == 'V' || c == ctrlKey('v') || c == ':' {
-			o.showMessage("Ascii %d has no effect in Organizer VISUAL mode", c)
-			return
-		}
-	*/
 
 	// in VISUAL mode don't want J, V, ctrl-V, : being passed to vim
 	// in vim : triggers visual selection range :'<,'>

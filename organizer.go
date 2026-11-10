@@ -27,28 +27,22 @@ type Organizer struct {
 	altRowoff int //the number of rows scrolled in the right window (aka number of top rows now off-screen)
 	coloff    int //the number of display columns of the current title scrolled off the left
 
-	rows            []Row
-	altRows         []AltRow
-	altFr           int
-	filter          string
-	sort            string
-	sortPriority    bool
-	command_line    string
-	message         string
-	note            []string // the preview
-	notice          []string // e.g., sync results, help text
-	command         string
-	show_deleted    bool
-	show_completed  bool
-	view            View
-	altView         View //int
-	taskview        int
-	current_task_id int
-	string_buffer   string
-	marked_entries  map[int]struct{} // map instead of list makes toggling a row easier
-	highlight       [2]int
-	vbuf            interfaces.VimBuffer
-	bufferTick      int
+	rows           []Row
+	filter         string
+	sort           string
+	sortPriority   bool
+	command_line   string
+	note           []string // the preview
+	notice         []string // e.g., sync results, help text
+	command        string
+	show_deleted   bool
+	view           View
+	altView        View //int
+	taskview       int
+	marked_entries map[int]struct{} // map instead of list makes toggling a row easier
+	highlight      [2]int
+	vbuf           interfaces.VimBuffer
+	bufferTick     int
 	//saveTick              int
 	normalCmds            map[string]func(*Organizer)
 	exCmds                map[string]func(*Organizer, int)
