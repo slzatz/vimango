@@ -41,10 +41,19 @@ func goString(s *C.uchar) string {
 
 // InitializeVim starts libvim. Call it once, before anything else.
 //
+// vim is put in restricted mode, as "vim -Z" or rvim: it starts no other
+// program. That is checked where vim would start one, so it holds however the
+// request arrives -- ":r !cmd", ":!cmd", a `cmd` in a file name, system(), a
+// mapping, a sourced script, :execute -- and each gets vim's own error (E145).
+// vimango has no use for a shell inside the note editor, and a note's text or
+// a habit from vim should not be able to run one. Restricted mode also turns
+// off vimscript's delete(), rename() and mkdir().
+//
 // void vimInit(int argc, char **argv);
 func InitializeVim(argc int) {
 	var c *C.char
 	C.vimInit(C.int(argc), &c)
+	C.restricted = 1
 	enableSpellSuggestCallback()
 	enableMessageCallback()
 }

@@ -258,6 +258,67 @@ func TestRefusedCommandsDoNothing(t *testing.T) {
 	}
 }
 
+// vim starts no program, by whatever route the request reaches it: typed, from
+// vimscript, from a mapping or from a sourced file. The check on what was
+// typed (classifyEx) cannot see most of these; vim's restricted mode stops
+// them where the shell would start.
+func TestVimStartsNoProgram(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile("in.txt", []byte("from a file\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	script := "!touch by-script-bang\ncall system('touch by-script-system')\nr !touch by-script-read\n"
+	if err := os.WriteFile("script.vim", []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	e := newTestEditor(t, "alpha", "bravo")
+	withOrganizer(t, e)
+	e.Session.editorOnly = true
+
+	// typed on the command line: vim says why not
+	for _, line := range []string{
+		"r !touch by-read", "r!touch by-read-bang", "0r !touch by-read-range", "read ++enc=utf-8 !touch by-read-opt",
+		"silent r !touch by-read-silent", "g/alpha/r !touch by-read-global",
+		"r `touch by-backtick`", "source `touch by-source-backtick`", "runtime `touch by-runtime-backtick`",
+		"echo system('touch by-system')", "call system('touch by-call')", "let x = systemlist('touch by-systemlist')",
+		"execute 'r !touch by-execute'", "execute '!touch by-execute-bang'",
+		"call delete('in.txt')", "call rename('in.txt', 'moved.txt')", "call mkdir('made')",
+	} {
+		if msg := exMessage(t, e, line); !strings.Contains(msg, "E145") && !strings.Contains(msg, "vimango") {
+			t.Errorf(":%s was answered with %q, want a refusal", line, msg)
+		}
+	}
+	// and by routes that never pass the command line
+	e.exCommand(`normal :r !touch by-normal` + "\r")
+	e.exCommand("source script.vim")
+	e.exCommand("nnoremap Q :r !touch by-mapping<CR>")
+	e.sendKeys("Q")
+	e.exCommand("nnoremap Q :!touch by-mapping-bang<CR>")
+	e.sendKeys("Q")
+
+	entries, _ := os.ReadDir(dir)
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	if got := strings.Join(names, " "); got != "in.txt script.vim" {
+		t.Errorf("the directory now holds %q; a program ran, or a file was moved or made", got)
+	}
+	if got := strings.Join(e.vbuf.Lines(), "|"); got != "alpha|bravo" {
+		t.Errorf("the note changed: %q", got)
+	}
+	if m := vim.GetCurrentMode(); m != 1 && m != 257 { // NORMAL, or NORMAL just after a key
+		t.Errorf("vim was left in mode %d", m)
+	}
+
+	// reading a file is still vim's :read
+	e.exCommand("$r in.txt")
+	if got := strings.Join(e.vbuf.Lines(), "|"); got != "alpha|bravo|from a file" {
+		t.Errorf("after :$r in.txt the note is %q", got)
+	}
+}
+
 func sameDir(a, b string) bool {
 	ra, _ := filepath.EvalSymlinks(a)
 	rb, _ := filepath.EvalSymlinks(b)

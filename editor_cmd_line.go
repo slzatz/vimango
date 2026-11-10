@@ -166,7 +166,8 @@ const editorVimExHelp = "\n## vim's ex commands\n\n" +
 	"any spelling vim accepts (`:wri`, `:exi`, `:clo`).\n\n" +
 	"Not available: commands that write or open files (`:w name`, `:sav`, `:e`,\n" +
 	"`:cd`), that need another window or buffer (`:sp`, `:bn`, `:tabnew`), that\n" +
-	"run programs (`:!`), or that need a prompt (`:s/a/b/c`, `:append`).\n"
+	"run programs (`:!`, `:r !cmd`, `system()`), or that need a prompt (`:s/a/b/c`,\n" +
+	"`:append`).\n"
 
 // editorNormalModeHelp is ":help normal" in the editor. The editor intercepts
 // no normal-mode keys, so there is no registry to list: normal mode is vim's,

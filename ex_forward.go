@@ -31,6 +31,11 @@ import (
 // with | and the command given to :g. It does not look inside vimscript:
 // :execute, :normal and :call run whatever they are given. That is on
 // purpose; the list guards against habit (:w notes.txt), not against intent.
+//
+// Starting a program is the exception, and is not decided here at all: vim
+// runs in restricted mode (vim.InitializeVim), so ":r !cmd", a `cmd` in a file
+// name, system() and ":!cmd" from a mapping or a script are refused by vim
+// itself, with E145, wherever they come from.
 
 type exAction int
 
