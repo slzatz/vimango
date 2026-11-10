@@ -7,7 +7,7 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// The same macro as vim/cvim's TestMacroRecordAndPlayback, but driven through
+// The same macro as the vim package's TestMacroRecordAndPlayback, but driven through
 // editorProcessKey so the whole Go interception layer is in the path. Only keys
 // that reach vim land in the recording register, so this is the test that
 // catches an interception regression: insert-mode keys in particular must keep

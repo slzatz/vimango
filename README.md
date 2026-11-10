@@ -54,7 +54,7 @@ The fork's build scripts own the configure flags — the `-Wno-error` set that c
 ### Build Notes
 
 - The `libvim.a` file must be placed in the vimango project root directory (next to `go.mod`).
-- You do **not** need to copy or regenerate the libvim headers under `vim/cvim/` (including `auto/config.h`) from your libvim build; the versions checked into this repo work on both platforms.
+- You do **not** need to copy or regenerate the libvim headers under `vim/` (including `auto/config.h`) from your libvim build; the versions checked into this repo work on both platforms.
 
 ## Building heic_worker
 

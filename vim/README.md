@@ -1,21 +1,26 @@
-# Vimango Vim Package
+# The vim package
 
-This package provides vim editing functionality for the Vimango application,
-backed by **libvim via CGO** — the only implementation. (A pure-Go engine,
-`govim`, and an adapter layer for switching between the two existed here
-until 2026-07; they were removed once CGO-everywhere was settled and Windows
-support was dropped.)
+vimango's binding to **libvim** — vim as a library — through cgo. It is the
+only layer between the application and libvim's C API: the application calls
+`vim.SendKey(…)`, and that function calls `vimKey`.
 
-## Directory Structure
+(Until 2026-11-10 there were three layers: this package forwarded to an
+`Engine` interface, a wrapper type implemented it, and the wrapper called a
+`cvim` package that held the cgo. The interface existed to switch between
+libvim and a pure-Go engine, `govim`, which was removed in 2026-07.)
 
-- `vim/` — API layer used by the application
-  - `api.go` — package-level functions the app calls (`vim.SendKey`, …)
-  - `engine.go` — `InitializeVim` plus thin wrappers (`CGOEngineWrapper`,
-    `CGOBufferWrapper`) that satisfy the interfaces in `interfaces/`
-  - `interfaces/` — `VimEngine` / `VimBuffer` interfaces (application code
-    holds buffers as `interfaces.VimBuffer`)
-  - `cvim/` — the cgo bindings to libvim (`cvim.go`) and vendored headers
-    (`src/`); the prebuilt `libvim.a` lives in the repo root
+## Layout
+
+- `vim.go` — buffers, input, cursor, mode, selection, command line
+- `spell.go`, `spell_callback.go` — spell checking (the callback has to live
+  in its own file: a file with `//export` may only have declarations in its
+  cgo preamble)
+- `*_test.go` — tests that drive libvim directly
+- `src/`, `proto/`, `auto/` — libvim's headers, copied from the
+  [slzatz/libvim](https://github.com/slzatz/libvim) fork. Headers only; the
+  code is in `libvim.a`, which `scripts/build-libvim.sh` builds and puts in
+  the project root. The linker flags name it by bare filename, so run `go`
+  from the project root.
 
 ## Usage
 
@@ -24,24 +29,27 @@ import "github.com/slzatz/vimango/vim"
 
 vim.InitializeVim(0)
 
-buffer := vim.NewBuffer(0)
-vim.SetCurrentBuffer(buffer)
+buf := vim.NewBuffer(0)
+vim.SetCurrentBuffer(buf)
+buf.SetLines(0, -1, []string{"Hello, world"})
 
-vim.SendInput("Hello, world!")
-vim.SendKey("<esc>")
+vim.SendMultiInput("A!")   // keys, one character at a time
+vim.SendKey("<esc>")       // a key in <> notation
 
-position := vim.GetCursorPosition()
-mode := vim.GetCurrentMode()
+lines := buf.Lines()               // ["Hello, world!"]
+pos := vim.GetCursorPosition()     // {line (1-based), byte column (0-based)}
+mode := vim.GetCurrentMode()       // 1 = NORMAL
 ```
 
-## Adding a libvim binding
+libvim is one process-wide vim and is not thread-safe: call it from one
+goroutine (vimango's main loop).
 
-1. Confirm the symbol exists in the prebuilt library:
-   `nm -gU libvim.a | grep vimWhatever` (declarations are in
-   `cvim/src/libvim.h`).
-2. Add the wrapper in `cvim/cvim.go` (C signature as a comment, Go func
-   below — follow the existing style).
-3. Expose it from `api.go`, either through `Engine` or as a direct `cvim`
-   call (see the CommandLine* functions for the direct pattern).
-4. Verify runtime behavior empirically — the vendored `src/` is
-   headers-only; `cvim/cmdline_test.go` shows the test pattern.
+## Adding a binding
+
+1. Confirm the symbol is in the library: `nm -gU libvim.a | grep vimWhatever`.
+   Its declaration is in `src/libvim.h`; if the fork added it, copy the
+   updated header in.
+2. Add the function to `vim.go`, with the C signature in its comment like the
+   others.
+3. Test it against the real library — `cmdline_test.go` shows the pattern.
+   The headers say what a function takes, not what it does.

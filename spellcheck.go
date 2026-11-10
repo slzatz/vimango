@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/slzatz/vimango/vim"
-	"github.com/slzatz/vimango/vim/cvim"
 )
 
 // Spell checking is vim's own, from libvim (restored in the slzatz/libvim
@@ -122,7 +121,7 @@ func (e *Editor) drawSpellErrors(pab *strings.Builder) {
 			continue
 		}
 		style := "\x1b[48;5;31m"
-		if se.Type != cvim.SpellBad {
+		if se.Type != vim.SpellBad {
 			style = "\x1b[4m"
 		}
 		y := e.getScreenYFromRowColWW(r, start) + e.top_margin - e.lineOffset

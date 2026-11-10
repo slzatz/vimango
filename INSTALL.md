@@ -141,10 +141,10 @@ set newer clang and GCC 14+ need, because libvim builds with `-Werror` — and
 reconfigure only when those flags change. The fork's `CLAUDE.md` and
 `PATCHES.md` explain the flags and what the fork changes.
 
-> The CGO linker directives in `vim/cvim/cvim.go` reference `libvim.a` as a bare
+> The CGO linker directives in `vim/vim.go` reference `libvim.a` as a bare
 > filename resolved from the build working directory, so it must sit in the
 > project root and you must run `go build` from there. The checked-in
-> libvim headers under `vim/cvim/` (including `auto/config.h`) work on both platforms and don't
+> libvim headers under `vim/` (including `auto/config.h`) work on both platforms and don't
 > need regenerating.
 
 ---

@@ -1,6 +1,4 @@
-//go:build cgo && !windows
-
-package cvim
+package vim
 
 import (
 	"fmt"
@@ -34,20 +32,20 @@ func TestBlockOperators(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		VimInit(0)
-		vbuf := CBufferNew(0)
-		CBufferSetCurrent(vbuf)
-		CBufferSetLines(vbuf, 0, 0, []string{"alpha", "bravo", "charlie", "delta"}, 4)
-		Key("<esc>")
-		Input("g")
-		Input("g")
-		Input("0")
+		InitializeVim(0)
+		vbuf := NewBuffer(0)
+		SetCurrentBuffer(vbuf)
+		vbuf.SetLines(0, 0, []string{"alpha", "bravo", "charlie", "delta"})
+		SendKey("<esc>")
+		SendInput("g")
+		SendInput("g")
+		SendInput("0")
 		for _, k := range tc.keys {
-			Input(k)
+			SendInput(k)
 		}
-		Key("<esc>")
+		SendKey("<esc>")
 
-		got := CBufferLines(vbuf)
+		got := vbuf.Lines()
 		fmt.Printf("%-18s -> %q\n", tc.name, got)
 		for i := range tc.want {
 			if i >= len(got) || got[i] != tc.want[i] {
@@ -64,45 +62,45 @@ func TestNonBlockVisualInsert(t *testing.T) {
 		{"v", "j", "A", "X"},
 		{"V", "j", "I", "X"},
 	} {
-		VimInit(0)
-		vbuf := CBufferNew(0)
-		CBufferSetCurrent(vbuf)
-		CBufferSetLines(vbuf, 0, 0, []string{"alpha", "bravo", "charlie"}, 3)
-		Key("<esc>")
-		Input("g")
-		Input("g")
-		Input("0")
+		InitializeVim(0)
+		vbuf := NewBuffer(0)
+		SetCurrentBuffer(vbuf)
+		vbuf.SetLines(0, 0, []string{"alpha", "bravo", "charlie"})
+		SendKey("<esc>")
+		SendInput("g")
+		SendInput("g")
+		SendInput("0")
 		for _, k := range keys {
-			Input(k)
+			SendInput(k)
 		}
-		Key("<esc>")
-		fmt.Printf("%-14v -> %q\n", keys, CBufferLines(vbuf))
+		SendKey("<esc>")
+		fmt.Printf("%-14v -> %q\n", keys, vbuf.Lines())
 	}
 }
 
 // Counts, undo and repeat on top of a block insert.
 func TestBlockInsertUndoAndRepeat(t *testing.T) {
-	VimInit(0)
-	vbuf := CBufferNew(0)
-	CBufferSetCurrent(vbuf)
-	CBufferSetLines(vbuf, 0, 0, []string{"alpha", "bravo", "charlie", "delta"}, 4)
-	Key("<esc>")
-	Input("g")
-	Input("g")
-	Input("0")
+	InitializeVim(0)
+	vbuf := NewBuffer(0)
+	SetCurrentBuffer(vbuf)
+	vbuf.SetLines(0, 0, []string{"alpha", "bravo", "charlie", "delta"})
+	SendKey("<esc>")
+	SendInput("g")
+	SendInput("g")
+	SendInput("0")
 	for _, k := range []string{"\x16", "j", "j", "I", "-", " "} {
-		Input(k)
+		SendInput(k)
 	}
-	Key("<esc>")
-	fmt.Printf("%-18s -> %q\n", "after insert", CBufferLines(vbuf))
-	Input("u")
-	fmt.Printf("%-18s -> %q\n", "after undo", CBufferLines(vbuf))
-	if got := CBufferLines(vbuf); got[0] != "alpha" || got[1] != "bravo" || got[2] != "charlie" {
+	SendKey("<esc>")
+	fmt.Printf("%-18s -> %q\n", "after insert", vbuf.Lines())
+	SendInput("u")
+	fmt.Printf("%-18s -> %q\n", "after undo", vbuf.Lines())
+	if got := vbuf.Lines(); got[0] != "alpha" || got[1] != "bravo" || got[2] != "charlie" {
 		t.Errorf("undo did not restore buffer: %q", got)
 	}
-	Key("<c-r>")
-	fmt.Printf("%-18s -> %q\n", "after redo", CBufferLines(vbuf))
-	if got := CBufferLines(vbuf); got[0] != "- alpha" || got[2] != "- charlie" {
+	SendKey("<c-r>")
+	fmt.Printf("%-18s -> %q\n", "after redo", vbuf.Lines())
+	if got := vbuf.Lines(); got[0] != "- alpha" || got[2] != "- charlie" {
 		t.Errorf("redo did not reapply block insert: %q", got)
 	}
 }

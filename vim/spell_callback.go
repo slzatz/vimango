@@ -1,9 +1,7 @@
-//go:build cgo && !windows
-
-package cvim
+package vim
 
 // The z= callback lives in its own file: a file with //export may only have
-// declarations in its preamble, and cvim.go's includes libvim.h.
+// declarations in its preamble, and vim.go's includes libvim.h.
 
 import "C"
 

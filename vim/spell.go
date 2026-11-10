@@ -1,6 +1,4 @@
-//go:build cgo && !windows
-
-package cvim
+package vim
 
 /*
 #include "src/libvim.h"
@@ -33,13 +31,13 @@ type SpellError struct {
 
 // void vimSpellGetErrors(buf_T *buf, linenr_T start, linenr_T end, int *num, spellError_T **errors);
 //
-// SpellGetErrors returns the misspellings in lines start..end (1-based,
-// inclusive) of vbuf. Like vim's own highlighting it finds nothing unless the
-// buffer is current, 'spell' is set and a dictionary is loaded.
-func SpellGetErrors(vbuf *C.buf_T, start, end int) []SpellError {
+// SpellErrors returns the misspellings in lines start..end (1-based,
+// inclusive) of the buffer. Like vim's own highlighting it finds nothing
+// unless the buffer is current, 'spell' is set and a dictionary is loaded.
+func (b *Buffer) SpellErrors(start, end int) []SpellError {
 	var n C.int
 	var errs *C.spellError_T
-	C.vimSpellGetErrors(vbuf, C.linenr_T(start), C.linenr_T(end), &n, &errs)
+	C.vimSpellGetErrors(b.buf, C.linenr_T(start), C.linenr_T(end), &n, &errs)
 	if errs == nil {
 		return nil
 	}
@@ -59,10 +57,11 @@ func SpellGetErrors(vbuf *C.buf_T, start, end int) []SpellError {
 
 // int vimSpellGetSuggestions(char_u **badWord, int *num_suggestions, char_u ***suggestions);
 //
-// SpellGetSuggestions returns the word z= would change and the replacements
-// it offers, best first; "{n}z=" applies suggestions[n-1]. ok is false when
+// GetSpellSuggestions returns the word z= would change (the misspelling under
+// or after the cursor, else the word under it) and the replacements it
+// offers, best first; "{n}z=" applies suggestions[n-1]. ok is false when
 // spell checking is off or there is no word at the cursor.
-func SpellGetSuggestions() (word string, suggestions []string, ok bool) {
+func GetSpellSuggestions() (word string, suggestions []string, ok bool) {
 	var bad *C.char_u
 	var n C.int
 	var sugs **C.char_u
@@ -85,9 +84,10 @@ func SpellGetSuggestions() (word string, suggestions []string, ok bool) {
 
 // void vimSetSpellSuggestCallback(VoidCallback callback);
 //
-// EnableSpellSuggestCallback makes z= without a count set the request read by
+// enableSpellSuggestCallback makes z= without a count set the request read by
 // TakeSpellSuggestRequest, instead of beeping. vim itself would show a
-// numbered prompt, which blocks; the embedder shows the list instead.
-func EnableSpellSuggestCallback() {
+// numbered prompt, which blocks; the application shows the list instead.
+// InitializeVim calls it.
+func enableSpellSuggestCallback() {
 	C.vimSetSpellSuggestCallback(C.VoidCallback(C.goSpellSuggestCallback))
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/slzatz/vimango/vim/interfaces"
+	"github.com/slzatz/vimango/vim"
 )
 
 // note that there isn't a columnOffset because currently only word wrap supported
@@ -28,7 +28,7 @@ type Editor struct {
 	redraw             bool
 	id                 int //db id of entry
 	//output             *Output
-	vbuf         interfaces.VimBuffer
+	vbuf         *vim.Buffer
 	ss           []string
 	searchPrefix string
 	suggestions  []string // spelling suggestions offered in SPELLING mode

@@ -1,0 +1,286 @@
+// Package vim is vimango's binding to libvim: vim as a library, with no
+// screen of its own. The application sends it keys and ex commands and reads
+// back the buffer, cursor and mode; drawing is the application's job.
+//
+// This is the only layer between the application and libvim's C API
+// (src/libvim.h). Each function says which C function it calls. libvim is one
+// process-wide vim -- one current buffer, one mode, one cursor -- and is not
+// thread-safe, so everything here must be called from one goroutine (the main
+// loop).
+//
+// The static library is linked by bare filename, so libvim.a must be in the
+// directory the go command is run from: the project root. It is built from
+// the slzatz/libvim fork by scripts/build-libvim.sh; src/, proto/ and auto/
+// here are that fork's headers.
+package vim
+
+/*
+#include "src/libvim.h"
+#cgo CFLAGS: -Iproto -DHAVE_CONFIG_H
+#cgo linux LDFLAGS: libvim.a -lm -ltinfo -ldl -lacl
+#cgo darwin CFLAGS: -I/opt/homebrew/include
+#cgo darwin LDFLAGS: libvim.a -lm -lncurses /opt/homebrew/opt/gettext/lib/libintl.a -liconv -L/opt/homebrew/lib -framework CoreServices -framework AppKit
+*/
+import "C"
+
+import (
+	"unsafe"
+)
+
+// ucharP returns s as a NUL-terminated char_u* for the duration of one call.
+// The pointer is into Go memory, which is fine for libvim functions that copy
+// or consume their argument before returning; none of the ones used here keep it.
+func ucharP(s string) *C.uchar {
+	bb := append([]byte(s), 0)
+	return (*C.uchar)(&bb[0])
+}
+
+func goString(s *C.uchar) string {
+	return C.GoString((*C.char)(unsafe.Pointer(s)))
+}
+
+// InitializeVim starts libvim. Call it once, before anything else.
+//
+// void vimInit(int argc, char **argv);
+func InitializeVim(argc int) {
+	var c *C.char
+	C.vimInit(C.int(argc), &c)
+	enableSpellSuggestCallback()
+}
+
+// ---- Buffers
+
+// Buffer is a vim buffer (libvim's buf_T).
+type Buffer struct {
+	buf *C.buf_T
+}
+
+// NewBuffer creates an empty buffer.
+//
+// buf_T *vimBufferNew(int flags);
+func NewBuffer(flags int) *Buffer {
+	return &Buffer{C.vimBufferNew(C.int(flags))}
+}
+
+// GetCurrentBuffer returns the buffer keys and commands currently act on.
+func GetCurrentBuffer() *Buffer {
+	return &Buffer{C.curbuf}
+}
+
+// SetCurrentBuffer makes buf the buffer keys and commands act on.
+//
+// void vimBufferSetCurrent(buf_T *buf);
+func SetCurrentBuffer(buf *Buffer) {
+	C.vimBufferSetCurrent(buf.buf)
+}
+
+// GetID returns vim's number for the buffer.
+//
+// int vimBufferGetId(buf_T *buf);
+func (b *Buffer) GetID() int {
+	return int(C.vimBufferGetId(b.buf))
+}
+
+// Line returns line n of the buffer, 1-based.
+//
+// char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
+func (b *Buffer) Line(n int) string {
+	return goString(C.vimBufferGetLine(b.buf, C.long(n)))
+}
+
+// Lines returns every line of the buffer.
+//
+// size_t vimBufferGetLineCount(buf_T *buf);
+func (b *Buffer) Lines() []string {
+	n := int(C.vimBufferGetLineCount(b.buf))
+	lines := make([]string, 0, n)
+	for i := 1; i <= n; i++ {
+		lines = append(lines, b.Line(i))
+	}
+	return lines
+}
+
+// SetLines replaces the lines after line start up to and including line end
+// with lines; end -1 means through the last line, so SetLines(0, -1, lines)
+// replaces the whole buffer and SetLines(0, 0, lines) inserts at the top.
+//
+// void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
+func (b *Buffer) SetLines(start, end int, lines []string) {
+	count := len(lines)
+	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
+	defer C.free(p)
+	view := unsafe.Slice((**C.uchar)(p), count)
+	for i, s := range lines {
+		view[i] = (*C.uchar)(unsafe.Pointer(C.CString(s)))
+		defer C.free(unsafe.Pointer(view[i]))
+	}
+	C.vimBufferSetLines(b.buf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
+}
+
+// GetLastChangedTick returns vim's b:changedtick: it goes up every time the
+// buffer's text changes, which is how the application knows to redraw and
+// whether there are unsaved changes.
+//
+// long vimBufferGetLastChangedTick(buf_T *buf);
+func (b *Buffer) GetLastChangedTick() int {
+	return int(C.vimBufferGetLastChangedTick(b.buf))
+}
+
+// ---- Input
+
+// SendInput sends one typed character (it may be multi-byte), as if from the
+// keyboard: "x", "é", ":".
+//
+// void vimInput(char_u *input);
+func SendInput(s string) {
+	C.vimInput(ucharP(s))
+}
+
+// SendMultiInput sends a string one character at a time.
+func SendMultiInput(s string) {
+	for _, r := range s {
+		C.vimInput(ucharP(string(r)))
+	}
+}
+
+// SendKey sends a key in vim's <> notation: "<esc>", "<c-u>", "<up>".
+//
+// void vimKey(char_u *key);
+func SendKey(s string) {
+	C.vimKey(ucharP(s))
+}
+
+// ExecuteCommand runs an ex command, without the leading ':'.
+//
+// void vimExecute(char_u *cmd);
+func ExecuteCommand(s string) {
+	C.vimExecute(ucharP(s))
+}
+
+// SendUserKey forwards a key the user typed with vim's mapping expansion on,
+// so definitions from vimango.vim apply to it. Every other Send* call runs
+// with expansion off: vimango's own key sequences (the ":" forwards, the
+// cmdline's <c-e><c-u>) must mean what vim defines them to mean, whatever the
+// user has mapped.
+//
+// libvim's vimInit leaves :map definitions stored but never expanded; the
+// fork's vimSetMappingsEnabled turns expansion on and off.
+//
+// void vimSetMappingsEnabled(int enabled);
+func SendUserKey(send func()) {
+	C.vimSetMappingsEnabled(1)
+	defer C.vimSetMappingsEnabled(0)
+	send()
+}
+
+// EvaluateExpression evaluates a vimscript expression and returns its value
+// as a string: EvaluateExpression("getreg('a')").
+//
+// char_u *vimEval(char_u *str);
+func EvaluateExpression(expr string) string {
+	r := C.vimEval(ucharP(expr))
+	if r == nil {
+		return ""
+	}
+	defer C.vim_free(unsafe.Pointer(r)) // vimEval returns an allocated copy
+	return goString(r)
+}
+
+// ---- Cursor, mode, selection
+
+// GetCursorPosition returns the cursor as {line, column}: the line 1-based,
+// the column a 0-based byte offset into it.
+//
+// pos_T vimCursorGetPosition(void);
+func GetCursorPosition() [2]int {
+	p := C.vimCursorGetPosition()
+	return [2]int{int(p.lnum), int(p.col)}
+}
+
+// SetCursorPosition moves the cursor; row is 1-based, col a 0-based byte offset.
+//
+// void vimCursorSetPosition(pos_T pos);
+func SetCursorPosition(row, col int) {
+	var p C.pos_T
+	p.lnum = C.long(row)
+	p.col = C.int(col)
+	C.vimCursorSetPosition(p)
+}
+
+// GetCurrentMode returns vim's mode, the values vim.h defines:
+//
+//	  1  NORMAL
+//	  2  VISUAL (GetVisualType says which kind)
+//	  4  OP_PENDING: an operator waiting for its motion, as after "d" or "2d"
+//	  8  CMDLINE: typing after ':', '/' or '?'
+//	 16  INSERT
+//	257  NORMAL with a command in progress (e.g. after "r")
+//
+// int vimGetMode(void);
+func GetCurrentMode() int {
+	return int(C.vimGetMode())
+}
+
+// GetVisualRange returns the two ends of the visual selection, each as
+// {line, column} like GetCursorPosition: where it started, and the cursor.
+//
+// void vimVisualGetRange(pos_T *startPos, pos_T *endPos);
+func GetVisualRange() [2][2]int {
+	var startPos, endPos C.pos_T
+	C.vimVisualGetRange(&startPos, &endPos)
+	return [2][2]int{
+		{int(startPos.lnum), int(startPos.col)},
+		{int(endPos.lnum), int(endPos.col)},
+	}
+}
+
+// GetVisualType returns the key that started the selection: 'v' (118)
+// characterwise, 'V' (86) linewise, Ctrl-V (22) blockwise.
+//
+// int vimVisualGetType(void);
+func GetVisualType() int {
+	return int(C.vimVisualGetType())
+}
+
+// GetMatchingPair returns the position of the bracket matching the one under
+// the cursor, as {line, column}, or {0, 0} if there is none.
+//
+// pos_T *vimSearchGetMatchingPair(int initc);
+func GetMatchingPair() [2]int {
+	p := C.vimSearchGetMatchingPair(0)
+	if p == nil {
+		return [2]int{}
+	}
+	return [2]int{int(p.lnum), int(p.col)}
+}
+
+// ---- Command line
+//
+// While the user types after ':' vim is in cmdline mode and its cmdline buffer
+// is the line editor; these read it back so the application can display it.
+
+// CommandLineGetType returns ':', '/' or '?' while vim is in cmdline mode, 0 otherwise.
+//
+// char_u vimCommandLineGetType(void);
+func CommandLineGetType() byte {
+	return byte(C.vimCommandLineGetType())
+}
+
+// CommandLineGetText returns what has been typed on the command line, without
+// the leading ':' or '/'; "" outside cmdline mode.
+//
+// char_u *vimCommandLineGetText(void);
+func CommandLineGetText() string {
+	t := C.vimCommandLineGetText()
+	if t == nil {
+		return ""
+	}
+	return goString(t)
+}
+
+// CommandLineGetPosition returns the cursor's byte offset within the command line.
+//
+// int vimCommandLineGetPosition(void);
+func CommandLineGetPosition() int {
+	return int(C.vimCommandLineGetPosition())
+}

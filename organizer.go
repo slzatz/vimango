@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/slzatz/vimango/vim"
-	"github.com/slzatz/vimango/vim/interfaces"
 )
 
 // RedrawScope represents the extent of organizer redraw work required after a key event.
@@ -41,7 +40,7 @@ type Organizer struct {
 	taskview       int
 	marked_entries map[int]struct{} // map instead of list makes toggling a row easier
 	highlight      [2]int
-	vbuf           interfaces.VimBuffer
+	vbuf           *vim.Buffer
 	bufferTick     int
 	//saveTick              int
 	normalCmds            map[string]func(*Organizer)
