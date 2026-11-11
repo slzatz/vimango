@@ -541,6 +541,7 @@ repositories:
   were taken from running some ninety commands through the editor. Writing it
   turned up three things not on any list: function keys never reach vim
   (`termcodes` does not name them), Ctrl-\ Ctrl-N in INSERT inserts its two
-  control characters as text, and `go.work` is still active on this machine
-  (`../glamour` is at the pinned commit, so nothing differs yet).
+  control characters as text, and `go.work` was still active on this machine
+  (`../glamour` was at the pinned commit, so nothing differed). `go.work` and
+  `go.work.sum` were deleted the same day; the build uses the pinned glamour.
 
