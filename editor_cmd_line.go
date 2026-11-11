@@ -152,8 +152,7 @@ func (e *Editor) help() {
 		}
 	}
 	e.mode = HELP
-	app.Organizer.drawNotice(helpText)
-	app.Organizer.altRowoff = 0
+	e.Screen.showNotice(helpText, 16)
 	e.command_line = ""
 }
 
@@ -280,21 +279,8 @@ func (e *Editor) closeNote(save, force bool) {
 		return
 	}
 
-	if e.Session.editorOnly {
-		// no organizer to return to: quitting the editor exits the app
-		// (leave the buffer intact; the main loop finishes this iteration
-		// before a.Run is checked)
-		app.Run = false
-		return
-	}
-
-	vim.ExecuteCommand("bw") // wipe out the buffer
-	e.Session.editor = nil
-	e.Session.editorMode = false
-	vim.SetCurrentBuffer(app.Organizer.vbuf)
-	e.Screen.eraseRightScreen()
-	app.Organizer.displayNote()
-	app.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
+	// back to the organizer in the TUI; in --editor mode, the end of the process
+	app.noteClosed()
 }
 
 func (e *Editor) checkStale() {

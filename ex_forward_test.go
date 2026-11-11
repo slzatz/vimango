@@ -227,8 +227,7 @@ func TestRefusedCommandsDoNothing(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	e := newTestEditor(t, "alpha", "bravo")
-	a := withOrganizer(t, e)
-	e.Session.editorOnly = true
+	a := editorOnly(t, e)
 
 	for _, line := range []string{
 		"w notes.txt", "w! notes.txt", "wq notes.txt", "sav notes.txt", "'<,'>w part.txt", "redir > out.txt",
@@ -273,8 +272,7 @@ func TestVimStartsNoProgram(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := newTestEditor(t, "alpha", "bravo")
-	withOrganizer(t, e)
-	e.Session.editorOnly = true
+	editorOnly(t, e)
 
 	// typed on the command line: vim says why not
 	for _, line := range []string{
@@ -707,8 +705,7 @@ func TestVimWritesNoFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := newTestEditor(t, "alpha", "bravo")
-	withOrganizer(t, e)
-	e.Session.editorOnly = true
+	editorOnly(t, e)
 
 	// typed: refused by vimango's list or by vim, and either says so
 	for _, line := range []string{

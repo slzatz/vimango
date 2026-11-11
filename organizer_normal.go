@@ -215,74 +215,26 @@ func (o *Organizer) scrollPreviewHome() {
 	o.drawRenderedNote()
 }
 
-// for scrolling reports (notices) like help
-func (o *Organizer) scrollNoticeDown() {
-	if len(o.notice) == 0 {
-		return
+// drawNotice shows text in the notice box (notice.go) over the right pane.
+func (o *Organizer) drawNotice(text string) {
+	hang := 0
+	if o.mode == HELP {
+		hang = 16
 	}
-	if o.altRowoff == len(o.notice)-2 {
-		o.ShowMessage(BL, "Reached end of rendered note")
-		return
-	}
-	o.altRowoff++
-	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
-	o.drawNoticeLayer()
-	o.drawNoticeText()
+	o.Screen.showNotice(text, hang)
 }
 
-// noticeRows is how many lines of a notice drawNoticeText shows: all of a
-// notice that fits in its box, otherwise the box less two rows.
-func (o *Organizer) noticeRows() int {
-	box := o.Screen.textLines - 10
-	if len(o.notice) <= box {
-		return len(o.notice)
-	}
-	return max(box-2, 1)
-}
+// The keys that scroll a notice, as normal-mode commands of the organizer.
+// What the scrolling has to say goes on the organizer's message line.
+func (o *Organizer) scrollNoticeDown() { o.noticeSays(o.Screen.scrollNoticeDown()) }
+func (o *Organizer) scrollNoticeUp()   { o.noticeSays(o.Screen.scrollNoticeUp()) }
+func (o *Organizer) scrollNoticeHome() { o.noticeSays(o.Screen.scrollNoticeHome()) }
+func (o *Organizer) pageNoticeDown()   { o.noticeSays(o.Screen.pageNoticeDown()) }
+func (o *Organizer) pageNoticeUp()     { o.noticeSays(o.Screen.pageNoticeUp()) }
 
-// for paging reports (notices) like help by half the box
-func (o *Organizer) pageNoticeDown() {
-	if len(o.notice) == 0 {
-		return
-	}
-	last := len(o.notice) - o.noticeRows()
-	if o.altRowoff >= last {
-		o.ShowMessage(BL, "Reached end of rendered note")
-		return
-	}
-	o.altRowoff = min(o.altRowoff+max(o.noticeRows()/2, 1), last)
-	o.drawNoticeLayer()
-	o.drawNoticeText()
-}
-
-func (o *Organizer) pageNoticeUp() {
-	if len(o.notice) == 0 || o.altRowoff == 0 {
-		return
-	}
-	o.altRowoff = max(o.altRowoff-max(o.noticeRows()/2, 1), 0)
-	o.drawNoticeLayer()
-	o.drawNoticeText()
-}
-
-func (o *Organizer) scrollNoticeHome() {
-	if len(o.notice) == 0 {
-		return
-	}
-	o.altRowoff = 0
-	o.ShowMessage(BL, "Line %d of %d", o.altRowoff, len(o.note))
-	o.drawNoticeLayer()
-	o.drawNoticeText()
-}
-
-// for scrolling reports (notices) like help
-func (o *Organizer) scrollNoticeUp() {
-	if len(o.notice) == 0 {
-		return
-	}
-	if o.altRowoff > 0 {
-		o.altRowoff--
-		o.drawNoticeLayer()
-		o.drawNoticeText()
+func (o *Organizer) noticeSays(message string) {
+	if message != "" {
+		o.ShowMessage(BL, "%s", message)
 	}
 }
 

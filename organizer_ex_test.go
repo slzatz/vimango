@@ -386,3 +386,32 @@ func TestPickingAContainer(t *testing.T) {
 		t.Errorf("after picking 3 the note's context is %q, want zebra", got)
 	}
 }
+
+// A notice opens at its top. It used to be drawn first from wherever the
+// preview had been scrolled to, and only then reset: a short :help after
+// paging down a long note asked for lines 15 to 5 of its text, and that
+// took the app down.
+func TestNoticeOpensAtItsTopAfterThePreviewWasScrolled(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha")
+	for i := range 80 {
+		o.note = append(o.note, "preview line "+strconv.Itoa(i))
+	}
+	captureStdout(t, func() {
+		o.organizerProcessKey(' ') // page the preview down
+		o.organizerProcessKey(' ')
+	})
+	if o.altRowoff == 0 {
+		t.Fatal("the premise of this test is wrong: Space did not scroll the preview")
+	}
+
+	o.ex(t, "help find") // five lines
+	if o.mode != HELP || o.Screen.noticeTop != 0 || len(o.Screen.notice) == 0 {
+		t.Errorf(":help find: mode %v, %d lines, from line %d", o.mode, len(o.Screen.notice), o.Screen.noticeTop)
+	}
+	captureStdout(t, func() { o.organizerProcessKey('\x1b') })
+
+	captureStdout(t, func() { o.organizerProcessKey(ctrlKey('i')) }) // entry info, another notice
+	if o.Screen.noticeTop != 0 || len(o.Screen.notice) == 0 {
+		t.Errorf("entry info: %d lines, from line %d", len(o.Screen.notice), o.Screen.noticeTop)
+	}
+}

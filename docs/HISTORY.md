@@ -332,3 +332,40 @@ repositories:
   comparison was added after a new unit test caught the refactor resolving
   the colours twice, which would have turned `"none"` back into the default
   blue.
+- **The structural split, third layer: `--editor` has no organizer.** The
+  mode vimango_hybrid edits in used to build the whole TUI behind the editor:
+  an organizer, a query for its first list of notes, and a vim buffer of
+  their titles. The editor needed it, because opening a note was an
+  organizer method (`openInEditor`) and the box `:help` is shown in belonged
+  to the organizer. Checks of `editorOnly` kept that hidden organizer from
+  drawing, taking focus or being returned to.
+
+  Now `InitApp` makes the organizer (and the render manager) only for the
+  TUI, and in `--editor` mode `app.Organizer` is nil. What the editor shared
+  with it moved to where both can reach it: `App.openEditor` reads the note
+  from the store and opens it (the organizer calls it for its current row);
+  `App.noteClosed` is what follows a close; the notice box is the screen's
+  (`notice.go`). The `editorOnly` checks that remain are the mode's decision
+  itself, the refusal of `:sync`, and five about layout.
+
+  Checked by replaying scripted sessions in a pty against the previous build,
+  each in its own copy of a small workspace, comparing every byte written to
+  the terminal, the exit status and what was left on disk: a 45-step TUI
+  session at two terminal sizes and nine `--editor` sessions (searching, substituting, spelling,
+  listings, resizes, refused commands, `:w`, `:x`, `:q`, `:q!`, an empty note,
+  a note with wide characters, no `--open`). All identical but for three
+  things, each meant:
+  - `:ls` lists one buffer fewer: there is no organizer's buffer of titles.
+  - Scrolling `:help` in the editor said "Line 13 of 0", counting the lines of
+    a preview that is not there; it counts the help's.
+  - A notice opened at whatever line the *last* thing shown there had been
+    scrolled to, and was reset only after being drawn. In the editor a second
+    `:help` started part-way down. In the TUI, `:help find` after paging down
+    a long note asked for lines 30 to 6 of its text and crashed (`slice bounds
+    out of range`), in raw mode. A notice now starts at its top.
+
+  Also: a note that cannot be read is no longer opened as an empty buffer;
+  and with no `--open`, `--editor` opens the note modified last (it was the
+  first row of the organizer's default list; hybrid always passes `--open`).
+  The tests that exercised `--editor` did so with an organizer present; they
+  now run without one.

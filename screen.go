@@ -17,6 +17,10 @@ type Screen struct {
 	edPct           int             // percent that editor space takes up of whole horiz screen real estate
 	ws              rawmode.Winsize //Row,Col,Xpixel,Ypixel unint16
 	Session         *Session
+
+	// the notice: text shown in a box over the right pane (notice.go)
+	notice    []string // its lines, rendered and wrapped
+	noticeTop int      // the first of them on screen
 }
 
 func (s *Screen) eraseScreenRedrawLines() {

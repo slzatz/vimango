@@ -48,16 +48,16 @@ func TestPagePreview(t *testing.T) {
 func TestPageNotice(t *testing.T) {
 	o := newPagingOrganizer(0)
 	for i := range 50 {
-		o.notice = append(o.notice, fmt.Sprintf("help %d", i))
+		o.Screen.notice = append(o.Screen.notice, fmt.Sprintf("help %d", i))
 	}
 	// box is 30-10 = 20 rows; a notice that overflows it shows 18
-	if got := o.noticeRows(); got != 18 {
+	if got := o.Screen.noticeRows(); got != 18 {
 		t.Fatalf("noticeRows = %d, want 18", got)
 	}
 	var got []int
 	for range 5 {
 		o.pageNoticeDown()
-		got = append(got, o.altRowoff)
+		got = append(got, o.Screen.noticeTop)
 	}
 	if want := fmt.Sprint([]int{9, 18, 27, 32, 32}); fmt.Sprint(got) != want {
 		t.Errorf("Space offsets = %v, want %v", got, want)
@@ -66,8 +66,8 @@ func TestPageNotice(t *testing.T) {
 	o.pageNoticeUp()
 	o.pageNoticeUp()
 	o.pageNoticeUp()
-	if o.altRowoff != 0 {
-		t.Errorf("b left the notice at %d", o.altRowoff)
+	if o.Screen.noticeTop != 0 {
+		t.Errorf("b left the notice at %d", o.Screen.noticeTop)
 	}
 }
 

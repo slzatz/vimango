@@ -48,8 +48,7 @@ func savedNoteEditor(t *testing.T, text string) (*Editor, *App) {
 	e.Store = db
 	e.id = id
 	e.dbText = text
-	a := withOrganizer(t, e)
-	e.Session.editorOnly = true
+	a := editorOnly(t, e)
 	return e, a
 }
 

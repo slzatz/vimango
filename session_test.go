@@ -31,6 +31,25 @@ func withOrganizer(t *testing.T, e *Editor) *App {
 	return a
 }
 
+// editorOnly makes e the editor of a vimango started with --editor, as
+// vimango_hybrid starts one: a session in editor-only mode and an app with no
+// organizer at all. Anything on the editor's path that reaches for one fails
+// here, as it would there.
+func editorOnly(t *testing.T, e *Editor) *App {
+	t.Helper()
+	a := &App{Session: e.Session, Screen: e.Screen, Store: e.Store, Run: true}
+	prev := app
+	app = a
+	t.Cleanup(func() { app = prev })
+
+	vim.SetCurrentBuffer(e.vbuf)
+	e.Session.editorOnly = true
+	e.Session.editor = e
+	e.Session.editorMode = true
+	e.saveTick = e.vbuf.GetLastChangedTick()
+	return a
+}
+
 // One note at a time: :q closes the note and hands focus back to the
 // organizer -- no editor left open behind it, vim on the organizer's buffer.
 func TestQuitReturnsToOrganizer(t *testing.T) {
@@ -77,8 +96,7 @@ func TestQuitRefusesUnsavedChanges(t *testing.T) {
 // editor in place for the main loop to finish its iteration.
 func TestQuitInEditorOnlyModeEndsTheApp(t *testing.T) {
 	e := newTestEditor(t, "alpha")
-	a := withOrganizer(t, e)
-	e.Session.editorOnly = true
+	a := editorOnly(t, e)
 
 	e.sendKeys(":q")
 	e.editorProcessKey('\r')

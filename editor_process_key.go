@@ -45,7 +45,6 @@ func (e *Editor) processKey(c int) (redraw bool) {
 		//return false
 		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
 		if prevMode == VISUAL || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving help
-			//app.Organizer.refreshScreen()
 			return true
 		} else {
 			return false
@@ -196,20 +195,16 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	return
 }
 
-// case HELP: the :help text is drawn as an organizer notice over the editor
-// pane; these keys scroll it, and ':' starts a new command line.
+// case HELP: the :help text is drawn in a notice (notice.go) over the editor
+// pane; the notice's keys scroll it, and ':' starts a new command line.
 func (e *Editor) HelpModeKeyHandler(c int) (redraw, exit bool) {
+	if message, scrolled := e.Screen.noticeKey(c); scrolled {
+		if message != "" {
+			e.ShowMessage(BL, "%s", message)
+		}
+		return false, true
+	}
 	switch c {
-	case ctrlKey('j'):
-		app.Organizer.scrollNoticeDown()
-	case ctrlKey('k'):
-		app.Organizer.scrollNoticeUp()
-	case HOME_KEY:
-		app.Organizer.scrollNoticeHome()
-	case ' ', PAGE_DOWN: // half a page, as in the rendered note
-		app.Organizer.pageNoticeDown()
-	case 'b', PAGE_UP:
-		app.Organizer.pageNoticeUp()
 	case ':': // COMMAND or SEARCH
 		e.ShowMessage(BR, ":")
 		vim.SendKey("<esc>")

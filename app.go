@@ -23,7 +23,7 @@ type App struct {
 	// Core components
 	Session   *Session     // Session handles terminal and screen management
 	Screen    *Screen      // Screen handles screen management
-	Organizer *Organizer   // Organizer manages tasks and their display
+	Organizer *Organizer   // the list of notes, in the TUI; nil in --editor mode, which has none
 	Store     *store.Store // vimango.db: the notes and their containers
 	PG        *sql.DB      // the PostgreSQL server, for sync; nil when none is configured
 
@@ -58,11 +58,8 @@ func CreateApp() *App {
 	screen := &Screen{Session: sess}
 	kitty := IsTermKitty()
 	return &App{
-		Session: sess,
-		Screen:  screen,
-		Organizer: &Organizer{Session: sess,
-			Screen: screen,
-		},
+		Session:   sess,
+		Screen:    screen,
 		keyEvents: make(chan terminal.Key, 16),
 		keyErrors: make(chan error, 1),
 		resizeCh:  make(chan struct{}, 1),
@@ -225,22 +222,23 @@ func (a *App) moveDividerPct(pct int) {
 	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 2
 	a.Screen.eraseScreenRedrawLines()
 
-	if a.Screen.divider > 10 {
-		a.Organizer.refreshScreen()
-		a.Organizer.drawStatusBar()
+	org := a.Organizer // nil in --editor mode: there is only the editor to redraw
+	if org != nil && a.Screen.divider > 10 {
+		org.refreshScreen()
+		org.drawStatusBar()
 	}
 
 	if a.Session.editorMode {
 		a.Screen.positionEditor()
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 		a.Screen.drawRightScreen()
-	} else if a.Organizer.view == TASK {
-		a.Organizer.displayNote()
+	} else if org != nil && org.view == TASK {
+		org.displayNote()
 	}
-	// diagnostics noise in the hybrid app: every host-window resize lands
-	// here via SIGWINCH and would flash this over the editor's message row
-	if !a.Session.editorOnly {
-		a.Organizer.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
+	// (not in the hybrid app: every host-window resize lands here via
+	// SIGWINCH and would flash this over the editor's message row)
+	if org != nil {
+		org.ShowMessage(BL, "rows: %d  cols: %d  divider: %d", a.Screen.screenLines, a.Screen.screenCols, a.Screen.divider)
 	}
 	a.returnCursor()
 }
@@ -279,7 +277,6 @@ func (a *App) InitDatabases(configPath string) error {
 	if err != nil {
 		return err
 	}
-	a.Organizer.Store = a.Store
 	// Postgres is optional - only connect if host is configured
 	if config.Postgres.Host != "" {
 		// Default SSL mode to "disable" for backward compatibility
@@ -319,42 +316,49 @@ func (a *App) InitDatabases(configPath string) error {
 }
 
 // InitApp initializes the application components
+// InitApp finishes setting the application up once the configuration and the
+// terminal are known. The organizer is made here, and only for the TUI: in
+// --editor mode a host app has its own list of notes, vimango is the editor
+// alone, and a.Organizer stays nil.
 func (a *App) InitApp() {
-
 	markdown_style, _ := selectMDStyle(a.Config.Chroma.Style)
 	a.Session.markdown_style = markdown_style
 	a.Session.imgSizeY = 800
 
-	a.Organizer.cx = 0
-	a.Organizer.cy = 0
-	a.Organizer.fc = 0
-	a.Organizer.fr = 0
-	a.Organizer.rowoff = 0
-	a.Organizer.coloff = 0
-	a.Organizer.sort = "modified"
-	a.Organizer.show_deleted = false
-	a.Organizer.highlight[0], a.Organizer.highlight[1] = -1, -1
-	a.Organizer.mode = NORMAL
-	//a.Organizer.last_mode = NORMAL
-	a.Organizer.view = TASK
-	a.Organizer.tabCompletion.list = nil
-	a.Organizer.tabCompletion.index = 0
-	a.Organizer.normalCmds = a.setOrganizerNormalCmds(a.Organizer)
-	a.Organizer.exCmds = a.setOrganizerExCmds(a.Organizer)
-	a.Organizer.filterList = a.setFilterList()
-
-	if a.Config.Options.Type == "folder" {
-		a.Organizer.taskview = BY_FOLDER
-	} else {
-		a.Organizer.taskview = BY_CONTEXT
+	if a.Session.editorOnly {
+		return
 	}
-
-	a.Organizer.filter = a.Config.Options.Title
-	a.Organizer.marked_entries = make(map[int]struct{})
-	a.Organizer.vbuf = vim.NewBuffer(0)
-	vim.SetCurrentBuffer(a.Organizer.vbuf)
+	a.Organizer = a.newOrganizer()
+	// the organizer's preview of the current note, and its images
+	a.RenderManager = NewRenderManager(a)
 }
 
+// newOrganizer is the TUI's list of notes, on the context or folder that
+// config.json names. Its rows are loaded by LoadInitialData.
+func (a *App) newOrganizer() *Organizer {
+	o := &Organizer{Session: a.Session, Screen: a.Screen, Store: a.Store}
+	o.sort = "modified"
+	o.highlight[0], o.highlight[1] = -1, -1
+	o.mode = NORMAL
+	o.view = TASK
+	o.normalCmds = a.setOrganizerNormalCmds(o)
+	o.exCmds = a.setOrganizerExCmds(o)
+	o.filterList = o.filterNames()
+
+	if a.Config.Options.Type == "folder" {
+		o.taskview = BY_FOLDER
+	} else {
+		o.taskview = BY_CONTEXT
+	}
+	o.filter = a.Config.Options.Title
+	o.marked_entries = make(map[int]struct{})
+	o.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(o.vbuf)
+	return o
+}
+
+// LoadInitialData lays the screen out and, in the TUI, loads and draws the
+// organizer's first list.
 func (a *App) LoadInitialData() {
 	a.Screen.textLines = a.Screen.screenLines - 2 - TOP_MARGIN
 
@@ -373,25 +377,89 @@ func (a *App) LoadInitialData() {
 	a.Screen.totaleditorcols = a.Screen.screenCols - a.Screen.divider - 1
 	a.Screen.eraseScreenRedrawLines()
 
-	if a.Organizer.setRows(a.Organizer.entries()) {
-		a.Organizer.ShowMessage(BL, "No results were returned")
+	org := a.Organizer
+	if org == nil {
+		return // --editor: the note is opened next, and is all there is to draw
 	}
+	if org.setRows(org.entries()) {
+		org.ShowMessage(BL, "No results were returned")
+	}
+	org.displayNote()
+	org.refreshScreen()
+	org.drawStatusBar()
 
-	// editor-only mode: the organizer is never rendered (divider = 1), so
-	// its boot draw would paint fragments into the editor's screen area —
-	// the status bar's first column, the current-row marker, and a BL
-	// message truncated to divider width (one char). The data loads above
-	// still run: openInEditor() reads o.rows / o.fr.
-	if a.Session.editorOnly {
+	org.ShowMessage(BL, "rows: %d  columns: %d", a.Screen.screenLines, a.Screen.screenCols)
+	a.returnCursor()
+}
+
+// openEditor opens a note in the editor: its text read from the store into a
+// vim buffer of its own, which becomes vim's current one, and the editor
+// drawn. title is what the editor shows as the note's; "" is the note's title
+// in the database. An error means the note could not be read, and no editor
+// was opened -- one opened on an empty buffer would look like an empty note,
+// and saving it would make it one.
+//
+// This is all that opening a note takes. The organizer calls it for the row
+// it is on; --editor calls it for the note the host asked for, with no
+// organizer there.
+func (a *App) openEditor(id int, title string) error {
+	note, err := a.Store.Note(id)
+	if err != nil {
+		return err
+	}
+	if title == "" {
+		title, _ = a.Store.Title(id)
+	}
+	a.Session.editorMode = true
+
+	ae := a.NewEditor()
+	ae.id = id
+	ae.title = title
+	ae.top_margin = TOP_MARGIN + 1
+	ae.dbText = note
+	ae.ss = strings.Split(note, "\n")
+	ae.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(ae.vbuf)
+	ae.vbuf.SetLines(0, -1, ae.ss)
+	ae.bufferTick = ae.vbuf.GetLastChangedTick()
+	ae.saveTick = ae.vbuf.GetLastChangedTick()
+	ae.mode = NORMAL
+	a.Session.editor = ae
+
+	a.Screen.positionEditor()
+	a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
+	a.Screen.drawRightScreen()
+	return nil
+}
+
+// noteClosed is what follows the editor closing its note. In the TUI that is
+// the organizer again, on the row it was on. In --editor mode there is
+// nothing to go back to: the process ends, which is how the host learns the
+// note was closed.
+func (a *App) noteClosed() {
+	if a.Organizer == nil {
+		// (the buffer is left as it is; the main loop finishes this
+		// iteration before a.Run is checked)
+		a.Run = false
 		return
 	}
-
+	vim.ExecuteCommand("bw") // wipe out the buffer
+	a.Session.editor = nil
+	a.Session.editorMode = false
+	vim.SetCurrentBuffer(a.Organizer.vbuf)
+	a.Screen.eraseRightScreen()
 	a.Organizer.displayNote()
-	a.Organizer.refreshScreen()
-	a.Organizer.drawStatusBar()
+	a.returnCursor() //because main while loop if started in editor_mode -- need this 09302020
+}
 
-	a.Organizer.ShowMessage(BL, "rows: %d  columns: %d", a.Screen.screenLines, a.Screen.screenCols)
-	a.returnCursor()
+// mostRecentNote is the note --editor opens when it is not told which: the
+// one modified last. ok is false when there are no notes.
+func (a *App) mostRecentNote() (id int, ok bool) {
+	entries, err := a.Store.Entries(store.Recent, "", store.Listing{Sort: "modified", Limit: 1})
+	if err != nil || len(entries) == 0 {
+		return 0, false
+	}
+	return entries[0].ID, true
 }
 
 // organizer and editor scroll methods set cx and cy
@@ -418,7 +486,7 @@ func (a *App) returnCursor() {
 		default:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", ae.cy+ae.top_margin, ae.cx+ae.left_margin+ae.left_margin_offset+1)
 		}
-	} else {
+	} else if a.Organizer != nil {
 		switch a.Organizer.mode {
 		case COMMAND_LINE:
 			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+2+TOP_MARGIN, len(a.Organizer.command_line)+LEFT_MARGIN+1)
@@ -515,10 +583,12 @@ func (a *App) MainLoop() {
 			} else {
 				k = key.Special
 			}
-			// editor-only mode: focus can never leave the editor. Safety
-			// net in case some unguarded path clears the focus flag.
-			if a.Session.editorOnly && a.Session.editor != nil {
-				a.Session.editorMode = true
+			// --editor: there is nothing but the editor for a key to go to
+			if org == nil {
+				a.Session.editorMode = a.Session.editor != nil
+				if !a.Session.editorMode {
+					continue
+				}
 			}
 			if a.Session.editorMode {
 				ae := a.Session.editor
@@ -561,8 +631,12 @@ func (a *App) MainLoop() {
 				}
 			}
 		case err := <-a.keyErrors:
-			if err != nil {
+			switch {
+			case err == nil:
+			case org != nil:
 				org.ShowMessage(BL, "Readkey problem %v", err)
+			case a.Session.editor != nil:
+				a.Session.editor.ShowMessage(BL, "Readkey problem %v", err)
 			}
 		case <-a.resizeCh:
 			a.handleResize()
@@ -573,9 +647,4 @@ func (a *App) MainLoop() {
 		a.returnCursor()
 	}
 	a.Cleanup()
-}
-
-// InitRenderManager initializes the async render manager
-func (a *App) InitRenderManager() {
-	a.RenderManager = NewRenderManager(a)
 }

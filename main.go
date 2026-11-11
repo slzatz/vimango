@@ -124,19 +124,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Validate --open id while we can still print to a cooked terminal
+	// Which note --editor opens, settled while we can still print to a
+	// cooked terminal: the one --open names, or else the one modified last.
 	if exists, _ := app.Store.Exists(openId); openId != -1 && !exists {
 		fmt.Printf("Error: no note with id %d\n", openId)
 		os.Exit(1)
+	}
+	if editorOnly && openId == -1 {
+		recent, ok := app.mostRecentNote()
+		if !ok {
+			fmt.Println("Error: no note to open (database has no saved entries)")
+			os.Exit(1)
+		}
+		openId = recent
 	}
 
 	// Validate glamour style file exists
 	if err := validateGlamourStyle(); err != nil {
 		log.Fatalf("Error: %v", err)
 	}
-
-	// Initialize async render manager for non-blocking image loading
-	app.InitRenderManager()
 
 	// Set up platform-specific signal handling
 	setupSignalHandling(app)
@@ -191,15 +197,14 @@ func main() {
 	app.LoadInitialData()
 
 	if editorOnly {
-		// openId == -1 opens the current (most recently modified) row
-		app.Organizer.openInEditor(openId)
-		if app.Session.editor == nil {
-			// e.g. empty database: nothing to edit
+		// There is no organizer in this mode: the editor opens the note
+		// from the database itself.
+		if err := app.openEditor(openId, ""); err != nil {
 			rawmode.Restore(app.origTermCfg)
-			fmt.Println("Error: no note to open (database has no saved entries)")
+			fmt.Printf("Error: could not open note %d: %v\n", openId, err)
 			os.Exit(1)
 		}
-		// openInEditor's draw ends wherever its last cell was — the bottom
+		// openEditor's draw ends wherever its last cell was — the bottom
 		// of the right border — and nothing places the cursor until the
 		// first key or resize. A host that spawns an editor and shows it
 		// at once (a VimangoHybrid pop-out) would show it there.

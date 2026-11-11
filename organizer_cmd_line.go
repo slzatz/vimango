@@ -667,39 +667,17 @@ func (o *Organizer) openInEditor(id int) {
 		return
 	}
 
-	o.Session.editorMode = true
-
 	// One note at a time: the organizer is only reachable once the previous
 	// editor has been closed (:q/:x), so there is never one to reuse.
-	ae := app.NewEditor()
-	ae.id = id
-	// an explicit id (e.g. --editor --open <id>) may not match the
-	// current row, whose title may also carry unsaved edits
+	//
+	// The row's title, not the database's: it may carry edits not yet saved.
+	title := ""
 	if o.fr < len(o.rows) && o.rows[o.fr].id == id {
-		ae.title = o.rows[o.fr].title
-	} else {
-		ae.title, _ = o.Store.Title(id)
+		title = o.rows[o.fr].title
 	}
-	ae.top_margin = TOP_MARGIN + 1
-	note := o.noteText(id)
-	ae.dbText = note
-	ae.ss = strings.Split(note, "\n")
-	// Make sure we have at least one line, even if the note was empty
-	if len(ae.ss) == 0 {
-		ae.ss = []string{""}
+	if err := app.openEditor(id, title); err != nil {
+		o.ShowMessage(BL, "Error retrieving note for id %d: %v", id, err)
 	}
-	ae.vbuf = vim.NewBuffer(0)
-	vim.SetCurrentBuffer(ae.vbuf)
-	ae.vbuf.SetLines(0, -1, ae.ss)
-	//////// need to look at whether we need both buffer and save tick 10/01/2025
-	ae.bufferTick = ae.vbuf.GetLastChangedTick()
-	ae.saveTick = ae.vbuf.GetLastChangedTick()
-	ae.mode = NORMAL
-	o.Session.editor = ae
-
-	o.Screen.positionEditor()
-	o.Screen.eraseRightScreen() //erases editor area + statusbar + msg
-	o.Screen.drawRightScreen()
 	o.command = ""
 	o.mode = NORMAL
 }
