@@ -133,15 +133,16 @@ pulls `main`, builds, and copies `libvim.a` and the spell dictionary into
 `~/vimango`. The last lines should be:
 
 ```
-Done. /Users/<you>/vimango/libvim.a is libvim 31301666c feat(api): ...
+Done. /Users/<you>/vimango/libvim.a is libvim d93698bc8 fix(mappings): ...
 Now build vimango:
 ```
 
-The commit must be **`31301666c` or later** (`77fc72a6d` is enough for a
-vimango at `0556725` or earlier). To check afterwards:
+The commit must be **`d93698bc8` or later** (`31301666c` is enough for a
+vimango at `108a96e` or earlier, `77fc72a6d` for one at `0556725` or earlier).
+To check afterwards:
 
 ```bash
-git -C ~/libvim merge-base --is-ancestor 31301666c HEAD && echo "libvim is new enough"
+git -C ~/libvim merge-base --is-ancestor d93698bc8 HEAD && echo "libvim is new enough"
 ```
 
 The script refuses to build from a checkout that would give the wrong library,
@@ -184,6 +185,7 @@ checkout:
 | `undefined: vimSpellGetErrors` | the fork's spell API |
 | `undefined: vimSearchGetHighlightEnabled` | fork `a036ecafe` |
 | `undefined: vimSetFileWritesEnabled` (or `_vimSetFileWritesEnabled` from the linker) | fork `31301666c` |
+| `undefined: vimInputPending` | fork `d93698bc8` |
 
 A `libvim.a` between `a036ecafe` and `77fc72a6d` links without complaint and
 is still too old (vim's errors show, its reports — "5 lines yanked" — do
@@ -357,7 +359,7 @@ cd ~/vimango
 sqlite3 vimango.db ".backup vimango-before-update.db.bak"
 git switch dev && git pull --ff-only
 rm -f go.work go.work.sum
-./scripts/build-libvim.sh --clean          # must end: libvim 31301666c or later
+./scripts/build-libvim.sh --clean          # must end: libvim d93698bc8 or later
 CGO_ENABLED=1 go build --tags=fts5
 ./vimango --migrate                        # two lines; a second run: already up to date
 cd ~/vimango_hybrid

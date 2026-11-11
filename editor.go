@@ -36,6 +36,7 @@ type Editor struct {
 	suggestions  []string            // spelling suggestions offered in SPELLING mode
 	spellKeys    string              // last NORMAL keys typed, to spot zg/zw (spellListKey)
 	searchDrawn  string              // vim's search state when the text was last drawn (searchState)
+	heldKeyShown bool                // a key vim is holding is drawn at the cursor (drawAfterKey)
 	hlCache      map[string][]string // highlighted rows by chunk text (highlightChunk)
 	hlCacheBytes int
 	bufferTick   int

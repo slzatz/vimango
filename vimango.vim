@@ -1,8 +1,9 @@
 " vimango.vim -- vimango's vimrc, sourced into libvim at startup.
 "
-" Mappings here apply to keys typed in the note editor only. libvim limits:
-" single-key left-hand sides only (a two-key lhs like "jk" swallows keys), and
-" no <C-r> inside an insert-mode right-hand side. See vimrc.go.
+" Mappings here apply to keys typed in the note editor only. A left-hand side
+" can be several keys ("inoremap jk <Esc>"); the first waits 'timeoutlen' for
+" the rest, as in vim. One libvim limit: no <C-r> inside an insert-mode
+" right-hand side. See vimrc.go.
 
 " Markdown list markers, by kind: what is recognized after a line's
 " indentation, and what is written. Every numbered line gets "1. " -- markdown

@@ -14,9 +14,11 @@ import (
 // (editorProcessKey wraps its sendToVim in vim.SendUserKey). vimango's own key
 // sequences and the organizer's title editing run with expansion off.
 //
-// libvim limits worth knowing when writing one:
-//   - single-key left-hand sides only: a partially matched multi-key mapping
-//     ("jk", ",b") waits in the typeahead buffer and swallows keys
+// A left-hand side can be several keys ("jk", ",b"). vim holds the first
+// until the next key shows whether the mapping is meant, or until 'timeoutlen'
+// has passed -- which MainLoop times, libvim having no clock (mappingWait).
+//
+// Limits worth knowing when writing one:
 //   - no <C-r> in the insert-mode part of a right-hand side; call a function
 //   - <esc> never reaches a mapping: vimango sends it to vim itself
 const vimrcFile = "vimango.vim"

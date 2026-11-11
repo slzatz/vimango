@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
@@ -565,8 +566,15 @@ func (a *App) startKeyReader() {
 // key reader, the resize signal, image loading -- runs elsewhere and reaches
 // the UI only as an event on one of the channels selected here.
 func (a *App) MainLoop() {
-	org := a.Organizer
 	a.startKeyReader()
+	a.handleEvents()
+	a.Cleanup()
+}
+
+// handleEvents is MainLoop between starting the key reader and cleaning up:
+// it returns when a.Run goes false. Apart so that a test can feed it keys.
+func (a *App) handleEvents() {
+	org := a.Organizer
 
 	// a nil channel is never ready, so no RenderManager means no such events
 	var renderResults <-chan RenderResult
@@ -574,9 +582,16 @@ func (a *App) MainLoop() {
 		renderResults = a.RenderManager.resultCh
 	}
 
+	// A key that begins a longer mapping ("j" when "jk" is mapped) waits in
+	// vim for the next one. vim gives up waiting after 'timeoutlen'; libvim
+	// has no clock, so the wait is kept here. nil -- never ready -- unless
+	// the last key left vim holding something.
+	var mappingTimeout <-chan time.Time
+
 	for a.Run {
 		select {
 		case key := <-a.keyEvents:
+			mappingTimeout = nil // the key settles it, one way or the other
 			var k int
 			if key.Regular != 0 {
 				k = int(key.Regular)
@@ -597,10 +612,9 @@ func (a *App) MainLoop() {
 				if !a.Session.editorMode {
 					continue
 				}
-				offset_changed := ae.scroll()
-				if redraw || offset_changed {
-					ae.drawText()
-					ae.drawStatusBar()
+				ae.drawAfterKey(redraw, k)
+				if wait, waiting := mappingWait(); waiting {
+					mappingTimeout = time.After(wait)
 				}
 			} else {
 				redraw := org.organizerProcessKey(k)
@@ -638,6 +652,11 @@ func (a *App) MainLoop() {
 			case a.Session.editor != nil:
 				a.Session.editor.ShowMessage(BL, "Readkey problem %v", err)
 			}
+		case <-mappingTimeout:
+			mappingTimeout = nil
+			if ae := a.Session.editor; ae != nil && a.Session.editorMode {
+				ae.drawAfterKey(ae.editorMappingTimeout(), noKey)
+			}
 		case <-a.resizeCh:
 			a.handleResize()
 		case res := <-renderResults:
@@ -646,5 +665,4 @@ func (a *App) MainLoop() {
 		}
 		a.returnCursor()
 	}
-	a.Cleanup()
 }

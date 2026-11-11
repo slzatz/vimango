@@ -376,3 +376,45 @@ repositories:
   showing the note, and whatever was typed next went into the other buffer --
   in the TUI, into the titles -- until the next forwarded ex command noticed
   and went back. The editor now checks after every key.
+
+## 2026-11-11
+
+- **Mappings can have more than one key on the left** (fork `d93698bc8`).
+  `inoremap jk <Esc>` and `nnoremap ,d dd` did not work: vim holds the first
+  key of such a mapping in its typeahead buffer until the next key shows
+  whether the mapping is meant, and libvim's `sm_execute()` put each new key
+  *in front of* the one waiting. The pair never completed, and the first key
+  was never seen again. The fork appends now, so keys are taken in the order
+  sent, and it gained the two calls the rest needs: `vimInputPending()` and
+  `vimInputTimeout()`.
+
+  What vimango does with them:
+  - **The timeout.** vim gives up on a half-typed mapping after
+    `'timeoutlen'` and takes the key as typed. libvim cannot wait, so
+    `MainLoop` keeps a timer (`mappingWait`, `editorMappingTimeout`). Without
+    it a `j` typed at the end of a word would not appear until the next key.
+  - **The held key is drawn at the cursor** in INSERT mode, as vim draws it,
+    so typing does not seem to lag by a key (`drawAfterKey`).
+  - **A mapping that ends on a command line** (`nnoremap ,s :%s/`) opens the
+    ex line with its text on it. The editor went by the key typed and took
+    anything but `:` for the start of a search; it asks vim now. This was
+    wrong for single-key mappings too.
+  - **Leaving INSERT by a mapping clears `-- INSERT --`.** Only a typed
+    `<esc>` did.
+  - `processKey` split in two for this: `forwardKey` is everything after the
+    key has been given to vim, and a timeout runs it with no key. `MainLoop`
+    is `startKeyReader`, `handleEvents`, `Cleanup`, so that a test can feed
+    the loop keys (`TestEventLoopTimesOutAHalfTypedMapping`).
+
+  Checked in the fork with ten new tests in `apitest/mapping.c` (eight of them
+  fail with the old order), here with `mapping_test.go`, and by driving the
+  real `--editor` in a pty: `j`, a second's pause, `jk`, `,d`, `:x`.
+
+  Found on the way, in the fork (`cc8b7f53d`): ten of its sixty test programs
+  ended with `return minunit_status;`, which is the status of the *last* test
+  only, so `build-macos.sh --tests` printed PASS for them whatever the earlier
+  tests had done. None was hiding a failure.
+
+  One trap when testing mappings: `inoremap j X | inoremap jk Y` maps `j` to
+  `X` and a space. vim ends a `:map` at the `|` and keeps the blank before
+  it.

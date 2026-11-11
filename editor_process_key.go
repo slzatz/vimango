@@ -5,7 +5,9 @@ import (
 	"io/ioutil"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/slzatz/vimango/vim"
 )
@@ -13,7 +15,22 @@ import (
 // editorProcessKey handles one key in the note editor and reports whether the
 // text needs redrawing.
 func (e *Editor) editorProcessKey(c int) (redraw bool) {
-	redraw = e.processKey(c)
+	return e.redrawAfter(e.processKey(c))
+}
+
+// editorMappingTimeout is 'timeoutlen' running out on a half-typed mapping:
+// MainLoop calls it when no key has followed one that vim is holding (see
+// mappingWait). vim takes the held keys as they are, and the editor follows
+// as it does after a key.
+func (e *Editor) editorMappingTimeout() (redraw bool) {
+	if vim.InputPending() == 0 {
+		return false
+	}
+	return e.redrawAfter(e.forwardKey(noKey, vim.InputTimeout))
+}
+
+// redrawAfter adds to a key's own answer the thing a key cannot see.
+func (e *Editor) redrawAfter(redraw bool) bool {
 	// Search highlighting can change with no change to the text: a new
 	// pattern (each character typed after "/", n, *), :noh, :set nohlsearch.
 	// Not while an overlay (:help, :marks) is up: drawing the text would wipe
@@ -23,6 +40,24 @@ func (e *Editor) editorProcessKey(c int) (redraw bool) {
 	}
 	return redraw
 }
+
+// mappingWait reports whether vim is holding keys that begin a longer mapping
+// ("j" when "jk" is mapped), and how long vim would wait for the rest:
+// 'timeoutlen'. With 'notimeout' vim waits for ever, and so does vimango --
+// the next key settles it.
+func mappingWait() (time.Duration, bool) {
+	if vim.InputPending() == 0 || vim.EvaluateExpression("&timeout") != "1" {
+		return 0, false
+	}
+	ms, err := strconv.Atoi(vim.EvaluateExpression("&timeoutlen"))
+	if err != nil || ms < 0 {
+		ms = 1000 // vim's default
+	}
+	return time.Duration(ms) * time.Millisecond, true
+}
+
+// noKey is forwardKey's key when there is none: a timeout.
+const noKey = -1
 
 // note that bool returned is whether to redraw
 func (e *Editor) processKey(c int) (redraw bool) {
@@ -74,16 +109,30 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	if exit {
 		return
 	}
+	return e.forwardKey(c, func() { sendToVim(c) })
+}
+
+// forwardKey gives vim a key the user typed -- send does that -- and brings
+// the editor into line with whatever vim did: mode, text, cursor, messages.
+// c is the key, or noKey when send is the timeout of a half-typed mapping.
+// The bool is whether to redraw.
+//
+// vim may do nothing yet: a key that begins a longer mapping waits for the
+// next (vim.InputPending). And it may do more than the key says: a mapping can
+// end anywhere, on a command line for one, so what follows asks vim where it
+// is and does not reason from c.
+func (e *Editor) forwardKey(c int, send func()) (redraw bool) {
 	// Process the key -- with vim's mapping expansion on, so vimango.vim's
 	// mappings apply to what the user types (and only to that; see vimrc.go)
 	wasVisual := e.mode == VISUAL
+	wasInsert := e.mode == INSERT
 	vim.TakeSpellSuggestRequest() // drop a z= typed outside the editor (organizer)
 	// What vim would have put on its message line for this key -- mostly
 	// errors: "E486: Pattern not found", "E20: Mark not set". Shown last, when
 	// this function returns, so it is not overwritten by a message of ours.
 	endsSearch := e.mode == SEARCH && c == '\r'
 	msgs := vim.CaptureMessages(func() {
-		vim.SendUserKey(func() { sendToVim(c) })
+		vim.SendUserKey(send)
 	})
 	// A key can take vim off the note's buffer: Ctrl-^ goes to the alternate
 	// buffer, which here is the organizer's list of titles or vim's own
@@ -96,8 +145,11 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	}
 	defer e.showKeyMessages(msgs, endsSearch)
 	// zg, zw etc. change what is misspelled without changing the buffer
-	spellRedraw := spellOn && spellListKey(e.spellKeys, c)
-	e.spellKeys = (e.spellKeys + string(rune(c)))[max(0, len(e.spellKeys)+len(string(rune(c)))-2):]
+	spellRedraw := false
+	if c != noKey {
+		spellRedraw = spellOn && spellListKey(e.spellKeys, c)
+		e.spellKeys = (e.spellKeys + string(rune(c)))[max(0, len(e.spellKeys)+len(string(rune(c)))-2):]
+	}
 
 	tick := e.vbuf.GetLastChangedTick()
 	if tick > e.bufferTick {
@@ -119,12 +171,14 @@ func (e *Editor) processKey(c int) (redraw bool) {
 		e.mode = PENDING
 		return false
 	case vim.ModeCmdline: // SEARCH and EX_COMMAND
-		// reached only on the ':' or '/' that opens the line: once e.mode is
+		// reached only on the key that opens the line: once e.mode is
 		// EX_COMMAND or SEARCH those handlers send keys to vim themselves and
-		// never fall through to here
+		// never fall through to here. The key is ':' or '/' -- or a mapping
+		// that ends on a command line ("nnoremap ,s :%s/"), so vim is asked
+		// which kind of line it is and what is on it already.
 		if e.mode != SEARCH && e.mode != EX_COMMAND {
 			e.command_line = ""
-			if c == ':' {
+			if kind := vim.CommandLineGetType(); kind == ':' {
 				// vim stays in cmdline mode: its cmdline buffer is the line
 				// editor; ExModeKeyHandler intercepts Enter so vim never
 				// executes anything
@@ -140,8 +194,9 @@ func (e *Editor) processKey(c int) (redraw bool) {
 				e.ShowMessage(BR, ":%s", e.command_line)
 			} else {
 				e.mode = SEARCH
-				e.searchPrefix = string(rune(c))
-				e.ShowMessage(BR, "%s", e.searchPrefix)
+				e.searchPrefix = string(rune(kind))
+				e.command_line = vim.CommandLineGetText()
+				e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
 			}
 			return false
 		}
@@ -159,6 +214,12 @@ func (e *Editor) processKey(c int) (redraw bool) {
 		e.mode = m
 	} else {
 		e.mode = OTHER // not sure this ever happens
+	}
+
+	// <esc> is not the only way out of INSERT: a mapping ("inoremap jk
+	// <Esc>") leaves it too, and "-- INSERT --" must not stay behind.
+	if wasInsert && e.mode != INSERT {
+		e.ShowMessage(BR, "")
 	}
 
 	// A key that ends VISUAL without changing text (y, a mapping that found

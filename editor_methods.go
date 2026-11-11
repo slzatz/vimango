@@ -4,6 +4,7 @@ import (
 	//"bufio"
 	"fmt"
 	"strings"
+	"unicode"
 
 	//	"time"
 	"github.com/mattn/go-runewidth"
@@ -157,6 +158,28 @@ func (e *Editor) getLineInRowWW(r, c int) int {
 		}
 	}
 	return len(segs)
+}
+
+// drawAfterKey redraws what a key (or a mapping's timeout) changed. c is the
+// key, or noKey.
+//
+// In INSERT mode a key that vim is holding -- the "j" of a "jk" mapping,
+// until the next key or the timeout says which it is -- is not in the text
+// yet. vim shows it at the cursor meanwhile, so that typing does not seem to
+// lag, and so does this; whatever happens next redraws the text over it.
+func (e *Editor) drawAfterKey(redraw bool, c int) {
+	offsetChanged := e.scroll()
+	if redraw || offsetChanged || e.heldKeyShown {
+		e.drawText()
+		e.drawStatusBar()
+	}
+	e.heldKeyShown = false
+	if e.mode == INSERT && c != noKey && !isSyntheticKey(c) && vim.InputPending() > 0 {
+		if r := rune(c); unicode.IsPrint(r) && runewidth.RuneWidth(r) == 1 {
+			fmt.Printf("\x1b[%d;%dH%c", e.cy+e.top_margin, e.cx+e.left_margin+e.left_margin_offset+1, r)
+			e.heldKeyShown = true
+		}
+	}
 }
 
 func (e *Editor) drawText() {

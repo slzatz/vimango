@@ -191,6 +191,27 @@ func SendUserKey(send func()) {
 	send()
 }
 
+// InputPending reports how many bytes vim has been sent and has not acted on.
+// It is non-zero when the keys so far begin a longer mapping: with
+// "inoremap jk <Esc>", after "j". The next key decides -- "k" completes the
+// mapping, anything else is taken after the "j" -- and so does InputTimeout.
+//
+// int vimInputPending(void);
+func InputPending() int {
+	return int(C.vimInputPending())
+}
+
+// InputTimeout is what 'timeoutlen' running out is in vim: it stops waiting
+// for the rest of a half-typed mapping and takes the keys that are there, as
+// they are or as the longest mapping they do complete. libvim has no clock,
+// so the caller keeps the time. It belongs inside SendUserKey, like the keys
+// it is about. With nothing waiting it does nothing.
+//
+// void vimInputTimeout(void);
+func InputTimeout() {
+	C.vimInputTimeout()
+}
+
 // EvaluateExpression evaluates a vimscript expression and returns its value
 // as a string: EvaluateExpression("getreg('a')").
 //
