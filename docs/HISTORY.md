@@ -452,3 +452,30 @@ repositories:
   that was missing, in vim's order, nothing said twice. Fork tests:
   `apitest/listings.c`. Here: `TestListingsAreShown`,
   `TestOldLibraryDoesNotListVariables`.
+
+- **A typed search is one search** (fork `6bc47d62d`). The known problem was
+  the wrap warning on the Enter of a typed `/pattern`, which vimango dropped
+  because it was wrong. The cause was larger than the warning. While a pattern
+  is typed, `'incsearch'` moves the cursor to the match; vim puts it back when
+  the command line returns and then searches. libvim did not put it back, and
+  made up for that by searching twice from wherever the cursor was, forward
+  and then back. That lands on the right match for a plain pattern -- and:
+  - warned for the two extra searches rather than the real one (both "hit
+    BOTTOM" and "hit TOP" for a search that did not wrap; nothing for
+    `?pattern` from the first line, which does);
+  - reported `E486: Pattern not found` for `/pattern/e` and `/pattern/+1`,
+    after going to the right place;
+  - left the cursor on the match when a search failed under `'nowrapscan'`;
+  - did not repeat the last pattern for an empty `/`, and set the `''` mark
+    in the wrong place;
+  - found the *previous* match with `'noincsearch'`.
+
+  The fork restores the cursor and runs vim's one search. Here the
+  `endsSearch` exception is gone, and `showKeyMessages` shows an error alone:
+  vim warns that it is wrapping before it knows the search will fail, and on
+  vim's screen the error overwrites the warning.
+
+  Checked with 29 typed-search scenarios in libvim, cursor and messages,
+  before and after; fork tests `apitest/search_typed.c`; here
+  `TestTypedSearch` and the end of `TestVimReportsForKeysAreShown`.
+

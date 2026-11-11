@@ -133,16 +133,16 @@ pulls `main`, builds, and copies `libvim.a` and the spell dictionary into
 `~/vimango`. The last lines should be:
 
 ```
-Done. /Users/<you>/vimango/libvim.a is libvim 6fc194385 feat(messages): ...
+Done. /Users/<you>/vimango/libvim.a is libvim 6bc47d62d fix(search): ...
 Now build vimango:
 ```
 
-The commit must be **`6fc194385` or later** (`31301666c` is enough for a
+The commit must be **`6bc47d62d` or later** (`31301666c` is enough for a
 vimango at `108a96e` or earlier, `77fc72a6d` for one at `0556725` or earlier).
 To check afterwards:
 
 ```bash
-git -C ~/libvim merge-base --is-ancestor 6fc194385 HEAD && echo "libvim is new enough"
+git -C ~/libvim merge-base --is-ancestor 6bc47d62d HEAD && echo "libvim is new enough"
 ```
 
 The script refuses to build from a checkout that would give the wrong library,
@@ -191,7 +191,9 @@ A `libvim.a` between `a036ecafe` and `77fc72a6d` links without complaint and
 is still too old (vim's errors show, its reports — "5 lines yanked" — do
 not). So does one between `d93698bc8` and `6fc194385`: `:registers`,
 `:history` and `:print` say nothing, and `:let` with no assignment is
-refused. That is why step 3 checks the commit rather than trusting the build.
+refused. And one before `6bc47d62d`: a typed `/pattern` warns of wraps that
+did not happen, and `/pattern/e` reports "Pattern not found". That is why
+step 3 checks the commit rather than trusting the build.
 
 `undefined: thisBinaryRequiresBuildTagFts5` means `--tags=fts5` was left off.
 
@@ -361,7 +363,7 @@ cd ~/vimango
 sqlite3 vimango.db ".backup vimango-before-update.db.bak"
 git switch dev && git pull --ff-only
 rm -f go.work go.work.sum
-./scripts/build-libvim.sh --clean          # must end: libvim 6fc194385 or later
+./scripts/build-libvim.sh --clean          # must end: libvim 6bc47d62d or later
 CGO_ENABLED=1 go build --tags=fts5
 ./vimango --migrate                        # two lines; a second run: already up to date
 cd ~/vimango_hybrid

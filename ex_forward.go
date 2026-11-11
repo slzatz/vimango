@@ -480,37 +480,31 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 // never registered one, and libvim itself dropped everything but errors
 // until the fork's 2da770b06.
 //
-// endsSearch says the key was the Enter that completes a typed /pattern.
-// libvim's wrap warning is not to be trusted there -- it searches again from
-// where the incremental search left the cursor, reporting a wrap that did not
-// happen and missing one that did (the fork's PATCHES.md) -- so warnings are
-// dropped for that one key. n, N, * and # report wraps correctly.
-func (e *Editor) showKeyMessages(msgs []vim.Message, endsSearch bool) {
-	var texts []string
-	isError := false
+// An error is shown alone. vim warns that a search is going round the end of
+// the buffer before it knows whether it will find anything, and then writes
+// "E486: Pattern not found" over the warning; here both arrive.
+func (e *Editor) showKeyMessages(msgs []vim.Message) {
+	var texts, errors []string
 	for _, m := range msgs {
-		if m.Warning && endsSearch {
-			continue
-		}
 		for _, l := range strings.Split(m.Title+m.Text, "\n") {
 			// Ctrl-G leads with vim's idea of the file -- "[No Name]"
 			// [Modified] -- which means nothing here: the note has no file,
 			// and vim thinks every buffer it never wrote is modified.
 			l = strings.TrimPrefix(strings.TrimSpace(l), `"[No Name]" `)
 			l = strings.TrimPrefix(l, "[Modified] ")
-			if l == "" || slices.Contains(texts, l) { // vim says some things twice
-				continue
+			switch {
+			case l == "" || slices.Contains(texts, l) || slices.Contains(errors, l): // vim says some things twice
+			case m.Error:
+				errors = append(errors, l)
+			default:
+				texts = append(texts, l)
 			}
-			texts = append(texts, l)
-			isError = isError || m.Error
 		}
 	}
-	if len(texts) == 0 {
-		return
-	}
-	if isError {
-		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", strings.Join(texts, "; "))
-	} else {
+	switch {
+	case len(errors) > 0:
+		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", strings.Join(errors, "; "))
+	case len(texts) > 0:
 		e.ShowMessage(BR, "%s", strings.Join(texts, "; "))
 	}
 }

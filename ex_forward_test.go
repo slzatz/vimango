@@ -581,6 +581,11 @@ func TestVimMessagesForKeysAreShown(t *testing.T) {
 	if strings.Count(msg, "E486") != 1 {
 		t.Errorf("the failed search was reported %d times: %q", strings.Count(msg, "E486"), msg)
 	}
+	// vim warns that it is going round the end before it knows the search
+	// will fail; the error is what stays on vim's screen, and here
+	if strings.Contains(msg, "search hit") {
+		t.Errorf("a failed search also showed the wrap warning: %q", msg)
+	}
 	if msg := keyMessage(t, e, "'z"); !strings.Contains(msg, "E20: Mark not set") {
 		t.Errorf("a jump to an unset mark showed %q", msg)
 	}
@@ -647,14 +652,74 @@ func TestVimReportsForKeysAreShown(t *testing.T) {
 		t.Errorf("N round the top showed %q", msg)
 	}
 
-	// libvim's wrap warning on the Enter of a typed search is wrong -- here it
-	// reports both directions for a search that does not wrap -- so it is not shown
+	// and on the Enter of a typed search. libvim used to get this one wrong:
+	// both directions for a search that did not wrap, nothing for one that did
 	if msg := keyMessage(t, e, "20G/foo\r"); strings.Contains(msg, "search hit") {
 		t.Errorf("a typed search that did not wrap showed %q", msg)
 	}
 	if e.fr != 24 {
 		t.Errorf("the search landed on row %d, want 24", e.fr)
 	}
+	if msg := keyMessage(t, e, "/foo\r"); strings.Count(msg, "search hit BOTTOM, continuing at TOP") != 1 || strings.Contains(msg, "hit TOP") {
+		t.Errorf("a typed search round the end showed %q", msg)
+	}
+	if e.fr != 4 {
+		t.Errorf("the search landed on row %d, want 4", e.fr)
+	}
+	if msg := keyMessage(t, e, "?foo\r"); strings.Count(msg, "search hit TOP, continuing at BOTTOM") != 1 || strings.Contains(msg, "hit BOTTOM") {
+		t.Errorf("a typed backward search round the top showed %q", msg)
+	}
+	if e.fr != 24 {
+		t.Errorf("the backward search landed on row %d, want 24", e.fr)
+	}
+}
+
+// A typed search does what it does in vim. libvim ran two searches for it,
+// from wherever the incremental search had left the cursor, so an offset was
+// reported as "Pattern not found", an empty pattern did not repeat, and a
+// search that failed could move the cursor.
+func TestTypedSearch(t *testing.T) {
+	e := newTestEditor(t, "one foo", "two", "three foo", "four")
+	withOrganizer(t, e)
+	t.Cleanup(func() { vim.ExecuteCommand("set wrapscan") })
+	at := func(what string, row, col int) {
+		t.Helper()
+		if e.fr != row || e.fc != col {
+			t.Errorf("%s: cursor at row %d, column %d; want %d, %d", what, e.fr, e.fc, row, col)
+		}
+	}
+
+	if msg := keyMessage(t, e, "/foo/e\r"); strings.Contains(msg, "E486") {
+		t.Errorf("/foo/e showed %q", msg)
+	}
+	at("/foo/e", 0, 6)
+	if msg := keyMessage(t, e, "gg/foo/+1\r"); strings.Contains(msg, "E486") {
+		t.Errorf("/foo/+1 showed %q", msg)
+	}
+	at("/foo/+1", 1, 0)
+
+	// an empty pattern is the last one again
+	keyMessage(t, e, "gg/foo\r")
+	at("/foo", 0, 4)
+	keyMessage(t, e, "/\r")
+	at("/ after /foo", 2, 6)
+
+	// back to where the search started
+	keyMessage(t, e, "``")
+	at("``", 0, 4)
+
+	// a search that fails leaves the cursor where it was, though the
+	// incremental search had shown the match on the way
+	vim.ExecuteCommand("set nowrapscan")
+	if msg := keyMessage(t, e, "G/one\r"); !strings.Contains(msg, "E385") {
+		t.Errorf("a search that may not wrap showed %q", msg)
+	}
+	at("a failed search", 3, 0)
+	vim.ExecuteCommand("set wrapscan")
+
+	// and so does <esc>
+	keyMessage(t, e, "/foo\x1b")
+	at("an abandoned search", 3, 0)
 }
 
 // A forwarded command's report goes on the message line; only a listing
