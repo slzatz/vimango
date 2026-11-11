@@ -513,3 +513,25 @@ repositories:
   `inputlist()` still call vim's waiting readers and never return --
   `:echo input('x')` freezes the editor. `getchar()` and `confirm()` return.
 
+- **A script that asks the user no longer freezes the editor** (fork
+  `76bc49547`). `:echo input('x')` never came back, nor did a mapping or a
+  function that called `input()`, `inputsecret()`, `inputdialog()` or
+  `inputlist()`, nor `:execute 'debug …'`. All of them end in vim waiting for
+  a key, and no key can reach libvim while it is running a command: keys are
+  handed to it between calls. The wait was a loop with no end.
+
+  vim has the same problem inside `:normal`, where the keys it was given can
+  run out, and answers it by handing the reader the key that makes it give
+  up. The fork now gives that answer whenever a key is asked for and none is
+  waiting, so the question is answered as Esc would answer it: `input()`
+  returns `''`, `inputlist()` 0, the debugger continues. The script goes on.
+
+  This is a floor, not support -- the user is never actually asked. Checked
+  with 36 commands and key sequences in libvim, each in its own process
+  (11 hung before, none after); fork tests `apitest/no_waiting.c`; here they
+  are in `TestForwardedCommandsDoNotHang`.
+
+  Also learned: `feedkeys()` with the `x` flag does nothing in libvim, and
+  libvim refuses `:s` with the `c` flag itself, with an error, so that one was
+  never a hang.
+

@@ -85,6 +85,12 @@ func TestForwardedCommandsDoNotHang(t *testing.T) {
 		"autocmd User Probe", "autocmd User", "augroup vimangotest", "doautocmd User Probe",
 		"source nothere.vim", "runtime nothere.vim", "read nothere.txt", "spellgood vimango", "registers a", "display a", "marks a",
 		"42", "$", "noh | set ts=4", "Foo", "zzz",
+		// vimscript that asks the user: no key can come while libvim runs,
+		// so the question is given up (the fork's 76bc49547; before it
+		// these never returned)
+		"echo input('x: ')", "call input('x: ')", "let g:r = input('x: ', 'default')", "echo inputsecret('x: ')",
+		"echo inputdialog('x: ')", "echo inputlist(['pick', '1. a', '2. b'])", "echo getchar()", "echo confirm('sure?')",
+		"execute 'debug echo 1'", "normal :echo input('x: ')\r",
 	)
 	slices.Sort(lines)
 	lines = slices.Compact(lines)
