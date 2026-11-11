@@ -63,6 +63,31 @@ endfunction
 xnoremap - :<C-u>call VimangoToggleList(line("'<"), line("'>"), 'bullet')<CR>
 xnoremap # :<C-u>call VimangoToggleList(line("'<"), line("'>"), 'number')<CR>
 
+" Insert mode: Enter on a list item starts the next item, with the same marker
+" after the same indentation ('autoindent' supplies the indentation when it is
+" set). Enter on an item with nothing in it ends the list: the marker goes and
+" the line is left empty. With the cursor inside the marker, or on a line that
+" is not a list item, Enter is just Enter.
+"
+" The marker is repeated as it is written, so a list numbered "1. " throughout
+" stays that way.
+"
+" Text pasted from the terminal reaches vim as typed keys, so a list pasted in
+" INSERT mode gets a second marker on every line unless :paste is on (which
+" turns mappings off, as it turns off 'autoindent').
+function! VimangoListEnter() abort
+  let line = getline('.')
+  let m = matchlist(line, '^\(\s*\)\(' . s:list_pattern.bullet . '\|' . s:list_pattern.number . '\)')
+  if empty(m) || col('.') <= strlen(m[0])
+    return "\<CR>"
+  endif
+  if strpart(line, strlen(m[0])) !~ '\S'
+    return "\<C-o>0\<C-o>D"
+  endif
+  return "\<CR>" . (&autoindent ? m[2] : m[0])
+endfunction
+inoremap <expr> <CR> VimangoListEnter()
+
 " ---------------------------------------------------------------------------
 " Bold, italic, code.
 "

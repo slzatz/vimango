@@ -320,3 +320,85 @@ func TestVimrcMissingFileIsSilent(t *testing.T) {
 	e.sendKeys("V-")
 	assertLines(t, e, "alpha")
 }
+
+// ---- Enter in INSERT mode on a list item (VimangoListEnter in vimango.vim) ----
+
+func TestVimrcEnterContinuesAList(t *testing.T) {
+	const esc = "\x1b"
+	cases := []struct {
+		name  string
+		setup string // an ex command to run first
+		lines []string
+		keys  string
+		want  []string
+	}{
+		{"bullets", "", []string{"- foo"}, "A\rbar\rbaz" + esc, []string{"- foo", "- bar", "- baz"}},
+		{"numbers", "", []string{"1. foo"}, "A\rbar\rbaz" + esc, []string{"1. foo", "1. bar", "1. baz"}},
+		{"the marker as written", "", []string{"2) foo"}, "A\rbar" + esc, []string{"2) foo", "2) bar"}},
+		{"star bullet", "", []string{"* foo"}, "A\rbar" + esc, []string{"* foo", "* bar"}},
+		{"a list typed from nothing", "", []string{""}, "i- one\rtwo\r\rafter" + esc, []string{"- one", "- two", "after"}},
+		{"nested", "", []string{"- top", "  - foo"}, "jA\rbar" + esc, []string{"- top", "  - foo", "  - bar"}},
+		{"nested, noautoindent", "set noautoindent", []string{"  1. foo"}, "A\rbar" + esc, []string{"  1. foo", "  1. bar"}},
+		{"tab indent", "", []string{"\t- foo"}, "A\rbar" + esc, []string{"\t- foo", "\t- bar"}},
+		{"an empty item ends the list", "", []string{"- foo"}, "A\rbar\r\rplain\rnext" + esc, []string{"- foo", "- bar", "plain", "next"}},
+		{"an empty nested item ends the list", "", []string{"  - foo"}, "A\r\rplain" + esc, []string{"  - foo", "plain"}},
+		{"an empty item that was already there", "", []string{"- foo", "- "}, "jA\rplain" + esc, []string{"- foo", "plain"}},
+		{"an empty item with trailing blanks", "", []string{"1.   "}, "A\rplain" + esc, []string{"plain"}},
+		{"in the middle of an item", "", []string{"- alpha bravo"}, "wwi\r" + esc, []string{"- alpha ", "- bravo"}},
+		{"inside the marker", "", []string{"- foo"}, "i\r" + esc, []string{"", "- foo"}},
+		// noautoindent: with it on, vim itself takes the indentation off text
+		// moved down from column 0
+		{"inside the indentation", "set noautoindent", []string{"  - foo"}, "i\r" + esc, []string{"", "  - foo"}},
+		{"not a list", "", []string{"plain"}, "A\rtext" + esc, []string{"plain", "text"}},
+		{"italic is not a bullet", "", []string{"*word* more"}, "A\rtext" + esc, []string{"*word* more", "text"}},
+		{"a rule is not a bullet", "", []string{"---"}, "A\rtext" + esc, []string{"---", "text"}},
+		{"a number without a space", "", []string{"3.14 is pi"}, "A\rtext" + esc, []string{"3.14 is pi", "text"}},
+		{":paste turns it off", "set paste", []string{"- foo"}, "A\r- bar" + esc, []string{"- foo", "- bar"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := newVimrcEditor(t, c.lines...)
+			t.Cleanup(func() {
+				vim.SendKey("<esc>")
+				vim.ExecuteCommand("set nopaste autoindent")
+			})
+			if c.setup != "" {
+				vim.ExecuteCommand(c.setup)
+			}
+			e.sendKeys(c.keys)
+			got := e.vbuf.Lines()
+			if len(got) != len(c.want) {
+				t.Fatalf("buffer = %q, want %q", got, c.want)
+			}
+			assertLines(t, e, c.want...)
+		})
+	}
+}
+
+// Ending a list leaves the editor in INSERT mode on the emptied line, with
+// vim on the note's buffer, and what was typed can be undone.
+func TestVimrcEnterEndingAListStaysInInsert(t *testing.T) {
+	e := newVimrcEditor(t, "- foo")
+
+	e.sendKeys("A\rbar\r")
+	assertLines(t, e, "- foo", "- bar", "- ")
+	e.sendKeys("\r")
+	if e.mode != INSERT || vim.GetCurrentMode() != vim.ModeInsert {
+		t.Errorf("after ending the list: mode %v, vim %v, want INSERT", e.mode, vim.GetCurrentMode())
+	}
+	if got := vim.GetCursorPosition(); got != [2]int{3, 0} {
+		t.Errorf("cursor = %v, want [3 0]", got)
+	}
+	if got := e.vbuf.Lines(); len(got) != 3 || got[2] != "" {
+		t.Fatalf("buffer = %q, want the third line empty", got)
+	}
+	e.sendKeys("x\x1b")
+	assertLines(t, e, "- foo", "- bar", "x")
+
+	for i := 0; i < 5 && len(e.vbuf.Lines()) > 1; i++ {
+		e.sendKeys("u")
+	}
+	if got := e.vbuf.Lines(); len(got) != 1 || got[0] != "- foo" {
+		t.Errorf("after undo: %q, want only the first line", got)
+	}
+}

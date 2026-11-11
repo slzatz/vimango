@@ -182,8 +182,11 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"`  Ctrl-I         ` - italic (*); also Tab, the same key to a terminal\n" +
 	"`  Ctrl-E         ` - code (`)\n" +
 	"`  - (visual)     ` - toggle the selected lines as a bulleted list\n" +
-	"`  # (visual)     ` - toggle the selected lines as a numbered list\n\n" +
+	"`  # (visual)     ` - toggle the selected lines as a numbered list\n" +
+	"`  Enter (insert) ` - on a list item, start the next one with the same marker\n\n" +
 	"The same key again removes a decoration or list; the other one swaps it.\n" +
+	"Enter on an empty list item ends the list. To paste a list in INSERT mode,\n" +
+	"`:paste` first (and `:nopaste` after), or each line gets a second marker.\n" +
 	"\nSearch with `/` `?` `n` `N` `*` `#`: the matches are highlighted until `:noh`\n" +
 	"(`set nohlsearch` in vimango.vim turns that off).\n" +
 	"Mappings live in vimango.vim, next to config.json.\n"

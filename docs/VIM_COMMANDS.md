@@ -120,6 +120,8 @@ Typed at the `:` line they last until the editor closes; put them in
 | `:inoremap ,d <C-r>=strftime('%F')<CR>` then `i,d` | today's date is inserted |
 | `:nnoremap ,s :%s/` then `,s` | the `:` line opens holding `%s/` |
 | `:iabbrev teh the` then type `teh ` in INSERT | `the ` |
+| `i- one` Enter `two` Enter Enter (from `vimango.vim`) | `- one`, `- two`, then an empty line with no marker: the list is over. The same with `1. ` |
+| `:paste`, then paste a list in INSERT, then `:nopaste` | the list as it was copied. Without `:paste` each line gets a second marker |
 | `:command! Hi echo 'hi there'` then `:Hi` | `hi there` |
 | `:source vimango.vim` | re-reads it |
 | `:r somefile.txt` | the file's text is read *into* the note (reading is allowed; writing is not) |

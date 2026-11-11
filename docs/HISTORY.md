@@ -563,3 +563,26 @@ repositories:
   recomputing its wanted column (`w_set_curswant` is still set from the
   buffer switch, and `vimInput` ends in `update_curswant()`), so a `$` typed
   first forgets that it meant "the end". Harmless, but it confuses tests.
+
+- **Enter continues a list.** In INSERT mode, Enter on a line that is a list
+  item -- `- `, `* `, `+ `, `1. `, `1) `, after any indentation -- starts the
+  next item with the same marker, and Enter on an item with nothing in it
+  clears the line and ends the list. All of it is `vimango.vim`: an
+  `inoremap <expr> <CR>` on `VimangoListEnter`, which uses the patterns the
+  visual `-` / `#` toggles already had. No Go and no libvim change. Tests:
+  `TestVimrcEnterContinuesAList`, `TestVimrcEnterEndingAListStaysInInsert`
+  (`vimrc_test.go`).
+
+  Choices made: the marker is repeated as written rather than counted up (a
+  list numbered `1. ` throughout stays so); the new line's indentation is
+  left to 'autoindent' when it is set, and written by the mapping when it is
+  not; ending a list is `<C-o>0<C-o>D`, not `<C-u>`, which leaves the
+  indentation of a nested item and depends on 'backspace' when the marker was
+  not typed in this insert. vim's 'comments' with 'formatoptions' `ro` was
+  the alternative: it continues bullets on Enter and on `o`, but knows
+  nothing of numbers and has no way to end a list.
+
+  Known: `o` in NORMAL mode on a list item opens a plain line. And vimango
+  does not ask the terminal for bracketed paste, so pasted text is typed keys:
+  a list pasted in INSERT mode gets a second marker on every line unless
+  `:paste` is on, which turns insert mappings off.

@@ -192,10 +192,11 @@ A task note's Taskwarrior uuid is `task.taskwarrior_uuid`: synced both ways, wri
 New key bindings belong in `vimango.vim` (project root, cwd-relative), sourced once at startup (`sourceVimrc`, `vimrc.go`), so `--editor` processes get it too. A missing file is fine and errors in it are silenced. It holds ordinary vimscript:
 
 - visual `-` / `#` toggle the selected lines as a bulleted or numbered markdown list, and switch one kind to the other (`VimangoToggleList`)
+- Enter in INSERT mode on a list item (`- `, `* `, `+ `, `1. `, `1) `) starts the next item with the same marker, and on an empty item ends the list by clearing the line (`VimangoListEnter`, an `<expr>` mapping on `<CR>`). The marker is repeated as written, never counted up. Terminal paste is typed keys, so a list pasted in INSERT gets a second marker per line unless `:paste` is on
 - Ctrl-B / Ctrl-I / Ctrl-E toggle bold / italic / code on the word under the cursor (normal) or a one-line selection (visual); a different key swaps the style (`VimangoDecorate`)
 - `set spelloptions=noallcaps,nomixedcase`, and anything else a vimrc would hold
 
-Both functions are string edits on the line (`getline`/`setline`), never `iw`/`gv`: after a decoration the text has moved, so vim's word motions and the `'<`/`'>` marks no longer describe it. Keep `editorNormalModeHelp` (the editor's `:help normal`) in step with the file.
+`VimangoToggleList` and `VimangoDecorate` are string edits on the line (`getline`/`setline`), never `iw`/`gv`: after a decoration the text has moved, so vim's word motions and the `'<`/`'>` marks no longer describe it. Keep `editorNormalModeHelp` (the editor's `:help normal`) in step with the file.
 
 Ctrl-I is Tab to a terminal, so Tab does italic. Ghostty — and so hybrid — sends Ctrl-I as the kitty-protocol `ESC [105;5u`; `terminal.ReadKey` decodes CSI-u Ctrl+letter back to its control byte and **drops any sequence it cannot use whole** (an unparsed tail such as `;5u` would reach vim as keys: "undo five times").
 
