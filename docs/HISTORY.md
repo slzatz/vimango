@@ -535,3 +535,12 @@ repositories:
   libvim refuses `:s` with the `c` flag itself, with an error, so that one was
   never a hang.
 
+- **`docs/VIM_COMMANDS.md`**: a list to test the editor against by hand, in the
+  TUI and in hybrid -- what vim's commands now do, what is blocked on purpose
+  and the message each gives, and what is still missing. Its expected results
+  were taken from running some ninety commands through the editor. Writing it
+  turned up three things not on any list: function keys never reach vim
+  (`termcodes` does not name them), Ctrl-\ Ctrl-N in INSERT inserts its two
+  control characters as text, and `go.work` is still active on this machine
+  (`../glamour` is at the pinned commit, so nothing differs yet).
+
