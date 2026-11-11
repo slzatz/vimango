@@ -85,6 +85,15 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	msgs := vim.CaptureMessages(func() {
 		vim.SendUserKey(func() { sendToVim(c) })
 	})
+	// A key can take vim off the note's buffer: Ctrl-^ goes to the alternate
+	// buffer, which here is the organizer's list of titles or vim's own
+	// empty one. Every key after it would edit that buffer, unseen, while
+	// the screen went on showing the note. Come straight back, and drop what
+	// vim said about the buffer it visited.
+	if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
+		vim.SetCurrentBuffer(e.vbuf)
+		msgs = nil
+	}
 	defer e.showKeyMessages(msgs, endsSearch)
 	// zg, zw etc. change what is misspelled without changing the buffer
 	spellRedraw := spellOn && spellListKey(e.spellKeys, c)

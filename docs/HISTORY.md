@@ -369,3 +369,10 @@ repositories:
   first row of the organizer's default list; hybrid always passes `--open`).
   The tests that exercised `--editor` did so with an organizer present; they
   now run without one.
+- **Ctrl-^ no longer takes the editor off its note.** Found while comparing
+  sessions for the change above: Ctrl-^ switches vim to its alternate buffer,
+  which in the TUI is the organizer's list of titles and in `--editor` mode
+  was the same hidden list (now vim's own empty buffer). The screen went on
+  showing the note, and whatever was typed next went into the other buffer --
+  in the TUI, into the titles -- until the next forwarded ex command noticed
+  and went back. The editor now checks after every key.

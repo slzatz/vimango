@@ -176,6 +176,8 @@ A task note's Taskwarrior uuid is `task.taskwarrior_uuid`: synced both ways, wri
 
 **The editor intercepts no normal-mode keys: every key reaches vim.** Editing shortcuts are vim mappings in `vimango.vim`; anything wanting an argument or a name is an ex command. (`<Space>` is a real vim motion; a leader key would swallow it.)
 
+**After every key, vim is on the note's buffer.** A key can take it elsewhere — Ctrl-^ goes to the alternate buffer — and `editorProcessKey` brings it straight back, as `forwardEx` does after an ex command. Otherwise the keys that follow edit a buffer nobody is looking at. Test: `TestKeyThatLeavesTheNoteComesBack`.
+
 ### vim mappings: `vimango.vim`
 
 New key bindings belong in `vimango.vim` (project root, cwd-relative), sourced once at startup (`sourceVimrc`, `vimrc.go`), so `--editor` processes get it too. A missing file is fine and errors in it are silenced. It holds ordinary vimscript:

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/slzatz/vimango/terminal"
@@ -213,5 +214,38 @@ func TestCursorColumnOnMultiByteLine(t *testing.T) {
 	e.editorProcessKey('x')
 	if got, want := e.line(0), "‘xy’"; got != want {
 		t.Errorf("after x: %q, want %q", got, want)
+	}
+}
+
+// A key that takes vim to another buffer does not leave it there. Ctrl-^
+// switches to the alternate buffer -- the organizer's list of titles, in the
+// TUI -- and what was typed next went into that buffer: titles were edited,
+// and the note on screen did not change.
+func TestKeyThatLeavesTheNoteComesBack(t *testing.T) {
+	e := newTestEditor(t, "alpha", "bravo")
+	a := withOrganizer(t, e)
+	// as when a note is opened from the organizer: the organizer's buffer
+	// was current, then the note's
+	vim.SetCurrentBuffer(a.Organizer.vbuf)
+	a.Organizer.vbuf.SetLines(0, -1, []string{"a title", "another title"})
+	vim.SetCurrentBuffer(e.vbuf)
+
+	out := captureStdout(t, func() {
+		e.editorProcessKey(ctrlKey('^'))
+		e.sendKeys("ix")
+		e.editorProcessKey('\x1b')
+	})
+
+	if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
+		t.Fatal("vim is not on the note's buffer")
+	}
+	if got := e.line(0); got != "xalpha" {
+		t.Errorf("after Ctrl-^ and ix the note's first line is %q, want the x in it", got)
+	}
+	if got := a.Organizer.vbuf.Lines(); got[0] != "a title" || got[1] != "another title" {
+		t.Errorf("the organizer's titles are now %q", got)
+	}
+	if strings.Contains(out, "line 1 of 2") {
+		t.Errorf("vim's report on the other buffer was shown: %q", out)
 	}
 }
