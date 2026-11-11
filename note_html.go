@@ -25,30 +25,54 @@ const defaultAccent = "#3498db"
 
 var accentHexRe = regexp.MustCompile(`^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
 
-// previewAccent resolves config.json's webview.accent to a CSS color:
-// "" → the default blue, "none"/"off" → currentColor (markers and the
-// blockquote bar take the surrounding text color), any #rgb/#rrggbb →
-// itself. Anything else falls back to the default rather than injecting
-// arbitrary text into the stylesheet.
-func previewAccent() string {
-	if app == nil || app.Config == nil {
-		return defaultAccent
-	}
-	return resolveAccent(app.Config.Webview.Accent, "webview.accent", defaultAccent)
+// htmlRenderer renders a note as an HTML document: `--render-html`, which is
+// vimango_hybrid's preview pane and its PDF export.
+//
+// It holds everything rendering takes from the rest of the program -- two
+// colours, how to look up a note's title, where images come from -- so that
+// rendering needs no App, no organizer and no terminal. RunRenderHTML builds
+// one from config.json, the store and the Drive sign-in; the zero value
+// renders with the default colours, leaves [[tid:N]] references unresolved,
+// and shows a placeholder where a Google Drive image would be.
+type htmlRenderer struct {
+	// accent is the colour of the blockquote bar and list markers, and
+	// codeAccent of inline code and code blocks, as config.json's
+	// webview.accent and webview.code_accent have them: render resolves
+	// them to CSS (accents), so nothing else reaches the stylesheet.
+	accent, codeAccent string
+
+	// linkNotes makes [[references]] clickable: the caller declaring itself
+	// a host that will intercept vimango://note/ (see wikilink.go).
+	linkNotes bool
+	// showTitle puts the note's title at the top of the page as an <h1>.
+	// The app's panes leave it out -- each has a native title bar right
+	// above -- but an exported page has nothing above it.
+	showTitle bool
+
+	// titleForTID is the current title of the note a [[tid:N]] reference
+	// names. nil shows "tid:N" and never marks a reference missing.
+	titleForTID titleForTID
+
+	// images downloads Google Drive images, and cache is where they are
+	// kept (./image_cache/, shared with the TUI) so that a note's images
+	// are fetched once. A nil cache downloads every time.
+	images driveImages
+	cache  *ImageCache
 }
 
-// previewCodeAccent resolves config.json's webview.code_accent — the
-// color of inline code and code blocks (fenced or indented). Its own
-// key rather than a share of webview.accent: code and the
-// blockquote/marker accent are different kinds of emphasis, and tuning
-// one shouldn't drag the other. Unset it falls back to whatever the
-// accent resolved to, so the two match until told otherwise.
-func previewCodeAccent() string {
-	accent := previewAccent()
-	if app == nil || app.Config == nil {
-		return accent
-	}
-	return resolveAccent(app.Config.Webview.CodeAccent, "webview.code_accent", accent)
+// accents resolves config.json's webview.accent and webview.code_accent to
+// CSS colours: "" → the default blue, "none"/"off" → currentColor (markers
+// and the blockquote bar take the surrounding text color), any #rgb/#rrggbb
+// → itself. Anything else falls back to the default rather than injecting
+// arbitrary text into the stylesheet.
+//
+// code_accent is its own key rather than a share of accent: code and the
+// blockquote/marker accent are different kinds of emphasis, and tuning one
+// shouldn't drag the other. Unset it falls back to whatever the accent
+// resolved to, so the two match until told otherwise.
+func accents(accent, codeAccent string) (string, string) {
+	accent = resolveAccent(accent, "webview.accent", defaultAccent)
+	return accent, resolveAccent(codeAccent, "webview.code_accent", accent)
 }
 
 // resolveAccent is the shared vocabulary behind both keys. `fallback`
@@ -68,16 +92,12 @@ func resolveAccent(configured, key, fallback string) string {
 	return fallback
 }
 
-// RenderNoteAsHTML renders a note's markdown as a standalone HTML document for
-// --render-html, which drives vimango_hybrid's preview pane. The document is
-// styled for an embedded pane: no <h1> (the host shows the title natively --
-// it is metadata, not part of the note) and left-aligned content, since
-// auto-centering inside a pane reads as a large wasted indent. title fills
-// only <title>.
-// showTitle puts the note's title at the top of the page as an <h1>. The
-// app's panes leave it out -- each has a native title bar right above --
-// but an exported page has nothing above it.
-func RenderNoteAsHTML(title, markdownContent string, linkNotes, showTitle bool) (string, error) {
+// render renders a note's markdown as a standalone HTML document. The
+// document is styled for an embedded pane: left-aligned content, since
+// auto-centering inside a pane reads as a large wasted indent, and no <h1>
+// unless showTitle (the host shows the title natively -- it is metadata, not
+// part of the note); title otherwise fills only <title>.
+func (r htmlRenderer) render(title, markdownContent string) (string, error) {
 	// Peel off a YAML frontmatter block, if the note opens with one, and
 	// render it as its own metadata card (frontmatter.go). Ahead of the
 	// image pass and of goldmark both: goldmark has no notion of
@@ -97,13 +117,13 @@ func RenderNoteAsHTML(title, markdownContent string, linkNotes, showTitle bool) 
 	}
 
 	// Pre-process markdown to handle Google Drive images
-	processedMarkdown, err := preprocessMarkdownImages(body)
+	processedMarkdown, err := r.inlineImages(body)
 	if err != nil {
 		return "", fmt.Errorf("failed to preprocess markdown images: %v", err)
 	}
 
 	// Convert markdown to HTML using goldmark
-	htmlContent := frontmatterCard + convertMarkdownToHTML(processedMarkdown, linkNotes)
+	htmlContent := frontmatterCard + r.markdownToHTML(processedMarkdown)
 
 	// Wrap in basic HTML template
 	htmlTemplate := `<!DOCTYPE html>
@@ -668,6 +688,7 @@ func RenderNoteAsHTML(title, markdownContent string, linkNotes, showTitle bool) 
 		return "", fmt.Errorf("failed to parse HTML template: %v", err)
 	}
 
+	accent, codeAccent := accents(r.accent, r.codeAccent)
 	var buf strings.Builder
 	err = tmpl.Execute(&buf, struct {
 		Title      string
@@ -677,12 +698,12 @@ func RenderNoteAsHTML(title, markdownContent string, linkNotes, showTitle bool) 
 		CodeAccent template.CSS
 	}{
 		Title:     title,
-		ShowTitle: showTitle,
+		ShowTitle: r.showTitle,
 		Content:   template.HTML(htmlContent),
-		// template.CSS is safe here: both resolvers only return
+		// template.CSS is safe here: accents only returns
 		// regex-validated hex or fixed keywords.
-		Accent:     template.CSS(previewAccent()),
-		CodeAccent: template.CSS(previewCodeAccent()),
+		Accent:     template.CSS(accent),
+		CodeAccent: template.CSS(codeAccent),
 	})
 
 	if err != nil {
@@ -728,10 +749,11 @@ func imagePlaceholderHTML(altText string, err error) string {
 		template.HTMLEscapeString(err.Error()), template.HTMLEscapeString(label), reason)
 }
 
-// preprocessMarkdownImages processes Google Drive images in markdown before HTML conversion
-func preprocessMarkdownImages(markdown string) (string, error) {
-	// Initialize cache if needed
-	initImageCache()
+// inlineImages replaces each Google Drive image in the markdown with the image
+// itself, as a data URI, before the conversion to HTML: from the cache, or
+// downloaded and then cached. One that cannot be had becomes a placeholder
+// that says why.
+func (r htmlRenderer) inlineImages(markdown string) (string, error) {
 
 	// Regular expression to find Google Drive URLs in markdown image syntax
 	// Matches both full URLs and gdrive: format
@@ -752,8 +774,8 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 		var err error
 
 		// Try cache first
-		if globalImageCache != nil {
-			if cachedData, found := globalImageCache.GetCachedImage(googleURL); found {
+		if r.cache != nil {
+			if cachedData, found := r.cache.GetCachedImage(googleURL); found {
 				// Check if cached data is already a data URI or raw base64
 				if strings.HasPrefix(cachedData, "data:") {
 					// Already a proper data URI, use as-is
@@ -765,7 +787,7 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 				}
 			} else {
 				// Cache miss - download and convert to data URI
-				dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
+				dataURI, err = r.driveImageDataURI(googleURL)
 				if err != nil {
 					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
 					processedMarkdown = strings.Replace(processedMarkdown, fullMatch, imagePlaceholderHTML(altText, err), 1)
@@ -773,14 +795,14 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 				}
 
 				// Store in cache for future use
-				if cacheErr := globalImageCache.StoreCachedImage(googleURL, dataURI); cacheErr != nil {
+				if cacheErr := r.cache.StoreCachedImage(googleURL, dataURI); cacheErr != nil {
 					log.Printf("Warning: Could not cache image %s: %v", googleURL, cacheErr)
 					// Continue anyway - we have the data URI
 				}
 			}
 		} else {
 			// No cache available - fallback to direct conversion
-			dataURI, err = convertGoogleDriveImageToDataURI(googleURL)
+			dataURI, err = r.driveImageDataURI(googleURL)
 			if err != nil {
 				log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
 				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, imagePlaceholderHTML(altText, err), 1)
@@ -796,11 +818,9 @@ func preprocessMarkdownImages(markdown string) (string, error) {
 	return processedMarkdown, nil
 }
 
-// convertGoogleDriveImageToDataURI downloads a Google Drive image and converts it to a data URI
-func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
-	// Download the image using the existing loadGoogleImage function
-	// Note: We'll use reasonable defaults for max width/height for web display
-	img, imgFmt, err := loadGoogleImage(googleURL, 1200, 800)
+// driveImageDataURI downloads a Google Drive image and converts it to a data URI
+func (r htmlRenderer) driveImageDataURI(googleURL string) (string, error) {
+	img, imgFmt, err := r.images.load(googleURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to load Google Drive image: %w", err)
 	}
@@ -834,8 +854,8 @@ func convertGoogleDriveImageToDataURI(googleURL string) (string, error) {
 	return dataURI, nil
 }
 
-// convertMarkdownToHTML converts markdown to HTML using goldmark
-func convertMarkdownToHTML(markdown string, linkNotes bool) string {
+// markdownToHTML converts markdown to HTML using goldmark
+func (r htmlRenderer) markdownToHTML(markdown string) string {
 	// Configure goldmark with common extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
@@ -850,7 +870,7 @@ func convertMarkdownToHTML(markdown string, linkNotes bool) string {
 			// see the note there on why that is the caller's to say.
 			// [[tid:N]] references resolve their current title
 			// through the open database, when there is one.
-			wikiLinkExtension{anchors: linkNotes, titleForTID: dbTitleForTID()},
+			wikiLinkExtension{anchors: r.linkNotes, titleForTID: r.titleForTID},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs

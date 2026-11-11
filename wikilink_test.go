@@ -52,7 +52,7 @@ func TestWikiLinkRendering(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := convertMarkdownToHTML(tc.in, false)
+			got := htmlRenderer{}.markdownToHTML(tc.in)
 			if !strings.Contains(got, tc.want) {
 				t.Errorf("got %q, want it to contain %q", got, tc.want)
 			}
@@ -70,7 +70,7 @@ func TestWikiLinkLeavesCodeAlone(t *testing.T) {
 		"inline html": "<pre>[[name]]</pre>\n",
 	}
 	for name, src := range cases {
-		got := convertMarkdownToHTML(src, false)
+		got := htmlRenderer{}.markdownToHTML(src)
 		if strings.Contains(got, "wikilink") {
 			t.Errorf("%s: brackets were consumed: %s", name, got)
 		}
@@ -90,7 +90,7 @@ func TestWikiLinkNonMatches(t *testing.T) {
 		"split by a line": "[[a\nb]]",
 	}
 	for name, src := range cases {
-		got := convertMarkdownToHTML(src, false)
+		got := htmlRenderer{}.markdownToHTML(src)
 		if strings.Contains(got, "wikilink") {
 			t.Errorf("%s: unexpectedly matched: %s", name, got)
 		}
@@ -108,7 +108,7 @@ func TestWikiLinkDoesNotBreakRealLinks(t *testing.T) {
 		"bare url":       "http://example.com",
 	}
 	for name, src := range cases {
-		got := convertMarkdownToHTML(src, false)
+		got := htmlRenderer{}.markdownToHTML(src)
 		if !strings.Contains(got, "example.com") {
 			t.Errorf("%s: link lost: %s", name, got)
 		}
@@ -152,7 +152,7 @@ func TestWikiLinkAnchors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := convertMarkdownToHTML(tc.in, true)
+			got := htmlRenderer{linkNotes: true}.markdownToHTML(tc.in)
 			if !strings.Contains(got, tc.want) {
 				t.Errorf("got %q, want it to contain %q", got, tc.want)
 			}
@@ -174,8 +174,8 @@ func TestWikiLinkAnchorsChangeNothingElse(t *testing.T) {
 		"[text](http://example.com)",
 		"plain paragraph with no references at all",
 	} {
-		spans := convertMarkdownToHTML(src, false)
-		anchors := convertMarkdownToHTML(src, true)
+		spans := htmlRenderer{}.markdownToHTML(src)
+		anchors := htmlRenderer{linkNotes: true}.markdownToHTML(src)
 		if spans != anchors {
 			t.Errorf("%q differed between modes:\n span:   %s\n anchor: %s", src, spans, anchors)
 		}
@@ -192,7 +192,7 @@ func TestDetermineWikiLinks(t *testing.T) {
 }
 
 // renderWikiOnly renders src with only the wiki-link extension, so a test
-// can hand it a resolver; convertMarkdownToHTML takes the database's.
+// can hand it a resolver without the rest of the renderer.
 func renderWikiOnly(t *testing.T, src string, anchors bool, resolve titleForTID) string {
 	t.Helper()
 	md := goldmark.New(goldmark.WithExtensions(wikiLinkExtension{anchors: anchors, titleForTID: resolve}))

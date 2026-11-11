@@ -25,7 +25,7 @@ func CheckForMigrate(args []string) bool {
 // build that changes how the database is stored -- and seeing the result, or
 // the reason it could not be done (another program in the middle of a write).
 func RunMigrate() int {
-	cfg, err := (&App{}).FromFile("config.json")
+	cfg, err := loadConfig("config.json")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: reading config.json: %v\n", err)
 		return 1

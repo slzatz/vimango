@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"google.golang.org/api/drive/v3"
 )
 
 func ExtractFileID(url string) (string, error) {
@@ -98,9 +99,24 @@ func decodeImageWithOrientation(r io.Reader) (image.Image, string, error) {
 // but Google Drive credentials haven't been set up
 var ErrGoogleDriveNotConfigured = errors.New("Google Drive not configured - see README.md for setup instructions")
 
-func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, imgFmt string, err error) {
-	// Check if Google Drive service is available
-	if app.Session.googleDrive == nil {
+// driveImages downloads images from Google Drive: the signed-in service, and
+// the width a download is reduced to before it is cached (preferences.json's
+// image_cache_max_width). The TUI's preview and --render-html each have one.
+type driveImages struct {
+	service  *drive.Service // nil when nobody is signed in
+	maxWidth int
+}
+
+// loadGoogleImage is the TUI's: the session's Drive service and the
+// preference the app holds.
+func loadGoogleImage(path string) (img image.Image, imgFmt string, err error) {
+	return driveImages{service: app.Session.googleDrive, maxWidth: app.imageCacheMaxWidth}.load(path)
+}
+
+// load downloads and decodes one image, named by a gdrive:ID or a Drive URL.
+// ErrGoogleDriveNotConfigured when there is no service to ask.
+func (d driveImages) load(path string) (img image.Image, imgFmt string, err error) {
+	if d.service == nil {
 		err = ErrGoogleDriveNotConfigured
 		return
 	}
@@ -110,7 +126,7 @@ func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, img
 		return
 	}
 
-	resp, err := app.Session.googleDrive.Files.Get(fileID).Download()
+	resp, err := d.service.Files.Get(fileID).Download()
 	if err != nil {
 		return
 	}
@@ -125,8 +141,8 @@ func loadGoogleImage(path string, maxWidth, maxHeight int) (img image.Image, img
 	img, imgFmt, err = decodeImageWithOrientation(resp.Body)
 	// Downsize large images for cache efficiency - configurable via preferences.json
 	// Use Resize with height=0 to preserve aspect ratio while constraining width
-	if err == nil && img != nil && img.Bounds().Dx() > app.imageCacheMaxWidth {
-		img = imaging.Resize(img, app.imageCacheMaxWidth, 0, imaging.Lanczos)
+	if err == nil && img != nil && d.maxWidth > 0 && img.Bounds().Dx() > d.maxWidth {
+		img = imaging.Resize(img, d.maxWidth, 0, imaging.Lanczos)
 	}
 	return
 }

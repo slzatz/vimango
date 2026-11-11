@@ -155,16 +155,6 @@ const wikiLinkTIDScheme = "vimango://tid/"
 // in which case nothing is claimed either way.
 type titleForTID func(tid int64) (string, error)
 
-// dbTitleForTID resolves against the open main database, or is nil when
-// there is none (tests, or a render before InitDatabases). A nil resolver
-// shows "tid:N" and never marks a reference missing.
-func dbTitleForTID() titleForTID {
-	if app == nil || app.Store == nil {
-		return nil
-	}
-	return app.Store.TitleForTID
-}
-
 type wikiLinkRenderer struct {
 	anchors     bool
 	titleForTID titleForTID

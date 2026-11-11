@@ -969,7 +969,7 @@ func loadImageForGlamour(url string, lim imageLimits) (image.Image, error) {
 
 	// Try Google Drive first if we can extract a file ID
 	if id, err := ExtractFileID(url); err == nil && id != "" {
-		img, _, gErr := loadGoogleImage(url, maxW, maxH)
+		img, _, gErr := loadGoogleImage(url)
 		if gErr == nil {
 			return img, nil
 		}

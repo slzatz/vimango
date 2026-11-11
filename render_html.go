@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"strconv"
 
@@ -56,49 +58,66 @@ func DetermineRenderHTML(args []string) int {
 func RunRenderHTML(id int, linkNotes, showTitle bool) int {
 	// The HEIC decoder leaves a plugin subprocess running that outlives
 	// this process unless it is killed. Deferred rather than placed at
-	// the end: every return below is an early one, and main() calls
-	// os.Exit on our result, which runs no defers of its own.
+	// the end: main() calls os.Exit on our result, which runs no defers
+	// of its own.
 	defer ShutdownHEICDecoder()
 	// ...and a host that no longer wants this render kills it (SIGTERM),
 	// which runs no defers either.
 	killHEICWorkerOnSignal()
 
-	app = CreateApp()
+	return renderNote(id, linkNotes, showTitle, os.Stdout, os.Stderr)
+}
 
-	prefs := app.LoadPreferences("preferences.json")
-	app.imageCacheMaxWidth = prefs.ImageCacheMaxWidth
+// renderNote is --render-html itself: the note with an id, as HTML on stdout,
+// with anything that went wrong on stderr and in the exit code it returns.
+//
+// It builds no App. What rendering needs is a note from the store and an
+// htmlRenderer made from config.json, preferences.json and the Drive sign-in;
+// nothing here or beneath it touches the global app, which stays nil in this
+// mode.
+func renderNote(id int, linkNotes, showTitle bool, stdout, stderr io.Writer) int {
+	config, err := loadConfig("config.json")
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: could not open databases: %v\n", err)
+		return 1
+	}
+	notes, err := openStore(config)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: could not open databases: %v\n", err)
+		return 1
+	}
+	defer notes.Close()
+
+	r := htmlRenderer{linkNotes: linkNotes, showTitle: showTitle, titleForTID: notes.TitleForTID}
+	r.accent, r.codeAccent = config.Webview.Accent, config.Webview.CodeAccent
 
 	// Optional: without Drive the note still renders, with a visible
 	// placeholder where each gdrive: image would be. Headless variant —
 	// stdio is piped, so the interactive OAuth prompt the TUI boot path
 	// falls into on a missing token.json would block forever here.
-	if srv, err := auth.GetDriveServiceHeadless(); err == nil {
-		app.Session.googleDrive = srv
-	} else {
-		fmt.Fprintf(os.Stderr, "Warning: Google Drive unavailable: %v\n", err)
+	r.images.maxWidth = readPreferences("preferences.json").ImageCacheMaxWidth
+	if r.images.service, err = auth.GetDriveServiceHeadless(); err != nil {
+		fmt.Fprintf(stderr, "Warning: Google Drive unavailable: %v\n", err)
 	}
-	initImageCache()
-
-	if err := app.InitDatabases("config.json"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not open databases: %v\n", err)
-		return 1
+	// the disk cache the TUI's inline images share; without one, every
+	// image is downloaded for every render
+	if r.cache, err = NewImageCache(); err != nil {
+		log.Printf("Warning: Failed to initialize image cache: %v", err)
+		r.cache = nil
 	}
 
-	title, note, err := app.Store.TitleAndNote(id)
+	title, note, err := notes.TitleAndNote(id)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: no note with id %d: %v\n", id, err)
+		fmt.Fprintf(stderr, "Error: no note with id %d: %v\n", id, err)
 		return 1
 	}
 
-	// Embedded-pane style: left-aligned content instead of a centered
-	// reading column, and no <h1> unless asked for (--title) — the host
-	// app's panes show the title in their own native header.
-	html, err := RenderNoteAsHTML(title, note, linkNotes, showTitle)
+	html, err := r.render(title, note)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not render note %d: %v\n", id, err)
+		fmt.Fprintf(stderr, "Error: could not render note %d: %v\n", id, err)
 		return 1
 	}
 
-	fmt.Print(html)
+	fmt.Fprint(stdout, html)
 	return 0
 }

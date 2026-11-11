@@ -190,7 +190,7 @@ func TestFrontmatterHTMLEscapes(t *testing.T) {
 
 // End to end, through the function --render-html calls.
 func TestRenderNoteAsHTMLFrontmatter(t *testing.T) {
-	out, err := RenderNoteAsHTML("t", "---\nname: a\nmetadata:\n  type: user\n---\n\nBody text.\n", false, false)
+	out, err := htmlRenderer{}.render("t", "---\nname: a\nmetadata:\n  type: user\n---\n\nBody text.\n")
 	if err != nil {
 		t.Fatal(err)
 	}

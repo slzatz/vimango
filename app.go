@@ -101,10 +101,10 @@ func (a *App) NewEditor() *Editor {
 	return editor
 }
 
-// FromFile returns a dbConfig struct parsed from a file.
+// loadConfig reads config.json.
 // Sensitive credentials can be overridden via environment variables:
 //   - VIMANGO_PG_PASSWORD: PostgreSQL password
-func (a *App) FromFile(path string) (*dbConfig, error) {
+func loadConfig(path string) (*dbConfig, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -129,11 +129,16 @@ func (a *App) FromFile(path string) (*dbConfig, error) {
 	return &cfg, nil
 }
 
-// LoadPreferences loads user preferences from preferences.json
-// Returns default preferences if file doesn't exist or is invalid
+// LoadPreferences loads user preferences from preferences.json, and
+// remembers the path for SavePreferences.
 func (a *App) LoadPreferences(path string) Preferences {
 	a.preferencesPath = path
+	return readPreferences(path)
+}
 
+// readPreferences reads preferences.json. It returns the defaults if the
+// file doesn't exist or is invalid, and for any value out of range.
+func readPreferences(path string) Preferences {
 	// Default preferences
 	defaults := Preferences{
 		ImageScale:         45,
@@ -243,32 +248,38 @@ func (a *App) moveDividerPct(pct int) {
 // ErrDatabaseNotFound is returned when SQLite database files don't exist
 var ErrDatabaseNotFound = fmt.Errorf("database files not found")
 
-// InitDatabases initializes database connections
-func (a *App) InitDatabases(configPath string) error {
-	// Read config file
-	config, err := a.FromFile(configPath)
-	if err != nil {
-		return err
-	}
-
-	// Check that database files exist before opening
-	// (sql.Open for SQLite creates empty files, which we want to avoid)
+// openStore opens the vimango.db that config.json names, as every mode of
+// vimango does at startup: the TUI and --editor through InitDatabases, and
+// --render-html by itself.
+func openStore(config *dbConfig) (*store.Store, error) {
+	// Check that the database file exists before opening it
+	// (sql.Open for SQLite creates an empty file, which we want to avoid)
 	if _, err := os.Stat(config.Sqlite3.DB); os.IsNotExist(err) {
-		return fmt.Errorf("%w: %s not found - run './vimango --init' to create databases", ErrDatabaseNotFound, config.Sqlite3.DB)
+		return nil, fmt.Errorf("%w: %s not found - run './vimango --init' to create databases", ErrDatabaseNotFound, config.Sqlite3.DB)
 	}
-
-	// Initialize main database
 	db, err := localdb.Open(config.Sqlite3.DB)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	a.Store = store.New(db)
-	a.Organizer.Store = a.Store
 	// Bring the database up to date with how this build stores it (WAL, the
 	// search index). Quiet, and a failure is not fatal: it means another
 	// process was mid-write, and the next start does it. Until then :find
 	// may report that task_fts is missing. `vimango --migrate` reports.
 	_, _ = localdb.Migrate(db)
+	return store.New(db), nil
+}
+
+// InitDatabases initializes database connections
+func (a *App) InitDatabases(configPath string) error {
+	config, err := loadConfig(configPath)
+	if err != nil {
+		return err
+	}
+	a.Store, err = openStore(config)
+	if err != nil {
+		return err
+	}
+	a.Organizer.Store = a.Store
 	// Postgres is optional - only connect if host is configured
 	if config.Postgres.Host != "" {
 		// Default SSL mode to "disable" for backward compatibility

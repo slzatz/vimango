@@ -314,3 +314,21 @@ repositories:
     with what was read. It now says it could not check and touches nothing.
   - A new note's context and folder were worked out in two places; one
     function now.
+- **The structural split, second layer: the HTML renderer builds no `App`.**
+  `--render-html` used to call `CreateApp()` -- an organizer, a screen, the
+  terminal probe for kitty -- and `InitDatabases`, which also opened the
+  Postgres handle, all to get at one note, two colours from `config.json` and
+  the Drive sign-in; the renderer then read those back through the global
+  `app`, with `if app == nil` guards for the tests. Now `renderNote` opens the
+  store (`openStore`, shared with `InitDatabases`) and builds an
+  `htmlRenderer`, a value that carries the colours, the flags, the
+  `[[tid:N]]` title lookup, the Drive downloader (`driveImages`) and the
+  image cache. The global stays nil in this mode. `loadConfig` and
+  `readPreferences` are plain functions for the same reason.
+
+  Checked against the previous build: 66 real notes -- with Drive images,
+  tid links, frontmatter and callouts among them -- 15 more with
+  `--wiki-links`, and five colour settings, all byte-identical. The colour
+  comparison was added after a new unit test caught the refactor resolving
+  the colours twice, which would have turned `"none"` back into the default
+  blue.
