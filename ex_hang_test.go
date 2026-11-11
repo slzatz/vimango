@@ -59,11 +59,11 @@ func exProbe(line string) (returned bool, report string) {
 }
 
 // A forwarded command must come back. libvim has no screen, and a command
-// that pages its output (bare :let listing every variable) waits forever for
-// a key that cannot arrive -- inside a C call, so the editor would freeze with
-// the note unsaved. This runs every forwarded command, bare and with
-// arguments, each in its own process with a time limit, along with the
-// listing forms that are refused, to show that the refusal is needed.
+// that waits for one never returns -- inside a C call, so the editor would
+// freeze with the note unsaved. Listing variables (bare :let) did: it padded
+// a column until a counter that the screen code used to advance reached it
+// (the fork fixed that in 6fc194385). This runs every forwarded command, bare
+// and with arguments, each in its own process with a time limit.
 func TestForwardedCommandsDoNotHang(t *testing.T) {
 	if testing.Short() {
 		t.Skip("spawns a process per command")

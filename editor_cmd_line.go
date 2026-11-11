@@ -162,7 +162,8 @@ const editorVimExHelp = "\n## vim's ex commands\n\n" +
 	"Any other command is vim's and goes to vim, with ranges and `|` as usual:\n" +
 	"`:s` `:g` `:v` `:d` `:m` `:t` `:j` `:>` `:<` `:normal` `:sort` `:u` `:red` `:noh`\n" +
 	"`:set` `:let` `:echo` `:map` `:marks` `:source`, and a line number (`:42`).\n" +
-	"What vim says back is shown on the message line.\n\n" +
+	"What vim says back is shown on the message line; what it lists (`:registers`,\n" +
+	"`:marks`, `:history`, `:messages`, `:map`, `:print`) is shown here.\n\n" +
 	"`:w` `:up` `:wq` `:x` `:q` `:q!` save and close the note in the database, in\n" +
 	"any spelling vim accepts (`:wri`, `:exi`, `:clo`).\n\n" +
 	"Not available: commands that write or open files (`:w name`, `:sav`, `:e`,\n" +

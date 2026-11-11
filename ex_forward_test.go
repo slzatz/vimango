@@ -23,6 +23,7 @@ func TestClassifyEx(t *testing.T) {
 		// state and information
 		"noh", "set ts=4", "se ts?", "setl sw=2", "let x = 5", "echo x", "echo 'a|b'", "echo 1 || 0", "call setline(1, 'x')",
 		"reg", "di", "marks", "ju", "changes", "undol", "his", "mes", "dig", "as", "ls", "pwd", "ve",
+		"let", "let g:", "let x", "let x = 1 | let", "p", "1,3nu", "li", "map", "ab", "com",
 		// mappings and commands
 		"map Q gq", "nnoremap <F2> :noh<CR>", "iab teh the", "unmap Q", "command Foo echo 1", "au BufEnter * echo 1",
 		"so vimango.vim", "ru! plugin/x.vim", "r notes.txt", "sleep 100m", "spellgood vimango", "spellr",
@@ -72,8 +73,6 @@ func TestClassifyEx(t *testing.T) {
 		"a", "append", "i", "c", "o", "vi", "ex", "fu Foo()", "if 1", "endif", "wh 1", "for i in [1]", "try", "X", "P",
 		// neither
 		"sy on", "fo", "foldo", "startinsert", "star", "stopi", "debug echo 1", "prof start x", "lua print(1)", "py print(1)", "gui", "sign list", "colo x", "filt /x/ ls",
-		// listing variables hangs libvim
-		"let", "let g:", "let x", "let x = 1 | let",
 		// the c flag
 		"s/a/b/c", "%s/a/b/gc", "s/a/b/cg | noh", "&&c",
 		// chained and nested
@@ -688,6 +687,102 @@ func TestForwardedCommandReports(t *testing.T) {
 		t.Errorf(":marks did not open the overlay (mode %v)", e.mode)
 	}
 	e.editorProcessKey('\x1b')
+}
+
+// What a command lists is shown: on the message line when it is one line, in
+// the overlay when it is more. libvim used to drop it -- :registers, :history,
+// :messages, :version, :map, :print and :let said nothing, and :let never
+// came back.
+func TestListingsAreShown(t *testing.T) {
+	e := newTestEditor(t, "alpha", "bravo", "charlie")
+	withOrganizer(t, e)
+	vim.ExecuteCommand("mapclear | mapclear!")
+	vim.ExecuteCommand("nnoremap ,d dd")
+	vim.ExecuteCommand("messages clear")
+	vim.ExecuteCommand("let g:listed = 7")
+	t.Cleanup(func() { vim.ExecuteCommand("mapclear | mapclear!") })
+	e.sendKeys("yy")
+
+	closeOverlay := func() {
+		if e.mode == HELP {
+			captureStdout(t, func() { e.editorProcessKey('\x1b') })
+		}
+	}
+	overlay := []struct{ line, want string }{
+		{"registers", `--- Registers ---`},
+		{"registers", `"0   alpha^J`},
+		{"1,3print", "alpha\r\n"}, // each line on its own
+		{"2,3#", "  3 charlie"},
+		{"history", "cmd history"},
+		{"history -3,", "2,3#"}, // what was typed above
+		{"version", "VIM - Vi IMproved"},
+		{"let", "listed                #7"},
+	}
+	for _, c := range overlay {
+		msg := exMessage(t, e, c.line)
+		if e.mode != HELP || !strings.Contains(msg, c.want) {
+			t.Errorf(":%s: mode %v, want the overlay with %q; showed %q", c.line, e.mode, c.want, msg)
+		}
+		closeOverlay()
+	}
+
+	messageLine := []struct{ line, want string }{
+		{"map", "n  ,d          * dd"},
+		{"1print", "alpha"},
+		{"let g:listed", "g:listed              #7"},
+		{"echon 'a' | echon 'b'", "ab"},
+	}
+	for _, c := range messageLine {
+		msg := exMessage(t, e, c.line)
+		if e.mode == HELP || !strings.Contains(msg, c.want) {
+			t.Errorf(":%s: mode %v, want %q on the message line; showed %q", c.line, e.mode, c.want, msg)
+		}
+		closeOverlay()
+	}
+
+	// :messages is what vim has said, and :echomsg is how a script says it
+	exMessage(t, e, "messages clear")
+	exMessage(t, e, "echomsg 'first thing'")
+	exMessage(t, e, "echomsg 'second thing'")
+	if msg := exMessage(t, e, "messages"); !strings.Contains(msg, "first thing") || !strings.Contains(msg, "second thing") {
+		t.Errorf(":messages showed %q", msg)
+	}
+	closeOverlay()
+
+	// said once: these send a message of their own
+	if msg := exMessage(t, e, "echo 'only once'"); !strings.HasSuffix(msg, "once'only once") {
+		t.Errorf(":echo showed %q", msg)
+	}
+	// and nothing at all under :silent
+	if msg := exMessage(t, e, "silent registers"); strings.Contains(msg, "Registers") || e.mode == HELP {
+		t.Errorf(":silent registers showed %q (mode %v)", msg, e.mode)
+	}
+}
+
+// A libvim.a from before the fork listed anything links without complaint,
+// and never comes back from a listing of variables. vimango asks the library
+// it has, and refuses the listing when it is that old.
+func TestOldLibraryDoesNotListVariables(t *testing.T) {
+	vim.InitializeVim(0)
+	if !vim.ListsOutput() {
+		t.Fatal("this libvim.a does not send listings: rebuild it (./scripts/build-libvim.sh)")
+	}
+	for _, line := range []string{"let", "let g:", "let g:x", "noh | let"} {
+		if d := classifyEx(line); d.action != exForward {
+			t.Errorf(":%s is refused: %s", line, d.reason)
+		}
+	}
+
+	libvimListsOutput = func() bool { return false }
+	t.Cleanup(func() { libvimListsOutput = vim.ListsOutput })
+	for _, line := range []string{"let", "let g:", "let g:x", "noh | let"} {
+		if d := classifyEx(line); d.action == exForward {
+			t.Errorf("with an old library :%s is forwarded, and would hang", line)
+		}
+	}
+	if d := classifyEx("let g:x = 1"); d.action != exForward {
+		t.Errorf("with an old library an assignment is refused: %s", d.reason)
+	}
 }
 
 // vim writes no file, by whatever route: the check on what was typed

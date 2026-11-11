@@ -78,6 +78,10 @@ var exVimangoActions = map[string]exAction{
 // show how).
 var exAllowed = map[string]bool{}
 
+// libvimListsOutput is vim.ListsOutput; a variable so that a test can stand
+// in for an old library.
+var libvimListsOutput = vim.ListsOutput
+
 func init() {
 	for _, name := range strings.Fields(`
 		substitute & ~ global vglobal delete yank put copy t move join > < normal sort retab center left right
@@ -319,12 +323,13 @@ func classifyExCommand(line string, first bool) exDecision {
 	if !exAllowed[cmd.Name] {
 		return exRefusal(cmd)
 	}
-	// :let with no assignment lists variables, and libvim never comes back
-	// from the listing: it waits, inside the C call, for a key to page with.
-	// (Found by TestForwardedCommandsDoNotHang, which runs every forwarded
-	// command; this is the only one that does it.)
-	if cmd.Name == "let" && !strings.Contains(rest, "=") {
-		return refuse(":let without an assignment lists variables, which libvim cannot show; use :echo for a value")
+	// :let with no assignment lists variables. A libvim.a from before the
+	// fork's 6fc194385 never comes back from that listing -- it pads a column
+	// with blanks for ever, inside the C call -- and such a library links
+	// without complaint. So ask the one that is linked. (Found by
+	// TestForwardedCommandsDoNotHang, which runs every forwarded command.)
+	if cmd.Name == "let" && !strings.Contains(rest, "=") && !libvimListsOutput() {
+		return refuse(":let without an assignment lists variables, and this libvim.a is too old to: rebuild it with ./scripts/build-libvim.sh")
 	}
 
 	// The command is forwarded. Does another one follow it?

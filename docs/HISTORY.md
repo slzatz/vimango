@@ -418,3 +418,37 @@ repositories:
   One trap when testing mappings: `inoremap j X | inoremap jk Y` maps `j` to
   `X` and a space. vim ends a `:map` at the `|` and keeps the blank before
   it.
+
+- **Commands that list something say it** (fork `6fc194385`). `:registers`,
+  `:history`, `:messages`, `:version` and a bare `:map` were the known silent
+  ones. A survey of 93 command lines in libvim found the gap much wider --
+  `:display`, `:abbreviate`, `:command`, `:print`, `:number`, `:list`,
+  `:g/pat/p`, `:autocmd`, `:tags`, `:echon` -- and found what the bare `:let`
+  hang really was.
+
+  One cause for all of it. vim writes a listing a piece at a time
+  (`msg_puts()`, `msg_putchar()`, `msg_advance()`), and every piece ends in one
+  function, where upstream libvim dropped it: no screen. The same deleted
+  screen code was what advanced `msg_col`, and `msg_advance()` pads with blanks
+  *until `msg_col` reaches a column* -- so `:let`, `:let g:var` and
+  `:highlight` did not wait for a key to page with, as CLAUDE.md said; they
+  looped. The fork keeps the column now and collects the text while an ex
+  command runs, sending it as one message when the command ends.
+
+  Here: nothing in the display path changed -- `showVimMessages` already put a
+  multi-line message in the overlay. `:let` with no assignment is forwarded,
+  but only when the linked library can list (`vim.ListsOutput()`): an older
+  `libvim.a` links just the same and would freeze the editor on it.
+  `TestForwardedCommandsDoNotHang` had been spending four 5-second timeouts on
+  the refused `:let` forms; the package's tests went from 8 s to 3.4 s.
+
+  Also in the fork: `:version` and `:messages` had been handed to callbacks
+  vimango does not set, and fall back to vim's own output; `:echomsg` is kept
+  in the message history again, so `:messages` has something to list;
+  `:echoerr` sent its error twice; a bare `:history` is the command history
+  whatever kind of line was typed last.
+
+  Checked by the survey, before and after: the only differences are output
+  that was missing, in vim's order, nothing said twice. Fork tests:
+  `apitest/listings.c`. Here: `TestListingsAreShown`,
+  `TestOldLibraryDoesNotListVariables`.
