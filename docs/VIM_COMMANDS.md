@@ -69,6 +69,8 @@ freezes); `docs/HISTORY.md` has the account of each.
 | `:ka` or `:mark a`, then `:'a` | set a mark, return to it |
 | `:delmarks a` | the mark is gone from `:marks` |
 | `:noh` | search highlighting off until the next search |
+| `gj`, `gk` on a row that wraps | down or up one screen line, in the same screen column; `3gj` three. A shorter screen line in between does not lose the column. After `$`, the end of each screen line. `dgj` deletes to there (before 2026-11-11 these did nothing) |
+| `H`, `M`, `L` | the first, middle and last row on screen, counting only rows shown whole; `3H` the third from the top |
 
 ### Listings (silent before 2026-11-11)
 
@@ -215,6 +217,8 @@ Worth confirming that these fail the way described, and not some other way.
 | A register name after Ctrl-R is not shown | vim draws a `"` while it waits; here nothing is drawn until the name is typed |
 | After a search, `/pattern` stays on the message line | harmless; vim leaves it there too until something else is said |
 | The search match under the cursor | highlighted like the others, not differently |
+| `$` as the very first key after opening a note, then `gj`/`gk` | they keep the column instead of going to the end of each screen line (libvim forgets the "end" on the first command in a new buffer); any `$` after that is fine |
+| `H`/`L` and `'scrolloff'` | `H` and `L` go to the top and bottom row exactly, as with `'scrolloff'` 0 |
 | Editing a title in the organizer (TUI) | shows none of vim's messages, and expands no mappings |
 
 If something on this page does not behave as written, that is the thing to

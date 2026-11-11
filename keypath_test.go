@@ -30,6 +30,7 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	vim.SetCursorPosition(1, 0)
 	e.ss = e.vbuf.Lines()
 	e.mode = NORMAL
+	vim.SetScreenLayout(e)
 	return e
 }
 

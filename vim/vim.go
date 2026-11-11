@@ -64,6 +64,7 @@ func InitializeVim(argc int) {
 	C.vimSetFileWritesEnabled(0)
 	enableSpellSuggestCallback()
 	enableMessageCallback()
+	enableScreenCallbacks()
 	probeListsOutput()
 }
 

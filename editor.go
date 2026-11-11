@@ -37,6 +37,7 @@ type Editor struct {
 	spellKeys    string              // last NORMAL keys typed, to spot zg/zw (spellListKey)
 	searchDrawn  string              // vim's search state when the text was last drawn (searchState)
 	heldKeyShown bool                // a key vim is holding is drawn at the cursor (drawAfterKey)
+	screenWant   screenWant          // where gj/gk left the cursor, and the column wanted (screen_motion.go)
 	hlCache      map[string][]string // highlighted rows by chunk text (highlightChunk)
 	hlCacheBytes int
 	bufferTick   int

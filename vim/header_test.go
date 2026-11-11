@@ -60,6 +60,9 @@ int main(void)
   STRUCT(spellError_T);
   FIELD(spellError_T, lnum); FIELD(spellError_T, col); FIELD(spellError_T, len); FIELD(spellError_T, type);
   STRUCT(VoidCallback); STRUCT(MessageCallback);
+  SIZE(screenLineMotion_T); VALUE(MOTION_H); VALUE(MOTION_L); VALUE(MOTION_M);
+  STRUCT(CursorMoveScreenLineCallback); STRUCT(CursorMoveScreenPositionCallback);
+  VALUE(FORWARD); VALUE(BACKWARD);
   VALUE(OK);
   VALUE(NORMAL); VALUE(VISUAL); VALUE(OP_PENDING); VALUE(CMDLINE); VALUE(INSERT); VALUE(NORMAL_BUSY);
   return 0;

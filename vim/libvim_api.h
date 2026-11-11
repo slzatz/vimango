@@ -41,6 +41,7 @@ typedef struct
 } pos_T;
 
 typedef struct file_buffer buf_T; /* only ever held by pointer */
+typedef struct window_S win_T;    /* only ever held by pointer */
 
 typedef enum
 {
@@ -74,6 +75,27 @@ typedef struct
   spellErrorType_T type;
 } spellError_T;
 
+/* H, M and L: which line of the window CursorMoveScreenLineCallback is asked for. */
+typedef enum
+{
+  MOTION_H,
+  MOTION_L,
+  MOTION_M,
+} screenLineMotion_T;
+
+typedef void (*CursorMoveScreenLineCallback)(screenLineMotion_T motion, int count, linenr_T startLine, linenr_T *destLine);
+
+/* gj and gk: count screen lines in direction (FORWARD 1, BACKWARD -1) from
+ * lnum, col; curswant is vim's wanted virtual column. */
+typedef void (*CursorMoveScreenPositionCallback)(
+    int direction, int count, linenr_T lnum, colnr_T cursor,
+    colnr_T curswant,
+    linenr_T *destLnum, colnr_T *destCol);
+
+/* The direction of a motion. */
+#define FORWARD 1
+#define BACKWARD (-1)
+
 /* What a function returning int for success returns. */
 #define OK 1
 
@@ -89,9 +111,14 @@ typedef struct
 
 /* vim's globals. */
 extern buf_T *curbuf;  /* the current buffer */
+extern win_T *curwin;  /* the one window */
 extern int restricted; /* restricted mode, as "vim -Z": no program is started */
 
 void vim_free(void *x);
+
+/* vim's own: the virtual (screen) columns a character occupies, as vim counts
+ * them -- 'tabstop', double-width characters. */
+void getvcol(win_T *wp, pos_T *pos, colnr_T *start, colnr_T *cursor, colnr_T *end);
 
 void vimInit(int argc, char **argv);
 
@@ -124,6 +151,9 @@ int vimInputPending(void);
 void vimInputTimeout(void);
 void vimSetFileWritesEnabled(int enabled);
 void vimSetMessageCallback(MessageCallback messageCallback);
+
+void vimSetCursorMoveScreenLineCallback(CursorMoveScreenLineCallback cursorMoveScreenLineCallback);
+void vimSetCursorMoveScreenPositionCallback(CursorMoveScreenPositionCallback cursorMoveScreenPositionCallback);
 
 pos_T *vimSearchGetMatchingPair(int initc);
 char_u *vimSearchGetPattern(void);

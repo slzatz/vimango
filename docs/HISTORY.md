@@ -545,3 +545,21 @@ repositories:
   (`../glamour` was at the pinned commit, so nothing differed). `go.work` and
   `go.work.sum` were deleted the same day; the build uses the pinned glamour.
 
+- **`gj`, `gk`, `H`, `M` and `L` work.** They did nothing: upstream libvim
+  took the screen out of vim's `nv_screengo` and `nv_scroll` and left two
+  callbacks (`vimSetCursorMoveScreenPositionCallback`,
+  `vimSetCursorMoveScreenLineCallback`) for the embedder to answer, since only
+  the embedder knows how lines are drawn. vimango never registered them, so
+  `gj`/`gk` failed silently and `H`/`M`/`L` stayed on their line. Now the
+  editor answers them (`screen_motion.go`) from the layout it draws -- word
+  wrap by `wrapRow`, tabs four columns -- and the binding (`vim/screen.go`)
+  turns its byte offsets into vim's virtual columns with vim's own `getvcol`,
+  so 'tabstop' and wide characters land right. No change to the fork.
+  Telling libvim the pane's width and letting vim compute instead would not
+  have worked: vim wraps at the width, vimango at word boundaries. Tests:
+  `screen_motion_test.go`.
+
+  Learned: in libvim the first command in a new buffer ends with vim
+  recomputing its wanted column (`w_set_curswant` is still set from the
+  buffer switch, and `vimInput` ends in `update_curswant()`), so a `$` typed
+  first forgets that it meant "the end". Harmless, but it confuses tests.

@@ -426,6 +426,7 @@ func (a *App) openEditor(id int, title string) error {
 	ae.saveTick = ae.vbuf.GetLastChangedTick()
 	ae.mode = NORMAL
 	a.Session.editor = ae
+	vim.SetScreenLayout(ae) // gj, gk, H, M, L
 
 	a.Screen.positionEditor()
 	a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
@@ -445,6 +446,7 @@ func (a *App) noteClosed() {
 		return
 	}
 	vim.ExecuteCommand("bw") // wipe out the buffer
+	vim.SetScreenLayout(nil)
 	a.Session.editor = nil
 	a.Session.editorMode = false
 	vim.SetCurrentBuffer(a.Organizer.vbuf)
