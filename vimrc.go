@@ -19,7 +19,6 @@ import (
 // has passed -- which MainLoop times, libvim having no clock (mappingWait).
 //
 // Limits worth knowing when writing one:
-//   - no <C-r> in the insert-mode part of a right-hand side; call a function
 //   - <esc> never reaches a mapping: vimango sends it to vim itself
 const vimrcFile = "vimango.vim"
 

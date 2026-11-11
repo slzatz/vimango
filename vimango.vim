@@ -2,8 +2,8 @@
 "
 " Mappings here apply to keys typed in the note editor only. A left-hand side
 " can be several keys ("inoremap jk <Esc>"); the first waits 'timeoutlen' for
-" the rest, as in vim. One libvim limit: no <C-r> inside an insert-mode
-" right-hand side. See vimrc.go.
+" the rest, as in vim. <C-r> works in an insert-mode right-hand side:
+" "inoremap <F5> <C-r>=strftime('%F')<CR>". See vimrc.go.
 
 " Markdown list markers, by kind: what is recognized after a line's
 " indentation, and what is written. Every numbered line gets "1. " -- markdown

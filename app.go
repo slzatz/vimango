@@ -474,9 +474,7 @@ func (a *App) returnCursor() {
 			// we don't need to position cursor and don't want cursor visible
 			fmt.Print(ab.String())
 			return
-		case SEARCH:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, len(ae.command_line)+a.Screen.divider+2)
-		case EX_COMMAND:
+		case SEARCH, EX_COMMAND:
 			// cursor tracks vim's cmdline position (mirrored in cmdLineCursor)
 			cur := ae.cmdLineCursor
 			if cur > len(ae.command_line) {

@@ -69,6 +69,14 @@ func (e *Editor) processKey(c int) (redraw bool) {
 		//e.mode = NORMAL_BUSY
 		prevMode := e.mode
 		mode := vim.GetCurrentMode() ////////
+		// <esc> ends one thing, and on a command line that need not be the
+		// line: it can be the register name CTRL-R was waiting for, or the
+		// expression being typed after CTRL-R =. The line under it is still
+		// open, as it was.
+		if mode == vim.ModeCmdline {
+			e.syncCmdline()
+			return false
+		}
 		e.mode = modeMap[mode]
 		//e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 		e.command_line = ""
@@ -77,6 +85,11 @@ func (e *Editor) processKey(c int) (redraw bool) {
 		e.fc = pos[1]
 		// vim clears the message line on <esc>; it does not announce NORMAL
 		e.ShowMessage(BR, "")
+		// ...and the same in INSERT: the <esc> ended a CTRL-R, or the
+		// expression for one, and the insert goes on
+		if e.mode == INSERT {
+			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
+		}
 		//return false
 		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
 		if prevMode == VISUAL || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving help
@@ -97,8 +110,6 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	switch e.mode {
 	case EX_COMMAND:
 		redraw, exit = e.ExModeKeyHandler(c)
-	case SEARCH:
-		redraw, exit = e.SearchModeKeyHandler(c)
 	case HELP:
 		redraw, exit = e.HelpModeKeyHandler(c)
 	case SPELLING:
@@ -170,33 +181,15 @@ func (e *Editor) forwardKey(c int, send func()) (redraw bool) {
 		e.mode = PENDING
 		return false
 	case vim.ModeCmdline: // SEARCH and EX_COMMAND
-		// reached only on the key that opens the line: once e.mode is
-		// EX_COMMAND or SEARCH those handlers send keys to vim themselves and
-		// never fall through to here. The key is ':' or '/' -- or a mapping
-		// that ends on a command line ("nnoremap ,s :%s/"), so vim is asked
-		// which kind of line it is and what is on it already.
-		if e.mode != SEARCH && e.mode != EX_COMMAND {
-			e.command_line = ""
-			if kind := vim.CommandLineGetType(); kind == ':' {
-				// vim stays in cmdline mode: its cmdline buffer is the line
-				// editor; ExModeKeyHandler intercepts Enter so vim never
-				// executes anything
-				e.mode = EX_COMMAND
-				// vim may have put a range on the line already: "'<,'>"
-				// when ':' is pressed in VISUAL, ".,.+2" after a count
-				// (3:). Show it at once, with the cursor after it -- it
-				// used to appear only when the next key was typed.
-				e.command_line = vim.CommandLineGetText()
-				e.cmdLineCursor = vim.CommandLineGetPosition()
-				e.tabCompletion.index = 0
-				e.tabCompletion.list = nil
-				e.ShowMessage(BR, ":%s", e.command_line)
-			} else {
-				e.mode = SEARCH
-				e.searchPrefix = string(rune(kind))
-				e.command_line = vim.CommandLineGetText()
-				e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
-			}
+		// A command line is open in vim. This key may have opened it -- ':'
+		// '/' '?', a mapping that ends on one ("nnoremap ,s :%s/"), or
+		// CTRL-R = and "=, which ask for an expression on a line of their
+		// own -- or have been typed on it. Either way vim is asked which
+		// kind of line it is and what is on it. (Keys typed on a ':' line
+		// do not come this way: ExModeKeyHandler sends them itself.)
+		opened := e.mode != SEARCH && e.mode != EX_COMMAND
+		e.syncCmdline()
+		if opened {
 			return false
 		}
 	case vim.ModeInsert:
@@ -209,7 +202,9 @@ func (e *Editor) forwardKey(c int, send func()) (redraw bool) {
 		redraw = true
 	}
 
-	if m, ok := modeMap[mode]; ok { // note that ModeCmdline => SEARCH (it is also COMMAND)
+	if mode == vim.ModeCmdline {
+		// SEARCH or EX_COMMAND: syncCmdline said which
+	} else if m, ok := modeMap[mode]; ok {
 		e.mode = m
 	} else {
 		e.mode = OTHER // not sure this ever happens
@@ -383,15 +378,32 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		return false, true
 	}
 
-	// mirror line and cursor from vim for display
+	// mirror the line from vim for display. It may not be the ':' line any
+	// more: CTRL-R = puts that aside for a line the expression is typed on,
+	// and then the keys are that line's, <cr> included
+	e.syncCmdline()
+	return false, true
+}
+
+// syncCmdline brings the editor's idea of the command line into step with
+// vim's, where it is typed: which kind of line it is, what is on it, where
+// the cursor is. A ':' line is EX_COMMAND, whose <cr> vimango takes for
+// itself (runExLine). Any other is SEARCH, whose keys all go to vim: '/' and
+// '?', and '=' -- the line an expression is typed on after CTRL-R = (in
+// INSERT, or on another command line) and after "= and @=.
+func (e *Editor) syncCmdline() {
+	kind := vim.CommandLineGetType()
+	if kind == ':' {
+		e.mode = EX_COMMAND
+	} else {
+		e.mode = SEARCH
+	}
+	e.searchPrefix = string(rune(kind))
 	e.command_line = vim.CommandLineGetText()
 	e.cmdLineCursor = vim.CommandLineGetPosition()
-
 	e.tabCompletion.index = 0
 	e.tabCompletion.list = nil
-
-	e.ShowMessage(BR, ":%s", e.command_line)
-	return false, true
+	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
 }
 
 // runExLine carries out an ex command line the user has entered (without its
@@ -480,19 +492,4 @@ func (e *Editor) resyncFromVim() {
 	pos := vim.GetCursorPosition()
 	e.fr = min(max(pos[0]-1, 0), len(e.ss)-1)
 	e.fc = min(max(pos[1], 0), len(e.ss[e.fr]))
-}
-
-// case SEARCH:
-func (e *Editor) SearchModeKeyHandler(c int) (bool, bool) {
-	// Below is purely for displaying command line correctly
-	// vim is actually handling the keystrokes whether we do this or not
-	if c == DEL_KEY || c == BACKSPACE {
-		e.command_line = dropLastRune(e.command_line)
-	} else if !isSyntheticKey(c) {
-		// sendToVim drops the other reader codes, so mirroring one here would
-		// show a character vim never received
-		e.command_line += string(rune(c))
-	}
-	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
-	return false, false
 }

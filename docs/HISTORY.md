@@ -479,3 +479,37 @@ repositories:
   before and after; fork tests `apitest/search_typed.c`; here
   `TestTypedSearch` and the end of `TestVimReportsForKeysAreShown`.
 
+- **Ctrl-R works, and `"=` no longer freezes the editor** (fork `3674896fb`).
+  The known limit was that `<C-r>` in an insert-mode mapping inserted a
+  literal `^R`. It was not about mappings: typed Ctrl-R did the same. vim
+  reads the register's name by waiting for a key, and for `=` reads a whole
+  command line; libvim is handed its keys and cannot wait, and upstream had
+  taken that code out of Insert mode and of the command line -- where Ctrl-R
+  was dropped and the register's *name* typed -- and left it in Normal mode,
+  where **`"=` and `@=` never returned**. Typing `"=` in the editor froze it,
+  with the note unsaved.
+
+  In the fork each state now remembers that it is owed a key. Ctrl-R works in
+  INSERT (`<C-r>a`, Ctrl-R Ctrl-R/Ctrl-O/Ctrl-P, `<C-r>=expr<CR>`) and on the
+  command line (registers, Ctrl-R Ctrl-W for the word under the cursor,
+  `<C-r>=`), and `"=` / `@=` ask for their expression. An expression is typed
+  on a command line of its own, stacked on whatever asked for it.
+
+  Here that meant the command line had to stop being tracked in Go. The
+  search line mirrored each key typed into a string of its own, and the ex
+  line assumed a line, once open, stayed the `:` line until Enter or Esc.
+  Now `syncCmdline` asks vim after every key which kind of line is open and
+  what is on it, so that: Ctrl-R on a search line shows what vim has; the `=`
+  line shows as `=`; **Enter on the expression's line goes to vim** (vimango
+  takes the Enter of a `:` line for itself, and would have run the expression
+  as a command); and Esc that ends only the expression, or only a waiting
+  Ctrl-R, leaves the line under it open. The cursor on a search line is now
+  where vim has it, as on the ex line.
+
+  Checked with 49 key sequences in libvim before and after (none hangs or
+  crashes), fork tests `apitest/ctrl_r.c`, and `ctrlr_test.go` here.
+
+  Found on the way, **not fixed**: `input()`, `inputsecret()` and
+  `inputlist()` still call vim's waiting readers and never return --
+  `:echo input('x')` freezes the editor. `getchar()` and `confirm()` return.
+
