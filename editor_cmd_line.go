@@ -185,8 +185,10 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"`  # (visual)     ` - toggle the selected lines as a numbered list\n" +
 	"`  Enter (insert) ` - on a list item, start the next one with the same marker\n\n" +
 	"The same key again removes a decoration or list; the other one swaps it.\n" +
-	"Enter on an empty list item ends the list. To paste a list in INSERT mode,\n" +
-	"`:paste` first (and `:nopaste` after), or each line gets a second marker.\n" +
+	"Enter on an empty list item ends the list.\n" +
+	"\nPasted text goes in as it is, in any mode: no mapping sees it and it is not\n" +
+	"re-indented. In NORMAL mode it is put after the cursor; in VISUAL it replaces\n" +
+	"the selection; on a command line it is put on the line and not run.\n" +
 	"\nSearch with `/` `?` `n` `N` `*` `#`: the matches are highlighted until `:noh`\n" +
 	"(`set nohlsearch` in vimango.vim turns that off).\n" +
 	"Mappings live in vimango.vim, next to config.json.\n"

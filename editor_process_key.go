@@ -135,15 +135,20 @@ func (e *Editor) processKey(c int) (redraw bool) {
 func (e *Editor) forwardKey(c int, send func()) (redraw bool) {
 	// Process the key -- with vim's mapping expansion on, so vimango.vim's
 	// mappings apply to what the user types (and only to that; see vimrc.go)
+	return e.followVim(c, func() { vim.SendUserKey(send) })
+}
+
+// followVim runs something that sends vim keys and brings the editor into
+// line with whatever vim did, as forwardKey says. run is a typed key, with
+// mappings (forwardKey), or text that is not keys at all: a paste (paste.go).
+func (e *Editor) followVim(c int, run func()) (redraw bool) {
 	wasVisual := e.mode == VISUAL
 	wasInsert := e.mode == INSERT
 	vim.TakeSpellSuggestRequest() // drop a z= typed outside the editor (organizer)
 	// What vim would have put on its message line for this key -- mostly
 	// errors: "E486: Pattern not found", "E20: Mark not set". Shown last, when
 	// this function returns, so it is not overwritten by a message of ours.
-	msgs := vim.CaptureMessages(func() {
-		vim.SendUserKey(send)
-	})
+	msgs := vim.CaptureMessages(run)
 	// A key can take vim off the note's buffer: Ctrl-^ goes to the alternate
 	// buffer, which here is the organizer's list of titles or vim's own
 	// empty one. Every key after it would edit that buffer, unseen, while

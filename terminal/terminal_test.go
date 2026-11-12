@@ -27,7 +27,7 @@ func keys(t *testing.T, input string) []Key {
 func regular(rs ...rune) []Key {
 	out := make([]Key, len(rs))
 	for i, r := range rs {
-		out[i] = Key{r, KeyNoSpl}
+		out[i] = Key{Regular: r, Special: KeyNoSpl}
 	}
 	return out
 }
@@ -80,7 +80,7 @@ func TestCSIUUnusableKeysAreDropped(t *testing.T) {
 // and dropped.
 func TestUnknownSequencesDoNotLeak(t *testing.T) {
 	assertKeys(t, "\x1b[1;5Az", regular('z')) // Ctrl-Up
-	assertKeys(t, "\x1b[200~z", regular('z')) // bracketed-paste start
+	assertKeys(t, "\x1b[201~z", regular('z')) // a paste's end with no start
 	assertKeys(t, "\x1b[24~z", regular('z'))  // F12
 	assertKeys(t, "\x1bOxz", regular('z'))    // unknown SS3
 }
@@ -89,7 +89,7 @@ func TestUnknownSequencesDoNotLeak(t *testing.T) {
 func TestSpecialKeysStillDecode(t *testing.T) {
 	for stack, key := range specialKeys {
 		seq := strings.TrimRight(string(stack[:]), "\x00")
-		assertKeys(t, "\x1b"+seq+"z", []Key{{0, key}, {'z', KeyNoSpl}})
+		assertKeys(t, "\x1b"+seq+"z", []Key{{Special: key}, {Regular: 'z'}})
 	}
 }
 
@@ -98,4 +98,32 @@ func TestSpecialKeysStillDecode(t *testing.T) {
 func TestBareEscapeBeforeOtherInput(t *testing.T) {
 	assertKeys(t, "\x1b", regular(27))
 	assertKeys(t, "\x1b:q\r", regular(27, ':', 'q', '\r'))
+}
+
+func pasted(text string) Key { return Key{Special: KeyPaste, Paste: text} }
+
+// A paste arrives whole, as one key, and what is typed around it is typed.
+func TestPasteIsOneKey(t *testing.T) {
+	assertKeys(t, "a\x1b[200~- one\r- two\x1b[201~b",
+		[]Key{{Regular: 'a'}, pasted("- one\r- two"), {Regular: 'b'}})
+	assertKeys(t, "\x1b[200~caf\u00e9 \u65e5\u672c\x1b[201~", []Key{pasted("caf\u00e9 \u65e5\u672c")})
+	// longer than any key sequence, and than the reader's buffer
+	long := strings.Repeat("0123456789abcdef\r", 4096)
+	assertKeys(t, "\x1b[200~"+long+"\x1b[201~z", []Key{pasted(long), {Regular: 'z'}})
+}
+
+// Nothing inside a paste is a key: not Esc, not a sequence that would be an
+// arrow or Ctrl-I, not a second start marker.
+func TestPasteHoldsNoKeys(t *testing.T) {
+	assertKeys(t, "\x1b[200~\x1b:q!\r\x1b[201~", []Key{pasted("\x1b:q!\r")})
+	assertKeys(t, "\x1b[200~\x1b[A\x1b[105;5u\x1b[200~x\x1b[201~",
+		[]Key{pasted("\x1b[A\x1b[105;5u\x1b[200~x")})
+	// the end marker's first bytes, without the rest, are text
+	assertKeys(t, "\x1b[200~a\x1b[20b\x1b[201~", []Key{pasted("a\x1b[20b")})
+}
+
+// An empty paste is nothing, and one cut off before its end marker is dropped.
+func TestPasteEmptyOrCutOff(t *testing.T) {
+	assertKeys(t, "\x1b[200~\x1b[201~z", regular('z'))
+	assertKeys(t, "x\x1b[200~never ended", regular('x'))
 }

@@ -582,7 +582,49 @@ repositories:
   the alternative: it continues bullets on Enter and on `o`, but knows
   nothing of numbers and has no way to end a list.
 
-  Known: `o` in NORMAL mode on a list item opens a plain line. And vimango
-  does not ask the terminal for bracketed paste, so pasted text is typed keys:
-  a list pasted in INSERT mode gets a second marker on every line unless
-  `:paste` is on, which turns insert mappings off.
+  Known: `o` in NORMAL mode on a list item opens a plain line. And at this
+  commit (`2aa57d5`) pasted text was still typed keys, so a list pasted in
+  INSERT mode got a second marker on every line unless `:paste` was on; the
+  next entry ends that.
+
+- **Pasted text is a paste, not keys (bracketed paste).** A terminal sends a
+  paste down the same pipe as the keyboard, and vimango gave every character
+  of it to vim as a typed key: 'autoindent' indented each line under the one
+  before (4, 8, 12 spaces for three lines indented 4), a mapping fired on
+  every key it was for -- the `<CR>` mapping above made `- b` into `- - b` --
+  and a paste in NORMAL mode, or in the organizer, ran as commands. Now
+  vimango asks the terminal for bracketed paste (`ESC [?2004h` before
+  `MainLoop`, `l` in `quitApp`), the key reader returns everything between
+  `ESC [200~` and `ESC [201~` as one `KeyPaste` event (it used to read the
+  start marker and throw it away), and `MainLoop` hands the text to
+  `Editor.pasteText` or `Organizer.pasteText` (`paste.go`).
+
+  In the note the text is typed into vim with 'paste' set and mappings off,
+  after dropping control characters other than tab and line end. Where it
+  lands is what vim does with a bracketed paste: at the cursor in INSERT;
+  after the cursor in NORMAL (before it in column 0), with a pending operator
+  or count dropped; over the selection in VISUAL (`c`); on a command line as
+  one line, not run. Being typed, a paste is one insert: `u` undoes it and
+  `.` repeats it. The organizer takes it into the title being edited or its
+  command line and drops it elsewhere, with a message. `forwardKey` was split
+  so that a paste shares what follows a key (`followVim`) without the mapping
+  expansion.
+
+  Why not vim's own code: libvim still has `bracketed_paste()`, behind the
+  `<PasteStart>` key, but sending that key segfaults (`STRLEN` of a termcode
+  libvim does not define) and the function reads the paste with `vgetc()`
+  from a terminal libvim does not have. Listed under "Open items"; vimango
+  does not send the key.
+
+  Measured: 250 KB (4,000 lines) pasted in 0.2 s. Checked with the real
+  binary on a pseudo-terminal against a scratch database -- `--editor`
+  (a nested list pasted in INSERT, saved with `:x`) and the TUI (a paste in
+  NORMAL does nothing, one into a title and one onto the command line) --
+  and that `ESC [?2004h` and `l` are both sent. Not checked by me: Cmd-V in
+  kitty, Ghostty, Rex and hybrid's pop-out, which is the user's test. Hybrid
+  needs no change of its own; its terminal is libghostty, which marks a paste
+  once the program asks. No libvim rebuild. Tests: `paste_test.go`,
+  `terminal/terminal_test.go`.
+
+  Left as it was: a death by signal restores neither raw mode nor this (a
+  shell sets bracketed paste for itself at its next prompt).

@@ -9,6 +9,7 @@ import (
 
 	"github.com/slzatz/vimango/auth"
 	"github.com/slzatz/vimango/rawmode"
+	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -210,6 +211,10 @@ func main() {
 		// at once (a VimangoHybrid pop-out) would show it there.
 		app.returnCursor()
 	}
+
+	// Pasted text is to arrive marked as a paste, not as typed keys
+	// (paste.go). quitApp turns this off again.
+	fmt.Print(terminal.BracketedPasteOn)
 
 	app.Run = true
 	app.MainLoop()

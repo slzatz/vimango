@@ -72,9 +72,10 @@ xnoremap # :<C-u>call VimangoToggleList(line("'<"), line("'>"), 'number')<CR>
 " The marker is repeated as it is written, so a list numbered "1. " throughout
 " stays that way.
 "
-" Text pasted from the terminal reaches vim as typed keys, so a list pasted in
-" INSERT mode gets a second marker on every line unless :paste is on (which
-" turns mappings off, as it turns off 'autoindent').
+" Pasted text is not typed, so this does not see it: vimango asks the terminal
+" to mark a paste (bracketed paste; paste.go) and puts the text in as it is.
+" Only in a terminal that cannot mark one does a pasted list get a second
+" marker on every line, and there :paste, which turns mappings off, avoids it.
 function! VimangoListEnter() abort
   let line = getline('.')
   let m = matchlist(line, '^\(\s*\)\(' . s:list_pattern.bullet . '\|' . s:list_pattern.number . '\)')

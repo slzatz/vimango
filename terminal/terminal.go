@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"strconv"
@@ -34,6 +35,7 @@ const (
 	KeyF11
 	KeyF12
 	KeyIns
+	KeyPaste // text pasted from the terminal; it is in Key.Paste
 )
 
 var specialKeys = map[[4]byte]int{
@@ -65,7 +67,17 @@ var ErrNoInput = fmt.Errorf("no input")
 type Key struct {
 	Regular rune
 	Special int
+	Paste   string // with Special == KeyPaste: the pasted text
 }
+
+// Bracketed paste (xterm's mode 2004): while it is on, the terminal sends
+// pasted text between two markers, ESC [200~ and ESC [201~, so it can be told
+// from typed keys. The program turns it on and must turn it off again.
+const (
+	BracketedPasteOn  = "\x1b[?2004h"
+	BracketedPasteOff = "\x1b[?2004l"
+	pasteEnd          = "\x1b[201~"
+)
 
 var bufr = bufio.NewReader(os.Stdin)
 
@@ -97,12 +109,12 @@ func readKey(r *bufio.Reader) (Key, error) {
 
 	//ascii escape is decimal 27
 	if ch != 27 {
-		return Key{ch, KeyNoSpl}, nil
+		return Key{Regular: ch, Special: KeyNoSpl}, nil
 	}
 
 	// nothing has been buffered, probably plain escape
 	if r.Buffered() == 0 {
-		return Key{27, KeyNoSpl}, nil
+		return Key{Regular: 27, Special: KeyNoSpl}, nil
 	}
 
 	// Every escape sequence we recognize is introduced by '[' (CSI) or 'O'
@@ -112,7 +124,7 @@ func readKey(r *bufio.Reader) (Key, error) {
 	// and leave those bytes for later reads.
 	next, err := r.Peek(1)
 	if err != nil || (next[0] != '[' && next[0] != 'O') {
-		return Key{27, KeyNoSpl}, nil
+		return Key{Regular: 27, Special: KeyNoSpl}, nil
 	}
 
 	seq, err := readSequence(r)
@@ -120,6 +132,9 @@ func readKey(r *bufio.Reader) (Key, error) {
 		return Key{}, err
 	}
 
+	if string(seq) == "[200~" {
+		return readPaste(r)
+	}
 	if seq[len(seq)-1] == 'u' && seq[0] == '[' {
 		return csiUKey(seq[1 : len(seq)-1])
 	}
@@ -127,13 +142,36 @@ func readKey(r *bufio.Reader) (Key, error) {
 		var stack [4]byte
 		copy(stack[:], seq)
 		if key, found := specialKeys[stack]; found {
-			return Key{0, key}, nil
+			return Key{Regular: 0, Special: key}, nil
 		}
 	}
 	// A sequence we don't know, consumed whole and dropped. The reader used
 	// to return ESC and leave the unread tail to be typed as keys: Ghostty's
 	// Ctrl-I, ESC [105;5u, reached vim as <esc> ; 5 u -- "undo five times".
 	return Key{}, ErrNoInput
+}
+
+// readPaste reads what follows a paste's start marker up to its end marker,
+// and returns the text between as one key. Nothing in it is a key: an escape
+// sequence in pasted text is text. Line ends come as the terminal sends them,
+// usually a carriage return each.
+//
+// A terminal that has begun a paste ends it, so this waits for the end marker
+// however long the paste is. An empty paste is nothing.
+func readPaste(r *bufio.Reader) (Key, error) {
+	var text []byte
+	for !bytes.HasSuffix(text, []byte(pasteEnd)) {
+		b, err := r.ReadByte()
+		if err != nil {
+			return Key{}, err
+		}
+		text = append(text, b)
+	}
+	text = text[:len(text)-len(pasteEnd)]
+	if len(text) == 0 {
+		return Key{}, ErrNoInput
+	}
+	return Key{Special: KeyPaste, Paste: string(text)}, nil
 }
 
 // readSequence reads the bytes after ESC through the sequence's final byte.
@@ -199,15 +237,15 @@ func csiUKey(params []byte) (Key, error) {
 	case code >= 0xE000 && code <= 0xF8FF: // functional keys live in private use
 		return Key{}, ErrNoInput
 	case m == 0:
-		return Key{rune(code), KeyNoSpl}, nil
+		return Key{Regular: rune(code), Special: KeyNoSpl}, nil
 	case m == shift:
-		return Key{unicode.ToUpper(rune(code)), KeyNoSpl}, nil
+		return Key{Regular: unicode.ToUpper(rune(code)), Special: KeyNoSpl}, nil
 	case m&^shift == ctrl:
 		switch {
 		case code >= 'a' && code <= 'z':
-			return Key{rune(code - 'a' + 1), KeyNoSpl}, nil
+			return Key{Regular: rune(code - 'a' + 1), Special: KeyNoSpl}, nil
 		case code >= '@' && code <= '_' && code != '@': // A-Z [ \ ] ^ _
-			return Key{rune(code - '@'), KeyNoSpl}, nil
+			return Key{Regular: rune(code - '@'), Special: KeyNoSpl}, nil
 		}
 	}
 	return Key{}, ErrNoInput

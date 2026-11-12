@@ -115,7 +115,7 @@ vimango itself builds and runs without it; see "HEIC".
 
 **Only `MainLoop` (`app.go`) draws, changes editor/organizer/screen state, or calls libvim.** libvim is not thread-safe and the drawing code keeps no locks. Every other goroutine computes and posts an event to a channel `MainLoop` selects on:
 
-- key reader → `keyEvents`
+- key reader → `keyEvents` (a paste is one event, however long)
 - SIGWINCH → `resizeCh` → `handleResize()` (`signals.go`), which re-reads the window size and redraws
 - image loading for the preview (`prepareImages`, `organizer_render.go`: Drive download, disk read, decode — nothing else) → `RenderManager.resultCh` → `applyResult()`, which transmits the images, runs glamour and draws
 
@@ -185,6 +185,8 @@ A task note's Taskwarrior uuid is `task.taskwarrior_uuid`: synced both ways, wri
 
 **The command line is vim's, and the editor follows it** (`syncCmdline`, after every key typed on one): which kind of line it is (`vim.CommandLineGetType()`), what is on it, where the cursor is. A `:` line is `EX_COMMAND`, whose Enter vimango takes for itself (`runExLine`); any other is `SEARCH`, whose keys all go to vim — `/` and `?`, and `=`, the line an expression is typed on. Do not track the line in Go: Ctrl-R puts a register on it, Ctrl-R Ctrl-W the word under the cursor, and **Ctrl-R = puts the whole line aside for an expression's and brings it back** — so the kind of line can change under a key, and `<esc>` can end the expression (or a Ctrl-R waiting for its register) and leave the line open. The same Ctrl-R works in INSERT (`<C-r>a`, `<C-r>=strftime('%F')<CR>`, in a mapping too), and `"=` in NORMAL asks for an expression the same way. Tests: `ctrlr_test.go`.
 
+**Pasted text is not keys.** vimango turns on bracketed paste (`terminal.BracketedPasteOn`, just before `MainLoop`; off again in `quitApp`), so the terminal marks a paste and `terminal.ReadKey` returns the whole of it as one `KeyPaste` event, which `MainLoop` gives to `Editor.pasteText` or `Organizer.pasteText` (`paste.go`) instead of to the key path. In the note it is typed into vim with `'paste'` set and mapping expansion off, so `'autoindent'`, `vimango.vim`'s `<CR>` mapping and abbreviations leave it alone, and control characters other than tab and line end are dropped first (an `<esc>` in a paste would end the insert and run the rest as commands). Where it goes is vim's own rule: at the cursor in INSERT; after the cursor in NORMAL (before it in the first column), dropping whatever was half-typed; over the selection in VISUAL; onto a command line as one line, never run. The organizer takes a paste into the title being edited or its command line, and drops it anywhere else. Anything new that accepts text must say what a paste does there. `:paste` / `:nopaste` remain for a terminal without bracketed paste. libvim's own `bracketed_paste` is not used: see "Open items". Tests: `paste_test.go`, `terminal/terminal_test.go`.
+
 **Motions by screen line are answered by the editor.** libvim draws nothing, so for `gj`/`gk` and `H`/`M`/`L` it calls back to ask where the screen lines are; the editor is that `vim.ScreenLayout` while it is open (`vim.SetScreenLayout` in `openEditor`, nil in `noteClosed`) and answers from the layout `drawRows` draws (`screen_motion.go`). Anything that changes how rows wrap must change both. The wanted column handed back is vim's virtual column (`vim.VirtualColumns`, vim's `getvcol`), not a screen column: vim counts a tab by `'tabstop'`, the screen as four. Tests: `screen_motion_test.go`.
 
 ### vim mappings: `vimango.vim`
@@ -192,7 +194,7 @@ A task note's Taskwarrior uuid is `task.taskwarrior_uuid`: synced both ways, wri
 New key bindings belong in `vimango.vim` (project root, cwd-relative), sourced once at startup (`sourceVimrc`, `vimrc.go`), so `--editor` processes get it too. A missing file is fine and errors in it are silenced. It holds ordinary vimscript:
 
 - visual `-` / `#` toggle the selected lines as a bulleted or numbered markdown list, and switch one kind to the other (`VimangoToggleList`)
-- Enter in INSERT mode on a list item (`- `, `* `, `+ `, `1. `, `1) `) starts the next item with the same marker, and on an empty item ends the list by clearing the line (`VimangoListEnter`, an `<expr>` mapping on `<CR>`). The marker is repeated as written, never counted up. Terminal paste is typed keys, so a list pasted in INSERT gets a second marker per line unless `:paste` is on
+- Enter in INSERT mode on a list item (`- `, `* `, `+ `, `1. `, `1) `) starts the next item with the same marker, and on an empty item ends the list by clearing the line (`VimangoListEnter`, an `<expr>` mapping on `<CR>`). The marker is repeated as written, never counted up
 - Ctrl-B / Ctrl-I / Ctrl-E toggle bold / italic / code on the word under the cursor (normal) or a one-line selection (visual); a different key swaps the style (`VimangoDecorate`)
 - `set spelloptions=noallcaps,nomixedcase`, and anything else a vimrc would hold
 
@@ -367,6 +369,7 @@ Listed 2026-11-10, the libvim item rewritten 2026-11-11; nothing here is started
   - **Refused though libvim could now do them**: `:filter /pat/ {cmd}` (and its refusal gives the wrong reason, "one window"), `:highlight`, `:function` with no body (to list). Each needs adding to `exAllowed` / `exModifiers` and a run of the hang test.
   - **Keys upstream commented out**: Ctrl-\ Ctrl-N in INSERT inserts the two control characters as text; Ctrl-\ e on a command line types `e`. Ctrl-K inserts `^K` (digraphs are not compiled in).
   - **`feedkeys()` with the `x` flag does nothing** (a `TODO` in the fork's `getchar.c`).
+  - **`<PasteStart>` segfaults.** vim's `bracketed_paste()` (`edit.c`) takes `STRLEN` of the `PE` termcode, which libvim does not have, and then reads the paste with `vgetc()` from a terminal that is not there. vimango never sends that key — it pastes by typing with `'paste'` set (`paste.go`) — but a mapping or `:execute "normal i\<PasteStart>"` reaches it. Found 2026-11-11.
   - **`` :runtime `cmd` `` segfaults** outside restricted mode; vimango runs restricted, where vim refuses the backtick first.
   - **Small**: nothing is drawn while Ctrl-R waits for its register (vim draws a `"`); `:execute 'sp'` is neither refused nor reported; `vimSetCursorAddCallback()` is dead wiring in the fork.
   - The fork's own list is "Known gaps" in its `CLAUDE.md`.

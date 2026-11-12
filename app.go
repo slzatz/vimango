@@ -534,6 +534,7 @@ func (a *App) Cleanup() {
 
 func (a *App) quitApp() {
 	fmt.Print("\x1b[2J\x1b[H") //clears the screen and sends cursor home
+	fmt.Print(terminal.BracketedPasteOff)
 
 	if err := rawmode.Restore(a.origTermCfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: disabling raw mode: %s\r\n", err)
@@ -592,8 +593,12 @@ func (a *App) handleEvents() {
 		select {
 		case key := <-a.keyEvents:
 			mappingTimeout = nil // the key settles it, one way or the other
+			// text pasted from the terminal: not a key (paste.go)
+			pasted := key.Special == terminal.KeyPaste
 			var k int
-			if key.Regular != 0 {
+			if pasted {
+				k = noKey
+			} else if key.Regular != 0 {
 				k = int(key.Regular)
 			} else {
 				k = key.Special
@@ -607,7 +612,12 @@ func (a *App) handleEvents() {
 			}
 			if a.Session.editorMode {
 				ae := a.Session.editor
-				redraw := ae.editorProcessKey(k)
+				var redraw bool
+				if pasted {
+					redraw = ae.pasteText(key.Paste)
+				} else {
+					redraw = ae.editorProcessKey(k)
+				}
 
 				if !a.Session.editorMode {
 					continue
@@ -617,7 +627,12 @@ func (a *App) handleEvents() {
 					mappingTimeout = time.After(wait)
 				}
 			} else {
-				redraw := org.organizerProcessKey(k)
+				var redraw RedrawScope
+				if pasted {
+					redraw = org.pasteText(key.Paste)
+				} else {
+					redraw = org.organizerProcessKey(k)
+				}
 				//org.ShowMessage(BR, "redraw: %d", redraw) ///DEBUG
 				if a.Session.editorMode {
 					a.returnCursor()
