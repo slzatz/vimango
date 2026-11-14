@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/slzatz/vimango/internal/localdb"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -26,7 +27,7 @@ func withOrganizer(t *testing.T, e *Editor) *App {
 
 	vim.SetCurrentBuffer(e.vbuf)
 	e.Session.editor = e
-	e.Session.editorMode = true
+	e.onClose = a.noteClosed
 	// the note as loaded is the saved state, as editNote records it
 	e.saveTick = e.vbuf.GetLastChangedTick()
 	return a
@@ -46,7 +47,7 @@ func editorOnly(t *testing.T, e *Editor) *App {
 	vim.SetCurrentBuffer(e.vbuf)
 	e.Session.editorOnly = true
 	e.Session.editor = e
-	e.Session.editorMode = true
+	e.onClose = a.noteClosed
 	e.saveTick = e.vbuf.GetLastChangedTick()
 	return a
 }
@@ -62,9 +63,6 @@ func TestQuitReturnsToOrganizer(t *testing.T) {
 
 	if a.Session.editor != nil {
 		t.Error(":q left an editor open")
-	}
-	if a.Session.editorMode {
-		t.Error(":q left the session in editor mode")
 	}
 	if got := vim.GetCurrentBuffer(); got.GetID() != a.Organizer.vbuf.GetID() {
 		t.Error("vim is not on the organizer's buffer after :q")
@@ -82,13 +80,13 @@ func TestQuitRefusesUnsavedChanges(t *testing.T) {
 	e.sendKeys("x")
 	e.sendKeys(":q")
 	e.editorProcessKey('\r')
-	if a.Session.editor != e || !a.Session.editorMode {
+	if a.Session.editor != e {
 		t.Fatal(":q closed a note with unsaved changes")
 	}
 
 	e.sendKeys(":q!")
 	e.editorProcessKey('\r')
-	if a.Session.editor != nil || a.Session.editorMode {
+	if a.Session.editor != nil {
 		t.Error(":q! did not close the note")
 	}
 }
@@ -107,7 +105,7 @@ func TestSyncIsRefusedInTheEditor(t *testing.T) {
 		if msg := exMessage(t, e, cmd); !strings.Contains(msg, "close the note") {
 			t.Errorf(":%s said %q", cmd, msg)
 		}
-		if a.Session.editor != e || !a.Session.editorMode {
+		if a.Session.editor != e {
 			t.Fatalf(":%s left the editor", cmd)
 		}
 		if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
@@ -119,6 +117,51 @@ func TestSyncIsRefusedInTheEditor(t *testing.T) {
 		if e.mode != NORMAL || !e.isModified() || e.line(0) != "lpha" {
 			t.Errorf("after :%s: mode %v, modified %v, text %q", cmd, e.mode, e.isModified(), e.line(0))
 		}
+	}
+}
+
+// Closing is all the editor does about it: what follows is whoever opened it's
+// to say, through onClose. The editor here has no app behind it at all -- the
+// global is nil -- and closes all the same, when and only when the note's text
+// is in the database or was thrown away.
+func TestEditorClosesThroughOnClose(t *testing.T) {
+	prev := app
+	app = nil
+	t.Cleanup(func() { app = prev })
+
+	e := newTestEditor(t, "alpha")
+	e.Store = newTestStore(t)
+	id, err := e.Store.Add("a note", false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.id = id
+	e.saveTick = e.vbuf.GetLastChangedTick()
+	closed := 0
+	e.onClose = func() { closed++ }
+
+	steps := []struct {
+		keys, cmd string
+		want      int // times closed, after the command
+		why       string
+	}{
+		{"", "q", 1, ":q on a clean note closes it"},
+		{"x", "q", 1, ":q on a modified note does not"},
+		{"", "q!", 2, ":q! does"},
+		{"", "x", 3, ":x writes the note and closes it"},
+		{"", "x", 4, ":x on the note just written closes it"},
+	}
+	captureStdout(t, func() {
+		for _, s := range steps {
+			e.sendKeys(s.keys)
+			e.exCommand(s.cmd)
+			if closed != s.want {
+				t.Errorf("%s: closed %d times, want %d", s.why, closed, s.want)
+			}
+		}
+	})
+	if text, _ := e.Store.Note(id); text != "lpha" {
+		t.Errorf(":x left %q in the database, want \"lpha\"", text)
 	}
 }
 

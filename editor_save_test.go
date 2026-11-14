@@ -145,7 +145,7 @@ func TestExitStaysOpenWhenTheWriteFailsInTheTUI(t *testing.T) {
 
 	e.exCommand("x")
 
-	if a.Session.editor != e || !a.Session.editorMode {
+	if a.Session.editor != e {
 		t.Fatal(":x closed the note although it was not saved")
 	}
 	if e.line(0) != "lpha" {

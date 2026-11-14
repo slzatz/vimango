@@ -158,7 +158,7 @@ func (rm *RenderManager) applyResult(res RenderResult) {
 // previewVisible reports whether the right pane is showing the rendered note
 // rather than the editor or a notice (help, sync report, container list).
 func (o *Organizer) previewVisible() bool {
-	if o.Session.editorMode || o.view != TASK {
+	if o.Session.editor != nil || o.view != TASK {
 		return false
 	}
 	switch o.mode {

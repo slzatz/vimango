@@ -175,7 +175,6 @@ func main() {
 	}
 
 	app.origTermCfg = origCfg
-	app.Session.editorMode = false
 
 	// Get window size
 	err = app.Screen.GetWindowSize()

@@ -128,7 +128,7 @@ func TestEditRefusesAnIdThatIsNotANote(t *testing.T) {
 	o, _ := newDBOrganizer(t, "one")
 	for _, arg := range []string{"99999", "abc", "-1", "1 2"} {
 		out := o.ex(t, "e "+arg)
-		if o.Session.editor != nil || o.Session.editorMode {
+		if o.Session.editor != nil {
 			t.Fatalf(":e %s opened an editor", arg)
 		}
 		if !strings.Contains(out, "There is no note with id") {

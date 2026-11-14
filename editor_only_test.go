@@ -45,7 +45,7 @@ func TestEditorOpensANoteWithNoOrganizer(t *testing.T) {
 		}
 	})
 	e := a.Session.editor
-	if e == nil || !a.Session.editorMode {
+	if e == nil {
 		t.Fatal("no editor is open")
 	}
 	if e.id != ids[0] || e.title != "note A" || e.dbText != "first line\nsecond line" {
@@ -89,7 +89,7 @@ func TestEditorDoesNotOpenWhatItCannotRead(t *testing.T) {
 	if err := a.openEditor(ids[0], ""); err == nil {
 		t.Error("a note was opened from a database that cannot be read")
 	}
-	if a.Session.editor != nil || a.Session.editorMode {
+	if a.Session.editor != nil {
 		t.Error("an editor is open after a failed read")
 	}
 }

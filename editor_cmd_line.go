@@ -286,7 +286,7 @@ func (e *Editor) closeNote(save, force bool) {
 	}
 
 	// back to the organizer in the TUI; in --editor mode, the end of the process
-	app.noteClosed()
+	e.onClose()
 }
 
 func (e *Editor) checkStale() {

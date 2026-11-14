@@ -656,3 +656,29 @@ repositories:
   With it the editor's uses of the global `app` are down to one,
   `app.noteClosed()`. Test: `TestSyncIsRefusedInTheEditor`
   (`session_test.go`), which fails on the old code.
+
+- **The editor closes through `onClose`, and `Session.editorMode` is gone.**
+  Two things, one commit, both about who knows a note is open.
+  - `closeNote` called `app.noteClosed()`: the editor reaching the global for
+    what follows its closing. It now calls `e.onClose`, a function the editor
+    is given when it is made (`App.NewEditor` gives it `a.noteClosed`). The
+    editor's files no longer use `app`. What the TUI and `--editor` do on
+    a close is unchanged, and is still `App.noteClosed`.
+  - "A note is open" was held twice, as `Session.editor` and as
+    `Session.editorMode`, and the two were set in different places. The
+    editor's `:sync` (above) was where they disagreed. `editorMode` is
+    removed: `Session.editor != nil` is the one answer, to where a key goes
+    (`handleEvents`), where the cursor is (`returnCursor`), what a resize
+    redraws, and whether the preview may draw (`previewVisible`).
+
+  No behaviour change intended. Tests: `TestEditorClosesThroughOnClose` closes
+  an editor with the global `app` nil; the suite's other close tests go
+  through `onClose` too. Checked with the real binary on a pseudo-terminal and
+  a scratch database: `--editor` (`:q` clean exits; `:q` modified stays, with
+  the message; `:x` writes and exits) and the TUI (`:e`, `:q` refused, `:q!`
+  back to the organizer, the next key goes to the organizer, `:e` again,
+  `:x`, `:q`).
+
+  Still shared with the TUI, for later: the editor holds `Session` and
+  `Screen`, asks `Session.editorOnly` for its layout in five places, and its
+  notice box reads the glamour style through `app.Config`.

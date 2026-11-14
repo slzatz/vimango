@@ -91,6 +91,7 @@ func (a *App) NewEditor() *Editor {
 		Screen:  a.Screen,
 		Session: a.Session,
 		Store:   a.Store,
+		onClose: a.noteClosed,
 	}
 
 	// Set up commands after editor creation so help can access registry
@@ -229,7 +230,7 @@ func (a *App) moveDividerPct(pct int) {
 		org.drawStatusBar()
 	}
 
-	if a.Session.editorMode {
+	if a.Session.editor != nil {
 		a.Screen.positionEditor()
 		a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 		a.Screen.drawRightScreen()
@@ -411,7 +412,6 @@ func (a *App) openEditor(id int, title string) error {
 	if title == "" {
 		title, _ = a.Store.Title(id)
 	}
-	a.Session.editorMode = true
 
 	ae := a.NewEditor()
 	ae.id = id
@@ -448,7 +448,6 @@ func (a *App) noteClosed() {
 	vim.ExecuteCommand("bw") // wipe out the buffer
 	vim.SetScreenLayout(nil)
 	a.Session.editor = nil
-	a.Session.editorMode = false
 	vim.SetCurrentBuffer(a.Organizer.vbuf)
 	a.Screen.eraseRightScreen()
 	a.Organizer.displayNote()
@@ -469,8 +468,7 @@ func (a *App) mostRecentNote() (id int, ok bool) {
 // returnCursor positions the terminal cursor in the right place
 func (a *App) returnCursor() {
 	var ab strings.Builder
-	if a.Session.editorMode {
-		ae := a.Session.editor
+	if ae := a.Session.editor; ae != nil {
 		switch ae.mode {
 		case SPELLING:
 			// we don't need to position cursor and don't want cursor visible
@@ -603,15 +601,14 @@ func (a *App) handleEvents() {
 			} else {
 				k = key.Special
 			}
-			// --editor: there is nothing but the editor for a key to go to
-			if org == nil {
-				a.Session.editorMode = a.Session.editor != nil
-				if !a.Session.editorMode {
-					continue
-				}
+			// A key goes to the open note's editor, or else to the organizer.
+			// In --editor there is no organizer, and nothing for a key to
+			// go to once the note is closed.
+			ae := a.Session.editor
+			if ae == nil && org == nil {
+				continue
 			}
-			if a.Session.editorMode {
-				ae := a.Session.editor
+			if ae != nil {
 				var redraw bool
 				if pasted {
 					redraw = ae.pasteText(key.Paste)
@@ -619,7 +616,9 @@ func (a *App) handleEvents() {
 					redraw = ae.editorProcessKey(k)
 				}
 
-				if !a.Session.editorMode {
+				// the key closed the note (the TUI): noteClosed has drawn
+				// the organizer and placed the cursor
+				if a.Session.editor == nil {
 					continue
 				}
 				ae.drawAfterKey(redraw, k)
@@ -634,7 +633,8 @@ func (a *App) handleEvents() {
 					redraw = org.organizerProcessKey(k)
 				}
 				//org.ShowMessage(BR, "redraw: %d", redraw) ///DEBUG
-				if a.Session.editorMode {
+				// the key opened a note: openEditor has drawn it
+				if a.Session.editor != nil {
 					a.returnCursor()
 					continue
 				}
@@ -669,7 +669,7 @@ func (a *App) handleEvents() {
 			}
 		case <-mappingTimeout:
 			mappingTimeout = nil
-			if ae := a.Session.editor; ae != nil && a.Session.editorMode {
+			if ae := a.Session.editor; ae != nil {
 				ae.drawAfterKey(ae.editorMappingTimeout(), noKey)
 			}
 		case <-a.resizeCh:

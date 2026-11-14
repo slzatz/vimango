@@ -57,8 +57,13 @@ type Editor struct {
 	exCmds          map[string]func(*Editor) // map of ex commands
 	commandRegistry *CommandRegistry[func(*Editor)]
 	Store           *store.Store // the database
-	Session         *Session     // pointer to the session
-	Screen          *Screen      // pointer to the screen
+	// onClose is what follows the editor closing its note (closeNote), and
+	// is whoever opened the editor's to say: the TUI goes back to the
+	// organizer, --editor ends the process (App.noteClosed). The editor
+	// itself knows of neither.
+	onClose func()
+	Session *Session // pointer to the session
+	Screen  *Screen  // pointer to the screen
 }
 
 func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct

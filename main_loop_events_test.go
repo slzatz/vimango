@@ -170,7 +170,7 @@ func TestLoadedImagesAreAppliedByTheMainLoop(t *testing.T) {
 func TestImageResultThatCannotBeShownIsDropped(t *testing.T) {
 	cases := map[string]func(a *App, org *Organizer){
 		// the bug this replaces: the pane was erased under the open editor
-		"note opened in the editor": func(a *App, org *Organizer) { org.Session.editorMode = true },
+		"note opened in the editor": func(a *App, org *Organizer) { org.Session.editor = &Editor{} },
 		"help is over the preview":  func(a *App, org *Organizer) { org.mode = HELP },
 		"a sync report is over it":  func(a *App, org *Organizer) { org.mode = NAVIGATE_NOTICE },
 		"container view":            func(a *App, org *Organizer) { org.view = FOLDER },

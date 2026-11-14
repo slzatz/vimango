@@ -6,8 +6,10 @@ import (
 )
 
 type Session struct {
-	editor           *Editor // the open note's editor; nil when none is open. One note at a time
-	editorMode       bool
+	// editor is the open note's editor, or nil when none is open: one note
+	// at a time. It is also where keys go -- to the editor while there is
+	// one, to the organizer otherwise. Nothing else records that.
+	editor           *Editor
 	editorOnly       bool // --editor boot mode: set once at startup, never cleared
 	imgSizeY         int
 	fts_search_terms string
