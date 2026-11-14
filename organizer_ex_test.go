@@ -106,8 +106,8 @@ func TestEditByIdOpensThatNote(t *testing.T) {
 	if e == nil {
 		t.Fatal(":e <id> opened no editor")
 	}
-	if e.id != ids[2] || e.title != "three" || strings.Join(e.vbuf.Lines(), "\n") != "text of three" {
-		t.Errorf(":e %d opened note %d (%q, %q)", ids[2], e.id, e.title, strings.Join(e.vbuf.Lines(), "\n"))
+	if e.ID() != ids[2] || e.Title() != "three" || noteLines() != "text of three" {
+		t.Errorf(":e %d opened note %d (%q, %q)", ids[2], e.ID(), e.Title(), noteLines())
 	}
 }
 
@@ -118,7 +118,7 @@ func TestEditOpensTheCurrentNote(t *testing.T) {
 	vim.SetCursorPosition(2, 0)
 
 	o.ex(t, "e")
-	if e := o.Session.editor; e == nil || e.id != ids[1] {
+	if e := o.Session.editor; e == nil || e.ID() != ids[1] {
 		t.Errorf(":e with the second row current opened %+v, want note %d", e, ids[1])
 	}
 }

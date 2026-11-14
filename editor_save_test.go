@@ -29,10 +29,12 @@ func newTestStore(t *testing.T) *store.Store {
 // a change to it.
 const oldStamp = "2000-01-01 00:00:00"
 
-// savedNoteEditor opens a synced note holding text in an editor -- in the
-// database and in the buffer, as editNote leaves it --
-// with the app in --editor mode, the way vimango_hybrid runs it.
-func savedNoteEditor(t *testing.T, text string) (*Editor, *App) {
+// savedNoteEditor is an editor on a synced note holding text -- in the
+// database and in the buffer, as opening it leaves them -- with the layout a
+// host app gives, the way vimango_hybrid runs it. The host says whether the
+// editor has closed: to vimango_hybrid that is the process ending, its only
+// "saved" signal.
+func savedNoteEditor(t *testing.T, text string) (*Editor, *testHost) {
 	t.Helper()
 	db := newTestStore(t)
 	const tid = 7
@@ -48,13 +50,8 @@ func savedNoteEditor(t *testing.T, text string) (*Editor, *App) {
 	e.Store = db
 	e.id = id
 	e.dbText = text
-	a := editorOnly(t, e)
-	return e, a
-}
-
-func (e *Editor) exCommand(s string) {
-	e.sendKeys(":" + s)
-	e.editorProcessKey('\r')
+	e.editorLayout = hostAppLayout
+	return e, hostOf(e)
 }
 
 func noteInDB(t *testing.T, e *Editor) (note, modified string) {
@@ -67,7 +64,7 @@ func noteInDB(t *testing.T, e *Editor) (note, modified string) {
 
 // :x on a modified note writes it -- text and search index -- and closes.
 func TestExitSavesAndQuits(t *testing.T) {
-	e, a := savedNoteEditor(t, "alpha")
+	e, h := savedNoteEditor(t, "alpha")
 
 	e.sendKeys("x") // "lpha"
 	e.exCommand("x")
@@ -82,8 +79,8 @@ func TestExitSavesAndQuits(t *testing.T) {
 	if found != 1 || stale != 0 {
 		t.Errorf("after :x the search index finds the new text %d times and the old %d; want 1 and 0", found, stale)
 	}
-	if a.Run {
-		t.Error(":x saved but did not end the app")
+	if h.open() {
+		t.Error(":x saved but did not close the note")
 	}
 }
 
@@ -103,17 +100,14 @@ func TestExitStaysOpenWhenTheWriteFails(t *testing.T) {
 	}
 	for name, breakIt := range failures {
 		t.Run(name, func(t *testing.T) {
-			e, a := savedNoteEditor(t, "alpha")
+			e, h := savedNoteEditor(t, "alpha")
 			e.sendKeys("x")
 			breakIt(t, e)
 
 			e.exCommand("x")
 
-			if !a.Run {
-				t.Fatal(":x ended the app although the note was not saved")
-			}
-			if a.Session.editor != e {
-				t.Error(":x dropped the editor although the note was not saved")
+			if !h.open() {
+				t.Fatal(":x closed the note although it was not saved")
 			}
 			if !e.isModified() {
 				t.Error("a failed :x left the buffer marked clean")
@@ -124,39 +118,21 @@ func TestExitStaysOpenWhenTheWriteFails(t *testing.T) {
 
 			// and the refusal holds for :q; only :q! may discard the edit
 			e.exCommand("q")
-			if !a.Run {
+			if !h.open() {
 				t.Error(":q closed a note whose save had failed")
 			}
 			e.exCommand("q!")
-			if a.Run {
+			if h.open() {
 				t.Error(":q! did not close the note")
 			}
 		})
 	}
 }
 
-// The same in the TUI, where closing means wiping the buffer and returning to
-// the organizer.
-func TestExitStaysOpenWhenTheWriteFailsInTheTUI(t *testing.T) {
-	e, a := savedNoteEditor(t, "alpha")
-	sessionOf(e).editorOnly = false
-	e.sendKeys("x")
-	e.Store.DB().Close()
-
-	e.exCommand("x")
-
-	if a.Session.editor != e {
-		t.Fatal(":x closed the note although it was not saved")
-	}
-	if e.line(0) != "lpha" {
-		t.Errorf("buffer is %q after a failed :x, want the edit intact", e.line(0))
-	}
-}
-
 // As in vim, :x does not write a clean buffer: no new modified time, and a row
 // that changed underneath (a sync) keeps its newer text.
 func TestExitLeavesACleanNoteAlone(t *testing.T) {
-	e, a := savedNoteEditor(t, "alpha")
+	e, h := savedNoteEditor(t, "alpha")
 	if _, err := e.Store.DB().Exec("UPDATE task SET note='newer, from a sync' WHERE id=?;", e.id); err != nil {
 		t.Fatal(err)
 	}
@@ -166,14 +142,14 @@ func TestExitLeavesACleanNoteAlone(t *testing.T) {
 	if note, modified := noteInDB(t, e); note != "newer, from a sync" || modified != oldStamp {
 		t.Errorf(":x on a clean buffer wrote the row: note %q, modified %s", note, modified)
 	}
-	if a.Run {
-		t.Error(":x on a clean buffer did not end the app")
+	if h.open() {
+		t.Error(":x on a clean buffer did not close the note")
 	}
 }
 
 // :w that fails leaves the buffer modified, so the quit guard still protects it.
 func TestFailedWriteLeavesTheBufferModified(t *testing.T) {
-	e, a := savedNoteEditor(t, "alpha")
+	e, h := savedNoteEditor(t, "alpha")
 	e.sendKeys("x")
 	e.Store.DB().Close()
 
@@ -182,7 +158,7 @@ func TestFailedWriteLeavesTheBufferModified(t *testing.T) {
 		t.Fatal("a failed :w marked the buffer clean")
 	}
 	e.exCommand("q")
-	if !a.Run {
+	if !h.open() {
 		t.Error(":q closed a note whose :w had failed")
 	}
 }
@@ -252,5 +228,45 @@ func TestCheckStaleThatCannotReadChangesNothing(t *testing.T) {
 	}
 	if got := strings.Join(e.vbuf.Lines(), "|"); got != "alpha" || e.dbText != "alpha" {
 		t.Errorf("the buffer is %q and the baseline %q; both should still be the note", got, e.dbText)
+	}
+}
+
+// Closing is all the editor does about it: what follows is whoever opened it's
+// to say, through onClose. The editor closes when and only when the note's
+// text is in the database or was thrown away.
+func TestEditorClosesThroughOnClose(t *testing.T) {
+	e := newTestEditor(t, "alpha")
+	e.Store = newTestStore(t)
+	id, err := e.Store.Add("a note", false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.id = id
+	e.saveTick = e.vbuf.GetLastChangedTick()
+	closed := 0
+	e.onClose = func() { closed++ }
+
+	steps := []struct {
+		keys, cmd string
+		want      int // times closed, after the command
+		why       string
+	}{
+		{"", "q", 1, ":q on a clean note closes it"},
+		{"x", "q", 1, ":q on a modified note does not"},
+		{"", "q!", 2, ":q! does"},
+		{"", "x", 3, ":x writes the note and closes it"},
+		{"", "x", 4, ":x on the note just written closes it"},
+	}
+	captureStdout(t, func() {
+		for _, s := range steps {
+			e.sendKeys(s.keys)
+			e.exCommand(s.cmd)
+			if closed != s.want {
+				t.Errorf("%s: closed %d times, want %d", s.why, closed, s.want)
+			}
+		}
+	})
+	if text, _ := e.Store.Note(id); text != "lpha" {
+		t.Errorf(":x left %q in the database, want \"lpha\"", text)
 	}
 }

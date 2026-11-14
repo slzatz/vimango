@@ -3,36 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
-
-	"github.com/slzatz/vimango/internal/localdb"
-	"github.com/slzatz/vimango/vim"
 )
-
-// editorOnlyApp is a vimango started with --editor, before its note is open:
-// a store with one note per text, a screen, and no organizer.
-func editorOnlyApp(t *testing.T, texts ...string) (a *App, ids []int) {
-	t.Helper()
-	vim.InitializeVim(0)
-	vim.SendKey("<esc>")
-	db := newTestStore(t)
-	for i, text := range texts {
-		id, err := db.Add("note "+string(rune('A'+i)), false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := db.SetNote(id, text); err != nil {
-			t.Fatal(err)
-		}
-		ids = append(ids, id)
-	}
-	sess := &Session{editorOnly: true}
-	scr := &Screen{screenCols: 120, screenLines: 40, textLines: 37, divider: 1, totaleditorcols: 118, edPct: 100, Session: sess}
-	a = &App{Session: sess, Screen: scr, Store: db, Run: true}
-	prev := app
-	app = a
-	t.Cleanup(func() { app = prev })
-	return a, ids
-}
 
 // --editor opens its note from the database by itself. It used to build an
 // organizer, load a list of notes into it, and ask the organizer to open one.
@@ -48,16 +19,14 @@ func TestEditorOpensANoteWithNoOrganizer(t *testing.T) {
 	if e == nil {
 		t.Fatal("no editor is open")
 	}
-	if e.id != ids[0] || e.title != "note A" || e.dbText != "first line\nsecond line" {
-		t.Errorf("the editor holds note %d, %q, %q", e.id, e.title, e.dbText)
+	if e.ID() != ids[0] || e.Title() != "note A" {
+		t.Errorf("the editor holds note %d, %q", e.ID(), e.Title())
 	}
-	if got := strings.Join(e.vbuf.Lines(), "|"); got != "first line|second line" {
+	// vim is on the note's buffer, and that holds the note
+	if got := noteLines(); got != "first line|second line" {
 		t.Errorf("the buffer is %q", got)
 	}
-	if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
-		t.Error("vim is not on the note's buffer")
-	}
-	if e.isModified() {
+	if e.Modified() {
 		t.Error("a note just opened counts as modified")
 	}
 	if a.Organizer != nil {
@@ -66,8 +35,8 @@ func TestEditorOpensANoteWithNoOrganizer(t *testing.T) {
 
 	// and it edits, saves and closes like any editor
 	captureStdout(t, func() {
-		e.sendKeys("x")
-		e.exCommand("x")
+		pressKeys(e, "x")
+		runEx(e, "x")
 	})
 	if text, _ := a.Store.Note(ids[0]); text != "irst line\nsecond line" {
 		t.Errorf("after x and :x the note is %q", text)
@@ -121,50 +90,50 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 	captureStdout(t, func() { a.openEditor(ids[0], "") })
 	e := a.Session.editor
 
-	out := exMessage(t, e, "help")
-	if e.mode != HELP || len(screenOf(e).notice) < 20 || !strings.Contains(out, "checkstale") {
-		t.Fatalf(":help: mode %v, a notice of %d lines", e.mode, len(screenOf(e).notice))
+	out := said(t, e, "help")
+	if e.Mode() != HELP || len(a.Screen.notice) < 20 || !strings.Contains(out, "checkstale") {
+		t.Fatalf(":help: mode %v, a notice of %d lines", e.Mode(), len(a.Screen.notice))
 	}
 	captureStdout(t, func() {
 		for _, key := range []int{' ', ctrlKey('j'), ctrlKey('j'), 'b', PAGE_DOWN, PAGE_UP, ctrlKey('k'), HOME_KEY} {
 			e.editorProcessKey(key)
 		}
 	})
-	if e.mode != HELP || screenOf(e).noticeTop != 0 {
-		t.Errorf("after scrolling down and back: mode %v, top line %d", e.mode, screenOf(e).noticeTop)
+	if e.Mode() != HELP || a.Screen.noticeTop != 0 {
+		t.Errorf("after scrolling down and back: mode %v, top line %d", e.Mode(), a.Screen.noticeTop)
 	}
 	captureStdout(t, func() { e.editorProcessKey(' ') })
-	if screenOf(e).noticeTop == 0 {
+	if a.Screen.noticeTop == 0 {
 		t.Error("Space did not page the help")
 	}
 	captureStdout(t, func() { e.editorProcessKey('\x1b') })
-	if e.mode != NORMAL && e.mode != NORMAL_BUSY { // vim's two names for it
-		t.Errorf("Escape left mode %v", e.mode)
+	if e.Mode() != NORMAL && e.Mode() != NORMAL_BUSY { // vim's two names for it
+		t.Errorf("Escape left mode %v", e.Mode())
 	}
 
 	// a second notice starts at its own top, not where the last one was left
-	captureStdout(t, func() { e.exCommand("help normal") })
-	if screenOf(e).noticeTop != 0 {
-		t.Errorf(":help normal opened at line %d of its text", screenOf(e).noticeTop)
+	captureStdout(t, func() { runEx(e, "help normal") })
+	if a.Screen.noticeTop != 0 {
+		t.Errorf(":help normal opened at line %d of its text", a.Screen.noticeTop)
 	}
 	captureStdout(t, func() { e.editorProcessKey('\x1b') })
 
 	// a listing from vim
 	captureStdout(t, func() {
-		e.sendKeys("ma")
-		e.exCommand("marks")
+		pressKeys(e, "ma")
+		runEx(e, "marks")
 	})
-	if e.mode != HELP || !strings.Contains(strings.Join(screenOf(e).notice, "\n"), "mark") {
-		t.Errorf(":marks: mode %v, notice %q", e.mode, screenOf(e).notice)
+	if e.Mode() != HELP || !strings.Contains(strings.Join(a.Screen.notice, "\n"), "mark") {
+		t.Errorf(":marks: mode %v, notice %q", e.Mode(), a.Screen.notice)
 	}
 	captureStdout(t, func() { e.editorProcessKey('\x1b') })
 
 	// and what is the host's to do says so
-	if msg := exMessage(t, e, "sync"); !strings.Contains(msg, "sync is handled by the app") {
+	if msg := said(t, e, "sync"); !strings.Contains(msg, "sync is handled by the app") {
 		t.Errorf(":sync said %q", msg)
 	}
-	if got := strings.Join(e.vbuf.Lines(), "|"); got != "alpha|bravo|charlie" || e.isModified() {
-		t.Errorf("the note is %q (modified %v) after only looking at help", got, e.isModified())
+	if got := noteLines(); got != "alpha|bravo|charlie" || e.Modified() {
+		t.Errorf("the note is %q (modified %v) after only looking at help", got, e.Modified())
 	}
 }
 

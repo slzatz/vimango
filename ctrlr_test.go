@@ -18,7 +18,6 @@ const ctrlR = "\x12"
 func newRegisterEditor(t *testing.T, lines ...string) *Editor {
 	t.Helper()
 	e := newTestEditor(t, lines...)
-	withOrganizer(t, e)
 	vim.ExecuteCommand("mapclear | mapclear!")
 	vim.ExecuteCommand("let @a = 'REG'")
 	vim.ExecuteCommand(`let @b = "two\nlines\n"`)

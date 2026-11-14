@@ -11,7 +11,6 @@ import (
 func searchEditor(t *testing.T, lines ...string) *Editor {
 	t.Helper()
 	e := newTestEditor(t, lines...)
-	withOrganizer(t, e)
 	e.top_margin = 1
 	vim.ExecuteCommand("set hlsearch")
 	vim.ExecuteCommand("let @/ = ''")

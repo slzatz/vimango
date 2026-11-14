@@ -894,3 +894,32 @@ repositories:
     literal.
 
   A move and a rename: `compare-drawing.py` says `SAME`.
+
+- **The editor's tests stand without the app.** Step 4c, the first half:
+  the editor's tests are most of the root package's, and they made their
+  editors on a real `Screen` and `Session`, and wrapped an `App` around one
+  to ask whether it had closed (`a.Run`, `a.Session.editor`). None of that
+  can come along into a package that does not import the application.
+  - **`testHost`** (`editor_testhost_test.go`) is who opens a test's editor:
+    a notice box that records what it is shown (and writes it out, so a test
+    still reads a listing from the output), and a count of the times the
+    editor said its note was closed. `newTestEditor` uses it, with a layout
+    written out (`tuiLayout`, `hostAppLayout`: the two the screen makes), and
+    counts the note as loaded as saved, as opening one does.
+  - **The tests that asked the app now ask the host**: `h.open()` where they
+    read `a.Run`. `TestExitStaysOpenWhenTheWriteFailsInTheTUI` is gone: to
+    the editor there is one way to close, whoever opened it.
+  - **The tests of the app with an editor in it are written as that**
+    (`session_test.go`, `editor_only_test.go`): `tuiApp` / `editorOnlyApp`
+    make an app over a store, `openIn` opens a note with `App.openEditor`,
+    and what they read of the editor is what it says of itself -- `ID()`,
+    `Title()`, `Mode()`, `Modified()`, new -- or what vim and the database
+    hold. `TestFailedSaveKeepsTheNoteOpen` is the app's side of the removed
+    test, for both ways of running. The two event-loop tests are
+    `event_loop_test.go`, the organizer's paste test
+    `organizer_paste_test.go`, the screen's layouts `screen_test.go`.
+
+  Tests only, but for the four accessors. 222 tests before, 221 after and
+  one renamed half (`TestLongTitleIsCutAtACharacterBoundary`, the
+  organizer's part of a test the editor's part of which went with the
+  editor).

@@ -4,45 +4,37 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
-// The two layouts vimango gives an editor, on a terminal of 40 rows by 120
-// columns: the TUI's right pane, and the whole of a host app's window.
-func TestEditorLayouts(t *testing.T) {
-	tui := &Screen{screenLines: 40, screenCols: 120, textLines: 37, divider: 48, Session: &Session{}}
-	want := editorLayout{
-		top_margin: 2, left_margin: 48, screenlines: 37, screencols: 71,
-		statusBar: true, corner: true,
-		message: messageLine{row: 40, col: 49, width: 72},
-		aside:   messageLine{row: 40, col: 1, width: 48},
-	}
-	if got := tui.editorLayout(); got != want {
-		t.Errorf("the TUI's layout is\n%+v, want\n%+v", got, want)
-	}
-
-	host := &Screen{screenLines: 40, screenCols: 120, textLines: 37, divider: 1, Session: &Session{editorOnly: true}}
-	want = editorLayout{
-		top_margin: 1, left_margin: 1, screenlines: 38, screencols: 118,
-		message: messageLine{row: 40, col: 2, width: 119},
-		aside:   messageLine{row: 40, col: 2, width: 119},
-	}
-	if got := host.editorLayout(); got != want {
-		t.Errorf("the --editor layout is\n%+v, want\n%+v", got, want)
-	}
-}
-
-// The editor draws by the layout it was given and asks nothing else: not the
-// session's mode, not the screen's size. Each editor here is given the layout
-// of the *other* program, and draws that.
+// The editor draws by the layout it was given and asks nothing else: not
+// which program it is in, not the screen's size. Each editor here is given
+// the layout of the *other* program, and draws that. (That the screen makes
+// these two layouts is TestEditorLayouts, with the screen.)
 func TestEditorDrawsByItsLayout(t *testing.T) {
+	// on a terminal of 40 rows by 100 columns: the whole of it, as a host
+	// app's window; and its right pane from column 41, as in the TUI
+	hostLayout := editorLayout{
+		top_margin: 1, left_margin: 1, screenlines: 38, screencols: 98,
+		message: messageLine{row: 40, col: 2, width: 99},
+		aside:   messageLine{row: 40, col: 2, width: 99},
+	}
+	paneLayout := editorLayout{
+		top_margin: 2, left_margin: 40, screenlines: 37, screencols: 59,
+		statusBar: true, corner: true,
+		message: messageLine{row: 40, col: 41, width: 60},
+		aside:   messageLine{row: 40, col: 1, width: 40},
+	}
+
 	inTUI := newTestEditor(t, "alpha")
 	inTUI.id, inTUI.title = 7, "a note"
-	inTUI.editorLayout = (&Screen{screenLines: 40, screenCols: 100, textLines: 37, divider: 1, Session: &Session{editorOnly: true}}).editorLayout()
+	inTUI.editorLayout = hostLayout
 
 	inHost := newTestEditor(t, "alpha")
 	inHost.id, inHost.title = 7, "a note"
-	sessionOf(inHost).editorOnly = true // the flag alone changes nothing the editor draws
-	inHost.editorLayout = (&Screen{screenLines: 40, screenCols: 100, textLines: 37, divider: 40, Session: &Session{}}).editorLayout()
+	inHost.editorLayout = paneLayout
 
 	for _, c := range []struct {
 		name          string
@@ -72,5 +64,64 @@ func TestEditorDrawsByItsLayout(t *testing.T) {
 			t.Errorf("%s: cursor on the command line at %s (shown %v), want %s", c.name, got, show, c.cursor)
 		}
 		captureStdout(t, func() { e.editorProcessKey('\x1b') })
+	}
+}
+
+// A status bar or a message with no room for all of its text is cut at a
+// character boundary. It used to be cut at a byte count, which left half of a
+// multi-byte character -- shown as garbage, and one more column than there is
+// room for when the character was a wide one. (The organizer's half of this
+// is TestLongTitleIsCutAtACharacterBoundary.)
+func TestLongTextIsCutAtACharacterBoundary(t *testing.T) {
+	// every character here is more than one byte; 日本語 are two columns each
+	const long = "café déjà vu — 日本語のノート — żółć — café déjà vu — 日本語のノート — żółć — café déjà vu — 日本語のノート"
+
+	check := func(what, out string, room int) {
+		t.Helper()
+		if !utf8.ValidString(out) {
+			t.Errorf("%s: output is not valid UTF-8: %q", what, out)
+		}
+		if w := runewidth.StringWidth(stripANSI(out)); w > room {
+			t.Errorf("%s: %d columns shown, room for %d", what, w, room)
+		}
+		if !strings.Contains(out, "caf") {
+			t.Errorf("%s: the text is not there at all: %q", what, out)
+		}
+	}
+	// text is what a draw wrote after its last cursor movement
+	text := func(out string) string {
+		if i := strings.LastIndex(out, "H"); i >= 0 && strings.Contains(out[:i], "\x1b[") {
+			return out[i+1:]
+		}
+		return out
+	}
+
+	e := newTestEditor(t, "alpha")
+	e.title = long
+	e.id = 7
+	for cols := 20; cols <= 50; cols++ { // every width, so the cut lands inside each kind of character
+		e.screencols = cols
+		out := text(captureStdout(t, e.drawStatusBar))
+		// the bar is a space and then the row, as it always was
+		check("editor status bar", out, cols+1)
+		if w := runewidth.StringWidth(stripANSI(out)); w != cols+1 {
+			t.Errorf("editor status bar at %d columns is %d wide, want %d: cut or padded by bytes?", cols, w, cols+1)
+		}
+	}
+	for width := 20; width <= 50; width++ { // as a resize changes it
+		e.aside.width = width
+		check("editor message", text(captureStdout(t, func() { e.ShowAside("%s", long) })), width)
+		check("editor message, bold", text(captureStdout(t, func() { e.ShowAside("\x1b[1m%s\x1b[0m", long) })), width)
+	}
+}
+
+// A bold message keeps its closing escape when it is cut, so the bold does not
+// run on into whatever is drawn next.
+func TestCutMessageKeepsItsReset(t *testing.T) {
+	e := newTestEditor(t, "alpha")
+	e.aside.width = 10
+	out := captureStdout(t, func() { e.ShowAside("\x1b[1m%s\x1b[0m", strings.Repeat("x", 40)) })
+	if !strings.HasSuffix(out, "\x1b[0m") || strings.Count(out, "x") != 10 {
+		t.Errorf("cut bold message is %q", out)
 	}
 }

@@ -148,7 +148,6 @@ func exMessage(t *testing.T, e *Editor, line string) string {
 // the text and cursor follows.
 func TestForwardedCommandsEditTheNote(t *testing.T) {
 	e := newTestEditor(t, "delta", "alpha", "charlie", "bravo")
-	withOrganizer(t, e)
 
 	e.sendKeys(":sort")
 	if redraw := e.editorProcessKey('\r'); !redraw {
@@ -195,7 +194,6 @@ func TestForwardedCommandsEditTheNote(t *testing.T) {
 // not have.
 func TestForwardedCommandsShowVimsReply(t *testing.T) {
 	e := newTestEditor(t, "alpha")
-	withOrganizer(t, e)
 
 	if msg := exMessage(t, e, "echo 6*7"); !strings.Contains(msg, "42") {
 		t.Errorf(":echo showed %q", msg)
@@ -226,7 +224,7 @@ func TestRefusedCommandsDoNothing(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	e := newTestEditor(t, "alpha", "bravo")
-	a := editorOnly(t, e)
+	e.editorLayout = hostAppLayout
 
 	for _, line := range []string{
 		"w notes.txt", "w! notes.txt", "wq notes.txt", "sav notes.txt", "'<,'>w part.txt", "redir > out.txt",
@@ -251,7 +249,7 @@ func TestRefusedCommandsDoNothing(t *testing.T) {
 	if got := strings.Join(e.vbuf.Lines(), "|"); got != "alpha|bravo" {
 		t.Errorf("the note changed: %q", got)
 	}
-	if !a.Run || a.Session.editor != e {
+	if !hostOf(e).open() {
 		t.Error("a refused command closed the editor")
 	}
 }
@@ -271,7 +269,7 @@ func TestVimStartsNoProgram(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := newTestEditor(t, "alpha", "bravo")
-	editorOnly(t, e)
+	e.editorLayout = hostAppLayout
 
 	// typed on the command line: vim says why not
 	for _, line := range []string{
@@ -333,7 +331,6 @@ func TestForwardExRepairsWhatACommandBroke(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	e := newTestEditor(t, "alpha")
-	withOrganizer(t, e)
 
 	out := captureStdout(t, func() { e.forwardEx("enew") })
 	if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
@@ -358,20 +355,20 @@ func TestForwardExRepairsWhatACommandBroke(t *testing.T) {
 func TestVimSpellingsOfSaveAndClose(t *testing.T) {
 	dir := t.TempDir()
 	t.Run("wq saves to the database and closes", func(t *testing.T) {
-		e, a := savedNoteEditor(t, "alpha")
+		e, h := savedNoteEditor(t, "alpha")
 		t.Chdir(dir)
 		e.sendKeys("x")
 		e.exCommand("wq")
-		if note, _ := noteInDB(t, e); note != "lpha" || a.Run {
-			t.Errorf("after :wq the database holds %q and Run is %v", note, a.Run)
+		if note, _ := noteInDB(t, e); note != "lpha" || h.open() {
+			t.Errorf("after :wq the database holds %q and the note is open: %v", note, h.open())
 		}
 	})
 	t.Run("wri saves", func(t *testing.T) {
-		e, a := savedNoteEditor(t, "alpha")
+		e, h := savedNoteEditor(t, "alpha")
 		e.sendKeys("x")
 		e.exCommand("wri")
-		if note, _ := noteInDB(t, e); note != "lpha" || !a.Run || e.isModified() {
-			t.Errorf("after :wri the database holds %q, Run %v, modified %v", note, a.Run, e.isModified())
+		if note, _ := noteInDB(t, e); note != "lpha" || !h.open() || e.isModified() {
+			t.Errorf("after :wri the database holds %q, open %v, modified %v", note, h.open(), e.isModified())
 		}
 	})
 	t.Run("update saves only a modified note", func(t *testing.T) {
@@ -387,30 +384,30 @@ func TestVimSpellingsOfSaveAndClose(t *testing.T) {
 		}
 	})
 	t.Run("a failed wq stays open", func(t *testing.T) {
-		e, a := savedNoteEditor(t, "alpha")
+		e, h := savedNoteEditor(t, "alpha")
 		e.sendKeys("x")
 		e.Store.DB().Close()
 		e.exCommand("wq")
-		if !a.Run || !e.isModified() {
+		if !h.open() || !e.isModified() {
 			t.Error(":wq closed the editor although the note was not saved")
 		}
 	})
 	t.Run("clo and qa close; q! discards", func(t *testing.T) {
 		for _, line := range []string{"clo", "qa"} {
-			e, a := savedNoteEditor(t, "alpha")
+			e, h := savedNoteEditor(t, "alpha")
 			e.exCommand(line)
-			if a.Run {
+			if h.open() {
 				t.Errorf(":%s did not close a clean note", line)
 			}
 		}
-		e, a := savedNoteEditor(t, "alpha")
+		e, h := savedNoteEditor(t, "alpha")
 		e.sendKeys("x")
 		e.exCommand("qa")
-		if !a.Run {
+		if !h.open() {
 			t.Error(":qa closed a modified note")
 		}
 		e.exCommand("qa!")
-		if a.Run {
+		if h.open() {
 			t.Error(":qa! did not close")
 		}
 	})
@@ -431,10 +428,6 @@ func TestVimSpellingsOfSaveAndClose(t *testing.T) {
 // moved, and nothing was written to disk. (A command that waited for input
 // would hang this test.)
 func TestForwardedListIsSafeInLibvim(t *testing.T) {
-	repo, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	dir := t.TempDir()
 	t.Chdir(dir)
 	for name, text := range map[string]string{"in.txt": "from a file\n", "src.vim": "let g:sourced = 1\n"} {
@@ -443,9 +436,6 @@ func TestForwardedListIsSafeInLibvim(t *testing.T) {
 		}
 	}
 	e := newTestEditor(t, "alpha", "bravo", "charlie", "delta")
-	withOrganizer(t, e)
-	// the overlay renders with a glamour style, found by path
-	screenOf(e).glamourStyle = filepath.Join(repo, "default.json")
 	vim.ExecuteCommand("let g:locked = 1")
 	vim.ExecuteCommand("let @a = 'x'")
 
@@ -518,7 +508,6 @@ func TestForwardedListIsSafeInLibvim(t *testing.T) {
 // the range vim puts there, and it is on screen before anything is typed.
 func TestCommandLineOpensWithVimsRange(t *testing.T) {
 	e := newTestEditor(t, "alpha", "bravo", "charlie", "delta")
-	withOrganizer(t, e)
 
 	e.sendKeys("Vj")
 	out := captureStdout(t, func() { e.editorProcessKey(':') })
@@ -572,7 +561,6 @@ func keyMessage(t *testing.T, e *Editor, keys string) string {
 // that finds nothing, a mark that is not set, an empty register.
 func TestVimMessagesForKeysAreShown(t *testing.T) {
 	e := newTestEditor(t, "alpha bravo", "charlie")
-	withOrganizer(t, e)
 
 	msg := keyMessage(t, e, "/nowhere\r")
 	if !strings.Contains(msg, "E486: Pattern not found: nowhere") {
@@ -622,7 +610,6 @@ func TestVimReportsForKeysAreShown(t *testing.T) {
 	}
 	lines[4], lines[14], lines[24] = "row 5 foo", "row 15 foo", "row 25 foo"
 	e := newTestEditor(t, lines...)
-	withOrganizer(t, e)
 
 	for _, tc := range []struct{ keys, want string }{
 		{"gg5yy", "5 lines yanked"},
@@ -680,7 +667,6 @@ func TestVimReportsForKeysAreShown(t *testing.T) {
 // search that failed could move the cursor.
 func TestTypedSearch(t *testing.T) {
 	e := newTestEditor(t, "one foo", "two", "three foo", "four")
-	withOrganizer(t, e)
 	t.Cleanup(func() { vim.ExecuteCommand("set wrapscan") })
 	at := func(what string, row, col int) {
 		t.Helper()
@@ -726,7 +712,6 @@ func TestTypedSearch(t *testing.T) {
 // takes the overlay.
 func TestForwardedCommandReports(t *testing.T) {
 	e := newTestEditor(t, "alpha", "alpha", "alpha", "bravo", "bravo", "bravo")
-	withOrganizer(t, e)
 
 	if msg := exMessage(t, e, "%s/alpha/x/"); !strings.Contains(msg, "3 substitutions on 3 lines") || e.mode == HELP {
 		t.Errorf(":%%s showed %q (mode %v)", msg, e.mode)
@@ -760,7 +745,6 @@ func TestForwardedCommandReports(t *testing.T) {
 // came back.
 func TestListingsAreShown(t *testing.T) {
 	e := newTestEditor(t, "alpha", "bravo", "charlie")
-	withOrganizer(t, e)
 	vim.ExecuteCommand("mapclear | mapclear!")
 	vim.ExecuteCommand("nnoremap ,d dd")
 	vim.ExecuteCommand("messages clear")
@@ -776,7 +760,7 @@ func TestListingsAreShown(t *testing.T) {
 	overlay := []struct{ line, want string }{
 		{"registers", `--- Registers ---`},
 		{"registers", `"0   alpha^J`},
-		{"1,3print", "alpha\r\n"}, // each line on its own
+		{"1,3print", "alpha\nbravo\ncharlie\n"}, // each line on its own
 		{"2,3#", "  3 charlie"},
 		{"history", "cmd history"},
 		{"history -3,", "2,3#"}, // what was typed above
@@ -865,7 +849,7 @@ func TestVimWritesNoFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := newTestEditor(t, "alpha", "bravo")
-	editorOnly(t, e)
+	e.editorLayout = hostAppLayout
 
 	// typed: refused by vimango's list or by vim, and either says so
 	for _, line := range []string{

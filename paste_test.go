@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -219,71 +218,5 @@ func TestPasteALot(t *testing.T) {
 	t.Logf("%d KB in %v", len(text)/1024, took)
 	if took > 5*time.Second {
 		t.Errorf("pasting %d KB took %v", len(text)/1024, took)
-	}
-}
-
-// The whole way: a paste from the key reader, through the event loop, into
-// the note.
-func TestEventLoopPastes(t *testing.T) {
-	a, ids := editorOnlyApp(t, "- foo")
-	a.keyEvents = make(chan terminal.Key, 64)
-	vim.ExecuteCommand("mapclear | mapclear!")
-	sourceVimrc()
-	t.Cleanup(func() { vim.ExecuteCommand("mapclear | mapclear!") })
-
-	captureStdout(t, func() {
-		if err := a.openEditor(ids[0], ""); err != nil {
-			t.Fatal(err)
-		}
-		a.keyEvents <- terminal.Key{Regular: 'A'}
-		a.keyEvents <- terminal.Key{Special: terminal.KeyPaste, Paste: "\r- bar\r  - baz"}
-		for _, r := range "\x1b:x\r" {
-			a.keyEvents <- terminal.Key{Regular: r}
-		}
-		a.handleEvents() // :x ends it: --editor has one note
-	})
-
-	if text, err := a.Store.Note(ids[0]); err != nil || text != "- foo\n- bar\n  - baz" {
-		t.Errorf("the note is %q (%v)", text, err)
-	}
-}
-
-// The organizer takes a paste into the title being edited and onto its
-// command line, as one line. Anywhere else the paste is dropped: as keys it
-// ran as the organizer's commands.
-func TestOrganizerPaste(t *testing.T) {
-	o, _ := newDBOrganizer(t, "alpha", "bravo")
-
-	// NORMAL: "dd" is not run, "m" does not mark
-	captureStdout(t, func() { o.pasteText("ddm\rx") })
-	if got := o.vbuf.Lines(); got[0] != "alpha" || got[1] != "bravo" || len(o.marked_entries) != 0 {
-		t.Fatalf("a paste in NORMAL mode did something: %q, %d marked", got, len(o.marked_entries))
-	}
-	if o.mode != NORMAL {
-		t.Fatalf("mode %v, want NORMAL", o.mode)
-	}
-
-	// the title: one line, where the cursor is, and the row stays the row
-	captureStdout(t, func() {
-		o.organizerProcessKey('A')
-		if o.pasteText(" one\r two\r") != RedrawPartial {
-			t.Error("a paste into the title did not ask for the row to be redrawn")
-		}
-	})
-	if got := o.vbuf.Lines(); len(got) != 2 || got[0] != "alpha one  two" || o.rows[0].title != got[0] {
-		t.Errorf("titles %q, row %q", got, o.rows[0].title)
-	}
-	if o.mode != INSERT || o.fr != 0 || !o.rows[0].dirty {
-		t.Errorf("mode %v, row %d, dirty %v", o.mode, o.fr, o.rows[0].dirty)
-	}
-	captureStdout(t, func() { o.organizerProcessKey('\x1b') })
-
-	// the command line: nothing is run by the paste's line end
-	captureStdout(t, func() {
-		o.organizerProcessKey(':')
-		o.pasteText("find café\r")
-	})
-	if o.mode != COMMAND_LINE || o.command_line != "find café" {
-		t.Errorf("mode %v, command line %q", o.mode, o.command_line)
 	}
 }

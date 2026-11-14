@@ -9,52 +9,6 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// newTestEditor builds the smallest Editor editorProcessKey will drive: a real
-// vim buffer plus both command tables, so the whole interception layer is in
-// the path.
-func newTestEditor(t *testing.T, lines ...string) *Editor {
-	t.Helper()
-	vim.InitializeVim(0)
-	sess := &Session{}
-	a := &App{Session: sess}
-	scr := &Screen{screenCols: 100, screenLines: 40, textLines: 30, divider: 40, Session: sess}
-	// (a bare editor, not newEditor's: no line numbers and no highlighting,
-	// so that a test's columns are the text's)
-	e := &Editor{editorHost: editorHost{notices: scr, syncAnswer: a.syncAnswer()}}
-	// the TUI's layout on that screen, with a narrower text area
-	e.editorLayout = scr.editorLayout()
-	e.screencols = 50
-	e.screenlines = 30
-	e.commandRegistry = editorCommands()
-	e.exCmds = e.commandRegistry.GetFunctionMap()
-	// vim is a process-wide singleton, so a previous test may have left it in
-	// INSERT or VISUAL; start every editor from NORMAL
-	vim.SendKey("<esc>")
-	e.vbuf = vim.NewBuffer(0)
-	vim.SetCurrentBuffer(e.vbuf)
-	e.vbuf.SetLines(0, -1, lines)
-	vim.SetCursorPosition(1, 0)
-	e.ss = e.vbuf.Lines()
-	e.mode = NORMAL
-	vim.SetScreenLayout(e)
-	return e
-}
-
-// screenOf is the screen a test's editor is on, and sessionOf that screen's
-// session. The editor holds neither: of the screen it is given only the notice
-// box, which in these tests is the screen itself.
-func screenOf(e *Editor) *Screen { return e.notices.(*Screen) }
-
-func sessionOf(e *Editor) *Session { return screenOf(e).Session }
-
-func (e *Editor) sendKeys(s string) {
-	for _, r := range s {
-		e.editorProcessKey(int(r))
-	}
-}
-
-func (e *Editor) line(n int) string { return e.vbuf.Lines()[n] }
-
 // The leader used to swallow <space> unconditionally, so it never reached vim.
 // vim defines <Space> as "l", and a vim-like editor should honour that.
 func TestSpaceIsAMotionNotALeader(t *testing.T) {
@@ -237,11 +191,11 @@ func TestCursorColumnOnMultiByteLine(t *testing.T) {
 // and the note on screen did not change.
 func TestKeyThatLeavesTheNoteComesBack(t *testing.T) {
 	e := newTestEditor(t, "alpha", "bravo")
-	a := withOrganizer(t, e)
 	// as when a note is opened from the organizer: the organizer's buffer
 	// was current, then the note's
-	vim.SetCurrentBuffer(a.Organizer.vbuf)
-	a.Organizer.vbuf.SetLines(0, -1, []string{"a title", "another title"})
+	titles := vim.NewBuffer(0)
+	vim.SetCurrentBuffer(titles)
+	titles.SetLines(0, -1, []string{"a title", "another title"})
 	vim.SetCurrentBuffer(e.vbuf)
 
 	out := captureStdout(t, func() {
@@ -256,7 +210,7 @@ func TestKeyThatLeavesTheNoteComesBack(t *testing.T) {
 	if got := e.line(0); got != "xalpha" {
 		t.Errorf("after Ctrl-^ and ix the note's first line is %q, want the x in it", got)
 	}
-	if got := a.Organizer.vbuf.Lines(); got[0] != "a title" || got[1] != "another title" {
+	if got := titles.Lines(); got[0] != "a title" || got[1] != "another title" {
 		t.Errorf("the organizer's titles are now %q", got)
 	}
 	if strings.Contains(out, "line 1 of 2") {

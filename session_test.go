@@ -8,61 +8,88 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// withOrganizer makes e the session's one open editor, with a minimal app
-// behind it -- an organizer with its own vim buffer and no rows, so returning
-// to it draws nothing that needs a database (displayNote with no rows only
-// clears the pane).
-func withOrganizer(t *testing.T, e *Editor) *App {
+// The app with a note open in its editor: what a close comes to in the TUI
+// and in --editor, and that the editor's :sync reaches neither a sync nor the
+// organizer. What the editor itself does is tested with the editor.
+
+// testApp is a vimango with notes to open: a store with one note per text
+// ("note A", "note B", ...), and a screen 40 rows by 120 columns. Started with
+// --editor it has no organizer and the editor has the whole screen;
+// otherwise it is the TUI, the editor in its right pane, with an organizer
+// that has a vim buffer of its own and no rows -- so going back to it draws
+// nothing that needs a list.
+func testApp(t *testing.T, editorOnly bool, texts ...string) (a *App, ids []int) {
 	t.Helper()
-	orgBuf := vim.NewBuffer(0)
-	a := &App{
-		Session:   sessionOf(e),
-		Screen:    screenOf(e),
-		Organizer: &Organizer{Session: sessionOf(e), Screen: screenOf(e), vbuf: orgBuf},
-		Run:       true,
+	vim.InitializeVim(0)
+	vim.SendKey("<esc>")
+	db := newTestStore(t)
+	for i, text := range texts {
+		id, err := db.Add("note "+string(rune('A'+i)), false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.SetNote(id, text); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	sess := &Session{editorOnly: editorOnly}
+	scr := &Screen{screenCols: 120, screenLines: 40, textLines: 37, divider: 48, totaleditorcols: 70, edPct: 60, Session: sess}
+	a = &App{Session: sess, Screen: scr, Store: db, Run: true}
+	if editorOnly {
+		scr.divider, scr.totaleditorcols, scr.edPct = 1, 118, 100
+	} else {
+		a.Organizer = &Organizer{Session: sess, Screen: scr, Store: db, vbuf: vim.NewBuffer(0)}
+		vim.SetCurrentBuffer(a.Organizer.vbuf)
 	}
 	prev := app
 	app = a
 	t.Cleanup(func() { app = prev })
-
-	vim.SetCurrentBuffer(e.vbuf)
-	sessionOf(e).editor = e
-	e.onClose = a.noteClosed
-	// the note as loaded is the saved state, as editNote records it
-	e.saveTick = e.vbuf.GetLastChangedTick()
-	return a
+	return a, ids
 }
 
-// editorOnly makes e the editor of a vimango started with --editor, as
-// vimango_hybrid starts one: a session in editor-only mode and an app with no
-// organizer at all. Anything on the editor's path that reaches for one fails
-// here, as it would there.
-func editorOnly(t *testing.T, e *Editor) *App {
+// tuiApp is the TUI; editorOnlyApp is a vimango started with --editor, before
+// its note is open.
+func tuiApp(t *testing.T, texts ...string) (*App, []int) { return testApp(t, false, texts...) }
+
+func editorOnlyApp(t *testing.T, texts ...string) (*App, []int) { return testApp(t, true, texts...) }
+
+// openIn opens a note in the app's editor, as :e and --open do.
+func openIn(t *testing.T, a *App, id int) *Editor {
 	t.Helper()
-	a := &App{Session: sessionOf(e), Screen: screenOf(e), Store: e.Store, Run: true}
-	prev := app
-	app = a
-	t.Cleanup(func() { app = prev })
-
-	vim.SetCurrentBuffer(e.vbuf)
-	sessionOf(e).editorOnly = true
-	sessionOf(e).editor = e
-	e.onClose = a.noteClosed
-	// what a host decides, decided again for this one
-	e.syncAnswer = a.syncAnswer()
-	screenOf(e).positionEditor()
-	e.saveTick = e.vbuf.GetLastChangedTick()
-	return a
+	captureStdout(t, func() {
+		if err := a.openEditor(id, ""); err != nil {
+			t.Fatal(err)
+		}
+	})
+	return a.Session.editor
 }
+
+// pressKeys types s in the editor, and runEx an ex command and Enter. said is
+// what the editor wrote for an ex command, without the escape sequences.
+func pressKeys(e *Editor, s string) {
+	for _, r := range s {
+		e.editorProcessKey(int(r))
+	}
+}
+
+func runEx(e *Editor, cmd string) { pressKeys(e, ":"+cmd+"\r") }
+
+func said(t *testing.T, e *Editor, cmd string) string {
+	t.Helper()
+	return stripANSI(captureStdout(t, func() { runEx(e, cmd) }))
+}
+
+// noteLines is the text of the note vim is on.
+func noteLines() string { return strings.Join(vim.GetCurrentBuffer().Lines(), "|") }
 
 // One note at a time: :q closes the note and hands focus back to the
 // organizer -- no editor left open behind it, vim on the organizer's buffer.
 func TestQuitReturnsToOrganizer(t *testing.T) {
-	e := newTestEditor(t, "alpha")
-	a := withOrganizer(t, e)
+	a, ids := tuiApp(t, "alpha")
+	e := openIn(t, a, ids[0])
 
-	e.sendKeys(":q")
-	e.editorProcessKey('\r')
+	captureStdout(t, func() { runEx(e, "q") })
 
 	if a.Session.editor != nil {
 		t.Error(":q left an editor open")
@@ -77,20 +104,23 @@ func TestQuitReturnsToOrganizer(t *testing.T) {
 
 // A modified note is not closed by :q, and is by :q!.
 func TestQuitRefusesUnsavedChanges(t *testing.T) {
-	e := newTestEditor(t, "alpha")
-	a := withOrganizer(t, e)
+	a, ids := tuiApp(t, "alpha")
+	e := openIn(t, a, ids[0])
 
-	e.sendKeys("x")
-	e.sendKeys(":q")
-	e.editorProcessKey('\r')
+	captureStdout(t, func() {
+		pressKeys(e, "x")
+		runEx(e, "q")
+	})
 	if a.Session.editor != e {
 		t.Fatal(":q closed a note with unsaved changes")
 	}
 
-	e.sendKeys(":q!")
-	e.editorProcessKey('\r')
+	captureStdout(t, func() { runEx(e, "q!") })
 	if a.Session.editor != nil {
 		t.Error(":q! did not close the note")
+	}
+	if text, _ := a.Store.Note(ids[0]); text != "alpha" {
+		t.Errorf(":q! left %q in the database", text)
 	}
 }
 
@@ -99,87 +129,63 @@ func TestQuitRefusesUnsavedChanges(t *testing.T) {
 // hand over to the organizer with the note still open and its edits unsaved,
 // where :q then quit without a word about them.
 func TestSyncIsRefusedInTheEditor(t *testing.T) {
-	e := newTestEditor(t, "alpha")
-	a := withOrganizer(t, e)
+	a, ids := tuiApp(t, "alpha")
+	e := openIn(t, a, ids[0])
 	orgMode := a.Organizer.mode
 
-	captureStdout(t, func() { e.sendKeys("x") }) // an unsaved edit
+	captureStdout(t, func() { pressKeys(e, "x") }) // an unsaved edit
 	for _, cmd := range []string{"sync", "test", "sync?"} {
-		if msg := exMessage(t, e, cmd); !strings.Contains(msg, "close the note") {
+		if msg := said(t, e, cmd); !strings.Contains(msg, "close the note") {
 			t.Errorf(":%s said %q", cmd, msg)
 		}
 		if a.Session.editor != e {
 			t.Fatalf(":%s left the editor", cmd)
 		}
-		if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
-			t.Fatalf(":%s took vim off the note's buffer", cmd)
-		}
 		if a.Organizer.mode != orgMode {
 			t.Errorf(":%s reached the organizer: its mode is %v", cmd, a.Organizer.mode)
 		}
-		if e.mode != NORMAL || !e.isModified() || e.line(0) != "lpha" {
-			t.Errorf("after :%s: mode %v, modified %v, text %q", cmd, e.mode, e.isModified(), e.line(0))
+		if e.Mode() != NORMAL || !e.Modified() || noteLines() != "lpha" {
+			t.Errorf("after :%s: mode %v, modified %v, text %q", cmd, e.Mode(), e.Modified(), noteLines())
 		}
 	}
-}
 
-// Closing is all the editor does about it: what follows is whoever opened it's
-// to say, through onClose. The editor here has no app behind it at all -- the
-// global is nil -- and closes all the same, when and only when the note's text
-// is in the database or was thrown away.
-func TestEditorClosesThroughOnClose(t *testing.T) {
-	prev := app
-	app = nil
-	t.Cleanup(func() { app = prev })
-
-	e := newTestEditor(t, "alpha")
-	e.Store = newTestStore(t)
-	id, err := e.Store.Add("a note", false, localdb.DefaultContextUUID, localdb.DefaultFolderUUID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.id = id
-	e.saveTick = e.vbuf.GetLastChangedTick()
-	closed := 0
-	e.onClose = func() { closed++ }
-
-	steps := []struct {
-		keys, cmd string
-		want      int // times closed, after the command
-		why       string
-	}{
-		{"", "q", 1, ":q on a clean note closes it"},
-		{"x", "q", 1, ":q on a modified note does not"},
-		{"", "q!", 2, ":q! does"},
-		{"", "x", 3, ":x writes the note and closes it"},
-		{"", "x", 4, ":x on the note just written closes it"},
-	}
-	captureStdout(t, func() {
-		for _, s := range steps {
-			e.sendKeys(s.keys)
-			e.exCommand(s.cmd)
-			if closed != s.want {
-				t.Errorf("%s: closed %d times, want %d", s.why, closed, s.want)
-			}
-		}
-	})
-	if text, _ := e.Store.Note(id); text != "lpha" {
-		t.Errorf(":x left %q in the database, want \"lpha\"", text)
+	// in --editor the answer is the host's
+	a, ids = editorOnlyApp(t, "alpha")
+	e = openIn(t, a, ids[0])
+	if msg := said(t, e, "sync"); !strings.Contains(msg, "sync is handled by the app") {
+		t.Errorf(":sync in --editor said %q", msg)
 	}
 }
 
 // --editor has no organizer to return to: :q ends the app instead, leaving the
 // editor in place for the main loop to finish its iteration.
 func TestQuitInEditorOnlyModeEndsTheApp(t *testing.T) {
-	e := newTestEditor(t, "alpha")
-	a := editorOnly(t, e)
+	a, ids := editorOnlyApp(t, "alpha")
+	e := openIn(t, a, ids[0])
 
-	e.sendKeys(":q")
-	e.editorProcessKey('\r')
+	captureStdout(t, func() { runEx(e, "q") })
 	if a.Run {
 		t.Error(":q in --editor mode did not end the app")
 	}
 	if a.Session.editor != e {
 		t.Error(":q in --editor mode dropped the editor before the loop finished")
+	}
+}
+
+// A write that fails keeps the note open, in the TUI as in --editor: the
+// editor does not say it closed, so the app does nothing.
+func TestFailedSaveKeepsTheNoteOpen(t *testing.T) {
+	for _, editorOnly := range []bool{false, true} {
+		a, ids := testApp(t, editorOnly, "alpha")
+		e := openIn(t, a, ids[0])
+		captureStdout(t, func() { pressKeys(e, "x") })
+		a.Store.DB().Close()
+
+		captureStdout(t, func() { runEx(e, "x") })
+
+		if a.Session.editor != e || !a.Run || !e.Modified() {
+			t.Errorf("--editor %v: after a failed :x the editor is open %v, the app running %v, the buffer modified %v",
+				editorOnly, a.Session.editor == e, a.Run, e.Modified())
+		}
 	}
 }

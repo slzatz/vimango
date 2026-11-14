@@ -169,6 +169,14 @@ type noticeBox interface {
 	noticeKey(c int) (message string, handled bool)
 }
 
+// What an editor says of itself to whoever opened it: the id of its note,
+// the title it shows for it, what it is doing with keys, and whether the
+// buffer holds changes that are not in the database.
+func (e *Editor) ID() int        { return e.id }
+func (e *Editor) Title() string  { return e.title }
+func (e *Editor) Mode() Mode     { return e.mode }
+func (e *Editor) Modified() bool { return e.isModified() }
+
 // ShowMessage writes a message on the editor's message line, in place of the
 // last one. ShowAside writes one beside the note, for what is not about the
 // text under the cursor. See editorLayout for where each is.
