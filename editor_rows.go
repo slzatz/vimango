@@ -242,7 +242,9 @@ func (e *Editor) drawRows(pab *strings.Builder) {
 	y := 0
 	e.visibleRows(func(n int, row string) bool {
 		if e.numberLines {
-			fmt.Fprintf(&numCols, "\x1b[48;5;235m\x1b[38;5;245m%3d \x1b[49m", n+1)
+			// (both colours are put back: whatever is drawn next -- the status
+			// bar, a message -- is not the numbers' grey)
+			fmt.Fprintf(&numCols, "\x1b[48;5;235m\x1b[38;5;245m%3d \x1b[39;49m", n+1)
 		}
 		for _, line := range strings.Split(row, "\t") {
 			if y == e.screenlines {

@@ -15,6 +15,12 @@ func (e *Editor) highlightInfo() { // [2][4]int {
 	e.highlight = vim.GetVisualRange() //[]line col []line col
 }
 
+// shadedStyle is how the visual selection and a matched pair of braces are
+// drawn: grey text on a darker ground. The grey was the line numbers', left
+// set by accident until 2026-11-14 -- so a selection was grey only with
+// numbers on and nothing else drawn in between. It is now said here.
+const shadedStyle = "\x1b[48;5;237m\x1b[38;5;245m"
+
 // highlight matched braces in NORMAL and INSERT modes
 func (e *Editor) drawHighlightedBraces() {
 
@@ -51,11 +57,11 @@ func (e *Editor) drawHighlightedBraces() {
 	match := e.ss[pos[0]-1][pos[1]]
 
 	x := e.getScreenXFromRowColWW(pos[0]-1, pos[1]) + e.left_margin + e.left_margin_offset + 1
-	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s", y+e.top_margin, x, string(match))
+	fmt.Printf("\x1b[%d;%dH%s%s", y+e.top_margin, x, shadedStyle, string(match))
 
 	x = e.getScreenXFromRowColWW(e.fr, e.fc-back) + e.left_margin + e.left_margin_offset + 1
 	y = e.getScreenYFromRowColWW(e.fr, e.fc-back) + e.top_margin - e.lineOffset // added line offset 12-25-2019
-	fmt.Printf("\x1b[%d;%dH\x1b[48;5;237m%s\x1b[0m", y, x, string(b))
+	fmt.Printf("\x1b[%d;%dH%s%s\x1b[0m", y, x, shadedStyle, string(b))
 	return
 }
 
@@ -252,7 +258,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 
 	y := e.getScreenYFromRowColWW(startRow, 0) - e.lineOffset
 
-	pab.WriteString("\x1b[48;5;237m")
+	pab.WriteString(shadedStyle)
 	for r := startRow; r <= endRow && y < e.screenlines; r++ {
 		row := e.visualRowText(r)
 		lo, hi := 0, len(row) // VISUAL_LINE takes the whole row

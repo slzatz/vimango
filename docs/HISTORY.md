@@ -823,3 +823,27 @@ repositories:
   `sendToVim`, `clipColumns`, the wrap helpers, the command registry,
   `writeFileAtomic`. Giving those a home is step 4b, and one package or
   several is Steve's decision first.
+
+- **Drawing the text leaves no colour set.** The leak noted in the first
+  entry above, fixed where it starts: the line numbers put back the
+  foreground as well as the background (`drawRows`). Steve's choice for the
+  TUI's status bar: the terminal's own colour, always.
+  - **What changes on screen:** in the TUI the status bar no longer turns
+    grey at the first key that redraws; the messages of `:number` and
+    `:syntax` are not grey (hybrid too).
+  - **What is kept:** the visual selection and a matched pair of braces were
+    grey text on a darker ground by the same accident -- only with line
+    numbers on, and only when nothing drawn in between (a visible
+    misspelling, a search match) had reset the colour. With numbers on and
+    spell off, which is how an editor starts, that was grey, so grey is now
+    said outright: `shadedStyle` (`editor_methods.go`), one constant to
+    change if the selection's text should be the terminal's colour instead.
+    In the states where the accident went the other way the selection is
+    now grey too.
+
+  Checked by comparing screens, not bytes: both builds through
+  `compare-drawing.py`'s keys and more (selections with line numbers on and
+  off, with a search highlighted, with `:spell` on; a matched brace), read
+  by a terminal emulator, every cell and attribute compared after every
+  step. The differences are those above and no others. Test:
+  `TestDrawingTheTextLeavesNoColourSet`, which fails without the fix.

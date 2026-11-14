@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -297,5 +299,57 @@ func BenchmarkWholeNote(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var buf bytes.Buffer
 		Highlight2(&buf, text, "markdown", MDFormatter, e.markdownStyle)
+	}
+}
+
+// foregroundLeftSet reports whether out ends with a foreground colour still
+// in effect: an SGR that sets one (30-37, 38;..., 90-97) with no reset (0, or
+// 39) after it.
+func foregroundLeftSet(out string) bool {
+	set := false
+	for _, m := range regexp.MustCompile(`\x1b\[([0-9;]*)m`).FindAllStringSubmatch(out, -1) {
+		params := strings.Split(m[1], ";")
+		for i := 0; i < len(params); i++ {
+			n, _ := strconv.Atoi(params[i]) // "" is 0
+			switch {
+			case n == 0 || n == 39:
+				set = false
+			case n >= 30 && n <= 37, n >= 90 && n <= 97:
+				set = true
+			case n == 38:
+				set = true
+				i = len(params) // the rest are the colour's own numbers
+			case n == 48:
+				i = len(params)
+			}
+		}
+	}
+	return set
+}
+
+// Drawing the text leaves no colour behind for whatever is drawn next. The
+// line numbers set a grey foreground and put back only the background, so
+// the TUI's status bar turned grey at the first key that redrew the text, as
+// did a message shown after a redraw (:number, :syntax) -- and the visual
+// selection was grey or not by the same accident. The selection's grey is
+// now its own (shadedStyle).
+func TestDrawingTheTextLeavesNoColourSet(t *testing.T) {
+	e := newTestEditor(t, "alpha (bravo)", "charlie", "delta")
+	e.numberLines = true
+	e.left_margin_offset = LEFT_MARGIN_OFFSET
+
+	if out := captureStdout(t, e.drawText); !strings.Contains(out, "  1 ") || foregroundLeftSet(out) {
+		t.Errorf("drawText with line numbers left a foreground colour set: %q", out)
+	}
+
+	// a selection is drawn in its own grey, with the numbers on or off
+	for _, numbers := range []bool{true, false} {
+		e.numberLines = numbers
+		captureStdout(t, func() { e.sendKeys("vj") })
+		out := captureStdout(t, e.drawText)
+		if !strings.Contains(out, shadedStyle) || foregroundLeftSet(out) {
+			t.Errorf("a selection, line numbers %v: drawn %q", numbers, out)
+		}
+		captureStdout(t, func() { e.editorProcessKey('\x1b') })
 	}
 }
