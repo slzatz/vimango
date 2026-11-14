@@ -21,12 +21,12 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":write", ":w"},
 	})
 
-	registry.Register("sync", (*Editor).synchronize, CommandInfo{
+	registry.Register("sync", (*Editor).noSync, CommandInfo{
 		Aliases:     []string{"test", "sync?"},
-		Description: "Synchronize with remote server (test or sync? for dry-run)",
+		Description: "Not run from the editor: close the note and sync from the organizer",
 		Usage:       "sync",
 		Category:    "Data Management",
-		Examples:    []string{":sync", ":test (dry-run)", ":sync? (dry-run)"},
+		Examples:    []string{":x, then :sync in the organizer"},
 	})
 
 	registry.Register("read", (*Editor).readFile, CommandInfo{
@@ -354,30 +354,20 @@ func (e *Editor) number() {
 	e.ShowMessage(BR, "Line numbering is %t", e.numberLines)
 }
 
-// synchronize makes :sync work from the editor pane (the macOS host
-// app's Sync menu feeds ":sync\r" into the pty without knowing which
-// pane has focus). It returns focus to the organizer — same steps as
-// moveLeft's return path — and delegates to the organizer's synchronize
-// so the full report renders in the notice view exactly as it does when
-// syncing from the organizer.
-func (e *Editor) synchronize() {
+// noSync is :sync, :test and :sync? typed in the editor: sync is not the
+// editor's to run, and the answer says whose it is. The names stay registered
+// so that they get this answer and not vim's (":sync" is vim's :syncbind).
+//
+// In --editor mode a host app owns sync: it runs vimango-sync itself and
+// refreshes its list afterwards, and a sync here would run behind its back.
+// In the TUI it is the organizer's, once the note is closed. Until 2026-11-13
+// the TUI's editor handed over to the organizer with the note still open:
+// the organizer's :q then quit with the note's unsaved edits and no warning,
+// and :test and :sync?, the dry runs, ran a real sync.
+func (e *Editor) noSync() {
 	if e.Session.editorOnly {
-		// --editor runs inside a host app that owns sync (it spawns
-		// vimango-sync itself and refreshes its list, status bar, and
-		// :synclog afterwards). An in-process sync here would run behind
-		// the host's back — and could race a host-initiated sync — so
-		// redirect instead of syncing.
 		e.ShowMessage(BR, "sync is handled by the app — use the Sync menu")
 		return
 	}
-
-	if e.Screen.divider < 10 {
-		e.Screen.edPct = 80
-		app.moveDividerPct(80)
-	}
-	e.Session.editorMode = false
-	vim.SetCurrentBuffer(app.Organizer.vbuf)
-	app.Organizer.command_line = e.command_line // dry-run detection (:test / :sync?)
-	app.Organizer.synchronize(exArgs{name: "sync"})
-	app.returnCursor()
+	e.ShowMessage(BR, "sync is the organizer's: close the note (:x or :q), then :sync")
 }

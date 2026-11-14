@@ -38,9 +38,12 @@ freezes); `docs/HISTORY.md` has the account of each.
   `u` after each command puts it back.
 - **Where output goes.** One line of output goes on the message line. More
   than that opens the overlay `:help` uses: Space / `b` page it, Esc closes it.
-- **hybrid** drives the same editor. Two differences: `:sync` answers "sync is
-  handled by the app — use the Sync menu", and `:q` / `:x` end the pop-out
-  (the process exiting is how hybrid knows the note was saved).
+- **hybrid** drives the same editor. Two differences: `:q` / `:x` end the
+  pop-out (the process exiting is how hybrid knows the note was saved), and
+  what `:sync` answers. The editor does not sync in either: in hybrid it says
+  "sync is handled by the app — use the Sync menu", in the TUI "sync is the
+  organizer's: close the note (:x or :q), then :sync". `:test` and `:sync?`
+  get the same answer.
 
 ## 1. What works
 
@@ -157,7 +160,8 @@ Typed at the `:` line they last until the editor closes; put them in
 ### vimango's own commands
 
 `:spell`, `:suggest` (the same as `z=`), `:number`, `:syntax`, `:paste` /
-`:nopaste`, `:checkstale`, `:sync` (TUI only), `:help`, `:help normal`.
+`:nopaste`, `:checkstale`, `:help`, `:help normal`. `:sync` is refused, with
+where to sync from instead.
 
 ## 2. Blocked on purpose
 

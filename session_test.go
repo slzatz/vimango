@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/slzatz/vimango/vim"
@@ -89,6 +90,35 @@ func TestQuitRefusesUnsavedChanges(t *testing.T) {
 	e.editorProcessKey('\r')
 	if a.Session.editor != nil || a.Session.editorMode {
 		t.Error(":q! did not close the note")
+	}
+}
+
+// :sync is not the editor's: typed there -- as :test and :sync?, the dry
+// runs, too -- it is refused, and the note stays open as it was. It used to
+// hand over to the organizer with the note still open and its edits unsaved,
+// where :q then quit without a word about them.
+func TestSyncIsRefusedInTheEditor(t *testing.T) {
+	e := newTestEditor(t, "alpha")
+	a := withOrganizer(t, e)
+	orgMode := a.Organizer.mode
+
+	captureStdout(t, func() { e.sendKeys("x") }) // an unsaved edit
+	for _, cmd := range []string{"sync", "test", "sync?"} {
+		if msg := exMessage(t, e, cmd); !strings.Contains(msg, "close the note") {
+			t.Errorf(":%s said %q", cmd, msg)
+		}
+		if a.Session.editor != e || !a.Session.editorMode {
+			t.Fatalf(":%s left the editor", cmd)
+		}
+		if vim.GetCurrentBuffer().GetID() != e.vbuf.GetID() {
+			t.Fatalf(":%s took vim off the note's buffer", cmd)
+		}
+		if a.Organizer.mode != orgMode {
+			t.Errorf(":%s reached the organizer: its mode is %v", cmd, a.Organizer.mode)
+		}
+		if e.mode != NORMAL || !e.isModified() || e.line(0) != "lpha" {
+			t.Errorf("after :%s: mode %v, modified %v, text %q", cmd, e.mode, e.isModified(), e.line(0))
+		}
 	}
 }
 

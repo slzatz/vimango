@@ -628,3 +628,31 @@ repositories:
 
   Left as it was: a death by signal restores neither raw mode nor this (a
   shell sets bracketed paste for itself at its next prompt).
+
+## 2026-11-13
+
+- **The editor refuses `:sync`, in the TUI as in `--editor`.** In the TUI,
+  `:sync` typed in the editor used to hand over to the organizer and run the
+  sync there, with the note still open. Two things were wrong with that, both
+  found by reading the code for what the editor still reaches outside itself:
+  - **Unsaved edits could be lost without a word.** The handover cleared
+    `Session.editorMode` and left the editor, modified, in `Session.editor`.
+    Nothing led back to it; the organizer's `:q` asks only about unsaved
+    *titles* and quit. Opening any note replaced it. (Confirmed with a test
+    before the fix: buffer modified, `app.Run` false after `:q`.)
+  - **`:test` and `:sync?`, the dry runs, ran a real sync.** The editor
+    passed the organizer `exArgs{name: "sync"}` whatever was typed; the
+    organizer has told a dry run by `ex.name` since commands took `exArgs`,
+    and the line that copied the editor's command line across for it no
+    longer did anything. Read, not run: there is no server in the tests.
+
+  Now all three names answer "sync is the organizer's: close the note (:x or
+  :q), then :sync" and nothing else happens (`noSync`, `editor_cmd_line.go`);
+  in `--editor` the answer is the host's, as before. The names stay in the
+  editor's registry so that the answer is this one and not vim's -- `:sync`
+  is vim's `:syncbind`. A TUI change only, and Steve's decision: hybrid never
+  ran the editor's sync and injects only `:checkstale`, `:q`, `:x` and `:q!`.
+
+  With it the editor's uses of the global `app` are down to one,
+  `app.noteClosed()`. Test: `TestSyncIsRefusedInTheEditor`
+  (`session_test.go`), which fails on the old code.
