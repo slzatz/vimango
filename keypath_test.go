@@ -14,12 +14,15 @@ import (
 func newTestEditor(t *testing.T, lines ...string) *Editor {
 	t.Helper()
 	vim.InitializeVim(0)
-	a := &App{}
 	sess := &Session{}
+	a := &App{Session: sess}
 	scr := &Screen{screenCols: 100, screenLines: 40, textLines: 30, divider: 40, Session: sess}
 	e := &Editor{Session: sess, Screen: scr}
+	// the TUI's layout on that screen, with a narrower text area
+	e.editorLayout = scr.editorLayout()
 	e.screencols = 50
 	e.screenlines = 30
+	e.syncAnswer = a.syncAnswer()
 	e.exCmds = a.setEditorExCmds(e)
 	// vim is a process-wide singleton, so a previous test may have left it in
 	// INSERT or VISUAL; start every editor from NORMAL

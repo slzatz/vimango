@@ -48,6 +48,9 @@ func editorOnly(t *testing.T, e *Editor) *App {
 	e.Session.editorOnly = true
 	e.Session.editor = e
 	e.onClose = a.noteClosed
+	// what a host decides, decided again for this one
+	e.syncAnswer = a.syncAnswer()
+	e.Screen.positionEditor()
 	e.saveTick = e.vbuf.GetLastChangedTick()
 	return a
 }

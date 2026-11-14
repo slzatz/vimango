@@ -59,22 +59,6 @@ func (e *Editor) drawHighlightedBraces() {
 	return
 }
 
-func (e *Editor) setLinesMargins() { //also sets top margin
-
-	// editor-only mode: no top border row (native title bar above) and no
-	// status-bar row (native status bar below) — but keep one blank row
-	// between the text and the message/cmdline line as a visual separator,
-	// so the net gain over the TUI layout is one text row. Text runs from
-	// row 1 (top_margin=1) to two rows above the cmdline.
-	if e.Session.editorOnly {
-		e.screenlines = e.Screen.textLines + 1
-		e.top_margin = 1
-		return
-	}
-	e.screenlines = e.Screen.textLines
-	e.top_margin = TOP_MARGIN + 1
-}
-
 // used by updateNote
 func (e *Editor) bufferToString() string {
 	return strings.Join(e.ss, "\n")
@@ -290,11 +274,8 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 }
 
 func (e *Editor) drawStatusBar() {
-	// editor-only mode: the hybrid host shows note id/title in its own
-	// native status bar; the row below the text area (screenlines +
-	// top_margin) is a deliberately blank separator above the
-	// message/cmdline line (setLinesMargins), so there is nothing to draw.
-	if e.Session.editorOnly {
+	// a host with a status bar of its own asks for none (Screen.editorLayout)
+	if !e.statusBar {
 		return
 	}
 
@@ -329,18 +310,12 @@ func (e *Editor) drawFrame() {
 		ab.WriteString("\x1b[37;1mx")
 	}
 
-	//'T' corner = w or right top corner = k
-	// (skipped in editor-only mode: top_margin is 1, so the corner row
-	// (top_margin-1 = 0) doesn't exist — the cursor would clamp to row 1
-	// and stamp the corner glyph over the border/text there)
-	if !e.Session.editorOnly {
+	// the top right corner (k), where the frame meets a border above the
+	// text. With no such border there is no row for it: a layout whose text
+	// starts on row 1 asks for none, or the corner would land on the text.
+	if e.corner {
 		fmt.Fprintf(&ab, "\x1b[%d;%dH", e.top_margin-1, e.left_margin+e.screencols+1)
-
-		if e.left_margin+e.screencols > e.Screen.screenCols-4 {
-			ab.WriteString("\x1b[37;1mk") //draw corner
-		} else {
-			ab.WriteString("\x1b[37;1mw")
-		}
+		ab.WriteString("\x1b[37;1mk")
 	}
 
 	//exit line drawing mode
@@ -350,7 +325,7 @@ func (e *Editor) drawFrame() {
 	fmt.Print(ab.String())
 }
 
-// note that app.returnCursor uses e.cy and e.cx to position the terminal cursor
+// scroll sets cx and cy, which cursor() turns into the terminal's row and column
 func (e *Editor) scroll() (offset_changed bool) {
 
 	prevOffset := e.lineOffset

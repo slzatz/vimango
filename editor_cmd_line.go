@@ -358,16 +358,10 @@ func (e *Editor) number() {
 // editor's to run, and the answer says whose it is. The names stay registered
 // so that they get this answer and not vim's (":sync" is vim's :syncbind).
 //
-// In --editor mode a host app owns sync: it runs vimango-sync itself and
-// refreshes its list afterwards, and a sync here would run behind its back.
-// In the TUI it is the organizer's, once the note is closed. Until 2026-11-13
-// the TUI's editor handed over to the organizer with the note still open:
-// the organizer's :q then quit with the note's unsaved edits and no warning,
-// and :test and :sync?, the dry runs, ran a real sync.
+// Whose it is, is for whoever opened the editor to say (App.syncAnswer). Until
+// 2026-11-13 the TUI's editor handed over to the organizer with the note
+// still open: the organizer's :q then quit with the note's unsaved edits and
+// no warning, and :test and :sync?, the dry runs, ran a real sync.
 func (e *Editor) noSync() {
-	if e.Session.editorOnly {
-		e.ShowMessage(BR, "sync is handled by the app — use the Sync menu")
-		return
-	}
-	e.ShowMessage(BR, "sync is the organizer's: close the note (:x or :q), then :sync")
+	e.ShowMessage(BR, "%s", e.syncAnswer)
 }

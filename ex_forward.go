@@ -452,7 +452,7 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 		}
 		oneLine = strings.Join(parts, "; ")
 	}
-	width := e.Screen.screenCols - e.Screen.divider
+	width := e.message.width
 
 	switch {
 	case len(errors) > 0:

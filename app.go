@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
 
@@ -88,16 +87,29 @@ func (a *App) NewEditor() *Editor {
 			list  []string
 			index int
 		}{list: nil, index: 0},
-		Screen:  a.Screen,
-		Session: a.Session,
-		Store:   a.Store,
-		onClose: a.noteClosed,
+		Screen:     a.Screen,
+		Session:    a.Session,
+		Store:      a.Store,
+		onClose:    a.noteClosed,
+		syncAnswer: a.syncAnswer(),
 	}
 
 	// Set up commands after editor creation so help can access registry
 	editor.exCmds = a.setEditorExCmds(editor)
 
 	return editor
+}
+
+// syncAnswer is what an editor says to :sync, which is never its own to run
+// (Editor.noSync). In --editor mode a host app owns sync: it runs
+// vimango-sync itself and refreshes its list afterwards, and a sync here
+// would run behind its back. In the TUI it is the organizer's, once the note
+// is closed.
+func (a *App) syncAnswer() string {
+	if a.Session.editorOnly {
+		return "sync is handled by the app — use the Sync menu"
+	}
+	return "sync is the organizer's: close the note (:x or :q), then :sync"
 }
 
 // loadConfig reads config.json.
@@ -416,7 +428,6 @@ func (a *App) openEditor(id int, title string) error {
 	ae := a.NewEditor()
 	ae.id = id
 	ae.title = title
-	ae.top_margin = TOP_MARGIN + 1
 	ae.dbText = note
 	ae.ss = strings.Split(note, "\n")
 	ae.vbuf = vim.NewBuffer(0)
@@ -469,22 +480,11 @@ func (a *App) mostRecentNote() (id int, ok bool) {
 func (a *App) returnCursor() {
 	var ab strings.Builder
 	if ae := a.Session.editor; ae != nil {
-		switch ae.mode {
-		case SPELLING:
-			// we don't need to position cursor and don't want cursor visible
-			fmt.Print(ab.String())
+		row, col, show := ae.cursor()
+		if !show {
 			return
-		case SEARCH, EX_COMMAND:
-			// cursor tracks vim's cmdline position (mirrored in cmdLineCursor)
-			cur := ae.cmdLineCursor
-			if cur > len(ae.command_line) {
-				cur = len(ae.command_line)
-			}
-			col := utf8.RuneCountInString(ae.command_line[:cur])
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", a.Screen.textLines+TOP_MARGIN+2, col+a.Screen.divider+2)
-		default:
-			fmt.Fprintf(&ab, "\x1b[%d;%dH", ae.cy+ae.top_margin, ae.cx+ae.left_margin+ae.left_margin_offset+1)
 		}
+		fmt.Fprintf(&ab, "\x1b[%d;%dH", row, col)
 	} else if a.Organizer != nil {
 		switch a.Organizer.mode {
 		case COMMAND_LINE:

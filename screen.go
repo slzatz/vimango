@@ -121,14 +121,47 @@ func (s *Screen) drawRightScreen() {
 	}
 }
 
-// positionEditor fits the open editor to the right pane, from the divider to
-// the right edge.
+// positionEditor gives the open editor its layout: when it is opened, and
+// again whenever the terminal's size or the divider changes.
 func (s *Screen) positionEditor() {
 	if e := s.Session.editor; e != nil {
-		e.left_margin = s.divider
-		e.screencols = s.screenCols - s.divider - 1
-		e.setLinesMargins()
+		e.editorLayout = s.editorLayout()
 	}
+}
+
+// editorLayout is where an editor draws on this screen: from the divider to
+// the right edge, with its message line on the last row. This is the one
+// place that knows the two ways vimango shows an editor.
+//
+// In the TUI the editor is the right pane: a border along the top, the text,
+// a status bar, the message line. What it says beside the note goes under
+// the organizer.
+//
+// In --editor mode it has the whole of a host app's window (the divider is
+// column 1), and the host has a title bar above and a status bar below. So
+// there is no top border -- the text starts on row 1, and there is no row for
+// a corner -- and no status bar: the row it would have is left blank, between
+// the text and the message line, and the text gains the border's row. With
+// nothing beside the editor, everything it says goes on its message line.
+func (s *Screen) editorLayout() editorLayout {
+	message := messageLine{row: s.textLines + 2 + TOP_MARGIN, col: s.divider + 1, width: s.screenCols - s.divider}
+	l := editorLayout{
+		left_margin: s.divider,
+		screencols:  s.screenCols - s.divider - 1,
+		message:     message,
+	}
+	if s.Session.editorOnly {
+		l.top_margin = 1
+		l.screenlines = s.textLines + 1
+		l.aside = message
+		return l
+	}
+	l.top_margin = TOP_MARGIN + 1
+	l.screenlines = s.textLines
+	l.statusBar = true
+	l.corner = true
+	l.aside = messageLine{row: message.row, col: 1, width: s.divider}
+	return l
 }
 
 func (s *Screen) GetWindowSize() error { //should be updateWindowDimensions

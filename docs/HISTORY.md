@@ -682,3 +682,43 @@ repositories:
   Still shared with the TUI, for later: the editor holds `Session` and
   `Screen`, asks `Session.editorOnly` for its layout in five places, and its
   notice box reads the glamour style through `app.Config`.
+
+- **The editor is given its layout.** Its drawing code asked
+  `Session.editorOnly` in five places -- where messages go, how many lines of
+  text and from which row, whether to draw a status bar, whether to draw the
+  frame's corner, what `:sync` answers -- and read the screen's size and
+  divider besides. Every one of those was the editor working out which
+  program it was in. Now `Screen.editorLayout()` works it out once, on the
+  screen's side, and hands the editor an `editorLayout`: the text's
+  rectangle, `statusBar`, `corner`, and two `messageLine`s (`message`, and
+  `aside` for what the TUI shows under the organizer). `positionEditor` sets
+  it at open and at every resize. The `:sync` answer is `App.syncAnswer()`,
+  given to the editor when it is made.
+
+  Moved with it: the editor's half of `App.returnCursor` is `Editor.cursor()`
+  (the app was reading the editor's margins and the screen's rows to place a
+  cursor on the editor's command line); `setLinesMargins` is gone; and
+  `drawFrame`'s choice between two corner characters is gone -- it compared
+  the frame's column with the screen's width, was left from when several
+  editors sat side by side, and has been true since there was one.
+
+  **One change to what is sent to the terminal**, none to what is seen: the
+  editor clears a message line with "erase N characters" (`ESC [ N X`, which
+  it already used for every line of text) from the line's start, in place of
+  "erase to end of line" on the right and "erase to start of line" on the
+  left. A layout that states a width has to clear that width.
+
+  Checked by running the binary from before this change and the one after
+  through the same keys on a pseudo-terminal, each on its own copy of the
+  database, and comparing everything written to the terminal step by step:
+  `--editor` (23 steps: edit, `:w`, undo, `:q` refused, `:help` and paging,
+  search, visual, `:sync`, `:marks`, a resize, `:number`, `z=`, `:q!`) and the
+  TUI (the same inside `:e`, then `:x`, the organizer, `:e`, `:q`). Apart from
+  the erase above the two are byte for byte the same. Tests:
+  `editor_layout_test.go` -- the two layouts, and that an editor given the
+  other program's layout draws that one, whatever the session's flag says.
+
+  Found on the way, not changed: `drawSpellErrors` (`spellcheck.go`) tests
+  `y <= e.screenlines` with a `y` that already includes the top margin, so in
+  the TUI a misspelling on the last line of the pane is not marked. In
+  `--editor`, where the text starts on row 1, it is.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func TestTwoKeyInsertMapping(t *testing.T) {
 	}
 	assertLines(t, e, "aalpha") // nothing done with the j yet
 	out := captureStdout(t, func() { e.sendKeys("k") })
-	if strings.Contains(out, "INSERT") || !strings.Contains(out, "\x1b[K") {
+	if erase := fmt.Sprintf("\x1b[%dX", e.message.width); strings.Contains(out, "INSERT") || !strings.Contains(out, erase) {
 		t.Errorf("leaving INSERT by a mapping did not clear the message line: %q", out)
 	}
 	if vim.InputPending() != 0 {

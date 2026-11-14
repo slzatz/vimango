@@ -2,22 +2,47 @@ package main
 
 import (
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
+// editorLayout is where the editor draws and what it draws there, in the
+// terminal's rows and columns (counted from 1). The editor works none of it
+// out: whoever opens it sets the layout, and sets it again when the terminal
+// changes size (Screen.editorLayout, Screen.positionEditor). So the editor
+// does not know which program it is in -- the TUI's right pane, or the whole
+// of a window a host app gave it -- and nothing in its files asks.
+type editorLayout struct {
+	top_margin  int  // the row of the first line of text
+	left_margin int  // the column of the border left of the text, which starts in the next
+	screenlines int  // lines of text
+	screencols  int  // columns of text, line numbers included
+	statusBar   bool // the note's id and title, on the row under the text
+	corner      bool // the frame's top right corner, on the row above the text
+
+	// message is the editor's message line, and its command line. aside is
+	// where it says what is not about the text under the cursor ("Saved note
+	// 5", how far a notice has scrolled): under the organizer in the TUI, and
+	// the message line again where there is nothing beside the editor.
+	message, aside messageLine
+}
+
+// messageLine is one row's worth of room for a message.
+type messageLine struct {
+	row, col int // where it starts
+	width    int // the columns it may use
+}
+
 // note that there isn't a columnOffset because currently only word wrap supported
 
 type Editor struct {
-	cx, cy             int //screen cursor x and y position
-	fc, fr             int // file cursor: fc is a byte offset into ss[fr], as libvim reports it; fr is the 0-based row
-	lineOffset         int //first row based on user scroll
-	screenlines        int //number of lines for this Editor
-	screencols         int //number of columns for this Editor
-	left_margin        int //can vary (so could TOP_MARGIN - will do that later
-	left_margin_offset int // 0 if no line numbers
-	top_margin         int
+	editorLayout
+	cx, cy             int       // cursor position in the text area: column and line, from 0
+	fc, fr             int       // file cursor: fc is a byte offset into ss[fr], as libvim reports it; fr is the 0-based row
+	lineOffset         int       //first row based on user scroll
+	left_margin_offset int       // 0 if no line numbers
 	highlight          [2][2]int // [line col][line col] -> note line is 1-based not zero-based
 	mode               Mode
 	vmode              Mode
@@ -62,21 +87,41 @@ type Editor struct {
 	// organizer, --editor ends the process (App.noteClosed). The editor
 	// itself knows of neither.
 	onClose func()
-	Session *Session // pointer to the session
-	Screen  *Screen  // pointer to the screen
+	// syncAnswer is what :sync is answered with. Sync is never the editor's
+	// to run; whose it is depends on who opened the editor (noSync).
+	syncAnswer string
+	Session    *Session // pointer to the session
+	Screen     *Screen  // pointer to the screen
 }
 
-func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) { //Sesseion struct
-	// editor-only mode: there is no organizer pane, so the BL message
-	// area is divider(=1) columns wide — a BL message renders as a single
-	// stray character at column 1 of the cmdline row. Route everything to
-	// the editor's own (full-width) BR area instead.
-	if e.Session.editorOnly {
-		loc = BR
+// ShowMessage writes a message in place of the last one: on the editor's
+// message line (BR), or beside the note (BL) -- see editorLayout for where
+// each is.
+func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) {
+	line := e.message
+	if loc == BL {
+		line = e.aside
 	}
-	max_length := e.Screen.PositionMessage(loc)
+	// to the start of the line, and erase the whole of it
+	fmt.Printf("\x1b[%d;%dH\x1b[%dX", line.row, line.col, line.width)
 	// by columns: cutting at a byte count split multi-byte characters, and
 	// counted the bytes of an escape sequence ("-- INSERT --" is sent bold)
-	str, _ := clipColumns(fmt.Sprintf(format, a...), 0, max_length)
+	str, _ := clipColumns(fmt.Sprintf(format, a...), 0, line.width)
 	fmt.Print(str)
+}
+
+// cursor is where the terminal's cursor belongs while the editor has the
+// keys: in the text, or on the command line being typed. show is false when
+// no cursor should be seen (a spelling suggestion is being chosen).
+func (e *Editor) cursor() (row, col int, show bool) {
+	switch e.mode {
+	case SPELLING:
+		return 0, 0, false
+	case SEARCH, EX_COMMAND:
+		// vim's place on its command line (mirrored in cmdLineCursor),
+		// after the ':' or '/' the line starts with
+		cur := min(e.cmdLineCursor, len(e.command_line))
+		return e.message.row, e.message.col + 1 + utf8.RuneCountInString(e.command_line[:cur]), true
+	}
+	return e.cy + e.top_margin, e.cx + e.left_margin + e.left_margin_offset + 1, true
 }
