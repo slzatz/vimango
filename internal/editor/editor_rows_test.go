@@ -8,6 +8,25 @@ import (
 	"testing"
 )
 
+// wrappedRow is buffer row raw as the tests expect to see it on screen, styles
+// aside: tabs as four spaces, and a tab between the screen lines it wraps
+// onto. Written apart from styledRow, so that it can check it.
+func (e *Editor) wrappedRow(raw string) string {
+	row := strings.ReplaceAll(raw, "\t", "    ")
+	segs := wrapRow(row, e.wrapWidth())
+	if len(segs) == 1 {
+		return row
+	}
+	var sb strings.Builder
+	for i, seg := range segs {
+		if i > 0 {
+			sb.WriteByte('\t')
+		}
+		sb.WriteString(row[seg.start:seg.end])
+	}
+	return sb.String()
+}
+
 func highlightEditor(t testing.TB, rows []string) *Editor {
 	e := &Editor{}
 	e.ss = rows
@@ -28,8 +47,8 @@ func drawnRows(e *Editor) (out []string) {
 }
 
 // The highlighting changes how the text is drawn, never the text: with the
-// escapes taken out, every row is what wrappedRow draws with highlighting off
-// -- tabs widened and wrapped at the same places.
+// escapes taken out, every row is wrappedRow's -- tabs widened and wrapped at
+// the same places.
 func TestHighlightingKeepsTheText(t *testing.T) {
 	note := []string{
 		"---", "title: a **note**", "---",
@@ -124,6 +143,25 @@ func TestSyntaxOnOffAndAliases(t *testing.T) {
 		if tc.line == "md sideways" && !strings.Contains(out, "Usage: :md [on|off]") {
 			t.Errorf(":%s: no usage message in %q", tc.line, out)
 		}
+	}
+}
+
+// With highlighting off, every row is drawn as body text is with it on: the
+// same grey, nothing bold, italic or coloured as code -- not in the
+// terminal's default colour, which is brighter and read as bold.
+func TestHighlightingOffIsBodyText(t *testing.T) {
+	note := []string{"plain words", "# Heading", "a **bold** and `code` row", "```", "fenced", "```"}
+	e := highlightEditor(t, note)
+	e.highlightSyntax = false
+	for i, row := range drawnRows(e) {
+		if want := mdStyle(0).sgr() + note[i] + sgrReset; row != want {
+			t.Errorf("row %d drawn %q, want %q", i+1, row, want)
+		}
+	}
+	// and the body text is the same either way
+	e.highlightSyntax = true
+	if on := drawnRows(e)[0]; on != mdStyle(0).sgr()+"plain words"+sgrReset {
+		t.Errorf("body text with highlighting on drawn %q", on)
 	}
 }
 

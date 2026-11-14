@@ -9,26 +9,9 @@ import (
 
 // Drawing the note's rows, with markdown highlighting (markdown.go).
 
-// wrappedRow returns buffer row raw as it goes on screen: tabs as four spaces,
-// and a tab between the screen lines it wraps onto. (The tab is the separator
-// because no real one is left.)
-func (e *Editor) wrappedRow(raw string) string {
-	row := strings.ReplaceAll(raw, "\t", "    ")
-	segs := wrapRow(row, e.wrapWidth())
-	if len(segs) == 1 {
-		return row
-	}
-	var sb strings.Builder
-	for i, seg := range segs {
-		if i > 0 {
-			sb.WriteByte('\t')
-		}
-		sb.WriteString(row[seg.start:seg.end])
-	}
-	return sb.String()
-}
-
-// styledRow is wrappedRow with the row's markdown highlighted. Each screen
+// styledRow returns buffer row raw as it goes on screen, each byte in its
+// style: tabs as four spaces, and a tab between the screen lines it wraps
+// onto (the tab is the separator because no real one is left). Each screen
 // line starts and ends in a reset state.
 func (e *Editor) styledRow(raw string, styles []mdStyle) string {
 	row := strings.ReplaceAll(raw, "\t", "    ")
@@ -65,8 +48,12 @@ func (e *Editor) visibleRows(yield func(n int, row string) bool) {
 		return
 	}
 	if !e.highlightSyntax {
+		// Every row as body text, in the colour it has with highlighting
+		// on. Sent with no colour at all, it took the terminal's default
+		// foreground, a brighter white than the body text's grey, and the
+		// whole note looked bold.
 		for n := first; n < len(e.ss); n++ {
-			if !yield(n, e.wrappedRow(e.ss[n])) {
+			if !yield(n, e.styledRow(e.ss[n], make([]mdStyle, len(e.ss[n])))) {
 				return
 			}
 		}

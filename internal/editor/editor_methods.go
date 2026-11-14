@@ -86,7 +86,7 @@ func (e *Editor) wrapRowText(r, c int) (string, int) {
 }
 
 // visualRowText returns buffer row r exactly as the drawing code puts it on
-// screen — tabs widened to the four spaces wrappedRow emits —
+// screen — tabs widened to the four spaces styledRow emits —
 // so a highlight drawn over it lines up with the text underneath.
 func (e *Editor) visualRowText(r int) string {
 	return strings.ReplaceAll(e.ss[r], "\t", strings.Repeat(" ", tabWidth))

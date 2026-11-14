@@ -1026,3 +1026,11 @@ repositories:
   anything else gets a usage line), and answers to `:md` and `:markdown`,
   which say what it is for. `:highlight` was considered and left alone: it
   is vim's command for colours, refused here on purpose.
+- **With highlighting off the note is body text, not bold.** Off, the rows
+  were sent with no colour at all and took the terminal's default
+  foreground -- in Ghostty and libghostty a brighter white than the body
+  text's `#c4c4c4` -- so the whole note looked bold beside it (traced: no
+  bold attribute was ever set). Now every row is drawn as unstyled body
+  text, in the same grey as with highlighting on, whatever the terminal's
+  default (`TestHighlightingOffIsBodyText`). `wrappedRow`, which drew the
+  rows uncoloured, is now only the tests' reference for the text.
