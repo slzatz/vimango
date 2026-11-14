@@ -96,7 +96,7 @@ func highlightEditor(t testing.TB, rows []string) *Editor {
 	if err != nil {
 		t.Skip(err)
 	}
-	e := &Editor{markdownStyle: style}
+	e := &Editor{editorHost: editorHost{markdownStyle: style}}
 	e.ss = rows
 	e.screencols = 60
 	e.screenlines = 40

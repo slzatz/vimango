@@ -786,3 +786,27 @@ repositories:
   shown after a redraw in the same key (`:number`, `:syntax`) is grey.
   `drawFrame` ends with a reset, which is why a reload looked right. Which
   colour the bar should be is Steve's to say.
+
+- **The editor has a constructor of its own.** The rest of step 4a.
+  `(*App).NewEditor`, `(*App).setEditorExCmds` and the first half of
+  `(*App).openEditor` were methods of the app that used nothing of it but
+  five things to hand on. Those five are now a value, `editorHost` (the
+  store, the notice box, the markdown style, `onClose`, the `:sync` answer),
+  embedded in `Editor` beside `editorLayout`: between them, everything an
+  editor knows of the program it is in.
+  - `newEditor(host)` is an editor with no note; `openNote(host, id, title)`
+    reads the note from the host's store into a vim buffer and returns the
+    editor, or an error and no editor. `editorCommands()` is the registry of
+    vimango's own ex commands.
+  - `App.editorHost()` is what this app gives; `App.openEditor` is now
+    `openNote`, then the app's part: `Session.editor`, `positionEditor`, and
+    the first draw.
+  - Two fields of `Editor` that nothing read, `redraw` and `modified`, are
+    gone. (`NewEditor` set them, which is how they were found.)
+
+  No behaviour change: `compare-drawing.py` says `SAME`, and the
+  `:checkstale` screens match as above. Test: `TestEditorIsMadeFromItsHost`
+  (`editor_host_test.go`) makes an editor with no `App`, `Screen` or
+  `Session` and the global nil -- a notice box that only records, a store, a
+  layout -- and opens, draws, shows `:help` and `:marks`, writes, reloads,
+  and closes it.

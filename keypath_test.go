@@ -17,13 +17,15 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	sess := &Session{}
 	a := &App{Session: sess}
 	scr := &Screen{screenCols: 100, screenLines: 40, textLines: 30, divider: 40, Session: sess}
-	e := &Editor{notices: scr}
+	// (a bare editor, not newEditor's: no line numbers and no highlighting,
+	// so that a test's columns are the text's)
+	e := &Editor{editorHost: editorHost{notices: scr, syncAnswer: a.syncAnswer()}}
 	// the TUI's layout on that screen, with a narrower text area
 	e.editorLayout = scr.editorLayout()
 	e.screencols = 50
 	e.screenlines = 30
-	e.syncAnswer = a.syncAnswer()
-	e.exCmds = a.setEditorExCmds(e)
+	e.commandRegistry = editorCommands()
+	e.exCmds = e.commandRegistry.GetFunctionMap()
 	// vim is a process-wide singleton, so a previous test may have left it in
 	// INSERT or VISUAL; start every editor from NORMAL
 	vim.SendKey("<esc>")

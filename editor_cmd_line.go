@@ -9,7 +9,9 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
+// editorCommands is vimango's own ex commands in the editor, with what :help
+// says of each. Every other command is vim's (ex_forward.go).
+func editorCommands() *CommandRegistry[func(*Editor)] {
 	registry := NewCommandRegistry[func(*Editor)]()
 
 	// File Operations commands
@@ -117,10 +119,7 @@ func (a *App) setEditorExCmds(editor *Editor) map[string]func(*Editor) {
 		Examples:    []string{":help", ":help write", ":help File Operations", ":h"},
 	})
 
-	// Store registry in editor for help command access
-	editor.commandRegistry = registry
-
-	return registry.GetFunctionMap()
+	return registry
 }
 
 // help displays help information for editor commands

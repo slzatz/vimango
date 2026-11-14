@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/alecthomas/chroma/v2"
@@ -39,7 +40,8 @@ type messageLine struct {
 // note that there isn't a columnOffset because currently only word wrap supported
 
 type Editor struct {
-	editorLayout
+	editorLayout                 // where it draws: the host's to set
+	editorHost                   // what else it is given
 	cx, cy             int       // cursor position in the text area: column and line, from 0
 	fc, fr             int       // file cursor: fc is a byte offset into ss[fr], as libvim reports it; fr is the 0-based row
 	lineOffset         int       //first row based on user scroll
@@ -53,7 +55,6 @@ type Editor struct {
 	firstVisibleRow    int
 	highlightSyntax    bool
 	numberLines        bool
-	redraw             bool
 	id                 int //db id of entry
 	//output             *Output
 	vbuf         *vim.Buffer
@@ -74,7 +75,6 @@ type Editor struct {
 	// since I read it" (news) from "I have unsaved edits" (not news). Set
 	// wherever a note is loaded into an editor or written back.
 	dbText        string
-	modified      bool     // tracks if the buffer has been modified
 	title         string   // title of the note
 	tabCompletion struct { // for tab completion
 		list  []string
@@ -82,20 +82,73 @@ type Editor struct {
 	}
 	exCmds          map[string]func(*Editor) // map of ex commands
 	commandRegistry *CommandRegistry[func(*Editor)]
-	Store           *store.Store // the database
-	// onClose is what follows the editor closing its note (closeNote), and
-	// is whoever opened the editor's to say: the TUI goes back to the
-	// organizer, --editor ends the process (App.noteClosed). The editor
-	// itself knows of neither.
-	onClose func()
-	// syncAnswer is what :sync is answered with. Sync is never the editor's
-	// to run; whose it is depends on who opened the editor (noSync).
-	syncAnswer string
+}
+
+// editorHost is what an editor is given by whoever opens it: everything it
+// uses that is not its own. With the layout, which the host sets and sets
+// again as the terminal changes, this is all an editor knows of the program
+// it is in -- the TUI, or a host app's window (App.editorHost).
+type editorHost struct {
+	Store *store.Store // the database the note is read from and written to
 	// notices is the box the editor shows :help and vim's listings in. The
 	// box is the screen's; the editor is given this much of it.
 	notices noticeBox
 	// markdownStyle is the colours the note's markdown is drawn in (highlightChunk).
 	markdownStyle *chroma.Style
+	// onClose is what follows the editor closing its note (closeNote): the
+	// TUI goes back to the organizer, --editor ends the process
+	// (App.noteClosed). The editor itself knows of neither.
+	onClose func()
+	// syncAnswer is what :sync is answered with. Sync is never the editor's
+	// to run; whose it is depends on who opened the editor (noSync).
+	syncAnswer string
+}
+
+// newEditor is an editor with no note in it: its settings as they start, and
+// its ex commands.
+func newEditor(host editorHost) *Editor {
+	e := &Editor{
+		editorHost:         host,
+		mode:               NORMAL,
+		highlightSyntax:    true,
+		numberLines:        true,
+		left_margin_offset: LEFT_MARGIN_OFFSET, // room for the line numbers
+	}
+	e.commandRegistry = editorCommands()
+	e.exCmds = e.commandRegistry.GetFunctionMap()
+	return e
+}
+
+// openNote makes an editor on a note: the note's text, read from the host's
+// store into a vim buffer of its own, which becomes vim's current one. title
+// is what the editor shows as the note's; "" is the note's title in the
+// database. An error means the note could not be read, and there is no editor
+// -- one made on an empty buffer would look like an empty note, and saving it
+// would make it one.
+//
+// The editor has no layout yet and has drawn nothing: where it goes is the
+// host's to say (Screen.positionEditor), and then to ask for (Editor.draw).
+func openNote(host editorHost, id int, title string) (*Editor, error) {
+	note, err := host.Store.Note(id)
+	if err != nil {
+		return nil, err
+	}
+	if title == "" {
+		title, _ = host.Store.Title(id)
+	}
+
+	e := newEditor(host)
+	e.id = id
+	e.title = title
+	e.dbText = note
+	e.ss = strings.Split(note, "\n")
+	e.vbuf = vim.NewBuffer(0)
+	vim.SetCurrentBuffer(e.vbuf)
+	e.vbuf.SetLines(0, -1, e.ss)
+	e.bufferTick = e.vbuf.GetLastChangedTick()
+	e.saveTick = e.bufferTick
+	vim.SetScreenLayout(e) // gj, gk, H, M, L
+	return e, nil
 }
 
 // noticeBox is what the editor needs of the box that text other than the

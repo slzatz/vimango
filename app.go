@@ -70,36 +70,17 @@ func CreateApp() *App {
 	}
 }
 
-func (a *App) NewEditor() *Editor {
-	editor := &Editor{
-		cx:                 0, //actual cursor x position (takes into account any scroll/offset)
-		cy:                 0, //actual cursor y position ""
-		fc:                 0, //'file' x position as defined by reading sqlite text into rows vector
-		fr:                 0, //'file' y position ""
-		lineOffset:         0, //the number of lines of text at the top scrolled off the screen
-		mode:               NORMAL,
-		command_line:       "",
-		firstVisibleRow:    0,
-		highlightSyntax:    true, // applies to golang, c++ etc. and markdown
-		numberLines:        true,
-		redraw:             false,
-		left_margin_offset: LEFT_MARGIN_OFFSET, // 0 if not syntax highlighting b/o synt high =>line numbers
-		modified:           false,
-		tabCompletion: struct {
-			list  []string
-			index int
-		}{list: nil, index: 0},
+// editorHost is what this app gives an editor it opens: the database, the
+// screen's notice box, the colours for markdown, and what closing the note
+// and typing :sync come to here.
+func (a *App) editorHost() editorHost {
+	return editorHost{
 		Store:         a.Store,
-		onClose:       a.noteClosed,
-		syncAnswer:    a.syncAnswer(),
 		notices:       a.Screen,
 		markdownStyle: a.markdownStyle,
+		onClose:       a.noteClosed,
+		syncAnswer:    a.syncAnswer(),
 	}
-
-	// Set up commands after editor creation so help can access registry
-	editor.exCmds = a.setEditorExCmds(editor)
-
-	return editor
 }
 
 // syncAnswer is what an editor says to :sync, which is never its own to run
@@ -408,39 +389,21 @@ func (a *App) LoadInitialData() {
 	a.returnCursor()
 }
 
-// openEditor opens a note in the editor: its text read from the store into a
-// vim buffer of its own, which becomes vim's current one, and the editor
-// drawn. title is what the editor shows as the note's; "" is the note's title
-// in the database. An error means the note could not be read, and no editor
-// was opened -- one opened on an empty buffer would look like an empty note,
-// and saving it would make it one.
+// openEditor opens a note in the editor and shows it. Making the editor on
+// the note is the editor's own (openNote); what is the app's is that it is
+// now the open note, where keys go, and where on the screen it is drawn.
+// title is what the editor shows as the note's; "" is the note's title in
+// the database. An error means the note could not be read, and no editor was
+// opened.
 //
-// This is all that opening a note takes. The organizer calls it for the row
-// it is on; --editor calls it for the note the host asked for, with no
-// organizer there.
+// The organizer calls this for the row it is on; --editor calls it for the
+// note the host asked for, with no organizer there.
 func (a *App) openEditor(id int, title string) error {
-	note, err := a.Store.Note(id)
+	ae, err := openNote(a.editorHost(), id, title)
 	if err != nil {
 		return err
 	}
-	if title == "" {
-		title, _ = a.Store.Title(id)
-	}
-
-	ae := a.NewEditor()
-	ae.id = id
-	ae.title = title
-	ae.dbText = note
-	ae.ss = strings.Split(note, "\n")
-	ae.vbuf = vim.NewBuffer(0)
-	vim.SetCurrentBuffer(ae.vbuf)
-	ae.vbuf.SetLines(0, -1, ae.ss)
-	ae.bufferTick = ae.vbuf.GetLastChangedTick()
-	ae.saveTick = ae.vbuf.GetLastChangedTick()
-	ae.mode = NORMAL
 	a.Session.editor = ae
-	vim.SetScreenLayout(ae) // gj, gk, H, M, L
-
 	a.Screen.positionEditor()
 	a.Screen.eraseRightScreen() //erases editor area + statusbar + msg
 	a.Screen.drawRightScreen()
