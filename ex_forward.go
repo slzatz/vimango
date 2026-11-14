@@ -456,11 +456,11 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 
 	switch {
 	case len(errors) > 0:
-		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", strings.Join(errors, "; "))
+		e.ShowMessage("\x1b[41m%s\x1b[0m", strings.Join(errors, "; "))
 	case len(lines) == 0:
-		e.ShowMessage(BR, "")
+		e.ShowMessage("")
 	case !listing && len(oneLine) <= width:
-		e.ShowMessage(BR, "%s", oneLine)
+		e.ShowMessage("%s", oneLine)
 	default:
 		// as a code block, so markdown rendering leaves vim's columns alone
 		e.mode = HELP
@@ -503,8 +503,8 @@ func (e *Editor) showKeyMessages(msgs []vim.Message) {
 	}
 	switch {
 	case len(errors) > 0:
-		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", strings.Join(errors, "; "))
+		e.ShowMessage("\x1b[41m%s\x1b[0m", strings.Join(errors, "; "))
 	case len(texts) > 0:
-		e.ShowMessage(BR, "%s", strings.Join(texts, "; "))
+		e.ShowMessage("%s", strings.Join(texts, "; "))
 	}
 }

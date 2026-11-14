@@ -25,9 +25,9 @@ type editorLayout struct {
 	statusBar   bool // the note's id and title, on the row under the text
 	corner      bool // the frame's top right corner, on the row above the text
 
-	// message is the editor's message line, and its command line. aside is
+	// message is the editor's message line, and its command line (ShowMessage). aside is
 	// where it says what is not about the text under the cursor ("Saved note
-	// 5", how far a notice has scrolled): under the organizer in the TUI, and
+	// 5", how far a notice has scrolled; ShowAside): under the organizer in the TUI, and
 	// the message line again where there is nothing beside the editor.
 	message, aside messageLine
 }
@@ -37,6 +37,13 @@ type messageLine struct {
 	row, col int // where it starts
 	width    int // the columns it may use
 }
+
+// lineNumberCols is the room the line numbers take at the left of the text
+// (left_margin_offset, while they are on).
+const lineNumberCols = 4
+
+// sgrReset ends whatever colours and attributes are set.
+const sgrReset = "\x1b[0m"
 
 // note that there isn't a columnOffset because currently only word wrap supported
 
@@ -113,7 +120,7 @@ func newEditor(host editorHost) *Editor {
 		mode:               NORMAL,
 		highlightSyntax:    true,
 		numberLines:        true,
-		left_margin_offset: LEFT_MARGIN_OFFSET, // room for the line numbers
+		left_margin_offset: lineNumberCols, // room for the line numbers
 	}
 	e.commandRegistry = editorCommands()
 	e.exCmds = e.commandRegistry.GetFunctionMap()
@@ -162,14 +169,18 @@ type noticeBox interface {
 	noticeKey(c int) (message string, handled bool)
 }
 
-// ShowMessage writes a message in place of the last one: on the editor's
-// message line (BR), or beside the note (BL) -- see editorLayout for where
-// each is.
-func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) {
-	line := e.message
-	if loc == BL {
-		line = e.aside
-	}
+// ShowMessage writes a message on the editor's message line, in place of the
+// last one. ShowAside writes one beside the note, for what is not about the
+// text under the cursor. See editorLayout for where each is.
+func (e *Editor) ShowMessage(format string, a ...interface{}) {
+	e.writeMessage(e.message, format, a...)
+}
+
+func (e *Editor) ShowAside(format string, a ...interface{}) {
+	e.writeMessage(e.aside, format, a...)
+}
+
+func (e *Editor) writeMessage(line messageLine, format string, a ...interface{}) {
 	// to the start of the line, and erase the whole of it
 	fmt.Printf("\x1b[%d;%dH\x1b[%dX", line.row, line.col, line.width)
 	// by columns: cutting at a byte count split multi-byte characters, and

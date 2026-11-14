@@ -287,7 +287,7 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 
 		y = e.highlightRowRange(pab, row, lo, hi, y)
 	}
-	pab.WriteString(RESET)
+	pab.WriteString(sgrReset)
 }
 
 func (e *Editor) drawStatusBar() {

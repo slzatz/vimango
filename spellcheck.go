@@ -54,8 +54,8 @@ func initSpell() {
 }
 
 func spellUnavailableMessage() string {
-	return fmt.Sprintf("%sSpell check unavailable: %s/%s not found (scripts/build-libvim.sh copies it)%s",
-		RED_BG, spellDir, spellDictFile, RESET)
+	return fmt.Sprintf("\x1b[41mSpell check unavailable: %s/%s not found (scripts/build-libvim.sh copies it)%s",
+		spellDir, spellDictFile, sgrReset)
 }
 
 // syncSpellOption makes vim's 'spell' match spellOn. 'spell' is window-local
@@ -80,16 +80,16 @@ func syncSpellOption() {
 // as the note is edited.
 func (e *Editor) toggleSpell() {
 	if !spellAvailable {
-		e.ShowMessage(BR, "%s", spellUnavailableMessage())
+		e.ShowMessage("%s", spellUnavailableMessage())
 		return
 	}
 	spellOn = !spellOn
 	syncSpellOption()
 	e.drawText()
 	if spellOn {
-		e.ShowMessage(BR, "Spell checking is on")
+		e.ShowMessage("Spell checking is on")
 	} else {
-		e.ShowMessage(BR, "Spell checking is off")
+		e.ShowMessage("Spell checking is off")
 	}
 }
 
@@ -140,22 +140,22 @@ func (e *Editor) drawSpellErrors(pab *strings.Builder) {
 // SPELLING mode, where a digit picks one. Reached from z= and :suggest.
 func (e *Editor) spellSuggest() {
 	if !spellAvailable {
-		e.ShowMessage(BR, "%s", spellUnavailableMessage())
+		e.ShowMessage("%s", spellUnavailableMessage())
 		return
 	}
 	if !spellOn {
-		e.ShowMessage(BR, "Spell checking is off; :spell turns it on")
+		e.ShowMessage("Spell checking is off; :spell turns it on")
 		return
 	}
 	syncSpellOption()
 
 	word, suggestions, ok := vim.GetSpellSuggestions()
 	if !ok {
-		e.ShowMessage(BR, "No word under the cursor")
+		e.ShowMessage("No word under the cursor")
 		return
 	}
 	if len(suggestions) == 0 {
-		e.ShowMessage(BR, "No suggestions for %q", word)
+		e.ShowMessage("No suggestions for %q", word)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (e *Editor) spellSuggest() {
 		fmt.Fprintf(&b, "  \x1b[1m%d\x1b[0m %s", i+1, s)
 	}
 	b.WriteString("   (any other key cancels)")
-	e.ShowMessage(BR, "%s", b.String())
+	e.ShowMessage("%s", b.String())
 }
 
 // case SPELLING: a digit replaces the word with that suggestion, by sending
@@ -175,7 +175,7 @@ func (e *Editor) spellSuggest() {
 // <esc> never gets here: editorProcessKey handles it first.
 func (e *Editor) SpellingModeKeyHandler(c int) (redraw, exit bool) {
 	e.mode = NORMAL
-	e.ShowMessage(BR, "")
+	e.ShowMessage("")
 	n := c - '0'
 	if n < 1 || n > len(e.suggestions) {
 		return false, true

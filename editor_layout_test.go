@@ -62,7 +62,7 @@ func TestEditorDrawsByItsLayout(t *testing.T) {
 		if frame := captureStdout(t, e.drawFrame); strings.Contains(frame, corner) != c.corner {
 			t.Errorf("%s: corner drawn %v, want %v", c.name, !c.corner, c.corner)
 		}
-		if out := captureStdout(t, func() { e.ShowMessage(BL, "saved") }); !strings.HasPrefix(out, c.aside) {
+		if out := captureStdout(t, func() { e.ShowAside("saved") }); !strings.HasPrefix(out, c.aside) {
 			t.Errorf("%s: what it says beside the note went to %q, want it to start %q", c.name, out, c.aside)
 		}
 		// the cursor on a command line: after the ':' and the one character typed

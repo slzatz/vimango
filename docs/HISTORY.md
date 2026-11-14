@@ -877,3 +877,20 @@ repositories:
 
   The package imports `vim` (to send a key), so like `vim`'s own tests its
   tests link `libvim.a`: run `go test` from the project root.
+
+- **What is the editor's alone is in the editor's files.** Step 4b, the
+  part that needed no package: things the editor used from files it shares
+  a directory with but that nothing else used, or used differently.
+  - **Two message methods.** `ShowMessage(BR, …)` and `ShowMessage(BL, …)`
+    took the organizer's `Location` to choose between the editor's two
+    lines. They are `ShowMessage(…)` and `ShowAside(…)`; `Location` is the
+    organizer's again.
+  - **The wrap helpers** only the editor calls -- `wrapRow`, `wrapSegment`,
+    `expandedOffset`, `byteAtDisplayCol`, `byteAfterDisplayCol`, `tabWidth`
+    -- are `editor_wrap.go`, out of `word_wrap.go`, which is now only the
+    preview's `WordWrap`.
+  - `LEFT_MARGIN_OFFSET` is `lineNumberCols`, in `editor.go`; the editor's
+    three uses of `RESET` and one of `RED_BG` are its own `sgrReset` and a
+    literal.
+
+  A move and a rename: `compare-drawing.py` says `SAME`.

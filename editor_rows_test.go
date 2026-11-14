@@ -76,7 +76,7 @@ func seen(x string) string {
 			for j < len(x) && !(x[j] >= 'a' && x[j] <= 'z' || x[j] >= 'A' && x[j] <= 'Z') {
 				j++
 			}
-			if seq := x[i:min(j+1, len(x))]; seq == RESET {
+			if seq := x[i:min(j+1, len(x))]; seq == sgrReset {
 				style = ""
 			} else {
 				style += seq
@@ -227,7 +227,7 @@ func TestDrawRowsFillsThePane(t *testing.T) {
 		e := highlightEditor(t, rows)
 		e.highlightSyntax = highlight
 		e.numberLines = true
-		e.left_margin_offset = LEFT_MARGIN_OFFSET
+		e.left_margin_offset = lineNumberCols
 		e.screenlines = 10
 		e.firstVisibleRow = 100
 
@@ -336,7 +336,7 @@ func foregroundLeftSet(out string) bool {
 func TestDrawingTheTextLeavesNoColourSet(t *testing.T) {
 	e := newTestEditor(t, "alpha (bravo)", "charlie", "delta")
 	e.numberLines = true
-	e.left_margin_offset = LEFT_MARGIN_OFFSET
+	e.left_margin_offset = lineNumberCols
 
 	if out := captureStdout(t, e.drawText); !strings.Contains(out, "  1 ") || foregroundLeftSet(out) {
 		t.Errorf("drawText with line numbers left a foreground colour set: %q", out)

@@ -30,7 +30,7 @@ func parseSpans(t *testing.T, out string) []span {
 		}
 		text := out[loc[1]:end]
 		text = strings.ReplaceAll(text, "\x1b[48;5;237m", "")
-		text = strings.ReplaceAll(text, RESET, "")
+		text = strings.ReplaceAll(text, sgrReset, "")
 		text = cufRe.ReplaceAllString(text, "") // the \r\n + cursor-forward that ends a VISUAL_LINE row
 		if !utf8.ValidString(text) {
 			t.Errorf("span at %s;%s is not valid UTF-8: %q", out[loc[2]:loc[3]], out[loc[4]:loc[5]], text)

@@ -31,7 +31,7 @@ func highlighted(t *testing.T, e *Editor) (texts []string, rows []int) {
 	if out == "" {
 		return nil, nil
 	}
-	if !strings.HasPrefix(out, searchStyle) || !strings.HasSuffix(out, RESET) {
+	if !strings.HasPrefix(out, searchStyle) || !strings.HasSuffix(out, sgrReset) {
 		t.Fatalf("search highlights not wrapped in the search style: %q", out)
 	}
 	for _, s := range parseSpans(t, strings.TrimPrefix(out, searchStyle)) {

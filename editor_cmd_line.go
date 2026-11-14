@@ -126,7 +126,7 @@ func editorCommands() *pane.CommandRegistry[func(*Editor)] {
 // help displays help information for editor commands
 func (e *Editor) help() {
 	if e.commandRegistry == nil {
-		e.ShowMessage(BR, "Help system not available")
+		e.ShowMessage("Help system not available")
 		return
 	}
 
@@ -209,10 +209,10 @@ func (e *Editor) save() error {
 
 func (e *Editor) writeNote() {
 	if err := e.save(); err != nil {
-		e.ShowMessage(BL, "Note %d NOT saved: %v", e.id, err)
+		e.ShowAside("Note %d NOT saved: %v", e.id, err)
 		return
 	}
-	e.ShowMessage(BL, "Saved note %d", e.id)
+	e.ShowAside("Saved note %d", e.id)
 	e.drawStatusBar() //need this since now refresh won't do it unless redraw =true
 }
 
@@ -232,12 +232,12 @@ func (e *Editor) nopaste() {
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax
 	if e.highlightSyntax {
-		e.left_margin_offset = LEFT_MARGIN_OFFSET
+		e.left_margin_offset = lineNumberCols
 		//e.checkSpelling = false // can't syntax highlight(including markdown) and check spelling
 	}
 	e.drawText()
 	// no need to call drawFrame or drawStatusBar
-	e.ShowMessage(BR, "Syntax highlighting is %v", e.highlightSyntax)
+	e.ShowMessage("Syntax highlighting is %v", e.highlightSyntax)
 }
 
 // exit and quitActions are the registry's entries for :x and :q. runExLine
@@ -272,7 +272,7 @@ func (e *Editor) closeNote(save, force bool) {
 			if err := e.save(); err != nil {
 				e.mode = NORMAL
 				e.command_line = ""
-				e.ShowMessage(BR, "\x1b[41mNote %d NOT saved: %v\x1b[0m", e.id, err)
+				e.ShowMessage("\x1b[41mNote %d NOT saved: %v\x1b[0m", e.id, err)
 				return
 			}
 		}
@@ -281,7 +281,7 @@ func (e *Editor) closeNote(save, force bool) {
 	case e.isModified():
 		e.mode = NORMAL
 		e.command_line = ""
-		e.ShowMessage(BR, "No write since last change")
+		e.ShowMessage("No write since last change")
 		return
 	}
 
@@ -292,13 +292,13 @@ func (e *Editor) closeNote(save, force bool) {
 func (e *Editor) checkStale() {
 	title, dbText, err := e.Store.TitleAndNote(e.id)
 	if errors.Is(err, store.ErrNotFound) {
-		e.ShowMessage(BR, "Note %d was deleted elsewhere — :w will not bring it back", e.id)
+		e.ShowMessage("Note %d was deleted elsewhere — :w will not bring it back", e.id)
 		return
 	}
 	if err != nil {
 		// Not knowing is not the same as "it changed": a clean buffer is
 		// reloaded with what was read, and nothing was.
-		e.ShowMessage(BR, "Could not check note %d against the database: %v", e.id, err)
+		e.ShowMessage("Could not check note %d against the database: %v", e.id, err)
 		return
 	}
 	if dbText == e.dbText {
@@ -311,7 +311,7 @@ func (e *Editor) checkStale() {
 		// Both sides changed. Reloading would discard the user's edits and
 		// `:w` will discard the database's — only they can choose, so
 		// say so and touch nothing.
-		e.ShowMessage(BR, "Note %d changed in the database and you have unsaved changes — :w will overwrite it", e.id)
+		e.ShowMessage("Note %d changed in the database and you have unsaved changes — :w will overwrite it", e.id)
 		return
 	}
 
@@ -340,18 +340,18 @@ func (e *Editor) checkStale() {
 
 	// the new text, and the title, which a sync can change too
 	e.draw()
-	e.ShowMessage(BR, "Note %d reloaded — it changed in the database since you opened it", e.id)
+	e.ShowMessage("Note %d reloaded — it changed in the database since you opened it", e.id)
 }
 
 func (e *Editor) number() {
 	e.numberLines = !e.numberLines
 	if e.numberLines {
-		e.left_margin_offset = LEFT_MARGIN_OFFSET
+		e.left_margin_offset = lineNumberCols
 	} else {
 		e.left_margin_offset = 0
 	}
 	e.drawText()
-	e.ShowMessage(BR, "Line numbering is %t", e.numberLines)
+	e.ShowMessage("Line numbering is %t", e.numberLines)
 }
 
 // noSync is :sync, :test and :sync? typed in the editor: sync is not the
@@ -363,5 +363,5 @@ func (e *Editor) number() {
 // still open: the organizer's :q then quit with the note's unsaved edits and
 // no warning, and :test and :sync?, the dry runs, ran a real sync.
 func (e *Editor) noSync() {
-	e.ShowMessage(BR, "%s", e.syncAnswer)
+	e.ShowMessage("%s", e.syncAnswer)
 }

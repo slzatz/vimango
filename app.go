@@ -631,7 +631,7 @@ func (a *App) handleEvents() {
 			case org != nil:
 				org.ShowMessage(BL, "Readkey problem %v", err)
 			case a.Session.editor != nil:
-				a.Session.editor.ShowMessage(BL, "Readkey problem %v", err)
+				a.Session.editor.ShowAside("Readkey problem %v", err)
 			}
 		case <-mappingTimeout:
 			mappingTimeout = nil

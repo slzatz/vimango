@@ -53,8 +53,8 @@ func TestLongTextIsCutAtACharacterBoundary(t *testing.T) {
 	for divider := 20; divider <= 50; divider++ {
 		screenOf(e).divider = divider
 		e.editorLayout = screenOf(e).editorLayout() // as a resize does
-		check("editor message", text(captureStdout(t, func() { e.ShowMessage(BL, "%s", long) })), divider)
-		check("editor message, bold", text(captureStdout(t, func() { e.ShowMessage(BL, "\x1b[1m%s\x1b[0m", long) })), divider)
+		check("editor message", text(captureStdout(t, func() { e.ShowAside("%s", long) })), divider)
+		check("editor message, bold", text(captureStdout(t, func() { e.ShowAside("\x1b[1m%s\x1b[0m", long) })), divider)
 
 		o.Screen.divider = divider
 		check("organizer message", text(captureStdout(t, func() { o.showMessage("%s", long) })), divider)
@@ -73,7 +73,7 @@ func TestCutMessageKeepsItsReset(t *testing.T) {
 	e := newTestEditor(t, "alpha")
 	screenOf(e).divider = 10
 	e.editorLayout = screenOf(e).editorLayout()
-	out := captureStdout(t, func() { e.ShowMessage(BL, "\x1b[1m%s\x1b[0m", strings.Repeat("x", 40)) })
+	out := captureStdout(t, func() { e.ShowAside("\x1b[1m%s\x1b[0m", strings.Repeat("x", 40)) })
 	if !strings.HasSuffix(out, "\x1b[0m") || strings.Count(out, "x") != 10 {
 		t.Errorf("cut bold message is %q", out)
 	}

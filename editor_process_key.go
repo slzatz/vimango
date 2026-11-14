@@ -79,17 +79,17 @@ func (e *Editor) processKey(c int) (redraw bool) {
 			return false
 		}
 		e.mode = modeMap[mode]
-		//e.ShowMessage(BL, "vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
+		//e.ShowAside("vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
 		e.command_line = ""
 		pos := vim.GetCursorPosition() //set screen cx and cy from pos
 		e.fr = pos[0] - 1
 		e.fc = pos[1]
 		// vim clears the message line on <esc>; it does not announce NORMAL
-		e.ShowMessage(BR, "")
+		e.ShowMessage("")
 		// ...and the same in INSERT: the <esc> ended a CTRL-R, or the
 		// expression for one, and the insert goes on
 		if e.mode == INSERT {
-			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
+			e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
 		}
 		//return false
 		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
@@ -200,7 +200,7 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		}
 	case vim.ModeInsert:
 		if e.mode != INSERT {
-			e.ShowMessage(BR, "\x1b[1m-- INSERT --\x1b[0m")
+			e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
 		}
 	case vim.ModeVisual:
 		e.vmode = visualModeMap[vim.GetVisualType()]
@@ -219,7 +219,7 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 	// <esc> is not the only way out of INSERT: a mapping ("inoremap jk
 	// <Esc>") leaves it too, and "-- INSERT --" must not stay behind.
 	if wasInsert && e.mode != INSERT {
-		e.ShowMessage(BR, "")
+		e.ShowMessage("")
 	}
 
 	// A key that ends VISUAL without changing text (y, a mapping that found
@@ -270,13 +270,13 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 func (e *Editor) HelpModeKeyHandler(c int) (redraw, exit bool) {
 	if message, scrolled := e.notices.noticeKey(c); scrolled {
 		if message != "" {
-			e.ShowMessage(BL, "%s", message)
+			e.ShowAside("%s", message)
 		}
 		return false, true
 	}
 	switch c {
 	case ':': // COMMAND or SEARCH
-		e.ShowMessage(BR, ":")
+		e.ShowMessage(":")
 		vim.SendKey("<esc>")
 		vim.SendInput(":") // put vim in cmdline mode (the line editor)
 		e.command_line = ""
@@ -301,7 +301,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		vim.SendKey("<esc>")
 		if e.command_line == "" {
 			e.mode = NORMAL
-			e.ShowMessage(BR, "")
+			e.ShowMessage("")
 			return false, true
 		}
 		// make the line recallable with <up>/<down> next time (vim only adds
@@ -316,7 +316,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	if c == '\t' {
 		pos := strings.Index(e.command_line, " ")
 		if e.tabCompletion.list == nil {
-			e.ShowMessage(BL, "tab")
+			e.ShowAside("tab")
 			var s string
 			if pos != -1 {
 				s = e.command_line[pos+1:]
@@ -332,7 +332,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 
 				partial := filepath.Base(s)
 				paths, _ := ioutil.ReadDir(dir)
-				e.ShowMessage(BL, "dir: %s  base: %s", dir, partial)
+				e.ShowAside("dir: %s  base: %s", dir, partial)
 
 				for _, path := range paths {
 					if strings.HasPrefix(path.Name(), partial) {
@@ -356,7 +356,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		vim.SendKey("<c-u>")
 		vim.SendMultiInput(e.command_line)
 		e.cmdLineCursor = len(e.command_line)
-		e.ShowMessage(BR, ":%s", e.command_line)
+		e.ShowMessage(":%s", e.command_line)
 		return false, true
 	}
 
@@ -380,7 +380,7 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		e.command_line = ""
 		e.cmdLineCursor = 0
 		e.mode = NORMAL
-		e.ShowMessage(BR, "")
+		e.ShowMessage("")
 		return false, true
 	}
 
@@ -409,7 +409,7 @@ func (e *Editor) syncCmdline() {
 	e.cmdLineCursor = vim.CommandLineGetPosition()
 	e.tabCompletion.index = 0
 	e.tabCompletion.list = nil
-	e.ShowMessage(BR, "%s%s", e.searchPrefix, e.command_line)
+	e.ShowMessage("%s%s", e.searchPrefix, e.command_line)
 }
 
 // runExLine carries out an ex command line the user has entered (without its
@@ -433,7 +433,7 @@ func (e *Editor) runExLine(line string) (redraw bool) {
 		if e.isModified() {
 			e.writeNote()
 		} else {
-			e.ShowMessage(BR, "No changes to save")
+			e.ShowMessage("No changes to save")
 		}
 	case exSaveQuit:
 		e.closeNote(true, false)
@@ -482,7 +482,7 @@ func (e *Editor) runExLine(line string) (redraw bool) {
 	e.command_line = ""
 	e.mode = NORMAL
 	if decision.action == exRefuse {
-		e.ShowMessage(BR, "\x1b[41m%s\x1b[0m", decision.reason)
+		e.ShowMessage("\x1b[41m%s\x1b[0m", decision.reason)
 		return false
 	}
 	redraw = e.forwardEx(line)

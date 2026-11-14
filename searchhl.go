@@ -83,5 +83,5 @@ func (e *Editor) drawSearchMatches(pab *strings.Builder) {
 			e.highlightRowRange(pab, e.visualRowText(r), expandedOffset(raw, lo), expandedOffset(raw, hi), ys[r-first])
 		}
 	}
-	pab.WriteString(RESET)
+	pab.WriteString(sgrReset)
 }
