@@ -3,6 +3,8 @@ package editor
 import (
 	"fmt"
 	"strings"
+
+	"github.com/slzatz/vimango/internal/frontmatter"
 )
 
 // Drawing the note's rows, with markdown highlighting (markdown.go).
@@ -71,7 +73,7 @@ func (e *Editor) visibleRows(yield func(n int, row string) bool) {
 		return
 	}
 
-	fm := frontmatterRows(e.ss)
+	fm := frontmatter.Rows(e.ss)
 	var b mdBlock
 	for n := fm; n < first; n++ {
 		b = b.next(e.ss[n])

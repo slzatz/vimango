@@ -1010,3 +1010,13 @@ repositories:
   `webview.code_accent`, instead of chroma's `#ff5f5f`, so the editor and
   the preview show code in the same colour. It is a constant
   (`mdCodeColour`), not read from `config.json`.
+- **The editor and the preview agree exactly on frontmatter.** The rule
+  moved from `frontmatter.go` into a package of its own,
+  `internal/frontmatter` (`Split`, `Parse`, and `Rows` for the editor),
+  which both use; `frontmatter.go` keeps only the preview's card. Two
+  differences went: the editor took a closing `---` on a note's last row,
+  with no line break after it, where `Split` does not; and it drew plain
+  any block `Split` found, where the preview shows a block as frontmatter
+  only when `Parse` can display it (no `# comment`, anchor, alias or flow
+  YAML) and as markdown otherwise. Over the real database's 4,560 notes the
+  two now agree on all of them; 35 have frontmatter.

@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/slzatz/vimango/internal/frontmatter"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -99,10 +100,11 @@ func resolveAccent(configured, key, fallback string) string {
 // part of the note); title otherwise fills only <title>.
 func (r htmlRenderer) render(title, markdownContent string) (string, error) {
 	// Peel off a YAML frontmatter block, if the note opens with one, and
-	// render it as its own metadata card (frontmatter.go). Ahead of the
-	// image pass and of goldmark both: goldmark has no notion of
-	// frontmatter and would read the closing "---" as a setext heading
-	// underline, swallowing the whole block into an <h2>.
+	// render it as its own metadata card (internal/frontmatter decides what
+	// it is, frontmatter.go draws the card). Ahead of the image pass and of
+	// goldmark both: goldmark has no notion of frontmatter and would read
+	// the closing "---" as a setext heading underline, swallowing the whole
+	// block into an <h2>.
 	//
 	// Either half can decline -- no fenced block, or one this parser has
 	// no display for -- and then body is still the whole note and nothing
@@ -110,8 +112,8 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
 	// identically after this.
 	body := markdownContent
 	var frontmatterCard string
-	if fm, rest, ok := splitFrontmatter(markdownContent); ok {
-		if entries := parseFrontmatter(fm); entries != nil {
+	if fm, rest, ok := frontmatter.Split(markdownContent); ok {
+		if entries := frontmatter.Parse(fm); entries != nil {
 			frontmatterCard, body = frontmatterHTML(entries), rest
 		}
 	}

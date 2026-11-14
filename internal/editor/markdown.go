@@ -13,8 +13,13 @@ import (
 // A row is styled on its own. The only thing carried from one row to the
 // next is whether it is inside a fenced code block, so a redraw styles just
 // the rows in the window, after a quick pass down the rows above it for
-// fences. The YAML frontmatter at the top of a note is drawn plain. Notes are soft-wrapped, so a paragraph is one row, and
-// the inline rules below -- CommonMark's, simplified -- see all of it.
+// fences. Notes are soft-wrapped, so a paragraph is one row, and the inline
+// rules below -- CommonMark's, simplified -- see all of it.
+//
+// The YAML frontmatter at the top of a note is drawn plain. What counts as
+// frontmatter is internal/frontmatter's rule (frontmatter.Rows), which the
+// preview uses too: a block the preview shows as a card of keys is plain
+// here, and one it shows as markdown is highlighted as markdown.
 
 // mdStyle is how one byte of a row is drawn: a set of these bits.
 type mdStyle uint8
@@ -98,21 +103,6 @@ func (b mdBlock) next(row string) mdBlock {
 		return mdBlock{fenceChar: c, fenceLen: n}
 	}
 	return b
-}
-
-// frontmatterRows returns how many rows the YAML block at the top of the
-// note takes, both "---" rows included, or 0 if the note does not start with
-// one.
-func frontmatterRows(rows []string) int {
-	if len(rows) == 0 || rows[0] != "---" {
-		return 0
-	}
-	for i, r := range rows[1:] {
-		if r == "---" {
-			return i + 2
-		}
-	}
-	return 0
 }
 
 // rowStyles returns the style of each byte of row, which has state b, and the

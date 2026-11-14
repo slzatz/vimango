@@ -151,31 +151,28 @@ func TestFencedCode(t *testing.T) {
 	}
 }
 
-// The frontmatter is plain: a "# comment" in the YAML is not a heading. Only
-// a block at the very top is frontmatter, and it needs both of its rules.
+// Frontmatter is drawn plain -- a value of a **b** is not bold -- when the
+// preview shows it as a card (frontmatter.Rows). A block the preview cannot
+// show, such as one with a "# comment" in it, is markdown in both panes.
 func TestFrontmatterIsPlain(t *testing.T) {
-	for _, tc := range []struct {
-		rows []string
-		want int
-	}{
-		{[]string{"---", "title: x", "# yaml comment", "---", "# body"}, 4},
-		{[]string{"---", "body with no second rule"}, 0},
-		{[]string{"text", "---", "x: y", "---"}, 0},
-		{[]string{}, 0},
-	} {
-		if got := frontmatterRows(tc.rows); got != tc.want {
-			t.Errorf("%q: %d frontmatter rows, want %d", tc.rows, got, tc.want)
-		}
-	}
-
-	e := highlightEditor(t, []string{"---", "# yaml comment", "---", "# Heading"})
+	e := highlightEditor(t, []string{"---", "title: a **b**", "---", "# Heading"})
 	rows := drawnRows(e)
-	plain := mdStyle(0).sgr() + "# yaml comment" + sgrReset
+	plain := mdStyle(0).sgr() + "title: a **b**" + sgrReset
 	if rows[1] != plain {
 		t.Errorf("frontmatter row drawn %q, want it plain %q", rows[1], plain)
 	}
 	if !strings.HasPrefix(rows[3], mdHeading.sgr()) {
 		t.Errorf("the heading after the frontmatter is drawn %q", rows[3])
+	}
+
+	for _, note := range [][]string{
+		{"---", "title: x", "# a comment", "---"}, // Parse declines it
+		{"---", "title: x", "# the closer is the last row", "---"},
+	} {
+		e = highlightEditor(t, note)
+		if rows := drawnRows(e); !strings.HasPrefix(rows[2], mdHeading.sgr()) {
+			t.Errorf("%q: row 3 drawn %q, want it a heading: this is not frontmatter", note, rows[2])
+		}
 	}
 }
 
