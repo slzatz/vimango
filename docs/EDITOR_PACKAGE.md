@@ -1,9 +1,9 @@
 # The editor as a package: what is left
 
 Written 2026-11-13, at the end of the session that did steps 1 to 3;
-brought up to date 2026-11-14, when step 4a was done. This is the plan for
-what remains. When a part of it lands, record it in [HISTORY.md](HISTORY.md),
-and delete this file when the move is done.
+brought up to date 2026-11-14, when steps 4a and 4b were done. This is the
+plan for what remains: the move itself, 4c. When a part of it lands, record
+it in [HISTORY.md](HISTORY.md), and delete this file when the move is done.
 
 ## Why
 
@@ -30,6 +30,11 @@ then a package boundary so that the compiler keeps it that way.
 | `1a4794e` | 4a: `editorHost`, `newEditor`, `openNote`, `editorCommands` -- the constructors are the editor's, not methods of `App` |
 | `7e0f5a5` | 4a: `paste.go` split: the editor's half is `editor_paste.go` |
 
+| `d541698` | Drawing the text leaves no colour set (found on the way: the line numbers' grey) |
+| `3fc9906` | 4b: `internal/atomicfile` |
+| `702719f` | 4b: `internal/pane` -- the command registry, `ClipColumns`, `RuneStart`, `InclusiveEnd`, `SendToVim`, `IsSyntheticKey`, `VimKeyName`, `PastedText`, `OnOneLine` |
+| `04524aa` | 4b: what is the editor's alone is in its files -- `ShowMessage`/`ShowAside`, `editor_wrap.go`, `lineNumberCols`, `sgrReset` |
+
 An editor is now made from an `editorHost` (the store, the notice box, the
 markdown style, `onClose`, the `:sync` answer) and an `editorLayout`, and
 holds nothing else of the program around it.
@@ -38,14 +43,11 @@ holds nothing else of the program around it.
 ## What the editor still takes from outside
 
 Found by compiling the editor's files alone in a throwaway package and
-reading what was undefined (run again 2026-11-14, after 4a: nothing of the
-host is left, only what is listed below). "The editor's files" are
-`editor.go`, `editor_methods.go`, `editor_process_key.go`,
-`editor_cmd_line.go`, `editor_rows.go`, `editor_paste.go`, `ex_forward.go`,
+reading what was undefined. "The editor's files" are `editor.go`,
+`editor_methods.go`, `editor_process_key.go`, `editor_cmd_line.go`,
+`editor_rows.go`, `editor_paste.go`, `editor_wrap.go`, `ex_forward.go`,
 `spellcheck.go`, `searchhl.go`, `screen_motion.go`, `highlight.go`, and the
 two that set vim up at startup, `registers.go` and `vimrc.go`.
-
-To run the check again:
 
 ```bash
 mkdir zz && for f in editor*.go ex_forward.go spellcheck.go searchhl.go \
@@ -56,31 +58,18 @@ CGO_ENABLED=1 go build --tags=fts5 -gcflags=-e ./zz/ 2>&1 |
   grep -o "undefined: [A-Za-z_0-9.]*" | sort | uniq -c | sort -rn; rm -rf zz
 ```
 
-### Shared with the organizer (to give a home, step 4b)
+After 4b (2026-11-14) that prints two things only:
 
-These are used by the editor and by code that stays in `package main`, so
-they have to live somewhere both can import.
-
-| What | Now in | Also used by |
-|---|---|---|
-| `Mode` and its constants, `modeMap`, `visualModeMap` | `common.go` | the organizer (its own modes are in the same type: `COMMAND_LINE`, `NAVIGATE_NOTICE`, `CONTAINER`, `LINKS`) |
-| `termcodes`, `sendToVim`, `isSyntheticKey`, the key names (`ARROW_UP`, `END_KEY`, …) | `common.go` | the organizer's title editing |
-| `clipColumns` | `organizer_display.go` | the organizer |
-| `wrapRow`, `wrapSegment`, `expandedOffset`, `runeStart`, `inclusiveEnd`, `byteAtDisplayCol`, `byteAfterDisplayCol`, `tabWidth` | `word_wrap.go` | `runeStart` and `inclusiveEnd` by the organizer; the rest are the editor's alone and move with it |
-| `CommandRegistry`, `CommandInfo` | `command_registry.go` | the organizer |
-| `writeFileAtomic` | `atomicfile.go` | preferences, the image cache |
-| `Location` (`BL`, `BR`), `RESET`, `RED_BG`, `LEFT_MARGIN_OFFSET` | `common.go`, `ansi_colors.go` | the organizer |
-| `pastedText`, `onOneLine` | `paste.go` | the organizer's paste into a title or its command line |
-
-**To decide first, with Steve:** one small shared package or several. My
-recommendation is two: `internal/atomicfile` (it has nothing to do with the
-rest), and one package for text on a terminal that both panes use — the
-mode and key names, `sendToVim`, `clipColumns`, the two rune helpers, the
-command registry. `Location` need not be shared: the editor has exactly two
-places to write, so `ShowMessage(BR, …)` and `ShowMessage(BL, …)` can become
-two methods and the type stays the organizer's. The editor could also have a
-`Mode` of its own, with only its modes; that is cleaner and costs a second
-six-line `modeMap`.
+- **The mode names** -- `Mode`, `NORMAL`, `INSERT`, `VISUAL`, `VISUAL_BLOCK`,
+  `EX_COMMAND`, `SEARCH`, `SPELLING`, `HELP`, `PENDING`, `OTHER`, `modeMap`,
+  `visualModeMap` -- which are in `common.go`, in one type with the
+  organizer's (`COMMAND_LINE`, `NAVIGATE_NOTICE`, `CONTAINER`, `LINKS`).
+  Decided with Steve: the editor gets a `Mode` of its own. It is done *with*
+  the move, not before: in a package of its own the editor can keep these
+  names, so its files need no renaming, where two types in `package main`
+  could not share them.
+- `END_KEY`, once: the organizer's name for `terminal.KeyEnd`, which the
+  editor can use directly.
 
 ### The move itself (step 4c)
 
