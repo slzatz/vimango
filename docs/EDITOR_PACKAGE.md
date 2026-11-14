@@ -1,8 +1,9 @@
 # The editor as a package: what is left
 
-Written 2026-11-13, at the end of the session that did steps 1 to 3. This is
-the plan for the next one. When a part of it lands, record it in
-[HISTORY.md](HISTORY.md), and delete this file when the move is done.
+Written 2026-11-13, at the end of the session that did steps 1 to 3;
+brought up to date 2026-11-14, when step 4a was done. This is the plan for
+what remains. When a part of it lands, record it in [HISTORY.md](HISTORY.md),
+and delete this file when the move is done.
 
 ## Why
 
@@ -25,33 +26,35 @@ then a package boundary so that the compiler keeps it that way.
 | `2b534d5` | Closing goes through `Editor.onClose`; `Session.editorMode` is gone, `Session.editor != nil` is the one answer |
 | `dc1a53e` | The editor is given its layout (`editorLayout`, from `Screen.editorLayout()`); its files no longer mention `editorOnly` |
 | `f75d084` | Misspellings are marked on the last line of the TUI's pane (found on the way) |
+| `7a9817e` | 4a: the editor holds no `Session` and no `Screen` -- it is given the markdown style and the notice box (`noticeBox`, two methods), and draws itself after `:checkstale` (`Editor.draw`) |
+| `1a4794e` | 4a: `editorHost`, `newEditor`, `openNote`, `editorCommands` -- the constructors are the editor's, not methods of `App` |
+| `7e0f5a5` | 4a: `paste.go` split: the editor's half is `editor_paste.go` |
 
-The editor's files now use neither the global `app` nor `Session.editorOnly`.
+An editor is now made from an `editorHost` (the store, the notice box, the
+markdown style, `onClose`, the `:sync` answer) and an `editorLayout`, and
+holds nothing else of the program around it.
+`TestEditorIsMadeFromItsHost` makes one with no `App`, `Screen` or `Session`.
 
 ## What the editor still takes from outside
 
 Found by compiling the editor's files alone in a throwaway package and
-reading what was undefined. "The editor's files" are `editor.go`,
-`editor_methods.go`, `editor_process_key.go`, `editor_cmd_line.go`,
-`editor_rows.go`, `ex_forward.go`, `spellcheck.go`, `searchhl.go`,
-`screen_motion.go`, `highlight.go`, the editor's half of `paste.go`, and the
+reading what was undefined (run again 2026-11-14, after 4a: nothing of the
+host is left, only what is listed below). "The editor's files" are
+`editor.go`, `editor_methods.go`, `editor_process_key.go`,
+`editor_cmd_line.go`, `editor_rows.go`, `editor_paste.go`, `ex_forward.go`,
+`spellcheck.go`, `searchhl.go`, `screen_motion.go`, `highlight.go`, and the
 two that set vim up at startup, `registers.go` and `vimrc.go`.
 
-### From the host (to remove, step 4a)
+To run the check again:
 
-| What | Where | What to do |
-|---|---|---|
-| `e.Session.markdown_style` | `editor_rows.go:174` | Give the editor the style when it is made. It is the only use of `Editor.Session`; the field goes with it |
-| `e.Screen.eraseRightScreen()`, `drawRightScreen()` | `checkStale`, `editor_cmd_line.go` | The editor redraws itself (`drawText`, `drawFrame`, `drawStatusBar`); `drawText` already clears every line it draws |
-| `e.Screen.showNotice`, `e.Screen.noticeKey` | `:help`, listings, HELP mode's keys | The notice box stays the screen's. Give the editor a two-method interface for it |
-| `getGlamourStylePath()` reads `app.Config` | `notice.go`, on the editor's `:help` path | Give the screen the style path at startup; `Screen` then needs no global |
-| `(*App).NewEditor`, `(*App).setEditorExCmds` | `app.go`, `editor_cmd_line.go` | Neither uses the `App` beyond `Store`, `Screen`, `Session`, `noteClosed`, `syncAnswer`. Make them the editor's constructor, taking those |
-| `(*App).openEditor` | `app.go` | Split: reading the note and making the buffer is the editor's; `Session.editor = ae`, `positionEditor` and the first draw are the host's |
-| `paste.go` | both `Editor.pasteText` and `Organizer.pasteText` | Split the file in two |
-
-After 4a `Editor` holds no `Session` and no `Screen`, and what it needs is one
-value: store, layout, `onClose`, `syncAnswer`, the markdown style, the notice
-box.
+```bash
+mkdir zz && for f in editor*.go ex_forward.go spellcheck.go searchhl.go \
+    screen_motion.go highlight.go registers.go vimrc.go fts5_guard.go; do
+  case $f in *_test.go) continue;; esac
+  sed 's/^package main/package zz/' $f > zz/$f; done
+CGO_ENABLED=1 go build --tags=fts5 -gcflags=-e ./zz/ 2>&1 |
+  grep -o "undefined: [A-Za-z_0-9.]*" | sort | uniq -c | sort -rn; rm -rf zz
+```
 
 ### Shared with the organizer (to give a home, step 4b)
 
@@ -67,6 +70,7 @@ they have to live somewhere both can import.
 | `CommandRegistry`, `CommandInfo` | `command_registry.go` | the organizer |
 | `writeFileAtomic` | `atomicfile.go` | preferences, the image cache |
 | `Location` (`BL`, `BR`), `RESET`, `RED_BG`, `LEFT_MARGIN_OFFSET` | `common.go`, `ansi_colors.go` | the organizer |
+| `pastedText`, `onOneLine` | `paste.go` | the organizer's paste into a title or its command line |
 
 **To decide first, with Steve:** one small shared package or several. My
 recommendation is two: `internal/atomicfile` (it has nothing to do with the
@@ -84,9 +88,14 @@ six-line `modeMap`.
   most of the root package's: `keypath`, `macro_keypath`, `mapping`, `ctrlr`,
   `paste` (the editor's half), `ex_forward`, `ex_hang`, `searchhl`, `search`,
   `spellcheck`, `screen_motion`, `drawvisual`, `wraprow`, `highlight`,
-  `editor_rows`, `editor_save`, `editor_layout`, `vimrc`, `registers`, and
-  parts of `clip`, `session` and `editor_only`, which test the app with an
-  editor in it and stay.
+  `editor_rows`, `editor_save`, `editor_layout`, `editor_host`, `vimrc`,
+  `registers`, and parts of `clip`, `session` and `editor_only`, which test
+  the app with an editor in it and stay. The test helpers reach the screen
+  behind a test's editor with `screenOf(e)` (`e.notices.(*Screen)`); the
+  tests that move need a notice box of their own (`recordedNotices`, in
+  `editor_host_test.go`, is one).
+- The notice box's two methods and `editorHost`'s fields become exported, so
+  `Screen.showNotice` and `Screen.noticeKey` are renamed with them.
 - What becomes exported is small: the editor type, its constructor, its
   layout, and what `MainLoop` calls (`editorProcessKey`, `pasteText`,
   `drawAfterKey`, `editorMappingTimeout`, `cursor`, `ShowMessage`), plus the
@@ -103,9 +112,11 @@ six-line `modeMap`.
 - `CGO_ENABLED=1 go test --tags=fts5 ./...`
 - **`scripts/compare-drawing.py before after`** runs two builds through the
   same keys on a pseudo-terminal, in `--editor` and in the TUI, on a scratch
-  copy of the database, and compares everything written. For 4a (apart from
-  `:checkstale`, which it does not exercise), 4b and 4c the answer should be
-  `SAME`: none of them is meant to change a byte. Build the "before" binary
+  copy of the database, and compares everything written. For 4b and 4c the
+  answer should be `SAME`, as it was for 4a: none of them is meant to change
+  a byte. (`:checkstale` is not in it. For 4a, which changed what a reload
+  sends, the screens the two builds left were compared with a terminal
+  emulator; HISTORY, 2026-11-14.) Build the "before" binary
   first: `CGO_ENABLED=1 go build --tags=fts5 -o /tmp/vimango.before .`
 - Steve's own pass in hybrid and the TUI before each push, as always.
 
