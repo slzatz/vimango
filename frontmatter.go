@@ -20,10 +20,10 @@ import (
 // "---" as a thematic break and the closing one -- which sits directly
 // under a paragraph -- as a *setext h2 underline*, so the whole block
 // rendered as one giant <hr> + <h2>, auto-heading-id and all. The editor
-// meanwhile has always been right about it: chroma's markdown lexer peels
-// the block off and hands it to the YAML lexer, which is why the keys come
-// up colored on the terminal side. This file closes that gap for the HTML
-// renderer (note_html.go).
+// sets the block apart (it draws it plain, not as markdown:
+// frontmatterRows, internal/editor/markdown.go), and so, until 2026-11-14,
+// did chroma's markdown lexer, which drew it there as YAML. This file
+// closes that gap for the HTML renderer (note_html.go).
 //
 // Not a goldmark hook, unlike the callouts next door: frontmatter is not a
 // paragraph inside anything, and by the time the earliest hook runs the
@@ -33,9 +33,12 @@ import (
 
 // splitFrontmatter peels a leading "---" fenced block off src. It is a
 // deliberate transcription of chroma's own splitFrontmatter (lexers/
-// markdown.go), so that the editor and the preview agree byte for byte on
-// what counts as frontmatter. A note that looks like a memory doc in one
-// pane looks like one in the other, or in neither.
+// markdown.go), which the editor used to highlight with; the editor's own
+// rule (frontmatterRows) is the same -- a first row of exactly "---", to the
+// next such row -- so a note that looks like a memory doc in one pane looks
+// like one in the other, or in neither. One edge differs: here the closing
+// "---" must have a line break after it, and the editor also takes one on
+// the note's last row.
 //
 // The strict "---\n" prefix is load-bearing rather than incidental: there
 // are notes in the wild that open "---- Task Type: URL ----" and follow it
