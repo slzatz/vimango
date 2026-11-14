@@ -57,7 +57,7 @@ func TestHighlightingKeepsTheText(t *testing.T) {
 	}
 }
 
-// The colours are the ones gruvbox_mod.xml gave chroma, which this replaced.
+// Each style's escape: its attributes, and the one colour that wins.
 func TestMarkdownColours(t *testing.T) {
 	for _, tc := range []struct {
 		s    mdStyle

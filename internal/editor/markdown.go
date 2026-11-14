@@ -27,12 +27,13 @@ const (
 	mdCode                        // an inline code span, backticks included, or a fenced block's row
 )
 
-// The colours, as they were when chroma drew the note with gruvbox_mod.xml:
-// prose and italic in grey, headings and bold a near-white, code red.
+// The colours: prose and italic in grey and headings and bold a near-white,
+// as gruvbox_mod.xml had them for chroma; code in the orange-red of
+// config.json's webview.code_accent, so that it matches the rendered HTML.
 const (
 	mdTextColour   = "\x1b[38;2;196;196;196m" // #c4c4c4
 	mdStrongColour = "\x1b[38;2;232;236;241m" // #e8ecf1
-	mdCodeColour   = "\x1b[38;2;255;95;95m"   // #ff5f5f
+	mdCodeColour   = "\x1b[38;2;224;66;18m"   // #e04212
 )
 
 // sgr returns the escape sequence that draws in style s, from a reset state.

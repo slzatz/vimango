@@ -1006,3 +1006,7 @@ repositories:
     `gruvbox_mod.xml` and its attributes from `highlight.go`, and that the
     editor lexes frontmatter as YAML; none of that is so now. Not changed
     from here.
+- **Code in the editor is `#e04212`**, the rendered HTML's
+  `webview.code_accent`, instead of chroma's `#ff5f5f`, so the editor and
+  the preview show code in the same colour. It is a constant
+  (`mdCodeColour`), not read from `config.json`.
