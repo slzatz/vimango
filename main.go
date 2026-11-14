@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/slzatz/vimango/auth"
+	"github.com/slzatz/vimango/internal/editor"
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
@@ -158,14 +159,14 @@ func main() {
 	vim.ExecuteCommand("set hlsearch")
 
 	// Registers saved by the previous run (see registers.go)
-	restoreRegisters()
+	editor.RestoreRegisters()
 
 	// Spell checking: dictionary in spell/ (see spellcheck.go). Before
 	// vimango.vim so the user can override the spell options there.
-	initSpell()
+	editor.InitSpell()
 
 	// vimango.vim: user mappings and functions (see vimrc.go)
-	sourceVimrc()
+	editor.SourceVimrc()
 
 	// Enable raw mode
 	origCfg, err := rawmode.Enable()

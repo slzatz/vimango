@@ -8,7 +8,7 @@ pop-out editor (the same binary, `vimango --editor`). Three parts:
 3. **What is still missing or wrong.**
 
 It is not exhaustive. 138 of vim's 558 ex commands are forwarded; the
-authoritative list is `exAllowed` in `ex_forward.go`, and the reasons for the
+authoritative list is `exAllowed` in `internal/editor/ex_forward.go`, and the reasons for the
 rest are `exReasons` in the same file. Written 2026-11-11, after the libvim
 work of that day (multi-key mappings, listings, typed search, Ctrl-R, no more
 freezes); `docs/HISTORY.md` has the account of each.

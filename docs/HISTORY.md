@@ -919,7 +919,52 @@ repositories:
     `event_loop_test.go`, the organizer's paste test
     `organizer_paste_test.go`, the screen's layouts `screen_test.go`.
 
-  Tests only, but for the four accessors. 222 tests before, 221 after and
-  one renamed half (`TestLongTitleIsCutAtACharacterBoundary`, the
-  organizer's part of a test the editor's part of which went with the
-  editor).
+  Tests only, but for the four accessors. 218 tests before and 219 after:
+  one removed, and two added -- `TestFailedSaveKeepsTheNoteOpen`, and
+  `TestLongTitleIsCutAtACharacterBoundary`, the organizer's part of a test
+  whose other part stays with the editor.
+
+- **The editor is a package: `internal/editor`.** Step 4c, the move, and
+  the end of the plan that was `docs/EDITOR_PACKAGE.md` (deleted; what
+  comes after is under "Open items" in `CLAUDE.md`). The editor's fourteen
+  files and twenty test files moved, with their names; the package imports
+  `vim`, `internal/pane`, `internal/store`, `internal/atomicfile` and
+  `terminal`, and nothing of the application. The compiler now keeps what
+  the last three days arranged by hand: nothing in the editor can reach the
+  organizer, the screen, the session or the global `app`.
+  - **Its public face** is what the application already used: `Open(host,
+    id, title)` (was `openNote`); `Host` and `Layout` (`editorHost`,
+    `editorLayout`) with their fields exported, and `MessageLine`;
+    `NoticeBox`, whose two methods are `ShowNotice` and `NoticeKey` -- the
+    screen's are renamed to match; on an editor `ProcessKey`
+    (`editorProcessKey`), `PasteText`, `MappingTimeout`, `Draw`,
+    `DrawAfterKey`, `Cursor`, `ShowMessage`, `ShowAside`, `ID`, `Title`,
+    `Mode`, `Modified`; and `InitSpell`, `SourceVimrc`, `RestoreRegisters`,
+    `SaveRegisters`, `LoadMarkdownStyle` (`selectMDStyle`), `MappingWait`,
+    `NoKey`. The application sets a layout with `e.Layout = …`.
+    `Highlight2` and `MDFormatter`, which nothing outside used, are
+    `highlightText` and `markdownFormatter`.
+  - **The editor's modes are its own** (`editor.Mode`, `mode.go`), decided
+    with Steve. In its own package it keeps the names it had, so none of
+    its code changed for this. The organizer's `Mode` (`common.go`) lost
+    what only the editor used -- `EX_COMMAND`, `VISUAL_LINE`,
+    `VISUAL_BLOCK`, `SPELLING`, `OTHER` and `visualModeMap` -- and `LINKS`,
+    which nothing used at all.
+  - **Tests.** The editor's run in the project root, as they did
+    (`TestMain` goes there: `vimango.vim`, `spell/` and the chroma style are
+    found by working directory). `captureStdout`, `newTestStore`,
+    `stripANSI` and `ctrlKey` exist on both sides now, a few lines each.
+    `TestKeyConstantsTrackTheReader`, which is about the organizer's key
+    names, stayed in the root package (`keys_test.go`). 211 tests in the two
+    packages before and after, all run (counted from `go test -json`), with
+    the same two helper "tests" skipped. `TestForwardedCommandsDoNotHang`
+    still finds its own binary.
+
+  No behaviour change. Against the build from before step 4b:
+  `compare-drawing.py` says `SAME` for `--editor` and the TUI; the screen
+  comparison (39 and 41 steps) differs only in the age vim gives an undo;
+  the six `:checkstale` screens are the same.
+
+  One thing for vimango_hybrid's `CLAUDE.md`, not changed from here: it
+  names `~/vimango/highlight.go` for the `terminal16m-md` formatter, which
+  is now `~/vimango/internal/editor/highlight.go`.

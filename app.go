@@ -13,6 +13,7 @@ import (
 	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
 
 	"github.com/slzatz/vimango/internal/atomicfile"
+	"github.com/slzatz/vimango/internal/editor"
 	"github.com/slzatz/vimango/internal/localdb"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/rawmode"
@@ -74,13 +75,13 @@ func CreateApp() *App {
 // editorHost is what this app gives an editor it opens: the database, the
 // screen's notice box, the colours for markdown, and what closing the note
 // and typing :sync come to here.
-func (a *App) editorHost() editorHost {
-	return editorHost{
+func (a *App) editorHost() editor.Host {
+	return editor.Host{
 		Store:         a.Store,
-		notices:       a.Screen,
-		markdownStyle: a.markdownStyle,
-		onClose:       a.noteClosed,
-		syncAnswer:    a.syncAnswer(),
+		Notices:       a.Screen,
+		MarkdownStyle: a.markdownStyle,
+		OnClose:       a.noteClosed,
+		SyncAnswer:    a.syncAnswer(),
 	}
 }
 
@@ -319,7 +320,7 @@ func (a *App) InitDatabases(configPath string) error {
 // --editor mode a host app has its own list of notes, vimango is the editor
 // alone, and a.Organizer stays nil.
 func (a *App) InitApp() {
-	a.markdownStyle, _ = selectMDStyle(a.Config.Chroma.Style)
+	a.markdownStyle, _ = editor.LoadMarkdownStyle(a.Config.Chroma.Style)
 	a.Screen.glamourStyle = a.Config.Glamour.Style
 	a.Session.imgSizeY = 800
 
@@ -391,7 +392,7 @@ func (a *App) LoadInitialData() {
 }
 
 // openEditor opens a note in the editor and shows it. Making the editor on
-// the note is the editor's own (openNote); what is the app's is that it is
+// the note is the editor's own (editor.Open); what is the app's is that it is
 // now the open note, where keys go, and where on the screen it is drawn.
 // title is what the editor shows as the note's; "" is the note's title in
 // the database. An error means the note could not be read, and no editor was
@@ -400,7 +401,7 @@ func (a *App) LoadInitialData() {
 // The organizer calls this for the row it is on; --editor calls it for the
 // note the host asked for, with no organizer there.
 func (a *App) openEditor(id int, title string) error {
-	ae, err := openNote(a.editorHost(), id, title)
+	ae, err := editor.Open(a.editorHost(), id, title)
 	if err != nil {
 		return err
 	}
@@ -446,7 +447,7 @@ func (a *App) mostRecentNote() (id int, ok bool) {
 func (a *App) returnCursor() {
 	var ab strings.Builder
 	if ae := a.Session.editor; ae != nil {
-		row, col, show := ae.cursor()
+		row, col, show := ae.Cursor()
 		if !show {
 			return
 		}
@@ -473,7 +474,7 @@ func (a *App) returnCursor() {
 func (a *App) Cleanup() {
 	// Persist registers for the next run (see registers.go) while vim
 	// state is still alive.
-	saveRegisters()
+	editor.SaveRegisters()
 
 	// Stop async render manager
 	if a.RenderManager != nil {
@@ -561,7 +562,7 @@ func (a *App) handleEvents() {
 			pasted := key.Special == terminal.KeyPaste
 			var k int
 			if pasted {
-				k = noKey
+				k = editor.NoKey
 			} else if key.Regular != 0 {
 				k = int(key.Regular)
 			} else {
@@ -577,9 +578,9 @@ func (a *App) handleEvents() {
 			if ae != nil {
 				var redraw bool
 				if pasted {
-					redraw = ae.pasteText(key.Paste)
+					redraw = ae.PasteText(key.Paste)
 				} else {
-					redraw = ae.editorProcessKey(k)
+					redraw = ae.ProcessKey(k)
 				}
 
 				// the key closed the note (the TUI): noteClosed has drawn
@@ -587,8 +588,8 @@ func (a *App) handleEvents() {
 				if a.Session.editor == nil {
 					continue
 				}
-				ae.drawAfterKey(redraw, k)
-				if wait, waiting := mappingWait(); waiting {
+				ae.DrawAfterKey(redraw, k)
+				if wait, waiting := editor.MappingWait(); waiting {
 					mappingTimeout = time.After(wait)
 				}
 			} else {
@@ -636,7 +637,7 @@ func (a *App) handleEvents() {
 		case <-mappingTimeout:
 			mappingTimeout = nil
 			if ae := a.Session.editor; ae != nil {
-				ae.drawAfterKey(ae.editorMappingTimeout(), noKey)
+				ae.DrawAfterKey(ae.MappingTimeout(), editor.NoKey)
 			}
 		case <-a.resizeCh:
 			a.handleResize()

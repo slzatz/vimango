@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/slzatz/vimango/internal/editor"
 )
 
 // --editor opens its note from the database by itself. It used to build an
@@ -91,23 +93,23 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 	e := a.Session.editor
 
 	out := said(t, e, "help")
-	if e.Mode() != HELP || len(a.Screen.notice) < 20 || !strings.Contains(out, "checkstale") {
+	if e.Mode() != editor.HELP || len(a.Screen.notice) < 20 || !strings.Contains(out, "checkstale") {
 		t.Fatalf(":help: mode %v, a notice of %d lines", e.Mode(), len(a.Screen.notice))
 	}
 	captureStdout(t, func() {
 		for _, key := range []int{' ', ctrlKey('j'), ctrlKey('j'), 'b', PAGE_DOWN, PAGE_UP, ctrlKey('k'), HOME_KEY} {
-			e.editorProcessKey(key)
+			e.ProcessKey(key)
 		}
 	})
-	if e.Mode() != HELP || a.Screen.noticeTop != 0 {
+	if e.Mode() != editor.HELP || a.Screen.noticeTop != 0 {
 		t.Errorf("after scrolling down and back: mode %v, top line %d", e.Mode(), a.Screen.noticeTop)
 	}
-	captureStdout(t, func() { e.editorProcessKey(' ') })
+	captureStdout(t, func() { e.ProcessKey(' ') })
 	if a.Screen.noticeTop == 0 {
 		t.Error("Space did not page the help")
 	}
-	captureStdout(t, func() { e.editorProcessKey('\x1b') })
-	if e.Mode() != NORMAL && e.Mode() != NORMAL_BUSY { // vim's two names for it
+	captureStdout(t, func() { e.ProcessKey('\x1b') })
+	if e.Mode() != editor.NORMAL && e.Mode() != editor.NORMAL_BUSY { // vim's two names for it
 		t.Errorf("Escape left mode %v", e.Mode())
 	}
 
@@ -116,17 +118,17 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 	if a.Screen.noticeTop != 0 {
 		t.Errorf(":help normal opened at line %d of its text", a.Screen.noticeTop)
 	}
-	captureStdout(t, func() { e.editorProcessKey('\x1b') })
+	captureStdout(t, func() { e.ProcessKey('\x1b') })
 
 	// a listing from vim
 	captureStdout(t, func() {
 		pressKeys(e, "ma")
 		runEx(e, "marks")
 	})
-	if e.Mode() != HELP || !strings.Contains(strings.Join(a.Screen.notice, "\n"), "mark") {
+	if e.Mode() != editor.HELP || !strings.Contains(strings.Join(a.Screen.notice, "\n"), "mark") {
 		t.Errorf(":marks: mode %v, notice %q", e.Mode(), a.Screen.notice)
 	}
-	captureStdout(t, func() { e.editorProcessKey('\x1b') })
+	captureStdout(t, func() { e.ProcessKey('\x1b') })
 
 	// and what is the host's to do says so
 	if msg := said(t, e, "sync"); !strings.Contains(msg, "sync is handled by the app") {

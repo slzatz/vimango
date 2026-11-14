@@ -222,7 +222,7 @@ func (o *Organizer) drawNotice(text string) {
 	if o.mode == HELP {
 		hang = 16
 	}
-	o.Screen.showNotice(text, hang)
+	o.Screen.ShowNotice(text, hang)
 }
 
 // The keys that scroll a notice, as normal-mode commands of the organizer.

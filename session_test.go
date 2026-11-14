@@ -1,10 +1,13 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/slzatz/vimango/internal/editor"
 	"github.com/slzatz/vimango/internal/localdb"
+	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -48,6 +51,22 @@ func testApp(t *testing.T, editorOnly bool, texts ...string) (a *App, ids []int)
 	return a, ids
 }
 
+// newTestStore is a throwaway vimango.db as --init makes one: the schema, the
+// default containers, and the migrations (WAL, the search index and its
+// triggers).
+func newTestStore(t *testing.T) *store.Store {
+	t.Helper()
+	db, err := localdb.Open(filepath.Join(t.TempDir(), "vimango.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := localdb.Create(db); err != nil {
+		t.Fatal(err)
+	}
+	return store.New(db)
+}
+
 // tuiApp is the TUI; editorOnlyApp is a vimango started with --editor, before
 // its note is open.
 func tuiApp(t *testing.T, texts ...string) (*App, []int) { return testApp(t, false, texts...) }
@@ -55,7 +74,7 @@ func tuiApp(t *testing.T, texts ...string) (*App, []int) { return testApp(t, fal
 func editorOnlyApp(t *testing.T, texts ...string) (*App, []int) { return testApp(t, true, texts...) }
 
 // openIn opens a note in the app's editor, as :e and --open do.
-func openIn(t *testing.T, a *App, id int) *Editor {
+func openIn(t *testing.T, a *App, id int) *editor.Editor {
 	t.Helper()
 	captureStdout(t, func() {
 		if err := a.openEditor(id, ""); err != nil {
@@ -67,15 +86,15 @@ func openIn(t *testing.T, a *App, id int) *Editor {
 
 // pressKeys types s in the editor, and runEx an ex command and Enter. said is
 // what the editor wrote for an ex command, without the escape sequences.
-func pressKeys(e *Editor, s string) {
+func pressKeys(e *editor.Editor, s string) {
 	for _, r := range s {
-		e.editorProcessKey(int(r))
+		e.ProcessKey(int(r))
 	}
 }
 
-func runEx(e *Editor, cmd string) { pressKeys(e, ":"+cmd+"\r") }
+func runEx(e *editor.Editor, cmd string) { pressKeys(e, ":"+cmd+"\r") }
 
-func said(t *testing.T, e *Editor, cmd string) string {
+func said(t *testing.T, e *editor.Editor, cmd string) string {
 	t.Helper()
 	return stripANSI(captureStdout(t, func() { runEx(e, cmd) }))
 }
@@ -144,7 +163,7 @@ func TestSyncIsRefusedInTheEditor(t *testing.T) {
 		if a.Organizer.mode != orgMode {
 			t.Errorf(":%s reached the organizer: its mode is %v", cmd, a.Organizer.mode)
 		}
-		if e.Mode() != NORMAL || !e.Modified() || noteLines() != "lpha" {
+		if e.Mode() != editor.NORMAL || !e.Modified() || noteLines() != "lpha" {
 			t.Errorf("after :%s: mode %v, modified %v, text %q", cmd, e.Mode(), e.Modified(), noteLines())
 		}
 	}

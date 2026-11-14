@@ -24,7 +24,7 @@ import (
 // showNotice renders text and draws it. hang is how far a wrapped line is
 // indented under its first: :help's entries are a name and a description, and
 // the description continues under itself.
-func (s *Screen) showNotice(text string, hang int) {
+func (s *Screen) ShowNotice(text string, hang int) {
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithStylePath(glamourStylePath(s.glamourStyle)),
 		glamour.WithWordWrap(0),
@@ -128,7 +128,7 @@ func (s *Screen) scrollNoticeHome() string {
 // noticeKey is the keys that scroll a notice, the same wherever one is shown:
 // Ctrl-J and Ctrl-K by a line, Space or PgDn and b or PgUp by half a page (as
 // in the rendered note), Home to the top. handled is false for any other key.
-func (s *Screen) noticeKey(c int) (message string, handled bool) {
+func (s *Screen) NoticeKey(c int) (message string, handled bool) {
 	switch c {
 	case ctrlKey('j'):
 		return s.scrollNoticeDown(), true

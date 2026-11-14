@@ -143,26 +143,23 @@ var sortColumns = map[string]struct{}{
 	"priority": z0,
 }
 
+// Mode is what the organizer is doing with the keys it is given: vim's own
+// mode while a title is edited, under the organizer's name for it (modeMap),
+// or one of the organizer's -- its command line, and the notices it shows
+// over the right pane. The editor has modes of its own (editor.Mode).
 type Mode int
 
 const (
-	NORMAL      Mode = iota // just seeing this after an escape
-	NORMAL_BUSY             // Replace and almost any other keystroke in normal
-	INSERT
-	COMMAND_LINE // only in organizer mode
-	EX_COMMAND   // only in editor mode
-	VISUAL_LINE  // only editor mode
+	NORMAL       Mode = iota // just seeing this after an escape
+	NORMAL_BUSY              // Replace and almost any other keystroke in normal
+	INSERT                   // editing a title
+	COMMAND_LINE             // the organizer's ':' line
 	VISUAL
-	VISUAL_BLOCK // only editor mode
-	SEARCH       // only editor mode
-	//FIND            // only organizer mode
-	SPELLING        // choosing a z= suggestion by number (spellcheck.go)
-	NAVIGATE_NOTICE // only in organizer mode
-	HELP            // organizer and editor mode
-	CONTAINER       // overlay for choosing folder/context
-	LINKS           // only in organizer mode
-	PENDING
-	OTHER // Just in case
+	SEARCH          // vim's command line, while a title is edited
+	NAVIGATE_NOTICE // a notice is up: a sync report, a note's info
+	HELP            // :help is up
+	CONTAINER       // the list a context or folder is picked from
+	PENDING         // half of an operator (the "d" of "d3w")
 )
 
 var modeMap = map[vim.Mode]Mode{
@@ -172,13 +169,6 @@ var modeMap = map[vim.Mode]Mode{
 	vim.ModeCmdline:    SEARCH, // also COMMAND
 	vim.ModeInsert:     INSERT,
 	vim.ModeNormalBusy: NORMAL_BUSY, // just about any keystroke when in NORMAL mode
-}
-
-// v -> 118; V -> 86; ctrl-v -> 22
-var visualModeMap = map[int]Mode{
-	22:  VISUAL_BLOCK,
-	86:  VISUAL_LINE,
-	118: VISUAL,
 }
 
 const (
@@ -275,19 +265,12 @@ func (m Mode) String() string {
 		"NORMAL BUSY",
 		"INSERT",
 		"COMMAND LINE",
-		"EX COMMAND",
-		"VISUAL LINE",
 		"VISUAL",
-		"VISUAL BLOCK",
 		"SEARCH",
-		//"FIND",
-		"SPELLING",
 		"NAVIGATE_NOTICE",
 		"HELP",
 		"CONTAINER",
-		"LINKS",
 		"PENDING",
-		"OTHER",
 	}[m]
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/slzatz/vimango/internal/editor"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
 )
@@ -57,7 +58,7 @@ func TestEventLoopPastes(t *testing.T) {
 	a, ids := editorOnlyApp(t, "- foo")
 	a.keyEvents = make(chan terminal.Key, 64)
 	vim.ExecuteCommand("mapclear | mapclear!")
-	sourceVimrc()
+	editor.SourceVimrc()
 	t.Cleanup(func() { vim.ExecuteCommand("mapclear | mapclear!") })
 
 	captureStdout(t, func() {

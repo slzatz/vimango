@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/slzatz/vimango/internal/editor"
 	"github.com/slzatz/vimango/rawmode"
 )
 
@@ -116,7 +117,7 @@ func (s *Screen) eraseRightScreen() {
 
 func (s *Screen) drawRightScreen() {
 	if e := s.Session.editor; e != nil {
-		e.draw()
+		e.Draw()
 	}
 }
 
@@ -124,7 +125,7 @@ func (s *Screen) drawRightScreen() {
 // again whenever the terminal's size or the divider changes.
 func (s *Screen) positionEditor() {
 	if e := s.Session.editor; e != nil {
-		e.editorLayout = s.editorLayout()
+		e.Layout = s.editorLayout()
 	}
 }
 
@@ -142,24 +143,24 @@ func (s *Screen) positionEditor() {
 // a corner -- and no status bar: the row it would have is left blank, between
 // the text and the message line, and the text gains the border's row. With
 // nothing beside the editor, everything it says goes on its message line.
-func (s *Screen) editorLayout() editorLayout {
-	message := messageLine{row: s.textLines + 2 + TOP_MARGIN, col: s.divider + 1, width: s.screenCols - s.divider}
-	l := editorLayout{
-		left_margin: s.divider,
-		screencols:  s.screenCols - s.divider - 1,
-		message:     message,
+func (s *Screen) editorLayout() editor.Layout {
+	message := editor.MessageLine{Row: s.textLines + 2 + TOP_MARGIN, Col: s.divider + 1, Width: s.screenCols - s.divider}
+	l := editor.Layout{
+		LeftMargin: s.divider,
+		ScreenCols: s.screenCols - s.divider - 1,
+		Message:    message,
 	}
 	if s.Session.editorOnly {
-		l.top_margin = 1
-		l.screenlines = s.textLines + 1
-		l.aside = message
+		l.TopMargin = 1
+		l.ScreenLines = s.textLines + 1
+		l.Aside = message
 		return l
 	}
-	l.top_margin = TOP_MARGIN + 1
-	l.screenlines = s.textLines
-	l.statusBar = true
-	l.corner = true
-	l.aside = messageLine{row: message.row, col: 1, width: s.divider}
+	l.TopMargin = TOP_MARGIN + 1
+	l.ScreenLines = s.textLines
+	l.StatusBar = true
+	l.Corner = true
+	l.Aside = editor.MessageLine{Row: message.Row, Col: 1, Width: s.divider}
 	return l
 }
 
