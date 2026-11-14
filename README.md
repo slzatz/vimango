@@ -130,9 +130,6 @@ The `config.json` file structure (copy from `config.json.example`):
   "sqlite3": {
     "db": "vimango.db"
   },
-  "chroma": {
-    "style": "gruvbox_mod.xml"
-  },
   "glamour": {
     "style": "darkslz.json"
   }
@@ -144,7 +141,6 @@ The `config.json` file structure (copy from `config.json.example`):
 - **options**: Notes can be tagged with both "contexts" and "folders" - two parallel tagging systems
 - **postgres**: Remote sync is optional - leave empty if not using remote sync
 - **sqlite3**: Local database settings - these files will be created automatically
-- **chroma**: Syntax highlighting style for code blocks in markdown
 - **glamour**: Markdown rendering style - `darkslz.json` and `default.json` are included
 
 The full application makes heavy use of CGO to access various C libraries (libvim, sqlite3); CGO is required — pure-Go builds are unsupported.

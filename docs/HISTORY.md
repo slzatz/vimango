@@ -968,3 +968,41 @@ repositories:
   One thing for vimango_hybrid's `CLAUDE.md`, not changed from here: it
   names `~/vimango/highlight.go` for the `terminal16m-md` formatter, which
   is now `~/vimango/internal/editor/highlight.go`.
+- **The editor's own markdown highlighter replaces chroma.** chroma's
+  markdown lexer, run a chunk at a time with a cache (2026-11-10), gave way
+  to `internal/editor/markdown.go`, which styles headings, bold, italic,
+  strikethrough, inline code and fenced code and nothing else, one row at a
+  time. Asked for by Steve: the notes are markdown, and syntax highlighting
+  of programming languages was no longer wanted. What went: `highlight.go`
+  (the `terminal16m-md` formatter that added SGR 9), the chunking and the
+  highlight cache in `editor_rows.go`, `Host.MarkdownStyle`,
+  `LoadMarkdownStyle`, `config.json`'s `chroma.style` (an old config still
+  loads; the key is ignored) and `gruvbox_mod.xml`, whose colours are now
+  constants. chroma stays a dependency: glamour uses it, and
+  `frontmatter_test.go` checks `splitFrontmatter` against it.
+  - **Measured**: a redraw at the bottom of a 900-row note, 308 µs with the
+    chunk cache, 68 µs now with none (`BenchmarkRedrawAtBottomOfLongNote`);
+    chroma over the whole note was 16.8 ms.
+  - **Changed on purpose**: a fence may be indented and have any info string
+    (```` ```c++ ```` was not a fence to chroma), and an unclosed fence runs
+    to the end of the note (to chroma it was no fence). `***x***` is bold and
+    italic. Frontmatter is plain, not coloured as YAML; links, list markers,
+    quotes and HTML comments are no longer coloured. A stray backtick is
+    literal and affects nothing, so the nine notes CLAUDE.md listed as left
+    with one need nothing now.
+  - **Checked against the real database** (4,560 notes, 97,893 rows): every
+    row's text drawn unchanged, apart from 13 rows that hold raw terminal
+    escapes (pasted compiler output), which the check's own escape-stripping
+    cannot compare; the slowest whole note drew in 0.4 ms. Three notes end
+    inside a fence by the new rule: 2414 (a row of `~` used as a rule), 5612
+    (a closing fence with no opener, on its last row) and 5638 (a closing
+    fence with a citation link stuck to it), each coloured as code from there
+    to its end.
+  - **`:syntax` no longer touches the margin.** Turning highlighting on set
+    `left_margin_offset` to the line numbers' width whether or not they were
+    on, so with `:number` off it left a blank four-column margin and wrapped
+    the text four columns short (`TestSyntaxLeavesTheMarginAlone`).
+  - vimango_hybrid's `CLAUDE.md` says the editor's colours come from
+    `gruvbox_mod.xml` and its attributes from `highlight.go`, and that the
+    editor lexes frontmatter as YAML; none of that is so now. Not changed
+    from here.

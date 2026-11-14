@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alecthomas/chroma/v2"
 	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
 
 	"github.com/slzatz/vimango/internal/atomicfile"
@@ -38,8 +37,7 @@ type App struct {
 	resizeCh  chan struct{}     // Terminal resized (SIGWINCH)
 
 	// Database connections and other config
-	Config        *dbConfig
-	markdownStyle *chroma.Style // the colours the editor draws markdown in (config.json's chroma.style)
+	Config *dbConfig
 
 	// Application state
 	SyncInProcess      bool
@@ -73,15 +71,14 @@ func CreateApp() *App {
 }
 
 // editorHost is what this app gives an editor it opens: the database, the
-// screen's notice box, the colours for markdown, and what closing the note
-// and typing :sync come to here.
+// screen's notice box, and what closing the note and typing :sync come to
+// here.
 func (a *App) editorHost() editor.Host {
 	return editor.Host{
-		Store:         a.Store,
-		Notices:       a.Screen,
-		MarkdownStyle: a.markdownStyle,
-		OnClose:       a.noteClosed,
-		SyncAnswer:    a.syncAnswer(),
+		Store:      a.Store,
+		Notices:    a.Screen,
+		OnClose:    a.noteClosed,
+		SyncAnswer: a.syncAnswer(),
 	}
 }
 
@@ -320,7 +317,6 @@ func (a *App) InitDatabases(configPath string) error {
 // --editor mode a host app has its own list of notes, vimango is the editor
 // alone, and a.Organizer stays nil.
 func (a *App) InitApp() {
-	a.markdownStyle, _ = editor.LoadMarkdownStyle(a.Config.Chroma.Style)
 	a.Screen.glamourStyle = a.Config.Glamour.Style
 	a.Session.imgSizeY = 800
 

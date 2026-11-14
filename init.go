@@ -63,11 +63,6 @@ func runInit() {
 			Type:  "folder",
 			Title: "none",
 		},
-		Chroma: struct {
-			Style string `json:"style"`
-		}{
-			Style: "gruvbox_mod.xml",
-		},
 		Glamour: struct {
 			Style string `json:"style"`
 		}{

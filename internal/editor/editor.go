@@ -25,7 +25,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/alecthomas/chroma/v2"
 	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
@@ -89,13 +88,11 @@ type Editor struct {
 	vbuf         *vim.Buffer
 	ss           []string
 	searchPrefix string
-	suggestions  []string            // spelling suggestions offered in SPELLING mode
-	spellKeys    string              // last NORMAL keys typed, to spot zg/zw (spellListKey)
-	searchDrawn  string              // vim's search state when the text was last drawn (searchState)
-	heldKeyShown bool                // a key vim is holding is drawn at the cursor (DrawAfterKey)
-	screenWant   screenWant          // where gj/gk left the cursor, and the column wanted (screen_motion.go)
-	hlCache      map[string][]string // highlighted rows by chunk text (highlightChunk)
-	hlCacheBytes int
+	suggestions  []string   // spelling suggestions offered in SPELLING mode
+	spellKeys    string     // last NORMAL keys typed, to spot zg/zw (spellListKey)
+	searchDrawn  string     // vim's search state when the text was last drawn (searchState)
+	heldKeyShown bool       // a key vim is holding is drawn at the cursor (DrawAfterKey)
+	screenWant   screenWant // where gj/gk left the cursor, and the column wanted (screen_motion.go)
 	bufferTick   int
 	saveTick     int
 	// dbText is the note exactly as this editor last read it from — or
@@ -122,8 +119,6 @@ type Host struct {
 	// Notices is the box the editor shows :help and vim's listings in. The
 	// box is the screen's; the editor is given this much of it.
 	Notices NoticeBox
-	// MarkdownStyle is the colours the note's markdown is drawn in (highlightChunk).
-	MarkdownStyle *chroma.Style
 	// OnClose is what follows the editor closing its note (closeNote): the
 	// TUI goes back to the organizer, --editor ends the process (in
 	// vimango, App.noteClosed). The editor itself knows of neither.

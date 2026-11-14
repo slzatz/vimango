@@ -48,10 +48,6 @@ type dbConfig struct {
 		Title string `json:"title"`
 	} `json:"options"`
 
-	Chroma struct {
-		Style string `json:"style"`
-	} `json:"chroma"`
-
 	Glamour struct {
 		Style string `json:"style"`
 	} `json:"glamour"`

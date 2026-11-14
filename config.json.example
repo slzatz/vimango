@@ -13,9 +13,6 @@
   "sqlite3": {
     "db": "vimango.db"
   },
-  "chroma": {
-    "style": "gruvbox_mod.xml"
-  },
   "glamour": {
     "style": "darkslz.json"
   },

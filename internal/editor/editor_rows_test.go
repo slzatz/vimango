@@ -1,104 +1,15 @@
 package editor
 
 import (
-	"bytes"
 	"fmt"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
 )
 
-func TestMarkdownChunks(t *testing.T) {
-	ranges := func(rows ...string) (out [][2]int) {
-		for _, c := range markdownChunks(rows) {
-			out = append(out, [2]int{c.start, c.end})
-		}
-		return out
-	}
-	for _, tc := range []struct {
-		name string
-		rows []string
-		want [][2]int
-	}{
-		{"paragraphs end with their blank row",
-			[]string{"one", "two", "", "three", "", "", "four"},
-			[][2]int{{0, 3}, {3, 5}, {5, 6}, {6, 7}}},
-		{"a fence is one chunk, blank rows and all",
-			[]string{"text", "```go", "a := 1", "", "b := 2", "```", "after"},
-			[][2]int{{0, 1}, {1, 6}, {6, 7}}},
-		{"a fence with no closer is ordinary text",
-			[]string{"text", "```go", "a := 1", "", "more"},
-			[][2]int{{0, 4}, {4, 5}}},
-		{"an opener that chroma would not take is not one",
-			[]string{"```c++", "x", "", "```", "y", "```"},
-			[][2]int{{0, 3}, {3, 6}}},
-		{"frontmatter",
-			[]string{"---", "title: x", "", "tags: y", "---", "body", "", "---", "not frontmatter"},
-			[][2]int{{0, 5}, {5, 7}, {7, 9}}},
-		{"a rule on the first row with no second one is not frontmatter",
-			[]string{"---", "body", "", "more"},
-			[][2]int{{0, 3}, {3, 4}}},
-		{"a comment keeps its blank rows",
-			[]string{"before <!-- note", "", "still comment", "--> after", "", "next"},
-			[][2]int{{0, 5}, {5, 6}}},
-		{"a comment closed on its own row, or opened inside code, splits nothing",
-			[]string{"a <!-- b --> c", "", "use `<!--` to open", "", "d"},
-			[][2]int{{0, 2}, {2, 4}, {4, 5}}},
-		{"empty note", []string{""}, [][2]int{{0, 1}}},
-	} {
-		if got := ranges(tc.rows...); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: chunks %v, want %v", tc.name, got, tc.want)
-		}
-	}
-
-	// a long run with no blank row is cut, so a key typed in it does not
-	// re-highlight all of it
-	long := make([]string, 150)
-	for i := range long {
-		long[i] = "- item"
-	}
-	if got := ranges(long...); !slices.Equal(got, [][2]int{{0, 60}, {60, 120}, {120, 150}}) {
-		t.Errorf("150 rows with no blank row: chunks %v", got)
-	}
-}
-
-// seen reduces highlighted text to what is on screen: each visible character
-// with the style in force when it is written. Two strings that differ only in
-// where a colour is re-applied, or in the colour of a blank line, are equal.
-func seen(x string) string {
-	var out strings.Builder
-	style := ""
-	for i := 0; i < len(x); {
-		if x[i] == 0x1b {
-			j := i + 1
-			for j < len(x) && !(x[j] >= 'a' && x[j] <= 'z' || x[j] >= 'A' && x[j] <= 'Z') {
-				j++
-			}
-			if seq := x[i:min(j+1, len(x))]; seq == sgrReset {
-				style = ""
-			} else {
-				style += seq
-			}
-			i = j + 1
-			continue
-		}
-		if x[i] != ' ' && x[i] != '\t' {
-			out.WriteString(style + "|")
-		}
-		out.WriteByte(x[i])
-		i++
-	}
-	return out.String()
-}
-
 func highlightEditor(t testing.TB, rows []string) *Editor {
-	style, err := LoadMarkdownStyle("gruvbox_mod.xml")
-	if err != nil {
-		t.Skip(err)
-	}
-	e := &Editor{Host: Host{MarkdownStyle: style}}
+	e := &Editor{}
 	e.ss = rows
 	e.ScreenCols = 60
 	e.ScreenLines = 40
@@ -106,109 +17,84 @@ func highlightEditor(t testing.TB, rows []string) *Editor {
 	return e
 }
 
-func chunkedRows(e *Editor) (out []string) {
-	for _, c := range markdownChunks(e.ss) {
-		out = append(out, e.highlightChunk(e.ss[c.start:c.end], c.frontmatter)...)
-	}
+// drawnRows returns every row of the note as visibleRows draws it.
+func drawnRows(e *Editor) (out []string) {
+	e.firstVisibleRow = 0
+	e.visibleRows(func(n int, row string) bool {
+		out = append(out, row)
+		return true
+	})
 	return out
 }
 
-// Highlighting a chunk at a time must look the same as highlighting the whole
-// note at once, which is what it replaced. (Run over the 5,574 notes of a real
-// database when this was written: 5,552 came out the same; the other 22 each
-// had an unmatched backtick, covered by the next test.)
-func TestChunkedHighlightingLooksLikeTheWholeNote(t *testing.T) {
-	note := strings.Split(strings.Join([]string{
-		"---", "title: a note", "tags: [one, two]", "---",
+// The highlighting changes how the text is drawn, never the text: with the
+// escapes taken out, every row is what wrappedRow draws with highlighting off
+// -- tabs widened and wrapped at the same places.
+func TestHighlightingKeepsTheText(t *testing.T) {
+	note := []string{
+		"---", "title: a **note**", "---",
 		"# Heading", "",
-		"**Bold starts this paragraph** and *italic* follows, with `code` and a [link](http://example.com).",
-		"A second line of the same paragraph with ~~strike~~ and @mention #tag.", "",
-		"*Italic starts this one*", "",
-		"- a list item with **bold**", "- [x] a done task", "  - nested *item*", "1. numbered", "",
-		"> a quotation", "",
-		"```go", "func main() {", "", "\tfmt.Println(\"hi\") // comment", "}", "```", "",
-		"Text <!-- a comment", "", "that runs over a blank row --> and ends.", "",
-		"```", "plain fence", "```",
-		"A long line that has to wrap because it is quite a bit wider than the sixty columns this editor has, twice over if need be.", "",
-		"## Subheading", "last line",
-	}, "\n"), "\n")
+		"**Bold starts this paragraph** and *italic* follows, with `code`, ~~strike~~ and a long tail so that it has to wrap at sixty columns, twice over.",
+		"\tan indented **bold** row\twith a tab in it",
+		"```go", "func main() {", "\tfmt.Println(\"hi\")", "}", "```",
+		"é **ü** and → arrows", "",
+	}
 	e := highlightEditor(t, note)
-
-	var sb strings.Builder
-	for _, raw := range e.ss {
-		sb.WriteString(e.wrappedRow(raw))
-		sb.WriteByte('\n')
+	rows := drawnRows(e)
+	if len(rows) != len(note) {
+		t.Fatalf("%d rows in, %d drawn", len(note), len(rows))
 	}
-	var buf bytes.Buffer
-	if err := highlightText(&buf, sb.String(), "markdown", markdownFormatter, e.MarkdownStyle); err != nil {
-		t.Fatal(err)
-	}
-	whole := strings.Split(buf.String(), "\n")
-
-	chunked := chunkedRows(e)
-	if len(chunked) != len(note) {
-		t.Fatalf("%d rows in, %d highlighted rows out", len(note), len(chunked))
-	}
-	for i := range note {
-		if seen(whole[i]) != seen(chunked[i]) {
-			t.Errorf("row %d %q\n whole note: %q\n by chunk:   %q", i+1, note[i], whole[i], chunked[i])
-		}
-	}
-	// and the text itself is all there, in order
-	for i, row := range chunked {
+	for i, row := range rows {
 		if got, want := stripANSI(row), e.wrappedRow(note[i]); got != want {
-			t.Errorf("row %d: highlighted text %q, want %q", i+1, got, want)
+			t.Errorf("row %d: drawn text %q, want %q", i+1, got, want)
+		}
+		// each screen line of it starts from a reset state and leaves one
+		for _, line := range strings.Split(row, "\t") {
+			if line != "" && !strings.HasSuffix(line, sgrReset) {
+				t.Errorf("row %d: screen line %q leaves its style open", i+1, line)
+			}
 		}
 	}
 }
 
-// The one intended difference. chroma lets an unmatched backtick run on to the
-// next backtick however many paragraphs away, colouring everything between as
-// code; markdown ends a code span with its paragraph, and so does a chunk.
-func TestUnmatchedBacktickStopsAtTheParagraph(t *testing.T) {
-	e := highlightEditor(t, []string{"a stray ` backtick", "", "an ordinary paragraph", "", "and `code` here"})
-	rows := chunkedRows(e)
-	plain := seen(e.highlightChunk([]string{"an ordinary paragraph"}, false)[0])
-	if seen(rows[2]) != plain {
-		t.Errorf("the paragraph after a stray backtick is coloured %q, want it plain %q", rows[2], plain)
-	}
-}
-
-// A paragraph that begins with a marker is highlighted, including the very
-// first row of the note -- which whole-note highlighting missed, the lexer
-// wanting whitespace before the marker.
-func TestMarkerAtTheStartOfAChunk(t *testing.T) {
-	e := highlightEditor(t, []string{"**bold first row**", "", "**bold after a blank row**"})
-	rows := chunkedRows(e)
-	plain := seen(e.highlightChunk([]string{"x"}, false)[0])
-	for i := range []int{0, 2} {
-		if strings.HasPrefix(seen(rows[i*2]), plain[:len(plain)-1]) {
-			t.Errorf("row %d is not highlighted as bold: %q", i*2+1, rows[i*2])
+// The colours are the ones gruvbox_mod.xml gave chroma, which this replaced.
+func TestMarkdownColours(t *testing.T) {
+	for _, tc := range []struct {
+		s    mdStyle
+		want string
+	}{
+		{0, mdTextColour},
+		{mdHeading, "\x1b[1m" + mdStrongColour},
+		{mdBold, "\x1b[1m" + mdStrongColour},
+		{mdItalic, "\x1b[3m" + mdTextColour},
+		{mdStrike, "\x1b[9m" + mdTextColour},
+		{mdCode, mdCodeColour},
+		{mdHeading | mdCode, "\x1b[1m" + mdCodeColour},
+	} {
+		if got := tc.s.sgr(); got != tc.want {
+			t.Errorf("style %s: %q, want %q", styleName(tc.s), got, tc.want)
 		}
 	}
 }
 
-// Only the chunk that changed is highlighted again.
-func TestHighlightCache(t *testing.T) {
-	rows := []string{"# Title", "", "first paragraph", "", "second paragraph", "", "```", "code", "```"}
-	e := highlightEditor(t, rows)
-	draw := func() {
-		var ab strings.Builder
-		e.drawRows(&ab)
-	}
-	draw()
-	cached := len(e.hlCache)
-	if cached == 0 {
-		t.Fatal("nothing was cached")
-	}
-	draw()
-	if len(e.hlCache) != cached {
-		t.Errorf("redrawing unchanged text added %d cache entries", len(e.hlCache)-cached)
-	}
-	e.ss[4] = "second paragraph, edited"
-	draw()
-	if got := len(e.hlCache) - cached; got != 1 {
-		t.Errorf("editing one paragraph highlighted %d chunks, want 1", got)
+// :syntax turns the highlighting on and off and leaves the margin alone. It
+// used to make room for line numbers whenever it turned highlighting on, so
+// with the numbers off it left a blank margin and wrapped the text short.
+func TestSyntaxLeavesTheMarginAlone(t *testing.T) {
+	e := newTestEditor(t, "# a note")
+	for _, numbers := range []bool{false, true} {
+		e.numberLines = numbers
+		want := 0
+		if numbers {
+			want = lineNumberCols
+		}
+		e.left_margin_offset = want
+		for range 2 { // off, then on again
+			captureStdout(t, e.syntax)
+			if e.left_margin_offset != want {
+				t.Errorf("numbers %v, highlighting %v: margin %d, want %d", numbers, e.highlightSyntax, e.left_margin_offset, want)
+			}
+		}
 	}
 }
 
@@ -270,8 +156,8 @@ func longNote() []string {
 }
 
 // The cost of redrawing after a key, with the cursor at the bottom of a long
-// note and the edit changing one paragraph each time. Highlighting everything
-// from the top of the note, as before, took 45ms here; see BenchmarkWholeNote.
+// note and the edit changing one paragraph each time. chroma, run over the
+// whole note, took 45ms here.
 func BenchmarkRedrawAtBottomOfLongNote(b *testing.B) {
 	e := highlightEditor(b, longNote())
 	e.fr = len(e.ss) - 1
@@ -284,21 +170,6 @@ func BenchmarkRedrawAtBottomOfLongNote(b *testing.B) {
 		e.scroll()
 		ab.Reset()
 		e.drawRows(&ab)
-	}
-}
-
-func BenchmarkWholeNote(b *testing.B) {
-	e := highlightEditor(b, longNote())
-	var sb strings.Builder
-	for _, raw := range e.ss {
-		sb.WriteString(e.wrappedRow(raw))
-		sb.WriteByte('\n')
-	}
-	text := sb.String()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var buf bytes.Buffer
-		highlightText(&buf, text, "markdown", markdownFormatter, e.MarkdownStyle)
 	}
 }
 

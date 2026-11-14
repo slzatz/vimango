@@ -50,10 +50,10 @@ func editorCommands() *pane.CommandRegistry[func(*Editor)] {
 
 	// Editing commands
 	registry.Register("syntax", (*Editor).syntax, pane.CommandInfo{
-		Description: "Set syntax highlighting for current note",
-		Usage:       "syntax <language>",
+		Description: "Toggle markdown highlighting on/off",
+		Usage:       "syntax",
 		Category:    "Editing",
-		Examples:    []string{":syntax go", ":syntax python", ":syntax markdown"},
+		Examples:    []string{":syntax"},
 	})
 
 	registry.Register("number", (*Editor).number, pane.CommandInfo{
@@ -231,13 +231,9 @@ func (e *Editor) nopaste() {
 
 func (e *Editor) syntax() {
 	e.highlightSyntax = !e.highlightSyntax
-	if e.highlightSyntax {
-		e.left_margin_offset = lineNumberCols
-		//e.checkSpelling = false // can't syntax highlight(including markdown) and check spelling
-	}
 	e.drawText()
 	// no need to call drawFrame or drawStatusBar
-	e.ShowMessage("Syntax highlighting is %v", e.highlightSyntax)
+	e.ShowMessage("Markdown highlighting is %v", e.highlightSyntax)
 }
 
 // exit and quitActions are the registry's entries for :x and :q. runExLine
