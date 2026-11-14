@@ -733,3 +733,13 @@ repositories:
   `TestSpellErrorsAreMarkedToTheLastLineOfThePane`, for text starting on
   rows 1, 2 and 5, and for a word pushed below the pane by a row that wraps;
   it fails on the old code for rows 2 and 5.
+
+- **What is left of the editor's move to a package** is written down in
+  `docs/EDITOR_PACKAGE.md`, for the next session: what the editor still takes
+  from outside itself (found by compiling its files alone), what it shares
+  with the organizer, the order to do it in, and what comes after.
+  `scripts/compare-drawing.py` is the check used for the layout change, kept:
+  two builds, the same keys on a pseudo-terminal in both modes, every byte
+  compared. Run on the build before the spell fix and the one after, it
+  reports one difference -- a misspelling on row 38 of the TUI's pane, now
+  marked -- and none in `--editor`.
