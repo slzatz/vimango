@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
 
 // editorCommands is vimango's own ex commands in the editor, with what :help
 // says of each. Every other command is vim's (ex_forward.go).
-func editorCommands() *CommandRegistry[func(*Editor)] {
-	registry := NewCommandRegistry[func(*Editor)]()
+func editorCommands() *pane.CommandRegistry[func(*Editor)] {
+	registry := pane.NewCommandRegistry[func(*Editor)]()
 
 	// File Operations commands
-	registry.Register("write", (*Editor).writeNote, CommandInfo{
+	registry.Register("write", (*Editor).writeNote, pane.CommandInfo{
 		Aliases:     []string{"w"},
 		Description: "Save current note to database",
 		Usage:       "write",
@@ -23,7 +24,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":write", ":w"},
 	})
 
-	registry.Register("sync", (*Editor).noSync, CommandInfo{
+	registry.Register("sync", (*Editor).noSync, pane.CommandInfo{
 		Aliases:     []string{"test", "sync?"},
 		Description: "Not run from the editor: close the note and sync from the organizer",
 		Usage:       "sync",
@@ -31,7 +32,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":x, then :sync in the organizer"},
 	})
 
-	registry.Register("read", (*Editor).readFile, CommandInfo{
+	registry.Register("read", (*Editor).readFile, pane.CommandInfo{
 		Aliases:     []string{"r"},
 		Description: "Read contents from file into current note",
 		Usage:       "read <filename>",
@@ -39,7 +40,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":read todo.txt", ":r /tmp/notes.md"},
 	})
 
-	registry.Register("checkstale", (*Editor).checkStale, CommandInfo{
+	registry.Register("checkstale", (*Editor).checkStale, pane.CommandInfo{
 		Description: "Reload this note if the database changed underneath it (a clean buffer only; " +
 			"warns instead when you have unsaved changes). Injected by the host app after a sync",
 		Usage:    "checkstale",
@@ -48,14 +49,14 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 	})
 
 	// Editing commands
-	registry.Register("syntax", (*Editor).syntax, CommandInfo{
+	registry.Register("syntax", (*Editor).syntax, pane.CommandInfo{
 		Description: "Set syntax highlighting for current note",
 		Usage:       "syntax <language>",
 		Category:    "Editing",
 		Examples:    []string{":syntax go", ":syntax python", ":syntax markdown"},
 	})
 
-	registry.Register("number", (*Editor).number, CommandInfo{
+	registry.Register("number", (*Editor).number, pane.CommandInfo{
 		Aliases:     []string{"num"},
 		Description: "Toggle line numbers on/off",
 		Usage:       "number",
@@ -63,7 +64,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":number", ":num"},
 	})
 
-	registry.Register("paste", (*Editor).paste, CommandInfo{
+	registry.Register("paste", (*Editor).paste, pane.CommandInfo{
 		//Aliases:     []string{"num"},
 		Description: "Autoindent off - good for pasting content",
 		Usage:       "paste",
@@ -71,7 +72,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":paste"},
 	})
 
-	registry.Register("nopaste", (*Editor).nopaste, CommandInfo{
+	registry.Register("nopaste", (*Editor).nopaste, pane.CommandInfo{
 		//Aliases:     []string{"num"},
 		Description: "Autoindent on - not good for pasting content",
 		Usage:       "nopaste",
@@ -79,14 +80,14 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":nopaste"},
 	})
 	// Utility commands
-	registry.Register("spell", (*Editor).toggleSpell, CommandInfo{
+	registry.Register("spell", (*Editor).toggleSpell, pane.CommandInfo{
 		Description: "Toggle spell checking (misspellings are highlighted as you edit)",
 		Usage:       "spell",
 		Category:    "Utility",
 		Examples:    []string{":spell"},
 	})
 
-	registry.Register("suggest", (*Editor).spellSuggest, CommandInfo{
+	registry.Register("suggest", (*Editor).spellSuggest, pane.CommandInfo{
 		Description: "Pick a spelling correction for the word under the cursor (same as z=)",
 		Usage:       "suggest",
 		Category:    "Utility",
@@ -94,7 +95,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 	})
 
 	// System commands
-	registry.Register("quit", (*Editor).quitActions, CommandInfo{
+	registry.Register("quit", (*Editor).quitActions, pane.CommandInfo{
 		Aliases:     []string{"q", "quit!", "q!"},
 		Description: "Close current editor (q!/quit! forces without saving)",
 		Usage:       "quit",
@@ -102,7 +103,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 		Examples:    []string{":quit", ":q", ":q!", ":x"},
 	})
 
-	registry.Register("exit", (*Editor).exit, CommandInfo{
+	registry.Register("exit", (*Editor).exit, pane.CommandInfo{
 		Aliases:     []string{"x"},
 		Description: "Save and exit the current file",
 		Usage:       "x",
@@ -111,7 +112,7 @@ func editorCommands() *CommandRegistry[func(*Editor)] {
 	})
 
 	// Help command
-	registry.Register("help", (*Editor).help, CommandInfo{
+	registry.Register("help", (*Editor).help, pane.CommandInfo{
 		Aliases:     []string{"h"},
 		Description: "Show help for editor commands",
 		Usage:       "help [command|category]",

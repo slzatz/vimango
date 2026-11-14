@@ -5,6 +5,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/mattn/go-runewidth"
+
+	"github.com/slzatz/vimango/internal/pane"
 )
 
 // func (o *Organizer) insertRow(at int, s string, star bool, deleted bool, completed bool, modified string) {
@@ -51,7 +53,7 @@ func (o *Organizer) scroll() (offset_changed bool) {
 	// o.fc is a byte offset, as libvim reports it; coloff and cx are display
 	// columns, so measure the title up to the cursor and the glyph under it
 	title := o.rows[o.fr].title
-	fc := runeStart(title, o.fc)
+	fc := pane.RuneStart(title, o.fc)
 	col := runewidth.StringWidth(title[:fc])
 	w := 1 // in INSERT the cursor can sit just past the last character
 	if fc < len(title) {

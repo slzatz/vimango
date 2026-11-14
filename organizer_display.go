@@ -17,6 +17,7 @@ import (
 	"github.com/mattn/go-runewidth"
 
 	"github.com/slzatz/vimango/auth"
+	"github.com/slzatz/vimango/internal/pane"
 )
 
 const (
@@ -165,9 +166,9 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder) {
 	}
 
 	fmt.Fprintf(ab, "\x1b[%d;%dH", y+TOP_MARGIN+1, LEFT_MARGIN+1)
-	before, n1 := clipColumns(title, o.coloff, lo-o.coloff)
-	selected, n2 := clipColumns(title, lo, hi-lo)
-	after, n3 := clipColumns(title, hi, end-hi)
+	before, n1 := pane.ClipColumns(title, o.coloff, lo-o.coloff)
+	selected, n2 := pane.ClipColumns(title, lo, hi-lo)
+	after, n3 := pane.ClipColumns(title, hi, end-hi)
 	ab.WriteString(before)
 	if selected != "" {
 		ab.WriteString(LIGHT_GRAY_BG)
@@ -176,44 +177,6 @@ func (o *Organizer) drawActiveRow(ab *strings.Builder) {
 	}
 	ab.WriteString(after)
 	ab.WriteString(strings.Repeat(" ", titlecols-n1-n2-n3))
-}
-
-// clipColumns returns the part of s that falls in display columns
-// [from, from+width) and how many columns it fills. Titles are measured in
-// display columns on screen but stored as UTF-8, so slicing them by titlecols
-// cut multi-byte characters in half. CSI escapes (the fts highlight markers)
-// take no columns and are all kept, so a highlight the clip cuts off is still
-// closed. A wide rune straddling an edge becomes spaces for its visible part.
-func clipColumns(s string, from, width int) (string, int) {
-	var b strings.Builder
-	end := from + width
-	w, cols := 0, 0
-	for i := 0; i < len(s); {
-		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
-			j := i + 2
-			for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
-				j++
-			}
-			j = min(j+1, len(s))
-			b.WriteString(s[i:j])
-			i = j
-			continue
-		}
-		r, size := utf8.DecodeRuneInString(s[i:])
-		rw := runewidth.RuneWidth(r)
-		switch {
-		case w >= from && w+rw <= end:
-			b.WriteString(s[i : i+size])
-			cols += rw
-		case w < end && w+rw > from:
-			n := min(w+rw, end) - max(w, from)
-			b.WriteString(strings.Repeat(" ", n))
-			cols += n
-		}
-		w += rw
-		i += size
-	}
-	return b.String(), cols
 }
 
 func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int) {
@@ -245,7 +208,7 @@ func (o *Organizer) appendStandardRow(ab *strings.Builder, fr, y, titlecols int)
 		ab.WriteString(BLACK + YELLOW_BG)
 	}
 
-	title, cols := clipColumns(row.title, 0, titlecols)
+	title, cols := pane.ClipColumns(row.title, 0, titlecols)
 	ab.WriteString(title)
 	ab.WriteString(strings.Repeat(" ", titlecols-cols))
 
@@ -296,7 +259,7 @@ func (o *Organizer) appendSearchRow(ab *strings.Builder, fr, y, titlecols int) {
 		ab.WriteString(BLACK + YELLOW_BG)
 	}
 
-	title, cols := clipColumns(row.ftsTitle, 0, titlecols)
+	title, cols := pane.ClipColumns(row.ftsTitle, 0, titlecols)
 	ab.WriteString(title)
 	ab.WriteString(strings.Repeat(" ", titlecols-cols))
 	ab.WriteString(RESET)
@@ -446,7 +409,7 @@ func (o *Organizer) drawStatusBar() {
 		row := &o.rows[o.fr]
 
 		if runewidth.StringWidth(row.title) > 16 {
-			title, _ = clipColumns(row.title, 0, 12)
+			title, _ = pane.ClipColumns(row.title, 0, 12)
 			title += "..."
 		} else {
 			title = row.title
@@ -494,7 +457,7 @@ func (o *Organizer) drawStatusBar() {
 		} else {
 			status = fmt.Sprintf("\x1b[1m%s\x1b[0;7m %s %s %d %d/%d",
 				str, title, keywords, id, o.fr+1, len(o.rows))
-			status, _ = clipColumns(status, 0, o.Screen.divider)
+			status, _ = pane.ClipColumns(status, 0, o.Screen.divider)
 			ab.WriteString(status)
 		}
 	}

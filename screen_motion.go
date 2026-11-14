@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/mattn/go-runewidth"
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -61,7 +62,7 @@ func (e *Editor) ScreenPosition(down bool, count, line, col, curswant int) (int,
 		x = runewidth.StringWidth(text[seg.start:min(c, seg.end)])
 		// On the last character vim can want a column past the end of the
 		// line: where j or k came from, on a longer line.
-		if raw != "" && col >= runeStart(raw, len(raw)-1) {
+		if raw != "" && col >= pane.RuneStart(raw, len(raw)-1) {
 			if _, end := vim.VirtualColumns(line, col); curswant > end {
 				x += curswant - end
 			}
@@ -96,7 +97,7 @@ func (e *Editor) ScreenPosition(down bool, count, line, col, curswant int) (int,
 		b = byteAtDisplayCol(part, x)
 	}
 	if b >= len(part) && part != "" {
-		b = runeStart(part, len(part)-1)
+		b = pane.RuneStart(part, len(part)-1)
 	}
 	dest := rawOffset(raw, seg.start+b)
 

@@ -143,18 +143,6 @@ var sortColumns = map[string]struct{}{
 	"priority": z0,
 }
 
-var termcodes = map[int]string{
-	ARROW_UP:    "<up>",
-	ARROW_DOWN:  "<down>",
-	ARROW_RIGHT: "<right>",
-	ARROW_LEFT:  "<left>",
-	BACKSPACE:   "<bs>", //? also works "\x08"
-	HOME_KEY:    "<home>",
-	DEL_KEY:     "<del>",
-	PAGE_UP:     "<pageup>",
-	PAGE_DOWN:   "<pagedown>",
-}
-
 type Mode int
 
 const (
@@ -267,11 +255,7 @@ func ConvertGoogleDriveURLsToShort(markdown string) (string, int) {
 // KeyF2 landed on codes main had named NOP and SHIFT_TAB, and F3 through Ins
 // had no name here at all.
 //
-// isSyntheticKey is what keeps that safe. Only the codes in termcodes mean
-// anything to vim; every other synthetic code has to be dropped rather than
-// forwarded, because string(rune(c)) on one of them is a Greek letter, not a
-// keystroke. A key added to the terminal package is therefore inert here by
-// default instead of inserting mojibake into a note.
+// What becomes of one on its way to vim is pane.SendToVim.
 const (
 	BACKSPACE = 127 // a real byte, unlike the codes below
 
@@ -285,24 +269,6 @@ const (
 	PAGE_UP     = terminal.KeyPageUp
 	PAGE_DOWN   = terminal.KeyPageDown
 )
-
-// isSyntheticKey reports whether c is one of those reader codes rather than a
-// character the user actually typed.
-func isSyntheticKey(c int) bool { return c >= terminal.KeyArrowLeft }
-
-// sendToVim forwards one key. termcodes names the synthetic keys vim
-// understands; any other synthetic code is dropped, since vim would insert its
-// code point as text.
-func sendToVim(c int) {
-	if z, found := termcodes[c]; found {
-		vim.SendKey(z)
-		return
-	}
-	if isSyntheticKey(c) {
-		return
-	}
-	vim.SendInput(string(rune(c)))
-}
 
 func (m Mode) String() string {
 	return [...]string{

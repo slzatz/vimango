@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/alecthomas/chroma/v2"
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
@@ -81,7 +82,7 @@ type Editor struct {
 		index int
 	}
 	exCmds          map[string]func(*Editor) // map of ex commands
-	commandRegistry *CommandRegistry[func(*Editor)]
+	commandRegistry *pane.CommandRegistry[func(*Editor)]
 }
 
 // editorHost is what an editor is given by whoever opens it: everything it
@@ -173,7 +174,7 @@ func (e *Editor) ShowMessage(loc Location, format string, a ...interface{}) {
 	fmt.Printf("\x1b[%d;%dH\x1b[%dX", line.row, line.col, line.width)
 	// by columns: cutting at a byte count split multi-byte characters, and
 	// counted the bytes of an escape sequence ("-- INSERT --" is sent bold)
-	str, _ := clipColumns(fmt.Sprintf(format, a...), 0, line.width)
+	str, _ := pane.ClipColumns(fmt.Sprintf(format, a...), 0, line.width)
 	fmt.Print(str)
 }
 

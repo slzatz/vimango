@@ -1,4 +1,4 @@
-package main
+package pane
 
 import (
 	"strings"
@@ -16,15 +16,14 @@ import (
 // second marker), and in NORMAL mode the text ran as commands.
 //
 // Pasted text is text, wherever it lands: in the note at the cursor, on a
-// command line, in a title. It is never a key. What the editor does with one
-// is Editor.pasteText (editor_paste.go); the organizer, Organizer.pasteText
-// (organizer_process_key.go).
+// command line, in a title. It is never a key. What each pane does with one
+// is its own pasteText; what a paste is, is here.
 
-// pastedText is a paste as text: its line ends are "\n" whatever the terminal
+// PastedText is a paste as text: its line ends are "\n" whatever the terminal
 // sent (usually "\r"), and it holds no control character but those and tab.
 // An <esc> in pasted text would otherwise end the insert, and what followed
 // it would be commands.
-func pastedText(raw string) string {
+func PastedText(raw string) string {
 	raw = strings.ReplaceAll(raw, "\r\n", "\n")
 	raw = strings.ReplaceAll(raw, "\r", "\n")
 	return strings.Map(func(r rune) rune {
@@ -35,10 +34,10 @@ func pastedText(raw string) string {
 	}, raw)
 }
 
-// onOneLine is pasted text for a place that holds one line -- a command line,
+// OnOneLine is pasted text for a place that holds one line -- a command line,
 // a title: the line breaks and tabs inside it are spaces, and those at its
 // ends are gone. A pasted command is never run by its own line end.
-func onOneLine(text string) string {
+func OnOneLine(text string) string {
 	text = strings.Trim(text, "\n")
 	return strings.NewReplacer("\n", " ", "\t", " ").Replace(text)
 }

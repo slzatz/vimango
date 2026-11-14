@@ -855,3 +855,25 @@ repositories:
   the callers are the registers (the editor's), the preferences and the image
   cache. Their two tests moved with them; the image cache's test that shared
   the file is `image_cache_test.go`. A move only.
+
+- **`internal/pane`: what the organizer and the editor both use.** The
+  second home (step 4b). Moved, and exported:
+  - the command registry (`command_registry.go` is `pane/registry.go`):
+    `CommandRegistry`, `CommandInfo`, `NewCommandRegistry`, `NewKeyRegistry`,
+    and `KeyDisplayName` (was `keyToDisplayName`);
+  - `ClipColumns` (from `organizer_display.go`), `RuneStart` and
+    `InclusiveEnd` (from `word_wrap.go`);
+  - how a key goes to vim (from `common.go`): `SendToVim`,
+    `IsSyntheticKey`, and `VimKeyName(c)` in place of the `termcodes` map,
+    which is now the package's own. The organizer's key names (`ARROW_UP`,
+    …) stay in `common.go`; they are aliases of the reader's;
+  - what a paste is (`paste.go` is `pane/paste.go`): `PastedText`,
+    `OnOneLine`.
+
+  The tests of those moved with them (`TestClipColumns`,
+  `TestPastedTextIsCleaned`), and two are new (`TestRuneEdges`,
+  `TestKeysVimUnderstands`). The registry's tests go through the organizer's
+  commands and stay. A move only: `compare-drawing.py` says `SAME`.
+
+  The package imports `vim` (to send a key), so like `vim`'s own tests its
+  tests link `libvim.a`: run `go test` from the project root.

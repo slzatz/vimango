@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -120,7 +121,7 @@ func (e *Editor) processKey(c int) (redraw bool) {
 	if exit {
 		return
 	}
-	return e.forwardKey(c, func() { sendToVim(c) })
+	return e.forwardKey(c, func() { pane.SendToVim(c) })
 }
 
 // forwardKey gives vim a key the user typed -- send does that -- and brings
@@ -360,13 +361,13 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	}
 
 	// forward the key to vim's cmdline
-	if z, found := termcodes[c]; found {
+	if z, found := pane.VimKeyName(c); found {
 		vim.SendKey(z)
 	} else if c == END_KEY {
 		vim.SendKey("<end>")
 	} else if c >= 1 && c <= 26 { // Ctrl-A..Ctrl-Z (Enter/Tab intercepted above)
 		vim.SendKey(fmt.Sprintf("<c-%c>", rune('a'+c-1)))
-	} else if c < 32 || isSyntheticKey(c) {
+	} else if c < 32 || pane.IsSyntheticKey(c) {
 		// other control chars, and reader codes vim has no binding for --
 		// forwarding one of those would type its code point into the cmdline
 		return false, true

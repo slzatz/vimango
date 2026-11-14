@@ -6,47 +6,48 @@ import (
 
 	"github.com/mattn/go-runewidth"
 
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/internal/store"
 	//	"github.com/charmbracelet/glamour"
 )
 
 func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Organizer) {
-	registry := NewKeyRegistry[func(*Organizer)]()
+	registry := pane.NewKeyRegistry[func(*Organizer)]()
 
 	// Entry Actions commands
-	registry.Register(string(rune(0x4)), (*Organizer).del, CommandInfo{
-		Name:        keyToDisplayName(string(rune(0x4))),
+	registry.Register(string(rune(0x4)), (*Organizer).del, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(0x4))),
 		Description: "Toggle delete status of current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(rune(0x1)), (*Organizer).star, CommandInfo{
-		Name:        keyToDisplayName(string(rune(0x1))),
+	registry.Register(string(rune(0x1)), (*Organizer).star, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(0x1))),
 		Description: "Toggle star status of current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(rune(0x18)), (*Organizer).archive, CommandInfo{
-		Name:        keyToDisplayName(string(rune(0x18))),
+	registry.Register(string(rune(0x18)), (*Organizer).archive, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(0x18))),
 		Description: "Toggle archive status of current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register("m", (*Organizer).mark, CommandInfo{
-		Name:        keyToDisplayName("m"),
+	registry.Register("m", (*Organizer).mark, pane.CommandInfo{
+		Name:        pane.KeyDisplayName("m"),
 		Description: "Toggle mark on current note for batch operations",
 		Category:    "Entry Actions",
 	})
 
 	// Navigation commands
-	registry.Register(string(rune(ctrlKey('j'))), (*Organizer).scrollPreviewDown, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('j')))),
+	registry.Register(string(rune(ctrlKey('j'))), (*Organizer).scrollPreviewDown, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(ctrlKey('j')))),
 		Description: "Scroll rendered note down one line",
 		Category:    "Navigation",
 	})
 
-	registry.Register(string(rune(ctrlKey('k'))), (*Organizer).scrollPreviewUp, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('k')))),
+	registry.Register(string(rune(ctrlKey('k'))), (*Organizer).scrollPreviewUp, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(ctrlKey('k')))),
 		Description: "Scroll rendered note up one line",
 		Category:    "Navigation",
 	})
@@ -56,41 +57,41 @@ func (a *App) setOrganizerNormalCmds(organizer *Organizer) map[string]func(*Orga
 	// Shift-Space is Space here: terminals send it as a bare space (and the
 	// kitty protocol's CSI-u form decodes to one too), so the way back is b,
 	// as in less. They take Space (vim's l) and b from title editing.
-	registry.Register(" ", (*Organizer).pagePreviewDown, CommandInfo{
+	registry.Register(" ", (*Organizer).pagePreviewDown, pane.CommandInfo{
 		Name:        "Space/PgDn",
 		Aliases:     []string{string(rune(PAGE_DOWN))},
 		Description: "Scroll rendered note down half a page",
 		Category:    "Navigation",
 	})
 
-	registry.Register("b", (*Organizer).pagePreviewUp, CommandInfo{
+	registry.Register("b", (*Organizer).pagePreviewUp, pane.CommandInfo{
 		Name:        "b/PgUp",
 		Aliases:     []string{string(rune(PAGE_UP))},
 		Description: "Scroll rendered note up half a page",
 		Category:    "Navigation",
 	})
 
-	registry.Register(string(rune(ctrlKey('f'))), (*Organizer).newFolderNormal, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('f')))),
+	registry.Register(string(rune(ctrlKey('f'))), (*Organizer).newFolderNormal, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(ctrlKey('f')))),
 		Description: "Assign a folder to the current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(rune(ctrlKey('c'))), (*Organizer).newContextNormal, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('c')))),
+	registry.Register(string(rune(ctrlKey('c'))), (*Organizer).newContextNormal, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(ctrlKey('c')))),
 		Description: "Assign a context to the current note",
 		Category:    "Entry Actions",
 	})
 
-	registry.Register(string(rune(HOME_KEY)), (*Organizer).scrollPreviewHome, CommandInfo{
+	registry.Register(string(rune(HOME_KEY)), (*Organizer).scrollPreviewHome, pane.CommandInfo{
 		Name:        "Home",
 		Description: "Scroll rendered note to top",
 		Category:    "Navigation",
 	})
 
 	// Information commands
-	registry.Register(string(rune(ctrlKey('i'))), (*Organizer).info, CommandInfo{
-		Name:        keyToDisplayName(string(rune(ctrlKey('i')))),
+	registry.Register(string(rune(ctrlKey('i'))), (*Organizer).info, pane.CommandInfo{
+		Name:        pane.KeyDisplayName(string(rune(ctrlKey('i')))),
 		Description: "Show detailed information about current note",
 		Category:    "Information",
 	})
@@ -247,7 +248,7 @@ func (o *Organizer) displayEntryInfo(e *store.Info) string {
 
 	title := fmt.Sprintf("title: %s", e.Title)
 	if runewidth.StringWidth(title) > width {
-		title, _ = clipColumns(title, 0, width-3)
+		title, _ = pane.ClipColumns(title, 0, width-3)
 		title += "..."
 	}
 	fmt.Fprintf(&ab, "%s%s", title, "\n")

@@ -5,33 +5,6 @@ import (
 	"testing"
 )
 
-func TestClipColumns(t *testing.T) {
-	tests := []struct {
-		s           string
-		from, width int
-		want        string
-		cols        int
-	}{
-		{"alpha", 0, 3, "alp", 3},
-		{"alpha", 3, 10, "ha", 2},
-		// three-byte quotes are one column each; byte slicing tore them apart
-		{"‘x“y’", 0, 3, "‘x“", 3},
-		{"‘x“y’", 2, 2, "“y", 2},
-		// a wide rune straddling an edge becomes spaces for its visible part
-		{"a中b", 2, 2, " b", 2},
-		{"a中b", 0, 2, "a ", 2},
-		// fts highlight escapes take no columns and survive the clip
-		{"\x1b[48;5;31mab\x1b[49mcd", 0, 1, "\x1b[48;5;31ma\x1b[49m", 1},
-	}
-	for _, tt := range tests {
-		got, cols := clipColumns(tt.s, tt.from, tt.width)
-		if got != tt.want || cols != tt.cols {
-			t.Errorf("clipColumns(%q, %d, %d) = %q, %d; want %q, %d",
-				tt.s, tt.from, tt.width, got, cols, tt.want, tt.cols)
-		}
-	}
-}
-
 func newTestOrganizer(title string) *Organizer {
 	return &Organizer{
 		rows:   []Row{{title: title}},

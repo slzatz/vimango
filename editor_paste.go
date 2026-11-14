@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -18,12 +19,12 @@ import (
 //     first column, as "i" -- and vim is back in NORMAL.
 //   - :help and the spelling list take no text; the paste is dropped.
 func (e *Editor) pasteText(raw string) (redraw bool) {
-	text := pastedText(raw)
+	text := pane.PastedText(raw)
 	if text == "" || e.mode == HELP || e.mode == SPELLING {
 		return false
 	}
 	if vim.GetCurrentMode() == vim.ModeCmdline {
-		for _, r := range onOneLine(text) {
+		for _, r := range pane.OnOneLine(text) {
 			vim.SendInput(string(r))
 		}
 		e.syncCmdline()

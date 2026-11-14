@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/terminal"
 	"github.com/slzatz/vimango/vim"
 )
@@ -117,7 +118,7 @@ func TestSyntheticKeysAreNotForwarded(t *testing.T) {
 	}
 
 	for _, k := range unmapped {
-		if _, mapped := termcodes[k.code]; mapped {
+		if _, mapped := pane.VimKeyName(k.code); mapped {
 			t.Errorf("%s is in termcodes; this test assumes it is not", k.name)
 		}
 
@@ -145,7 +146,7 @@ func TestSyntheticKeysAreNotForwarded(t *testing.T) {
 		{"PageUp", PAGE_UP},
 		{"ArrowLeft", ARROW_LEFT},
 	} {
-		if _, mapped := termcodes[k.code]; !mapped {
+		if _, mapped := pane.VimKeyName(k.code); !mapped {
 			t.Errorf("%s (%d) is no longer in termcodes", k.name, k.code)
 		}
 	}
@@ -168,10 +169,10 @@ func TestKeyConstantsTrackTheReader(t *testing.T) {
 			t.Errorf("%s = %d but reader says %d", tc.name, tc.main, tc.term)
 		}
 	}
-	if isSyntheticKey(BACKSPACE) {
+	if pane.IsSyntheticKey(BACKSPACE) {
 		t.Error("BACKSPACE is a real byte and must not be treated as synthetic")
 	}
-	if !isSyntheticKey(terminal.KeyF1) {
+	if !pane.IsSyntheticKey(terminal.KeyF1) {
 		t.Error("F1 should be treated as synthetic")
 	}
 }

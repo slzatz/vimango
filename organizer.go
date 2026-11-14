@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
@@ -45,8 +46,8 @@ type Organizer struct {
 	//saveTick              int
 	normalCmds            map[string]func(*Organizer)
 	exCmds                map[string]func(*Organizer, exArgs)
-	commandRegistry       *CommandRegistry[func(*Organizer, exArgs)]
-	normalCommandRegistry *CommandRegistry[func(*Organizer)]
+	commandRegistry       *pane.CommandRegistry[func(*Organizer, exArgs)]
+	normalCommandRegistry *pane.CommandRegistry[func(*Organizer)]
 	filterList            []FilterNames
 	containerList         []string
 	tabCompletion         struct {
@@ -129,7 +130,7 @@ func (o *Organizer) readRowsIntoBuffer() {
 
 func (o *Organizer) showMessage(format string, a ...interface{}) {
 	fmt.Printf("\x1b[%d;%dH\x1b[1K\x1b[%d;1H", o.Screen.textLines+2+TOP_MARGIN, o.Screen.divider, o.Screen.textLines+2+TOP_MARGIN)
-	str, _ := clipColumns(fmt.Sprintf(format, a...), 0, o.Screen.divider)
+	str, _ := pane.ClipColumns(fmt.Sprintf(format, a...), 0, o.Screen.divider)
 	fmt.Print(str)
 }
 

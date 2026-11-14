@@ -8,6 +8,7 @@ import (
 
 	//	"time"
 	"github.com/mattn/go-runewidth"
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -164,7 +165,7 @@ func (e *Editor) drawAfterKey(redraw bool, c int) {
 		e.drawStatusBar()
 	}
 	e.heldKeyShown = false
-	if e.mode == INSERT && c != noKey && !isSyntheticKey(c) && vim.InputPending() > 0 {
+	if e.mode == INSERT && c != noKey && !pane.IsSyntheticKey(c) && vim.InputPending() > 0 {
 		if r := rune(c); unicode.IsPrint(r) && runewidth.RuneWidth(r) == 1 {
 			fmt.Printf("\x1b[%d;%dH%c", e.cy+e.top_margin, e.cx+e.left_margin+e.left_margin_offset+1, r)
 			e.heldKeyShown = true
@@ -269,11 +270,11 @@ func (e *Editor) drawVisual(pab *strings.Builder) {
 			// in the character under the cursor, so the end has to step over a
 			// whole rune
 			if r == startRow {
-				lo = runeStart(row, expandedOffset(e.ss[r], e.highlight[0][1]))
+				lo = pane.RuneStart(row, expandedOffset(e.ss[r], e.highlight[0][1]))
 			}
 			if r == endRow {
 				// in VISUAL mode like INSERT mode, the cursor can go beyond end of row
-				hi = inclusiveEnd(row, expandedOffset(e.ss[r], e.highlight[1][1]))
+				hi = pane.InclusiveEnd(row, expandedOffset(e.ss[r], e.highlight[1][1]))
 			}
 			if hi < lo {
 				hi = lo
@@ -304,11 +305,11 @@ func (e *Editor) drawStatusBar() {
 	ab.WriteString("\x1b[7m ") //switches to inverted colors
 	// cut and padded by screen columns, not bytes: a title can hold
 	// characters of several bytes, and of two columns
-	title, _ := clipColumns(e.title, 0, 30)
+	title, _ := pane.ClipColumns(e.title, 0, 30)
 	if e.isModified() {
 		title += "[+]"
 	}
-	status, cols := clipColumns(fmt.Sprintf("%d - %s ...", e.id, title), 0, e.screencols-1)
+	status, cols := pane.ClipColumns(fmt.Sprintf("%d - %s ...", e.id, title), 0, e.screencols-1)
 	ab.WriteString(status)
 	ab.WriteString(strings.Repeat(" ", max(e.screencols-cols, 0)))
 	ab.WriteString("\x1b[0m") //switches back to normal formatting

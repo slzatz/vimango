@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/slzatz/vimango/auth"
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
@@ -50,11 +51,11 @@ func (o *Organizer) parseEx(line string) (exArgs, func(*Organizer, exArgs), bool
 }
 
 func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organizer, exArgs) {
-	registry := NewCommandRegistry[func(*Organizer, exArgs)]()
+	registry := pane.NewCommandRegistry[func(*Organizer, exArgs)]()
 
 	// Navigation commands
 	// Note that the name in Register is the command that is recognized.
-	registry.Register("open", (*Organizer).open, CommandInfo{
+	registry.Register("open", (*Organizer).open, pane.CommandInfo{
 		Aliases:     []string{"o"},
 		Description: "Display notes with specified context, folder or keyword (will match in that order)",
 		Usage:       "open <name>",
@@ -62,7 +63,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":open work", ":o work"},
 	})
 
-	registry.Register("opencontext", (*Organizer).openContext, CommandInfo{
+	registry.Register("opencontext", (*Organizer).openContext, pane.CommandInfo{
 		Aliases:     []string{"oc"},
 		Description: "Display notes from specified context",
 		Usage:       "opencontext <context_name>",
@@ -70,7 +71,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":opencontext work", ":oc personal"},
 	})
 
-	registry.Register("openfolder", (*Organizer).openFolder, CommandInfo{
+	registry.Register("openfolder", (*Organizer).openFolder, pane.CommandInfo{
 		Aliases:     []string{"openfolder", "openf", "of"},
 		Description: "Display notes from specified folder",
 		Usage:       "openfolder <folder_name>",
@@ -78,7 +79,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":openfolder projects", ":of archive"},
 	})
 
-	registry.Register("openkeyword", (*Organizer).openKeyword, CommandInfo{
+	registry.Register("openkeyword", (*Organizer).openKeyword, pane.CommandInfo{
 		Aliases:     []string{"openkeyword", "openk", "ok"},
 		Description: "Display notes tagged with specified keyword",
 		Usage:       "openkeyword <keyword>",
@@ -87,7 +88,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// Data Management commands
-	registry.Register("new", (*Organizer).newEntry, CommandInfo{
+	registry.Register("new", (*Organizer).newEntry, pane.CommandInfo{
 		Aliases:     []string{"n"},
 		Description: "Create new entry",
 		Usage:       "new",
@@ -95,7 +96,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":new", ":n"},
 	})
 
-	registry.Register("write", (*Organizer).write, CommandInfo{
+	registry.Register("write", (*Organizer).write, pane.CommandInfo{
 		Aliases:     []string{"w"},
 		Description: "Save all modified entries to database",
 		Usage:       "write",
@@ -103,7 +104,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":write", ":w"},
 	})
 
-	registry.Register("sync", (*Organizer).synchronize, CommandInfo{
+	registry.Register("sync", (*Organizer).synchronize, pane.CommandInfo{
 		Aliases:     []string{"test", "sync?"},
 		Description: "Synchronize with remote server (test or sync? for dry-run)",
 		Usage:       "sync",
@@ -111,7 +112,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":sync", ":test (dry-run)", ":sync? (dry-run)"},
 	})
 
-	registry.Register("refresh", (*Organizer).refresh, CommandInfo{
+	registry.Register("refresh", (*Organizer).refresh, pane.CommandInfo{
 		Aliases:     []string{"r"},
 		Description: "Refresh current view",
 		Usage:       "refresh",
@@ -119,7 +120,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":refresh", ":r"},
 	})
 
-	registry.Register("convertgdrive", (*Organizer).convertGoogleDriveURLs, CommandInfo{
+	registry.Register("convertgdrive", (*Organizer).convertGoogleDriveURLs, pane.CommandInfo{
 		Aliases:     []string{"cgd"},
 		Description: "Convert Google Drive URLs to gdrive:ID format in current note",
 		Usage:       "convertgdrive",
@@ -128,14 +129,14 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// Search & Filter commands
-	registry.Register("find", (*Organizer).find, CommandInfo{
+	registry.Register("find", (*Organizer).find, pane.CommandInfo{
 		Description: "Search entries using full-text search",
 		Usage:       "find <search_terms>",
 		Category:    "Search & Filter",
 		Examples:    []string{":find meeting notes", ":find urgent todo"},
 	})
 
-	registry.Register("contexts", (*Organizer).containers, CommandInfo{
+	registry.Register("contexts", (*Organizer).containers, pane.CommandInfo{
 		Aliases:     []string{"c"},
 		Description: "show contexts",
 		Usage:       "contexts",
@@ -143,7 +144,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":contexts", "c"},
 	})
 
-	registry.Register("newc", (*Organizer).newContext, CommandInfo{
+	registry.Register("newc", (*Organizer).newContext, pane.CommandInfo{
 		//Aliases:     []string{"c"},
 		Description: "show contexts",
 		Usage:       "contexts",
@@ -151,7 +152,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":contexts", "c"},
 	})
 
-	registry.Register("newf", (*Organizer).newFolder, CommandInfo{
+	registry.Register("newf", (*Organizer).newFolder, pane.CommandInfo{
 		//Aliases:     []string{"c"},
 		Description: "show contexts",
 		Usage:       "contexts",
@@ -159,7 +160,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":contexts", "c"},
 	})
 
-	registry.Register("folders", (*Organizer).containers, CommandInfo{
+	registry.Register("folders", (*Organizer).containers, pane.CommandInfo{
 		Aliases:     []string{"f"},
 		Description: "show folders",
 		Usage:       "folders",
@@ -167,7 +168,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":folders", "f"},
 	})
 
-	registry.Register("keywords", (*Organizer).containers, CommandInfo{
+	registry.Register("keywords", (*Organizer).containers, pane.CommandInfo{
 		Aliases:     []string{"k"},
 		Description: "show keywords",
 		Usage:       "keywords",
@@ -175,7 +176,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":keywords", "k"},
 	})
 
-	registry.Register("set context", (*Organizer).setContext, CommandInfo{
+	registry.Register("set context", (*Organizer).setContext, pane.CommandInfo{
 		Aliases:     []string{"set c", "setc", "sc"},
 		Description: "Set context for entrie(s)",
 		Usage:       "set context <context>",
@@ -183,7 +184,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":set context work", ":set c work"},
 	})
 
-	registry.Register("set folder", (*Organizer).setFolder, CommandInfo{
+	registry.Register("set folder", (*Organizer).setFolder, pane.CommandInfo{
 		Aliases:     []string{"set f", "setf", "sf"},
 		Description: "Set folder for entrie(s)",
 		Usage:       "set folder <folder>",
@@ -191,7 +192,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":set folder todo", ":set f todo"},
 	})
 
-	registry.Register("add keyword", (*Organizer).addKeyword, CommandInfo{
+	registry.Register("add keyword", (*Organizer).addKeyword, pane.CommandInfo{
 		Aliases:     []string{"add k"},
 		Description: "Add keyword to entry",
 		Usage:       "add k <keyword>",
@@ -199,7 +200,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":add keyword urgent", ":add k urgent"},
 	})
 
-	registry.Register("recent", (*Organizer).recent, CommandInfo{
+	registry.Register("recent", (*Organizer).recent, pane.CommandInfo{
 		Description: "Show recently modified entries",
 		Usage:       "recent",
 		Category:    "Search & Filter",
@@ -207,14 +208,14 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// View Management commands
-	registry.Register("sort", (*Organizer).sortEntries, CommandInfo{
+	registry.Register("sort", (*Organizer).sortEntries, pane.CommandInfo{
 		Description: "Sort entries by column",
 		Usage:       "sort <column>",
 		Category:    "View Management",
 		Examples:    []string{":sort modified", ":sort created", ":sort priority"},
 	})
 
-	registry.Register("showall", (*Organizer).showAll, CommandInfo{
+	registry.Register("showall", (*Organizer).showAll, pane.CommandInfo{
 		//Aliases:     []string{"show"},
 		Description: "Toggle showing completed/deleted entries",
 		Usage:       "showall",
@@ -222,7 +223,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":showall", ":show"},
 	})
 
-	registry.Register("toggleimages", (*Organizer).toggleImages, CommandInfo{
+	registry.Register("toggleimages", (*Organizer).toggleImages, pane.CommandInfo{
 		Aliases:     []string{"ti"},
 		Description: "Toggle inline image display on/off",
 		Usage:       "toggleimages",
@@ -230,7 +231,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":toggleimages", ":ti"},
 	})
 
-	registry.Register("showimageinfo", (*Organizer).showImageInfo, CommandInfo{
+	registry.Register("showimageinfo", (*Organizer).showImageInfo, pane.CommandInfo{
 		Aliases:     []string{"sii"},
 		Description: "Toggle display of Google Drive folder/filename above images",
 		Usage:       "showimageinfo",
@@ -238,7 +239,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":showimageinfo", ":sii"},
 	})
 
-	registry.Register("refreshimageinfo", (*Organizer).refreshImageInfo, CommandInfo{
+	registry.Register("refreshimageinfo", (*Organizer).refreshImageInfo, pane.CommandInfo{
 		Aliases:     []string{"rii"},
 		Description: "Refresh Google Drive image metadata (currently file path) for images in current note. ! also re-download images.",
 		Usage:       "refreshimageinfo[!]",
@@ -246,7 +247,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":refreshimageinfo", ":refreshimageinfo!", ":rii", ":rii!"},
 	})
 
-	registry.Register("imagescale", (*Organizer).scaleImages, CommandInfo{
+	registry.Register("imagescale", (*Organizer).scaleImages, pane.CommandInfo{
 		Aliases:     []string{"is"},
 		Description: "Scale inline images up (+), down (-), or to specific size (N columns)",
 		Usage:       "imagescale [+|-|N]",
@@ -254,7 +255,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":imagescale +", ":imagescale -", ":imagescale 30", ":imagescale 60"},
 	})
 
-	registry.Register("cachewidth", (*Organizer).cacheWidth, CommandInfo{
+	registry.Register("cachewidth", (*Organizer).cacheWidth, pane.CommandInfo{
 		Aliases:     []string{"cw"},
 		Description: "Set max pixel width for cached Google Drive images (default 800)",
 		Usage:       "cachewidth [N]",
@@ -262,7 +263,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":cachewidth", ":cachewidth 800", ":cachewidth 1200", ":cw 600"},
 	})
 
-	registry.Register("clearcache", (*Organizer).clearImageCache, CommandInfo{
+	registry.Register("clearcache", (*Organizer).clearImageCache, pane.CommandInfo{
 		Aliases:     []string{"clc"},
 		Description: "Clear the disk image cache (forces re-download of Google Drive images)",
 		Usage:       "clearcache",
@@ -270,7 +271,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":clearcache", ":clc"},
 	})
 
-	registry.Register("imagereset", (*Organizer).imageReset, CommandInfo{
+	registry.Register("imagereset", (*Organizer).imageReset, pane.CommandInfo{
 		Aliases:     []string{"ir"},
 		Description: "Clear terminal image cache and rerender current note",
 		Usage:       "imagereset",
@@ -279,21 +280,21 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// Entry Management commands
-	registry.Register("e", (*Organizer).editNote, CommandInfo{
+	registry.Register("e", (*Organizer).editNote, pane.CommandInfo{
 		Description: "Edit the current note, or the note with the given id",
 		Usage:       "e [id]",
 		Category:    "Entry Management",
 		Examples:    []string{":e", ":e 123"},
 	})
 
-	registry.Register("copy", (*Organizer).copyEntry, CommandInfo{
+	registry.Register("copy", (*Organizer).copyEntry, pane.CommandInfo{
 		Description: "Copy current entry",
 		Usage:       "copy",
 		Category:    "Entry Management",
 		Examples:    []string{":copy"},
 	})
 
-	registry.Register("deletekeywords", (*Organizer).deleteKeywords, CommandInfo{
+	registry.Register("deletekeywords", (*Organizer).deleteKeywords, pane.CommandInfo{
 		Aliases:     []string{"delkw", "delk"},
 		Description: "Delete all keywords from current entry",
 		Usage:       "deletekeywords",
@@ -301,7 +302,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 		Examples:    []string{":deletekeywords", ":delkw"},
 	})
 
-	registry.Register("deletemarks", (*Organizer).deleteMarks, CommandInfo{
+	registry.Register("deletemarks", (*Organizer).deleteMarks, pane.CommandInfo{
 		Aliases:     []string{"delmarks", "delm"},
 		Description: "Clear all marked entries",
 		Usage:       "deletemarks",
@@ -311,7 +312,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 
 	// Container Management commands
 	// System commands
-	registry.Register("quit", (*Organizer).quitApp, CommandInfo{
+	registry.Register("quit", (*Organizer).quitApp, pane.CommandInfo{
 		Aliases:     []string{"q"},
 		Description: "Exit application (q! forces quit without saving)",
 		Usage:       "quit",
@@ -320,7 +321,7 @@ func (a *App) setOrganizerExCmds(organizer *Organizer) map[string]func(*Organize
 	})
 
 	// Help command
-	registry.Register("help", (*Organizer).help, CommandInfo{
+	registry.Register("help", (*Organizer).help, pane.CommandInfo{
 		Aliases:     []string{"h"},
 		Description: "Show help for commands",
 		Usage:       "help [command|category]",

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -82,7 +83,7 @@ func (o *Organizer) InsertModeKeyHandler(c int) (redraw RedrawScope) {
 		return RedrawPartial // was RedrawFull
 	}
 
-	sendToVim(c)
+	pane.SendToVim(c)
 
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
@@ -141,7 +142,7 @@ func (o *Organizer) NormalModeKeyHandler(c int) (redraw RedrawScope) {
 
 	// anything sent to vim should only require the active screen line to be redrawn
 	// however if the row changes we need to erase the > from the previous row
-	sendToVim(c)
+	pane.SendToVim(c)
 	if o.updateRowStatus2() {
 		redraw = RedrawPartial
 	} else {
@@ -212,7 +213,7 @@ func (o *Organizer) VisualModeKeyHandler(c int) {
 		return
 	}
 
-	sendToVim(c)
+	pane.SendToVim(c)
 	o.bufferTick = o.vbuf.GetLastChangedTick()
 	s := o.vbuf.Lines()[o.fr]
 	o.rows[o.fr].title = s
@@ -239,7 +240,7 @@ func (o *Organizer) setVisualHighlight(title string, pos [2][2]int) {
 	if hi < lo {
 		lo, hi = hi, lo
 	}
-	o.highlight = [2]int{min(lo, len(title)), inclusiveEnd(title, hi)}
+	o.highlight = [2]int{min(lo, len(title)), pane.InclusiveEnd(title, hi)}
 }
 
 func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
@@ -322,7 +323,7 @@ func (o *Organizer) ExModeKeyHandler(c int) (redraw RedrawScope) {
 	default:
 		// the organizer's command line is its own buffer, not a mirror of
 		// vim's, so a reader code with no meaning here is simply dropped
-		if !isSyntheticKey(c) {
+		if !pane.IsSyntheticKey(c) {
 			o.command_line += string(rune(c))
 		}
 	} // end switch c in COMMAND_LINE
@@ -409,7 +410,7 @@ func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
 // else there is nothing to paste into, and the paste is dropped -- as typed
 // keys it would have run as the organizer's commands.
 func (o *Organizer) pasteText(raw string) RedrawScope {
-	text := onOneLine(pastedText(raw))
+	text := pane.OnOneLine(pane.PastedText(raw))
 	if text == "" {
 		return RedrawNone
 	}

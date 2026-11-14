@@ -1,4 +1,4 @@
-package main
+package pane
 
 import (
 	"fmt"
@@ -296,8 +296,8 @@ func levenshteinDistance(s1, s2 string) int {
 	return matrix[len(s1)][len(s2)]
 }
 
-// keyToDisplayName converts key sequences to human-readable format for help display
-func keyToDisplayName(key string) string {
+// KeyDisplayName converts key sequences to human-readable format for help display
+func KeyDisplayName(key string) string {
 	var representation []string
 	for _, b := range []byte(key) {
 		representation = append(representation, representByte(b))

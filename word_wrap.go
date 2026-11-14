@@ -717,34 +717,6 @@ func expandedOffset(row string, c int) int {
 	return c + (tabWidth-1)*strings.Count(row[:c], "\t")
 }
 
-// runeStart backs c up to the first byte of the rune it lands inside, so a
-// column that arrives mid-rune cannot produce a torn slice.
-func runeStart(row string, c int) int {
-	if c >= len(row) {
-		return len(row)
-	}
-	if c < 0 {
-		return 0
-	}
-	for c > 0 && !utf8.RuneStart(row[c]) {
-		c--
-	}
-	return c
-}
-
-// inclusiveEnd returns the byte offset just past the rune covering c. A visual
-// selection includes the character under the cursor and vim reports that
-// cursor as a byte offset, so the end of the selection has to step over a
-// whole rune rather than a single byte.
-func inclusiveEnd(row string, c int) int {
-	if c >= len(row) {
-		return len(row)
-	}
-	c = runeStart(row, c)
-	_, size := utf8.DecodeRuneInString(row[c:])
-	return c + size
-}
-
 // byteAtDisplayCol returns the byte offset of the rune covering display column
 // col, or len(row) if the row ends before it. A wide rune straddling col
 // counts as covering it.
