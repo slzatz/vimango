@@ -847,3 +847,11 @@ repositories:
   by a terminal emulator, every cell and attribute compared after every
   step. The differences are those above and no others. Test:
   `TestDrawingTheTextLeavesNoColourSet`, which fails without the fix.
+
+- **`internal/atomicfile`.** Step 4b begins: the things the editor shares
+  with the rest get a home it can import. Steve's decision: two packages,
+  this one and `internal/pane` (next). `writeFileAtomic` is
+  `atomicfile.Write` and `removeStaleTempFiles` is `atomicfile.RemoveStale`;
+  the callers are the registers (the editor's), the preferences and the image
+  cache. Their two tests moved with them; the image cache's test that shared
+  the file is `image_cache_test.go`. A move only.

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/slzatz/vimango/internal/atomicfile"
 )
 
 // CacheEntry represents a single cached image entry
@@ -109,7 +111,7 @@ func NewImageCache() (*ImageCache, error) {
 		return nil, fmt.Errorf("failed to create cache directory: %v", err)
 	}
 
-	removeStaleTempFiles(cacheDir)
+	atomicfile.RemoveStale(cacheDir)
 
 	// Load existing cache index
 	if err := cache.loadIndex(); err != nil {
@@ -221,7 +223,7 @@ func (c *ImageCache) saveIndex() error {
 		return fmt.Errorf("failed to marshal index: %v", err)
 	}
 
-	if err := writeFileAtomic(c.indexFile, data, 0644); err != nil {
+	if err := atomicfile.Write(c.indexFile, data, 0644); err != nil {
 		return fmt.Errorf("failed to write index file: %v", err)
 	}
 
@@ -458,7 +460,7 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 	cacheFile := filepath.Join(c.cacheDir, filename)
 	fingerprint := hashString(base64Data)
 
-	if err := writeFileAtomic(cacheFile, []byte(base64Data), 0644); err != nil {
+	if err := atomicfile.Write(cacheFile, []byte(base64Data), 0644); err != nil {
 		return fmt.Errorf("failed to write cache file: %v", err)
 	}
 

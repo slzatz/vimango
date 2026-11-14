@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/slzatz/vimango/internal/atomicfile"
 	"github.com/slzatz/vimango/vim"
 )
 
@@ -103,7 +104,7 @@ func saveRegisters() {
 	// atomically: every editor writes this file as it closes, and two that
 	// close together (hybrid quitting with two pop-outs open) must leave
 	// one's registers or the other's, not an interleaving of both
-	_ = writeFileAtomic(registersFile, data, 0600)
+	_ = atomicfile.Write(registersFile, data, 0600)
 }
 
 // restoreRegisters loads registers.json (if any) into vim's registers.

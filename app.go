@@ -12,6 +12,7 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
 
+	"github.com/slzatz/vimango/internal/atomicfile"
 	"github.com/slzatz/vimango/internal/localdb"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/rawmode"
@@ -188,7 +189,7 @@ func (a *App) SavePreferences() error {
 		return fmt.Errorf("marshal preferences: %w", err)
 	}
 
-	if err := writeFileAtomic(a.preferencesPath, data, 0644); err != nil {
+	if err := atomicfile.Write(a.preferencesPath, data, 0644); err != nil {
 		return fmt.Errorf("write preferences: %w", err)
 	}
 	return nil

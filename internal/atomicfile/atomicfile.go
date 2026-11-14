@@ -1,4 +1,7 @@
-package main
+// Package atomicfile writes files that several vimango processes share --
+// registers.json, preferences.json, the image cache's index and images -- so
+// that a reader never sees part of one.
+package atomicfile
 
 import (
 	"os"
@@ -6,7 +9,7 @@ import (
 	"time"
 )
 
-// writeFileAtomic replaces the file at path with data: a reader, in this
+// Write replaces the file at path with data: a reader, in this
 // process or another, sees the old contents or the new, never part of one.
 // The data goes to a temporary file beside path, which is then renamed over
 // it.
@@ -16,7 +19,7 @@ import (
 // --render-html per preview -- and with one fixed name ("x.tmp", as it was
 // until 2026-11-10) two of them writing at once wrote into the same temporary
 // file, and the rename could publish a mixture of the two.
-func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
+func Write(path string, data []byte, perm os.FileMode) (err error) {
 	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
 	if err != nil {
 		return err
@@ -39,10 +42,10 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
 	return os.Rename(f.Name(), path)
 }
 
-// removeStaleTempFiles deletes what writeFileAtomic left in dir when its
+// RemoveStale deletes what Write left in dir when its
 // process was killed between creating the temporary file and renaming it:
 // anything named *.tmp and older than an hour, which no write still owns.
-func removeStaleTempFiles(dir string) {
+func RemoveStale(dir string) {
 	names, _ := filepath.Glob(filepath.Join(dir, "*.tmp"))
 	for _, name := range names {
 		if info, err := os.Stat(name); err == nil && time.Since(info.ModTime()) > time.Hour {
