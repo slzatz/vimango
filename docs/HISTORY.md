@@ -722,3 +722,14 @@ repositories:
   `y <= e.screenlines` with a `y` that already includes the top margin, so in
   the TUI a misspelling on the last line of the pane is not marked. In
   `--editor`, where the text starts on row 1, it is.
+
+- **Misspellings are marked on the last line of the TUI's pane.** The one
+  noted above. `drawSpellErrors` asked whether a word was on the pane with
+  `y >= top_margin && y <= screenlines`, where `y` was a screen row with the
+  top margin already added: right when the text starts on row 1, as in
+  `--editor`, and one line short when it starts on row 2, as in the TUI --
+  so hybrid never showed it. The test is now on the line within the pane,
+  `0 <= line < screenlines`, and the margin is added only to draw. Test:
+  `TestSpellErrorsAreMarkedToTheLastLineOfThePane`, for text starting on
+  rows 1, 2 and 5, and for a word pushed below the pane by a row that wraps;
+  it fails on the old code for rows 2 and 5.

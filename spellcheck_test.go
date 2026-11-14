@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -171,6 +172,43 @@ func TestDrawSpellErrors(t *testing.T) {
 	e.drawSpellErrors(&b)
 	if b.Len() != 0 {
 		t.Errorf("drew with spell off: %q", b.String())
+	}
+}
+
+// A misspelling is marked on every line of the pane and on none below it,
+// wherever the pane starts. The test for "on the pane" compared a screen row,
+// top margin included, with the number of lines: right when the text starts
+// on row 1 (--editor), one line short when it starts on row 2 (the TUI),
+// where a misspelling on the pane's last line went unmarked.
+func TestSpellErrorsAreMarkedToTheLastLineOfThePane(t *testing.T) {
+	const marked = "\x1b[48;5;31mwrold\x1b[0m"
+	for _, top := range []int{1, 2, 5} {
+		e := newSpellEditor(t, "one wrold", "two wrold", "three wrold", "four wrold")
+		e.top_margin = top
+		e.screenlines = 3
+
+		var b strings.Builder
+		e.drawSpellErrors(&b)
+		out := b.String()
+		if n := strings.Count(out, marked); n != 3 {
+			t.Errorf("text from row %d: %d of the pane's 3 lines marked: %q", top, n, out)
+		}
+		if last := fmt.Sprintf("\x1b[%d;", top+2); !strings.Contains(out, last) {
+			t.Errorf("text from row %d: nothing marked on the pane's last line, row %d: %q", top, top+2, out)
+		}
+
+		// a row that wraps onto all three lines pushes the next one off the pane
+		e = newSpellEditor(t, strings.TrimSpace(strings.Repeat("some plain words ", 7)), "five wrold")
+		e.top_margin = top
+		e.screenlines = 3
+		if n := e.getLinesInRowWW(0); n != 3 {
+			t.Fatalf("the long row takes %d lines, want 3", n)
+		}
+		b.Reset()
+		e.drawSpellErrors(&b)
+		if strings.Contains(b.String(), "wrold") {
+			t.Errorf("text from row %d: marked a word below the pane: %q", top, b.String())
+		}
 	}
 }
 

@@ -124,10 +124,12 @@ func (e *Editor) drawSpellErrors(pab *strings.Builder) {
 		if se.Type != vim.SpellBad {
 			style = "\x1b[4m"
 		}
-		y := e.getScreenYFromRowColWW(r, start) + e.top_margin - e.lineOffset
+		// the line of the pane the word is on, from 0; a row that wraps can
+		// put it above the pane or below
+		line := e.getScreenYFromRowColWW(r, start) - e.lineOffset
 		x := e.getScreenXFromRowColWW(r, start) + e.left_margin + e.left_margin_offset
-		if y >= e.top_margin && y <= e.screenlines {
-			fmt.Fprintf(pab, "\x1b[%d;%dH\x1b[0m", y, x+1)
+		if line >= 0 && line < e.screenlines {
+			fmt.Fprintf(pab, "\x1b[%d;%dH\x1b[0m", line+e.top_margin, x+1)
 			fmt.Fprint(pab, style+row[start:end]+"\x1b[0m")
 		}
 	}
