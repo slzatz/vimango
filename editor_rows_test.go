@@ -96,7 +96,7 @@ func highlightEditor(t testing.TB, rows []string) *Editor {
 	if err != nil {
 		t.Skip(err)
 	}
-	e := &Editor{Session: &Session{markdown_style: style}}
+	e := &Editor{markdownStyle: style}
 	e.ss = rows
 	e.screencols = 60
 	e.screenlines = 40
@@ -138,7 +138,7 @@ func TestChunkedHighlightingLooksLikeTheWholeNote(t *testing.T) {
 		sb.WriteByte('\n')
 	}
 	var buf bytes.Buffer
-	if err := Highlight2(&buf, sb.String(), "markdown", MDFormatter, e.Session.markdown_style); err != nil {
+	if err := Highlight2(&buf, sb.String(), "markdown", MDFormatter, e.markdownStyle); err != nil {
 		t.Fatal(err)
 	}
 	whole := strings.Split(buf.String(), "\n")
@@ -296,6 +296,6 @@ func BenchmarkWholeNote(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var buf bytes.Buffer
-		Highlight2(&buf, text, "markdown", MDFormatter, e.Session.markdown_style)
+		Highlight2(&buf, text, "markdown", MDFormatter, e.markdownStyle)
 	}
 }

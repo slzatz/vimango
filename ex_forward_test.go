@@ -443,9 +443,9 @@ func TestForwardedListIsSafeInLibvim(t *testing.T) {
 		}
 	}
 	e := newTestEditor(t, "alpha", "bravo", "charlie", "delta")
-	a := withOrganizer(t, e)
-	a.Config = &dbConfig{} // the overlay renders with a glamour style, found by path
-	a.Config.Glamour.Style = filepath.Join(repo, "default.json")
+	withOrganizer(t, e)
+	// the overlay renders with a glamour style, found by path
+	screenOf(e).glamourStyle = filepath.Join(repo, "default.json")
 	vim.ExecuteCommand("let g:locked = 1")
 	vim.ExecuteCommand("let @a = 'x'")
 

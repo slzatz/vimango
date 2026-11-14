@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/alecthomas/chroma/v2"
 	"google.golang.org/api/drive/v3"
 )
 
@@ -13,6 +12,5 @@ type Session struct {
 	editorOnly       bool // --editor boot mode: set once at startup, never cleared
 	imgSizeY         int
 	fts_search_terms string
-	markdown_style   *chroma.Style
 	googleDrive      *drive.Service // Google Drive service for file operations
 }

@@ -19,8 +19,9 @@ type Screen struct {
 	Session         *Session
 
 	// the notice: text shown in a box over the right pane (notice.go)
-	notice    []string // its lines, rendered and wrapped
-	noticeTop int      // the first of them on screen
+	notice       []string // its lines, rendered and wrapped
+	noticeTop    int      // the first of them on screen
+	glamourStyle string   // the style file it is rendered with, as config.json names it
 }
 
 func (s *Screen) eraseScreenRedrawLines() {
@@ -115,9 +116,7 @@ func (s *Screen) eraseRightScreen() {
 
 func (s *Screen) drawRightScreen() {
 	if e := s.Session.editor; e != nil {
-		e.drawText()
-		e.drawFrame()
-		e.drawStatusBar()
+		e.draw()
 	}
 }
 

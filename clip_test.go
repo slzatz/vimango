@@ -51,8 +51,8 @@ func TestLongTextIsCutAtACharacterBoundary(t *testing.T) {
 
 	o, _ := newDBOrganizer(t, long)
 	for divider := 20; divider <= 50; divider++ {
-		e.Screen.divider = divider
-		e.editorLayout = e.Screen.editorLayout() // as a resize does
+		screenOf(e).divider = divider
+		e.editorLayout = screenOf(e).editorLayout() // as a resize does
 		check("editor message", text(captureStdout(t, func() { e.ShowMessage(BL, "%s", long) })), divider)
 		check("editor message, bold", text(captureStdout(t, func() { e.ShowMessage(BL, "\x1b[1m%s\x1b[0m", long) })), divider)
 
@@ -71,8 +71,8 @@ func TestLongTextIsCutAtACharacterBoundary(t *testing.T) {
 // run on into whatever is drawn next.
 func TestCutMessageKeepsItsReset(t *testing.T) {
 	e := newTestEditor(t, "alpha")
-	e.Screen.divider = 10
-	e.editorLayout = e.Screen.editorLayout()
+	screenOf(e).divider = 10
+	e.editorLayout = screenOf(e).editorLayout()
 	out := captureStdout(t, func() { e.ShowMessage(BL, "\x1b[1m%s\x1b[0m", strings.Repeat("x", 40)) })
 	if !strings.HasSuffix(out, "\x1b[0m") || strings.Count(out, "x") != 10 {
 		t.Errorf("cut bold message is %q", out)

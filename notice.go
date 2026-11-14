@@ -26,7 +26,7 @@ import (
 // the description continues under itself.
 func (s *Screen) showNotice(text string, hang int) {
 	r, _ := glamour.NewTermRenderer(
-		glamour.WithStylePath(getGlamourStylePath()),
+		glamour.WithStylePath(glamourStylePath(s.glamourStyle)),
 		glamour.WithWordWrap(0),
 	)
 	note, _ := r.Render(text)

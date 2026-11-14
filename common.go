@@ -103,15 +103,25 @@ func validateGlamourStyle() error {
 	return fmt.Errorf("glamour style files not found:\n  Configured style: %s\n  Fallback style: default.json\nPlease ensure at least one of these files exists", configuredStyle)
 }
 
-// getGlamourStylePath returns the path to the glamour style file with fallback logic:
-// 1. Try configured style from config.json
+// getGlamourStylePath is the glamour style file the organizer's preview is
+// rendered with: glamourStylePath of the style config.json names.
+func getGlamourStylePath() string {
+	configured := ""
+	if app.Config != nil {
+		configured = app.Config.Glamour.Style
+	}
+	return glamourStylePath(configured)
+}
+
+// glamourStylePath returns the path to the glamour style file with fallback logic:
+// 1. Try the configured style, from config.json
 // 2. Try default.json
 // This function assumes validateGlamourStyle() has already been called at startup.
-func getGlamourStylePath() string {
+func glamourStylePath(configured string) string {
 	// Try config value first
-	if app.Config != nil && app.Config.Glamour.Style != "" {
-		if _, err := os.Stat(app.Config.Glamour.Style); err == nil {
-			return app.Config.Glamour.Style
+	if configured != "" {
+		if _, err := os.Stat(configured); err == nil {
+			return configured
 		}
 	}
 

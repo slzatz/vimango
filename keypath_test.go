@@ -17,7 +17,7 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	sess := &Session{}
 	a := &App{Session: sess}
 	scr := &Screen{screenCols: 100, screenLines: 40, textLines: 30, divider: 40, Session: sess}
-	e := &Editor{Session: sess, Screen: scr}
+	e := &Editor{notices: scr}
 	// the TUI's layout on that screen, with a narrower text area
 	e.editorLayout = scr.editorLayout()
 	e.screencols = 50
@@ -36,6 +36,13 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	vim.SetScreenLayout(e)
 	return e
 }
+
+// screenOf is the screen a test's editor is on, and sessionOf that screen's
+// session. The editor holds neither: of the screen it is given only the notice
+// box, which in these tests is the screen itself.
+func screenOf(e *Editor) *Screen { return e.notices.(*Screen) }
+
+func sessionOf(e *Editor) *Session { return screenOf(e).Session }
 
 func (e *Editor) sendKeys(s string) {
 	for _, r := range s {

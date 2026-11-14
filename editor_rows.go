@@ -171,7 +171,7 @@ func (e *Editor) highlightChunk(rows []string, frontmatter bool) []string {
 	}
 
 	var buf bytes.Buffer
-	_ = Highlight2(&buf, text, "markdown", MDFormatter, e.Session.markdown_style)
+	_ = Highlight2(&buf, text, "markdown", MDFormatter, e.markdownStyle)
 	out := strings.Split(buf.String(), "\n")
 	if len(out) < lead+len(rows) {
 		// the highlighter lost a line break: show the rows plain rather than misplaced

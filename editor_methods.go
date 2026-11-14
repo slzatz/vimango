@@ -166,6 +166,16 @@ func (e *Editor) drawAfterKey(redraw bool, c int) {
 	}
 }
 
+// draw draws the whole editor: the text, the frame, the status bar. For when
+// it is opened, when its layout changes, and when its note is reloaded; a key
+// redraws only what it changed (drawAfterKey). Nothing need be erased first:
+// drawText clears each line of the text area before it writes it.
+func (e *Editor) draw() {
+	e.drawText()
+	e.drawFrame()
+	e.drawStatusBar()
+}
+
 func (e *Editor) drawText() {
 	var ab strings.Builder
 

@@ -152,7 +152,7 @@ func (e *Editor) help() {
 		}
 	}
 	e.mode = HELP
-	e.Screen.showNotice(helpText, 16)
+	e.notices.showNotice(helpText, 16)
 	e.command_line = ""
 }
 
@@ -338,8 +338,8 @@ func (e *Editor) checkStale() {
 	vim.SetCursorPosition(e.fr+1, e.fc)
 	e.scroll()
 
-	e.Screen.eraseRightScreen()
-	e.Screen.drawRightScreen()
+	// the new text, and the title, which a sync can change too
+	e.draw()
 	e.ShowMessage(BR, "Note %d reloaded — it changed in the database since you opened it", e.id)
 }
 

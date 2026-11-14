@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/alecthomas/chroma/v2"
 	"github.com/slzatz/vimango/internal/store"
 	"github.com/slzatz/vimango/vim"
 )
@@ -90,8 +91,21 @@ type Editor struct {
 	// syncAnswer is what :sync is answered with. Sync is never the editor's
 	// to run; whose it is depends on who opened the editor (noSync).
 	syncAnswer string
-	Session    *Session // pointer to the session
-	Screen     *Screen  // pointer to the screen
+	// notices is the box the editor shows :help and vim's listings in. The
+	// box is the screen's; the editor is given this much of it.
+	notices noticeBox
+	// markdownStyle is the colours the note's markdown is drawn in (highlightChunk).
+	markdownStyle *chroma.Style
+}
+
+// noticeBox is what the editor needs of the box that text other than the
+// note's is shown in, over the note: to put text in it, and to give it the
+// keys that scroll it while it is up (HELP mode). The screen has the box
+// (notice.go), and draws it where the editor's text is; what the editor says
+// about the scrolling goes on its own message line.
+type noticeBox interface {
+	showNotice(text string, hang int)
+	noticeKey(c int) (message string, handled bool)
 }
 
 // ShowMessage writes a message in place of the last one: on the editor's

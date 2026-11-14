@@ -182,7 +182,7 @@ A task note's Taskwarrior uuid is `task.taskwarrior_uuid`: synced both ways, wri
 
 **The editor draws by the layout it is given and asks nothing else** — not `Session.editorOnly`, not the screen's size. `editorLayout` (`editor.go`) is the text's rectangle, whether there is a status bar and a top right corner, and two places for messages: `message`, the editor's message line and command line (`ShowMessage(BR, …)`), and `aside`, for what is not about the text under the cursor (`ShowMessage(BL, …)`: "Saved note 5", how far a notice has scrolled). `Screen.editorLayout()` (`screen.go`) is the one place that knows the two ways an editor is shown — the TUI's right pane, and the whole of a host's window, where `aside` is the message line again — and `Screen.positionEditor` gives the result to the editor when it is opened and at every resize. `Editor.cursor()` is where the terminal's cursor belongs; `App.returnCursor` asks it.
 
-So a new difference between the TUI's editor and hybrid's is a field of the layout, set in `Screen.editorLayout()`; a check of the mode in the editor's files is the thing this replaced. What the editor still takes from the screen is the notice box, and a redraw of the pane after `:checkstale` reloads. Tests: `editor_layout_test.go`.
+So a new difference between the TUI's editor and hybrid's is a field of the layout, set in `Screen.editorLayout()`; a check of the mode in the editor's files is the thing this replaced. The editor holds no `Screen` and no `Session`: of the screen it is given the notice box, as `noticeBox` (two methods), and it draws the whole of itself with `Editor.draw()`, which is also what a resize and `:checkstale`'s reload call. Tests: `editor_layout_test.go`.
 
 ### Keys
 

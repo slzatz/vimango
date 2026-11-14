@@ -282,7 +282,7 @@ func TestVimrcDecorateUndo(t *testing.T) {
 // reach vim, where Ctrl-H moves left like h and Ctrl-L changes nothing.
 func TestEditorInterceptsNoNormalKeys(t *testing.T) {
 	e := newTestEditor(t, "alpha bravo")
-	e.Session.editor = e
+	sessionOf(e).editor = e
 	vim.SetCursorPosition(1, 3)
 
 	e.editorProcessKey(ctrlKey('h'))
@@ -291,7 +291,7 @@ func TestEditorInterceptsNoNormalKeys(t *testing.T) {
 	}
 	e.editorProcessKey(ctrlKey('l'))
 	assertLines(t, e, "alpha bravo")
-	if e.Session.editor != e {
+	if sessionOf(e).editor != e {
 		t.Error("a key in the editor closed the editor")
 	}
 }

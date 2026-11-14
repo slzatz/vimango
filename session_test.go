@@ -16,9 +16,9 @@ func withOrganizer(t *testing.T, e *Editor) *App {
 	t.Helper()
 	orgBuf := vim.NewBuffer(0)
 	a := &App{
-		Session:   e.Session,
-		Screen:    e.Screen,
-		Organizer: &Organizer{Session: e.Session, Screen: e.Screen, vbuf: orgBuf},
+		Session:   sessionOf(e),
+		Screen:    screenOf(e),
+		Organizer: &Organizer{Session: sessionOf(e), Screen: screenOf(e), vbuf: orgBuf},
 		Run:       true,
 	}
 	prev := app
@@ -26,7 +26,7 @@ func withOrganizer(t *testing.T, e *Editor) *App {
 	t.Cleanup(func() { app = prev })
 
 	vim.SetCurrentBuffer(e.vbuf)
-	e.Session.editor = e
+	sessionOf(e).editor = e
 	e.onClose = a.noteClosed
 	// the note as loaded is the saved state, as editNote records it
 	e.saveTick = e.vbuf.GetLastChangedTick()
@@ -39,18 +39,18 @@ func withOrganizer(t *testing.T, e *Editor) *App {
 // here, as it would there.
 func editorOnly(t *testing.T, e *Editor) *App {
 	t.Helper()
-	a := &App{Session: e.Session, Screen: e.Screen, Store: e.Store, Run: true}
+	a := &App{Session: sessionOf(e), Screen: screenOf(e), Store: e.Store, Run: true}
 	prev := app
 	app = a
 	t.Cleanup(func() { app = prev })
 
 	vim.SetCurrentBuffer(e.vbuf)
-	e.Session.editorOnly = true
-	e.Session.editor = e
+	sessionOf(e).editorOnly = true
+	sessionOf(e).editor = e
 	e.onClose = a.noteClosed
 	// what a host decides, decided again for this one
 	e.syncAnswer = a.syncAnswer()
-	e.Screen.positionEditor()
+	screenOf(e).positionEditor()
 	e.saveTick = e.vbuf.GetLastChangedTick()
 	return a
 }

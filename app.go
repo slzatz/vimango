@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alecthomas/chroma/v2"
 	_ "github.com/lib/pq" // the "postgres" driver InitDatabases opens the server with
 
 	"github.com/slzatz/vimango/internal/localdb"
@@ -35,7 +36,8 @@ type App struct {
 	resizeCh  chan struct{}     // Terminal resized (SIGWINCH)
 
 	// Database connections and other config
-	Config *dbConfig
+	Config        *dbConfig
+	markdownStyle *chroma.Style // the colours the editor draws markdown in (config.json's chroma.style)
 
 	// Application state
 	SyncInProcess      bool
@@ -87,11 +89,11 @@ func (a *App) NewEditor() *Editor {
 			list  []string
 			index int
 		}{list: nil, index: 0},
-		Screen:     a.Screen,
-		Session:    a.Session,
-		Store:      a.Store,
-		onClose:    a.noteClosed,
-		syncAnswer: a.syncAnswer(),
+		Store:         a.Store,
+		onClose:       a.noteClosed,
+		syncAnswer:    a.syncAnswer(),
+		notices:       a.Screen,
+		markdownStyle: a.markdownStyle,
 	}
 
 	// Set up commands after editor creation so help can access registry
@@ -335,8 +337,8 @@ func (a *App) InitDatabases(configPath string) error {
 // --editor mode a host app has its own list of notes, vimango is the editor
 // alone, and a.Organizer stays nil.
 func (a *App) InitApp() {
-	markdown_style, _ := selectMDStyle(a.Config.Chroma.Style)
-	a.Session.markdown_style = markdown_style
+	a.markdownStyle, _ = selectMDStyle(a.Config.Chroma.Style)
+	a.Screen.glamourStyle = a.Config.Glamour.Style
 	a.Session.imgSizeY = 800
 
 	if a.Session.editorOnly {

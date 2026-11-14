@@ -743,3 +743,46 @@ repositories:
   compared. Run on the build before the spell fix and the one after, it
   reports one difference -- a misspelling on row 38 of the TUI's pane, now
   marked -- and none in `--editor`.
+
+## 2026-11-14
+
+- **The editor holds no `Session` and no `Screen`.** Step 4a of
+  `docs/EDITOR_PACKAGE.md`, the first half: what the editor took from those
+  two it is now given when it is made.
+  - **The markdown style.** `highlightChunk` read `e.Session.markdown_style`,
+    the editor's only use of the session. It is `Editor.markdownStyle`, from
+    `App.markdownStyle`; `Session.markdown_style` is gone (nothing else read
+    it).
+  - **The notice box.** `:help`, a vim listing and HELP mode's keys called
+    `e.Screen.showNotice` and `e.Screen.noticeKey`. The box is still the
+    screen's, and the editor is given it as `noticeBox`, an interface of
+    those two methods.
+  - **`:checkstale` redraws the editor itself.** After a reload it called the
+    screen's `eraseRightScreen` and `drawRightScreen`, which is the screen
+    erasing the pane and then asking the editor to draw. It calls
+    `Editor.draw()` -- the text, the frame, the status bar -- which is also
+    what `drawRightScreen` now calls. Nothing needs erasing first: `drawText`
+    clears each line before it writes it.
+  - **The notice's glamour style** came from `app.Config`, the global, on
+    the editor's `:help` path. The screen is given the configured name at
+    startup (`Screen.glamourStyle`) and `glamourStylePath` does the fallback
+    to `default.json`; the organizer's preview still asks through
+    `getGlamourStylePath`.
+
+  Checked: the suite; `scripts/compare-drawing.py` on the builds before and
+  after says `SAME` in `--editor` and in the TUI. `:checkstale` is not in
+  that script, and its bytes are meant to differ (no erase), so the *screen*
+  each build leaves after a reload was compared instead, with a terminal
+  emulator (pyte) reading the pseudo-terminal: `--editor` and the TUI, with
+  the cursor on the last line of a longer note, with `:help` up, in VISUAL,
+  and with line numbers off. Every cell and attribute the same.
+
+  That comparison caught a first attempt that left the frame out
+  (`drawText`, `drawStatusBar`), and with it something older, **not
+  changed**: the line numbers set a grey foreground (`ESC[38;5;245m`) and
+  put back only the background, so whatever is drawn straight after
+  `drawText` is grey. In the TUI the status bar is the terminal's own colour
+  when a note is opened and grey from the first key that redraws; a message
+  shown after a redraw in the same key (`:number`, `:syntax`) is grey.
+  `drawFrame` ends with a reset, which is why a reload looked right. Which
+  colour the bar should be is Steve's to say.

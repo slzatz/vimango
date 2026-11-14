@@ -267,7 +267,7 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 // case HELP: the :help text is drawn in a notice (notice.go) over the editor
 // pane; the notice's keys scroll it, and ':' starts a new command line.
 func (e *Editor) HelpModeKeyHandler(c int) (redraw, exit bool) {
-	if message, scrolled := e.Screen.noticeKey(c); scrolled {
+	if message, scrolled := e.notices.noticeKey(c); scrolled {
 		if message != "" {
 			e.ShowMessage(BL, "%s", message)
 		}

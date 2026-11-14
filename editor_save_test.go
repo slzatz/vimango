@@ -139,7 +139,7 @@ func TestExitStaysOpenWhenTheWriteFails(t *testing.T) {
 // the organizer.
 func TestExitStaysOpenWhenTheWriteFailsInTheTUI(t *testing.T) {
 	e, a := savedNoteEditor(t, "alpha")
-	e.Session.editorOnly = false
+	sessionOf(e).editorOnly = false
 	e.sendKeys("x")
 	e.Store.DB().Close()
 
@@ -195,10 +195,14 @@ func TestCheckStaleReloadsACleanBuffer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e.exCommand("checkstale")
+	out := stripANSI(captureStdout(t, func() { e.exCommand("checkstale") }))
 
 	if got := strings.Join(e.vbuf.Lines(), "|"); got != "newer|from a sync" {
 		t.Errorf("after :checkstale the buffer is %q, want the row's text", got)
+	}
+	// the editor draws the new text itself: it has no screen to ask
+	if !strings.Contains(out, "newer") || !strings.Contains(out, "from a sync") {
+		t.Errorf(":checkstale did not draw the reloaded text: %q", out)
 	}
 	if e.isModified() {
 		t.Error("the reload counted as an edit")

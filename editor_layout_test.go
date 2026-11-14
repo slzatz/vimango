@@ -41,7 +41,7 @@ func TestEditorDrawsByItsLayout(t *testing.T) {
 
 	inHost := newTestEditor(t, "alpha")
 	inHost.id, inHost.title = 7, "a note"
-	inHost.Session.editorOnly = true // the flag alone changes nothing the editor draws
+	sessionOf(inHost).editorOnly = true // the flag alone changes nothing the editor draws
 	inHost.editorLayout = (&Screen{screenLines: 40, screenCols: 100, textLines: 37, divider: 40, Session: &Session{}}).editorLayout()
 
 	for _, c := range []struct {

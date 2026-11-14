@@ -122,19 +122,19 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 	e := a.Session.editor
 
 	out := exMessage(t, e, "help")
-	if e.mode != HELP || len(e.Screen.notice) < 20 || !strings.Contains(out, "checkstale") {
-		t.Fatalf(":help: mode %v, a notice of %d lines", e.mode, len(e.Screen.notice))
+	if e.mode != HELP || len(screenOf(e).notice) < 20 || !strings.Contains(out, "checkstale") {
+		t.Fatalf(":help: mode %v, a notice of %d lines", e.mode, len(screenOf(e).notice))
 	}
 	captureStdout(t, func() {
 		for _, key := range []int{' ', ctrlKey('j'), ctrlKey('j'), 'b', PAGE_DOWN, PAGE_UP, ctrlKey('k'), HOME_KEY} {
 			e.editorProcessKey(key)
 		}
 	})
-	if e.mode != HELP || e.Screen.noticeTop != 0 {
-		t.Errorf("after scrolling down and back: mode %v, top line %d", e.mode, e.Screen.noticeTop)
+	if e.mode != HELP || screenOf(e).noticeTop != 0 {
+		t.Errorf("after scrolling down and back: mode %v, top line %d", e.mode, screenOf(e).noticeTop)
 	}
 	captureStdout(t, func() { e.editorProcessKey(' ') })
-	if e.Screen.noticeTop == 0 {
+	if screenOf(e).noticeTop == 0 {
 		t.Error("Space did not page the help")
 	}
 	captureStdout(t, func() { e.editorProcessKey('\x1b') })
@@ -144,8 +144,8 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 
 	// a second notice starts at its own top, not where the last one was left
 	captureStdout(t, func() { e.exCommand("help normal") })
-	if e.Screen.noticeTop != 0 {
-		t.Errorf(":help normal opened at line %d of its text", e.Screen.noticeTop)
+	if screenOf(e).noticeTop != 0 {
+		t.Errorf(":help normal opened at line %d of its text", screenOf(e).noticeTop)
 	}
 	captureStdout(t, func() { e.editorProcessKey('\x1b') })
 
@@ -154,8 +154,8 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 		e.sendKeys("ma")
 		e.exCommand("marks")
 	})
-	if e.mode != HELP || !strings.Contains(strings.Join(e.Screen.notice, "\n"), "mark") {
-		t.Errorf(":marks: mode %v, notice %q", e.mode, e.Screen.notice)
+	if e.mode != HELP || !strings.Contains(strings.Join(screenOf(e).notice, "\n"), "mark") {
+		t.Errorf(":marks: mode %v, notice %q", e.mode, screenOf(e).notice)
 	}
 	captureStdout(t, func() { e.editorProcessKey('\x1b') })
 
