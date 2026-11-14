@@ -403,3 +403,30 @@ func (o *Organizer) NavigateContainerModeKeyHandler(c int) RedrawScope {
 	}
 	return RedrawNone
 }
+
+// pasteText is a paste in the organizer, which holds text in two places: the
+// title being edited (INSERT) and the command line. Each is one line. Anywhere
+// else there is nothing to paste into, and the paste is dropped -- as typed
+// keys it would have run as the organizer's commands.
+func (o *Organizer) pasteText(raw string) RedrawScope {
+	text := onOneLine(pastedText(raw))
+	if text == "" {
+		return RedrawNone
+	}
+	switch o.mode {
+	case INSERT:
+		redraw := RedrawNone
+		for _, r := range text {
+			redraw = o.InsertModeKeyHandler(int(r))
+		}
+		return redraw
+	case COMMAND_LINE:
+		o.command_line += text
+		o.tabCompletion.index = 0
+		o.tabCompletion.list = nil
+		o.showMessage(":%s", o.command_line)
+		return RedrawNone
+	}
+	o.showMessage("Nothing to paste into: i edits the title, : starts a command")
+	return RedrawNone
+}

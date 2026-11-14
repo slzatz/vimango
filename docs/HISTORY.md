@@ -810,3 +810,16 @@ repositories:
   `Session` and the global nil -- a notice box that only records, a store, a
   layout -- and opens, draws, shows `:help` and `:marks`, writes, reloads,
   and closes it.
+
+- **`paste.go` is split.** The last of step 4a, and only a move:
+  `Editor.pasteText` and `pasteIntoVim` are `editor_paste.go`, which goes
+  with the editor; `Organizer.pasteText` is in `organizer_process_key.go`;
+  `paste.go` keeps what both use, `pastedText` and `onOneLine`.
+
+  With that, compiling the editor's files alone in a throwaway package (the
+  command is in `docs/EDITOR_PACKAGE.md`) finds nothing of the host left
+  undefined -- no `App`, `Session`, `Screen` or `app` -- only the 38 names
+  the editor shares with the organizer: the modes, the key names,
+  `sendToVim`, `clipColumns`, the wrap helpers, the command registry,
+  `writeFileAtomic`. Giving those a home is step 4b, and one package or
+  several is Steve's decision first.
