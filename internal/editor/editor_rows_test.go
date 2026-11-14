@@ -98,6 +98,35 @@ func TestSyntaxLeavesTheMarginAlone(t *testing.T) {
 	}
 }
 
+// :syntax and its aliases :md and :markdown turn the highlighting on and off,
+// or toggle it with no argument, typed as the user types them. Anything else
+// changes nothing.
+func TestSyntaxOnOffAndAliases(t *testing.T) {
+	e := newTestEditor(t, "# a note")
+	for _, tc := range []struct {
+		line string
+		want bool
+	}{
+		{"syntax off", false},
+		{"syntax on", true},
+		{"md off", false},
+		{"md", true},
+		{"markdown", false},
+		{"markdown on", true},
+		{"syntax on", true}, // on when on stays on
+		{"md sideways", true},
+		{"syntax", false},
+	} {
+		out := captureStdout(t, func() { e.runExLine(tc.line) })
+		if e.highlightSyntax != tc.want {
+			t.Errorf(":%s: highlighting %v, want %v", tc.line, e.highlightSyntax, tc.want)
+		}
+		if tc.line == "md sideways" && !strings.Contains(out, "Usage: :md [on|off]") {
+			t.Errorf(":%s: no usage message in %q", tc.line, out)
+		}
+	}
+}
+
 // drawRows fills the pane and no more, starts at the first visible row, and
 // numbers the rows by their place in the note.
 func TestDrawRowsFillsThePane(t *testing.T) {

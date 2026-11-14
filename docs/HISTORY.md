@@ -1020,3 +1020,9 @@ repositories:
   only when `Parse` can display it (no `# comment`, anchor, alias or flow
   YAML) and as markdown otherwise. Over the real database's 4,560 notes the
   two now agree on all of them; 35 have frontmatter.
+- **`:syntax on` / `:syntax off`, and `:md`.** `:syntax` was a bare
+  toggle, so what it did depended on a state the screen does not show. It
+  now takes vim's own `on` and `off` (a bare `:syntax` still toggles, and
+  anything else gets a usage line), and answers to `:md` and `:markdown`,
+  which say what it is for. `:highlight` was considered and left alone: it
+  is vim's command for colours, refused here on purpose.

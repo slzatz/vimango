@@ -159,7 +159,8 @@ Typed at the `:` line they last until the editor closes; put them in
 
 ### vimango's own commands
 
-`:spell`, `:suggest` (the same as `z=`), `:number`, `:syntax`, `:paste` /
+`:spell`, `:suggest` (the same as `z=`), `:number`, `:syntax` (also `:md`
+and `:markdown`; `on` or `off`, or a toggle with neither), `:paste` /
 `:nopaste`, `:checkstale`, `:help`, `:help normal`. `:sync` is refused, with
 where to sync from instead.
 

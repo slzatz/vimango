@@ -50,10 +50,11 @@ func editorCommands() *pane.CommandRegistry[func(*Editor)] {
 
 	// Editing commands
 	registry.Register("syntax", (*Editor).syntax, pane.CommandInfo{
-		Description: "Toggle markdown highlighting on/off",
-		Usage:       "syntax",
+		Aliases:     []string{"md", "markdown"},
+		Description: "Markdown highlighting: on, off, or toggle with no argument",
+		Usage:       "syntax [on|off]",
 		Category:    "Editing",
-		Examples:    []string{":syntax"},
+		Examples:    []string{":syntax", ":syntax off", ":md", ":md on"},
 	})
 
 	registry.Register("number", (*Editor).number, pane.CommandInfo{
@@ -229,8 +230,22 @@ func (e *Editor) nopaste() {
 	vim.SendInput(":set nopaste\r")
 }
 
+// syntax is :syntax, :md and :markdown: the markdown highlighting on or off
+// (vim's own ":syntax on" and ":syntax off"), or, with no argument, the
+// other way round.
 func (e *Editor) syntax() {
-	e.highlightSyntax = !e.highlightSyntax
+	name, arg, _ := strings.Cut(e.command_line, " ")
+	switch strings.TrimSpace(arg) {
+	case "":
+		e.highlightSyntax = !e.highlightSyntax
+	case "on":
+		e.highlightSyntax = true
+	case "off":
+		e.highlightSyntax = false
+	default:
+		e.ShowMessage("\x1b[41mUsage: :%s [on|off]\x1b[0m", name)
+		return
+	}
 	e.drawText()
 	// no need to call drawFrame or drawStatusBar
 	e.ShowMessage("Markdown highlighting is %v", e.highlightSyntax)
