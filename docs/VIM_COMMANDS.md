@@ -229,6 +229,7 @@ Worth confirming that these fail the way described, and not some other way.
 | The search match under the cursor | highlighted like the others, not differently |
 | `$` as the very first key after opening a note, then `gj`/`gk` | they keep the column instead of going to the end of each screen line (libvim forgets the "end" on the first command in a new buffer); any `$` after that is fine |
 | `g0`, `g^`, `gm`, `g$` on a row that wraps | do not go to the start, first non-blank, middle and end of the screen line the cursor is on, as `gj`/`gk` would lead one to expect. On a row longer than 80 columns they land somewhere unrelated to what is drawn (from column 150 of a 199-column row, in a pane 50 wide: `g0` goes to column 110 and `g$` to 189, where the screen line runs from 101 to 150); on a shorter row they are `0`, `^` and `$`, right only if the row fits on one screen line. libvim works them out from a window of its own, 80 wide and unwrapped. To fix in the fork and here together |
+| Ctrl-D, Ctrl-U, Ctrl-F, Ctrl-Y, `zt`, `zz`, `zb`, `z<CR>`, `z.`, `z-` | nothing: the cursor and the text stay where they are. libvim leaves scrolling to the program around it, and vimango does not answer yet. (Ctrl-B and Ctrl-E are bold and code, from `vimango.vim`.) Move with `{count}G`, `gg`, `G`, `H`/`M`/`L`, `{count}j` |
 | `H`/`L` and `'scrolloff'` | `H` and `L` go to the top and bottom row exactly, as with `'scrolloff'` 0 |
 | Editing a title in the organizer (TUI) | shows none of vim's messages, and expands no mappings |
 
