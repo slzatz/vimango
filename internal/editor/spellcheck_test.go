@@ -89,8 +89,7 @@ func TestCountZEqualsAppliesDirectly(t *testing.T) {
 	vim.SetCursorPosition(1, 6)
 
 	e.sendKeys("1z=")
-	// NORMAL_BUSY is what libvim reports after almost any normal command
-	if e.mode != NORMAL && e.mode != NORMAL_BUSY {
+	if e.mode != NORMAL {
 		t.Errorf("mode = %v, want NORMAL", e.mode)
 	}
 	if got, want := e.ss[0], "Hello world here."; got != want {

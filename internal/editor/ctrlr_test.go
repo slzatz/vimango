@@ -31,7 +31,7 @@ func newRegisterEditor(t *testing.T, lines ...string) *Editor {
 
 // inNormal: vim calls NORMAL "busy" for a moment after it comes back from a
 // command line, and the editor treats the two alike.
-func inNormal(e *Editor) bool { return e.mode == NORMAL || e.mode == NORMAL_BUSY }
+func inNormal(e *Editor) bool { return e.mode == NORMAL }
 
 // typeKeys is sendKeys with the terminal's output swallowed.
 func typeKeys(t *testing.T, e *Editor, keys string) {

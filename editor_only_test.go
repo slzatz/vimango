@@ -109,7 +109,7 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 		t.Error("Space did not page the help")
 	}
 	captureStdout(t, func() { e.ProcessKey('\x1b') })
-	if e.Mode() != editor.NORMAL && e.Mode() != editor.NORMAL_BUSY { // vim's two names for it
+	if e.Mode() != editor.NORMAL {
 		t.Errorf("Escape left mode %v", e.Mode())
 	}
 

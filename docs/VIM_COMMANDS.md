@@ -62,7 +62,7 @@ freezes); `docs/HISTORY.md` has the account of each.
 | `:2,3normal Ix` | an `x` at the start of lines 2 and 3 |
 | `:u`, `:red`, `:earlier 10s`, `:later 10s` | undo, redo, and by time |
 | `:retab`, `:center`, `:left`, `:right` | as in vim |
-| `V` then `:` | the line starts with `'<,'>`; any command above takes it |
+| `V` then `:` | the line starts with `'<,'>` and the selection is no longer drawn, as in vim; any command above takes it. `<esc>` leaves nothing selected |
 
 ### Moving and marking
 

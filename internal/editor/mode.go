@@ -13,8 +13,7 @@ import "github.com/slzatz/vimango/vim"
 type Mode int
 
 const (
-	NORMAL      Mode = iota // just seeing this after an escape
-	NORMAL_BUSY             // Replace and almost any other keystroke in normal
+	NORMAL Mode = iota
 	INSERT
 	EX_COMMAND // a ':' command line
 	VISUAL_LINE
@@ -28,12 +27,15 @@ const (
 )
 
 var modeMap = map[vim.Mode]Mode{
-	vim.ModeNormal:     NORMAL, // seems to be only after an escape
+	// vim has two names for NORMAL and the editor one. libvim reports
+	// ModeNormalBusy after almost every key typed there and ModeNormal only
+	// after an <esc>, and nothing here could tell them apart to any purpose.
+	vim.ModeNormal:     NORMAL,
+	vim.ModeNormalBusy: NORMAL,
 	vim.ModeVisual:     VISUAL,
 	vim.ModeOpPending:  PENDING,
 	vim.ModeCmdline:    SEARCH, // also EX_COMMAND: syncCmdline says which
 	vim.ModeInsert:     INSERT,
-	vim.ModeNormalBusy: NORMAL_BUSY, // just about any keystroke when in NORMAL mode
 }
 
 // visualModeMap is the kind of selection, from what vim.GetVisualType reports:
@@ -47,7 +49,6 @@ var visualModeMap = map[int]Mode{
 func (m Mode) String() string {
 	return [...]string{
 		"NORMAL",
-		"NORMAL BUSY",
 		"INSERT",
 		"EX COMMAND",
 		"VISUAL LINE",

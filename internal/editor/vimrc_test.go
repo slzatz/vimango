@@ -33,9 +33,8 @@ func TestVimrcBulletMappingLinewise(t *testing.T) {
 
 	e.sendKeys("Vjjj-")
 	assertLines(t, e, "- alpha", "  - bravo", "", "- charlie", "delta")
-	// the mapping's :s ends VISUAL; NORMAL_BUSY is what ProcessKey
-	// records for vim's normal mode after any forwarded key
-	if e.mode != NORMAL && e.mode != NORMAL_BUSY {
+	// the mapping's :s ends VISUAL
+	if e.mode != NORMAL {
 		t.Errorf("mode after mapping = %v, want normal", e.mode)
 	}
 	// drawText renders e.ss, so the editor's copy must be current

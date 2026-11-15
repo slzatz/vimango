@@ -61,54 +61,24 @@ func MappingWait() (time.Duration, bool) {
 // NoKey is forwardKey's key when there is none: a timeout.
 const NoKey = -1
 
-// note that bool returned is whether to redraw
+// handleKey is ProcessKey without what a key cannot see (redrawAfter). The
+// bool is whether to redraw.
 func (e *Editor) handleKey(c int) (redraw bool) {
-
-	//No matter what mode you are in an escape puts you in NORMAL mode
+	// <esc> goes to vim whatever the editor is doing: it ends :help and the
+	// list of spelling suggestions as it ends an insert, a selection or a
+	// command line. vimango sends it itself, so it never reaches a mapping.
+	// What vim then did is followed as it is for any key -- it can be more
+	// than ending something: a key vim was holding for a mapping goes in
+	// ahead of the <esc>, and an insert with a count is carried out by it.
 	if c == '\x1b' {
-		vim.SendKey("<esc>")
-		e.ss = e.vbuf.Lines() /// for commands like 4i
-		//e.mode = NORMAL_BUSY
-		prevMode := e.mode
-		mode := vim.GetCurrentMode() ////////
-		// <esc> ends one thing, and on a command line that need not be the
-		// line: it can be the register name CTRL-R was waiting for, or the
-		// expression being typed after CTRL-R =. The line under it is still
-		// open, as it was.
-		if mode == vim.ModeCmdline {
-			e.syncCmdline()
-			return false
-		}
-		e.mode = modeMap[mode]
-		//e.ShowAside("vim mode: %d | e.mode: %s", mode, e.mode) //////Debug
-		e.command_line = ""
-		pos := vim.GetCursorPosition() //set screen cx and cy from pos
-		e.fr = pos[0] - 1
-		e.fc = pos[1]
-		// vim clears the message line on <esc>; it does not announce NORMAL
-		e.ShowMessage("")
-		// ...and the same in INSERT: the <esc> ended a CTRL-R, or the
-		// expression for one, and the insert goes on
-		if e.mode == INSERT {
-			e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
-		}
-		//return false
-		// INSERT is below because escaping from INSERT needs a redraw if previously in VISUAL BLOCK mode and an s, c or I was typed
-		if prevMode == VISUAL || prevMode == HELP || prevMode == INSERT { //need to redraw to remove highlight or if leaving help
-			return true
-		} else {
-			return false
-		}
+		return e.followVim(c, func() { vim.SendKey("<esc>") })
 	}
 
-	// if exit is false, doesn't matter if redraw is false since redraw will be determined
-	// by the mode processing below
-	//	skip := false
+	// What the editor does with a key before vim sees it. NORMAL, VISUAL and
+	// INSERT have nothing here: vimango intercepts no keys there, so they go
+	// straight to vim (and through vimango.vim's mappings). exit means the
+	// key went no further, and redraw is then the answer.
 	var exit bool
-
-	// the switch is pre-processing before sending the key to vim. NORMAL,
-	// VISUAL and INSERT have none: vimango intercepts no keys there, so they
-	// go straight to vim (and through vimango.vim's mappings)
 	switch e.mode {
 	case EX_COMMAND:
 		redraw, exit = e.ExModeKeyHandler(c)
@@ -117,8 +87,6 @@ func (e *Editor) handleKey(c int) (redraw bool) {
 	case SPELLING:
 		redraw, exit = e.SpellingModeKeyHandler(c)
 	}
-
-	// if exit true, don't process key any further
 	if exit {
 		return
 	}
@@ -142,10 +110,10 @@ func (e *Editor) forwardKey(c int, send func()) (redraw bool) {
 
 // followVim runs something that sends vim keys and brings the editor into
 // line with whatever vim did, as forwardKey says. run is a typed key, with
-// mappings (forwardKey), or text that is not keys at all: a paste (paste.go).
+// mappings (forwardKey); <esc>, which vimango sends itself (handleKey); or
+// text that is not keys at all, a paste (editor_paste.go).
 func (e *Editor) followVim(c int, run func()) (redraw bool) {
-	wasVisual := e.mode == VISUAL
-	wasInsert := e.mode == INSERT
+	was := e.mode
 	vim.TakeSpellSuggestRequest() // drop a z= typed outside the editor (organizer)
 	// What vim would have put on its message line for this key -- mostly
 	// errors: "E486: Pattern not found", "E20: Mark not set". Shown last, when
@@ -176,11 +144,10 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		redraw = false
 	}
 	mode := vim.GetCurrentMode()
-	//submode := vim.GetSubMode() added this 9-22-25 but really only for obscure submodes
 
 	// The switch performs side effects only; e.mode is set once from modeMap
-	// below, so no case should assign it. The two early returns are the
-	// exceptions, and each says why it skips the buffer/cursor resync.
+	// below, so no case should assign it. The early return is the exception,
+	// and says why it skips the buffer/cursor resync.
 	switch mode {
 	case vim.ModeOpPending: // delete, change, yank, etc
 		// half of an operator (the "d" of "d3w"): the buffer has not changed
@@ -194,15 +161,12 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		// own -- or have been typed on it. Either way vim is asked which
 		// kind of line it is and what is on it. (Keys typed on a ':' line
 		// do not come this way: ExModeKeyHandler sends them itself.)
-		opened := e.mode != SEARCH && e.mode != EX_COMMAND
+		//
+		// <esc> can leave one open, too: it ends one thing, and that need
+		// not be the line. It can be the register name CTRL-R was waiting
+		// for, or the expression being typed after CTRL-R =, and the line
+		// under it is still there.
 		e.syncCmdline()
-		if opened {
-			return false
-		}
-	case vim.ModeInsert:
-		if e.mode != INSERT {
-			e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
-		}
 	case vim.ModeVisual:
 		e.vmode = visualModeMap[vim.GetVisualType()]
 		e.highlightInfo()
@@ -217,43 +181,40 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		e.mode = OTHER // not sure this ever happens
 	}
 
-	// <esc> is not the only way out of INSERT: a mapping ("inoremap jk
-	// <Esc>") leaves it too, and "-- INSERT --" must not stay behind.
-	if wasInsert && e.mode != INSERT {
+	// The message line. vim says what mode it is in only for INSERT, and an
+	// <esc> clears the line whatever was on it. "-- INSERT --" must not stay
+	// behind when the insert ends some other way, either: a mapping
+	// ("inoremap jk <Esc>") ends it too.
+	switch {
+	case mode == vim.ModeCmdline:
+		// the command line is on it (syncCmdline)
+	case c == '\x1b' || (was == INSERT && e.mode != INSERT):
+		e.command_line = ""
 		e.ShowMessage("")
+		// an <esc> can leave the insert going: it ended a CTRL-R, or the
+		// expression typed for one
+		if e.mode == INSERT {
+			e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
+		}
+	case e.mode == INSERT && was != INSERT:
+		e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
 	}
 
-	// A key that ends VISUAL without changing text (y, a mapping that found
-	// nothing to do) would otherwise leave the selection highlight on screen:
-	// the tick check above saw no change, and only VISUAL itself redraws.
-	if wasVisual && e.mode != VISUAL {
+	// What has to be drawn though the text is the same -- the tick check
+	// above saw no change:
+	//   - the selection, when VISUAL ends without an edit (y, <esc>, a
+	//     mapping that found nothing to do; only VISUAL itself redraws).
+	//     ':' ends it too, as it does in vim: the line opens on "'<,'>" and
+	//     the selection is no longer shown;
+	//   - the word under the cursor, when INSERT ends: it is not marked as
+	//     misspelled while it is being typed, and is once it is not;
+	//   - the text itself, when <esc> closes a notice that was over it.
+	if was != e.mode && (was == VISUAL || was == INSERT || was == HELP) {
 		redraw = true
 	}
 
-	//below is done for everything except SEARCH, EX_COMMAND and OP_PENDING
-	e.ss = e.vbuf.Lines()
-	// Add safety checks to prevent panic with empty buffers
-	if len(e.ss) == 0 {
-		e.ss = []string{""}
-	}
-
-	pos := vim.GetCursorPosition() //set screen cx and cy from pos
-	e.fr = pos[0] - 1
-
-	// Ensure fr is in bounds
-	if e.fr < 0 {
-		e.fr = 0
-	}
-	if e.fr >= len(e.ss) {
-		e.fr = len(e.ss) - 1
-	}
-
-	// Ensure pos[1] (column) is valid
-	if pos[1] > len(e.ss[e.fr]) {
-		pos[1] = len(e.ss[e.fr])
-	}
-
-	e.fc = pos[1]
+	//below is done for everything except OP_PENDING
+	e.resyncFromVim()
 
 	if spellRedraw {
 		redraw = true

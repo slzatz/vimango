@@ -1034,3 +1034,59 @@ repositories:
   text, in the same grey as with highlighting on, whatever the terminal's
   default (`TestHighlightingOffIsBodyText`). `wrappedRow`, which drew the
   rows uncoloured, is now only the tests' reference for the text.
+
+## 2026-11-15
+
+- **`<esc>` takes the path every key takes.** `handleKey` sent `<esc>` to
+  vim itself and returned, having copied back what an `<esc>` was expected
+  to change: the text, the cursor (unclamped), the mode. What vim did beyond
+  that was not followed -- its messages were not captured, the tick was not
+  checked, and nothing looked at which buffer vim was on. It matters more
+  than it reads: vimango_hybrid starts every command it injects with `<esc>`
+  (`:checkstale` after each sync, the `:q` that asks about unsaved changes),
+  so this was the first key of the host's whole control channel. Now
+  `handleKey` hands it to `followVim` like any key, sent with `vim.SendKey`
+  so that no mapping sees it, and `followVim` knows the two things that are
+  an `<esc>`'s own: it clears the message line, and it can leave a command
+  line open (it ended a Ctrl-R, or the expression for one).
+
+  Four things were wrong, each confirmed with a test that fails on the old
+  code (`esc_test.go`):
+  - **A key vim was holding went in ahead of the `<esc>` and was not
+    drawn.** With `nnoremap xx dd`, `x` then `<esc>` deleted a character
+    and the screen kept it until some later key redrew. With a held `u` the
+    undo happened unseen, and vim's "1 change; before #1" was never shown.
+  - **A held Ctrl-^ left vim on another buffer**, where the next keys were
+    typed: the check that brings vim back to the note (2026-11-11) ran for
+    every key but this one.
+  - **An `<esc>` that edits** -- `3ix<esc>`, an insert on a block -- was
+    drawn, but the tick was not recorded, so the next key redrew the whole
+    text for nothing.
+  - **The selection outlived VISUAL.** `v`, a motion, `:` and then `<esc>`
+    left the selection drawn with vim in NORMAL and nothing selected; moving
+    the cursor did not clear it. The cause was one step earlier: vim ends
+    VISUAL at the `:` (the line opens on `'<,'>`), and a key that opened a
+    command line returned before the redraw. Now the text is drawn without
+    the selection when the `:` is typed, **as vim draws it** -- the one
+    change here to what is seen in ordinary use.
+
+  With it, two smaller things:
+  - **Leaving INSERT redraws however it is left.** `<esc>` always did; a
+    mapping (`inoremap jk <Esc>`) did not, so with `:spell` on the word just
+    typed stayed unmarked until something else redrew.
+  - **The editor has one name for NORMAL.** libvim reports `NORMAL_BUSY`
+    after almost every key typed in NORMAL and `NORMAL` only after an
+    `<esc>`; the editor copied both and nothing told them apart, except the
+    tests, which each accepted either. `editor.NORMAL_BUSY` is gone. (The
+    organizer's `Mode` keeps its own.)
+
+  Checked with the binaries from before and after on a pseudo-terminal:
+  `compare-drawing.py` says `SAME` for `--editor` and the TUI, and a second
+  run through the cases above differs in those steps and no others. What
+  hybrid injects -- `<esc>:checkstale` from INSERT, with a notice up and on
+  a search line, `<esc>:q` from VISUAL -- is byte for byte the same.
+
+  Found on the way, not changed here: a notice can outlive HELP mode.
+  `:help`, then `:` and `<esc>` (or a command that draws nothing, `:noh`)
+  leaves the notice on screen with the editor in NORMAL, and the keys go to
+  the note under it.
