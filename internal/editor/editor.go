@@ -188,7 +188,7 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	e.vbuf.SetLines(0, -1, strings.Split(note, "\n"))
 	e.resyncFromVim()
 	e.saveTick = e.bufferTick // the note as read is the note as saved
-	vim.SetScreenLayout(e)    // gj, gk, H, M, L
+	vim.SetScreenLayout(e)    // gj, gk, H, M, L, g0, g^, gm, g$
 	return e, nil
 }
 

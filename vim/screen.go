@@ -6,6 +6,7 @@ package vim
 extern void goCursorMoveScreenLine(int motion, int count, linenr_T startLine, linenr_T *destLine);
 extern void goCursorMoveScreenPosition(int direction, int count, linenr_T lnum, colnr_T cursor,
                                        colnr_T curswant, linenr_T *destLnum, colnr_T *destCol);
+extern void goCursorMoveScreenColumn(int motion, linenr_T lnum, colnr_T col, colnr_T *destCol);
 
 static void virtualColumns(linenr_T lnum, colnr_T col, colnr_T *start, colnr_T *end)
 {
@@ -18,11 +19,11 @@ import "C"
 
 import "math"
 
-// The motions that move by what is on screen -- gj and gk, H, M and L -- are
-// not vim's in libvim. vim works them out from its window, and libvim has
-// none that matches what the embedder draws (vimango wraps lines itself, at
-// word boundaries), so libvim asks the embedder through two callbacks. With
-// no ScreenLayout set the cursor stays where it is.
+// The motions that move by what is on screen -- gj and gk, H, M and L, and
+// g0, g^, gm and g$ -- are not vim's in libvim. vim works them out from its
+// window, and libvim has none that matches what the embedder draws (vimango
+// wraps lines itself, at word boundaries), so libvim asks the embedder
+// through three callbacks.
 
 // ScreenLineMotion is which line of the window H, M or L wants.
 type ScreenLineMotion int
@@ -31,6 +32,15 @@ const (
 	ScreenTop    ScreenLineMotion = C.MOTION_H // H
 	ScreenBottom ScreenLineMotion = C.MOTION_L // L
 	ScreenMiddle ScreenLineMotion = C.MOTION_M // M
+)
+
+// ScreenColumnMotion is which character of a screen line g0, gm or g$ wants.
+type ScreenColumnMotion int
+
+const (
+	ScreenLineStart  ScreenColumnMotion = C.MOTION_SCREEN_START  // g0, and g^ on its way
+	ScreenLineMiddle ScreenColumnMotion = C.MOTION_SCREEN_MIDDLE // gm
+	ScreenLineEnd    ScreenColumnMotion = C.MOTION_SCREEN_END    // g$
 )
 
 // MaxCol is the wanted column after $: the end of whatever line the cursor
@@ -48,13 +58,28 @@ type ScreenLayout interface {
 	// ScreenLine is H, M and L: the line count lines from the top or the
 	// bottom of the window, or the one in its middle.
 	ScreenLine(motion ScreenLineMotion, count, line int) int
+	// ScreenColumn is g0, gm and g$: the byte offset, in line, of a character
+	// of the screen line that holds byte col -- its first, its last, or the
+	// one half the width of the window along it (or its last, on a shorter
+	// one). g^ asks for the first and goes on to the first non-blank itself,
+	// and g$ with a count is ScreenPosition, count-1 lines down after $.
+	ScreenColumn(motion ScreenColumnMotion, line, col int) int
 }
 
 var screenLayout ScreenLayout
 
-// SetScreenLayout makes l the one vim asks; nil makes the motions do nothing.
+// SetScreenLayout makes l the one vim asks. With nil, gj, gk, H, M and L do
+// nothing, and g0, g^, gm and g$ are libvim's own again, worked out from its
+// window of 80 columns: on a title, which is one line, they are 0, ^ and $.
+//
+// void vimSetCursorMoveScreenColumnCallback(CursorMoveScreenColumnCallback f);
 func SetScreenLayout(l ScreenLayout) {
 	screenLayout = l
+	if l == nil {
+		C.vimSetCursorMoveScreenColumnCallback(nil)
+		return
+	}
+	C.vimSetCursorMoveScreenColumnCallback(C.CursorMoveScreenColumnCallback(C.goCursorMoveScreenColumn))
 }
 
 // void vimSetCursorMoveScreenLineCallback(CursorMoveScreenLineCallback f);

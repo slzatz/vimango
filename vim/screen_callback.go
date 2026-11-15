@@ -3,7 +3,7 @@ package vim
 // The screen-motion callbacks live in their own file for the reason the spell
 // callback does: a file with //export may only have declarations in its cgo
 // preamble. The C types are spelled out (linenr_T is long, colnr_T int,
-// screenLineMotion_T an int-sized enum).
+// screenLineMotion_T and screenColumnMotion_T int-sized enums).
 
 import "C"
 
@@ -28,4 +28,12 @@ func goCursorMoveScreenPosition(direction C.int, count C.int, lnum C.long, curso
 	line, want := screenLayout.ScreenPosition(direction > 0, int(count), int(lnum), int(cursor), int(curswant))
 	*destLnum = C.long(line)
 	*destCol = C.int(want)
+}
+
+//export goCursorMoveScreenColumn
+func goCursorMoveScreenColumn(motion C.int, lnum C.long, col C.int, destCol *C.int) {
+	if screenLayout == nil {
+		return
+	}
+	*destCol = C.int(screenLayout.ScreenColumn(ScreenColumnMotion(motion), int(lnum), int(col)))
 }

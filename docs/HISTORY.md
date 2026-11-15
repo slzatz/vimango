@@ -1220,3 +1220,46 @@ repositories:
   VISUAL, with `:help` up and in NORMAL: the first three differ, by the
   line now written, and the others are byte for byte the same.
   `compare-drawing.py` says `SAME`.
+
+- **`g0`, `g^`, `gm` and `g$` go by the screen line.** The open item of
+  this morning, done on both sides. `gj`, `gk`, `H`, `M` and `L` asked the
+  editor where its screen lines are; these four were worked out from
+  libvim's own window, 80 columns and unwrapped, and went to columns that
+  have nothing to do with what is drawn.
+  - **The fork** (`928659d8f`): a third callback, opt-in,
+    `vimSetCursorMoveScreenColumnCallback()`. libvim gives a position and
+    says which character of the screen line holding it is wanted -- its
+    first, its last, or the middle one -- and is answered with a byte of
+    the same line. It keeps what is vim's: `g^` goes on from the start to
+    the first non-blank, `g$` leaves the column wanted at that character
+    (so `j` keeps it), and `g$` with a count is `gj` after `$`, the
+    callback there already was. An answer outside the line, or inside a
+    multi-byte character, is brought to a character. The fork's `TODO.md`
+    proposed "the first and last byte of the screen line"; that was not
+    enough for **`gm`, which is half the window's width along the screen
+    line and not the middle of its text**, and only the editor knows which
+    byte is at a screen column (a tab is four columns here and up to eight
+    in vim's count). So the middle is asked for, not derived.
+  - **Here**: `ScreenLayout` has a third method, `ScreenColumn`, which the
+    editor answers from `wrapRow` as it answers the other two
+    (`screen_motion.go`). The end of a screen line is the last character
+    drawn on it, which is the space the row was wrapped after -- where
+    `$ gk` already went, and where vim's `g$` goes with `'linebreak'`.
+  - **The callback is set only while there is a layout**
+    (`vim.SetScreenLayout`), not once at startup like the other two. With
+    it set and nobody to answer, the four would do nothing, and in the
+    organizer's title they have always been `0`, `^` and `$`, which on one
+    line is right. So with no note open they are libvim's own, as before.
+
+  Tests: `apitest/motion_screen.c` in the fork (nine new cases; all 67 of
+  its test programs pass), and here `screen_motion_test.go`: each motion
+  on each of a row's three screen lines, a screen line that starts with
+  blanks, the count, the column kept afterwards, `dg$` `dg0` `vg$d`, rows
+  with a tab and with two-byte characters, and no layout. With the binary
+  in `--editor` on a pseudo-terminal 60 wide, on a row of three screen
+  lines: from the second, `g0` puts the cursor in the first text column,
+  `g$` on the last character of that line, `gm` 27 columns in, and `2g$`
+  at the end of the third. `vim/libvim_api.h` has the declaration and the
+  header test's probe the enum. **`libvim.a` must be rebuilt**: an older
+  one does not link (`undefined: vimSetCursorMoveScreenColumnCallback`);
+  `docs/UPDATING_A_MAC.md` names the commit.

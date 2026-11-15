@@ -92,6 +92,19 @@ typedef void (*CursorMoveScreenPositionCallback)(
     colnr_T curswant,
     linenr_T *destLnum, colnr_T *destCol);
 
+/* g0, gm and g$ (g^ asks for the start): which character of the screen line
+ * holding lnum, col CursorMoveScreenColumnCallback is asked for. The answer
+ * is a byte offset in the same line. */
+typedef enum
+{
+  MOTION_SCREEN_START,
+  MOTION_SCREEN_MIDDLE,
+  MOTION_SCREEN_END,
+} screenColumnMotion_T;
+
+typedef void (*CursorMoveScreenColumnCallback)(
+    screenColumnMotion_T motion, linenr_T lnum, colnr_T col, colnr_T *destCol);
+
 /* The direction of a motion. */
 #define FORWARD 1
 #define BACKWARD (-1)
@@ -154,6 +167,7 @@ void vimSetMessageCallback(MessageCallback messageCallback);
 
 void vimSetCursorMoveScreenLineCallback(CursorMoveScreenLineCallback cursorMoveScreenLineCallback);
 void vimSetCursorMoveScreenPositionCallback(CursorMoveScreenPositionCallback cursorMoveScreenPositionCallback);
+void vimSetCursorMoveScreenColumnCallback(CursorMoveScreenColumnCallback cursorMoveScreenColumnCallback);
 
 pos_T *vimSearchGetMatchingPair(int initc);
 char_u *vimSearchGetPattern(void);

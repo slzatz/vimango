@@ -62,6 +62,9 @@ int main(void)
   STRUCT(VoidCallback); STRUCT(MessageCallback);
   SIZE(screenLineMotion_T); VALUE(MOTION_H); VALUE(MOTION_L); VALUE(MOTION_M);
   STRUCT(CursorMoveScreenLineCallback); STRUCT(CursorMoveScreenPositionCallback);
+  SIZE(screenColumnMotion_T);
+  VALUE(MOTION_SCREEN_START); VALUE(MOTION_SCREEN_MIDDLE); VALUE(MOTION_SCREEN_END);
+  STRUCT(CursorMoveScreenColumnCallback);
   VALUE(FORWARD); VALUE(BACKWARD);
   VALUE(OK);
   VALUE(NORMAL); VALUE(VISUAL); VALUE(OP_PENDING); VALUE(CMDLINE); VALUE(INSERT); VALUE(NORMAL_BUSY);

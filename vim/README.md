@@ -19,7 +19,7 @@ libvim and a pure-Go engine, `govim`, which was removed in 2026-07.)
 - `messages.go`, `message_callback.go` — what vim would write on its message
   line
 - `screen.go`, `screen_callback.go` — the motions that move by what is on
-  screen (`gj` `gk` `H` `M` `L`), which libvim asks the application about
+  screen (`gj` `gk` `H` `M` `L`, `g0` `g^` `gm` `g$`), which libvim asks the application about
   (`ScreenLayout`), and vim's virtual columns (`VirtualColumns`)
 - `excommands.go` — vim's command table, for resolving an ex command's name
   as vim does (`FindExCommand`)

@@ -8,11 +8,11 @@ import (
 	"github.com/slzatz/vimango/vim"
 )
 
-// The motions that move by what is on screen -- gj and gk, H, M and L. vim
-// works them out from its own window, which in libvim draws nothing and
-// wraps nothing, so libvim asks the embedder instead (vim.ScreenLayout), and
-// the editor answers from the layout it draws: rows wrapped at word
-// boundaries by wrapRow, tabs four columns wide. The editor is set as the
+// The motions that move by what is on screen -- gj and gk, H, M and L, and
+// g0, g^, gm and g$. vim works them out from its own window, which in libvim
+// draws nothing and wraps nothing, so libvim asks the embedder instead
+// (vim.ScreenLayout), and the editor answers from the layout it draws: rows
+// wrapped at word boundaries by wrapRow, tabs four columns wide. The editor is set as the
 // layout when it opens (openEditor), and answers only while vim is on its
 // buffer.
 
@@ -106,6 +106,32 @@ func (e *Editor) ScreenPosition(down bool, count, line, col, curswant int) (int,
 	want, _ := vim.VirtualColumns(line, dest)
 	e.screenWant = screenWant{line: line, col: dest, curswant: want, x: x}
 	return line, want
+}
+
+// ScreenColumn is g0 (vim.ScreenLineStart), gm and g$: the byte of line
+// that starts the screen line holding byte col, the one that ends it, or the
+// one half the pane's width along it -- the last, when the screen line is
+// shorter than that, as a row's last one is and any may be, wrapped at a
+// space. A space the row was wrapped after is the screen line's last
+// character, and g$ goes to it, as vim's does with 'linebreak'.
+func (e *Editor) ScreenColumn(motion vim.ScreenColumnMotion, line, col int) int {
+	if !e.onItsBuffer() || line < 1 || line > e.vbuf.LineCount() {
+		return col
+	}
+	raw, text, segs := e.screenLines(line)
+	seg := segs[segmentIndex(segs, expandedOffset(raw, col))]
+	part := text[seg.start:seg.end]
+	b := 0
+	switch motion {
+	case vim.ScreenLineMiddle:
+		b = byteAtDisplayCol(part, e.wrapWidth()/2)
+	case vim.ScreenLineEnd:
+		b = len(part)
+	}
+	if b >= len(part) && part != "" {
+		b = pane.RuneStart(part, len(part)-1)
+	}
+	return rawOffset(raw, seg.start+b)
 }
 
 // segmentIndex returns the index of the screen line holding byte offset c of
