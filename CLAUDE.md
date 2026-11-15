@@ -377,7 +377,6 @@ HEIC/HEIF (the iPhone camera format) is decoded by libheif in the `heic_worker` 
 Listed 2026-11-10, the libvim item rewritten 2026-11-11, the structure item 2026-11-14 and 2026-11-15; nothing here is started unless it says so. File names in the editor's and libvim's items are in `internal/editor` unless they say otherwise.
 
 - **To update another Mac, follow [docs/UPDATING_A_MAC.md](docs/UPDATING_A_MAC.md)**, and keep it current when a change adds a per-machine step. vimango and hybrid must be updated together, and `libvim.a` rebuilt.
-- **Run the sync integration tests once against `localdb.Open`.** Foreign keys became per-connection on 2026-11-10 with no Postgres on the machine to run them. They have always run on a single connection with enforcement on, so no change is expected.
 - **Structure: the editor is a package; what follows it.** The move was done 2026-11-14 (HISTORY): the editor is `internal/editor` and imports nothing of the application. In the order I would do the rest:
   - **A notice can outlive HELP mode.** `:help`, then `:` and `<esc>` (or a command that draws nothing, `:noh`), leaves the notice on screen with the editor in NORMAL: the keys go to the note under it. "A notice is up" is kept as the mode, and a command line typed over the notice takes the mode's place.
   - **The TUI's weight** is Steve's call, not a refactor: about 2,000 of the organizer's lines show images in a terminal that is used for emergencies.

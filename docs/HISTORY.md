@@ -1130,3 +1130,11 @@ repositories:
   against the build from before both changes, and the run through the
   `<esc>` cases says `SAME` against the build between them. Tests:
   `resync_test.go`.
+
+- **The sync integration tests pass against `localdb.Open`.** The open
+  item from 2026-11-10, when foreign keys became per-connection and there
+  was no Postgres on the machine to run them. Homebrew's `postgresql@17`
+  is installed now: run against a throwaway server on port 54329, as
+  CLAUDE.md's "Tests" describes, all 25 pass. No code changed. For scale:
+  with the server the tests cover 80.2% of `internal/sync`'s statements;
+  without it, which is what a plain `go test ./...` runs, 0.6%.
