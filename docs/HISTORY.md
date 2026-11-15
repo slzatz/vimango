@@ -1138,3 +1138,40 @@ repositories:
   CLAUDE.md's "Tests" describes, all 25 pass. No code changed. For scale:
   with the server the tests cover 80.2% of `internal/sync`'s statements;
   without it, which is what a plain `go test ./...` runs, 0.6%.
+
+- **A notice and HELP mode go together.** "A notice is up" was kept twice:
+  as the editor's mode, and as what the screen had drawn. They came apart
+  both ways.
+  - **The notice outlived the mode** (noted in the `<esc>` entry above).
+    `:` typed over a notice opens a command line and leaves the notice up,
+    which is wanted: `:help` lists the commands, and one is typed while
+    reading it. But when that line ended in anything but another notice --
+    `<esc>`, an empty Enter, Backspace over the colon, `:noh`, `:paste`, a
+    refused command, a typo -- the notice stayed, with the editor in NORMAL
+    and the keys going to the note under it.
+  - **The mode outlived the notice**, found while fixing the first. A resize
+    draws the whole editor, text over the notice, and the mode was still
+    HELP: the screen showed only the note, and every key but the ones that
+    scroll did nothing. vimango_hybrid resizes the editor whenever its
+    window changes.
+
+  Now the editor knows a notice is up apart from its mode (`Editor.notice`,
+  set by `showNotice`, the one place a notice starts; cleared by `drawText`,
+  which is what ends one). After a key, a notice that is up with the mode
+  neither HELP nor a command line means the note is drawn (`redrawAfter`).
+  And `Draw` in HELP mode shows the notice again -- from its top, and
+  wrapped for the new width, since the box rewraps what it is shown.
+
+  Tests, each failing on the old code: `notice_test.go` (seven ways a line
+  typed over a notice can end; one notice after another draws no text
+  between; `Draw` puts the notice back), and `TestResizeKeepsTheNoticeUp`
+  in the root package, on the real screen. On a pseudo-terminal the two
+  binaries differ at the resize, the page after it, and the `<esc>` and
+  `:noh` that end a line over a notice, and nowhere else;
+  `compare-drawing.py` says `SAME`.
+
+  Found on the way, not changed: a resize clears the screen
+  (`eraseScreenRedrawLines`) and `Draw` does not write the message line, so
+  a command line being typed disappears until the next key, and so does
+  "-- INSERT --". Confirmed for `--editor` and the TUI; now under "Open
+  items".

@@ -168,17 +168,27 @@ func (e *Editor) DrawAfterKey(redraw bool, c int) {
 	}
 }
 
-// Draw draws the whole editor: the text, the frame, the status bar. For when
-// it is opened, when its layout changes, and when its note is reloaded; a key
-// redraws only what it changed (DrawAfterKey). Nothing need be erased first:
-// drawText clears each line of the text area before it writes it.
+// Draw draws the whole editor: the text, the frame, the status bar, and the
+// notice over them if one is up. For when it is opened, when its layout
+// changes, and when its note is reloaded; a key redraws only what it changed
+// (DrawAfterKey). Nothing need be erased first: drawText clears each line of
+// the text area before it writes it.
 func (e *Editor) Draw() {
 	e.drawText()
 	e.drawFrame()
 	e.drawStatusBar()
+	// The text is now over the notice the keys are still scrolling. Show it
+	// again: from its top, and laid out for the layout as it is now, which
+	// is what changed if this is a resize.
+	if e.mode == HELP {
+		e.showNotice(e.notice.text, e.notice.hang)
+	}
 }
 
+// drawText draws the text area: the rows, and what is marked on them. It
+// draws over a notice, which is how one ends.
 func (e *Editor) drawText() {
+	e.notice.up = false
 	var ab strings.Builder
 
 	fmt.Fprintf(&ab, "\x1b[?25l\x1b[%d;%dH", e.TopMargin, e.LeftMargin+1)

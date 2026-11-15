@@ -40,6 +40,13 @@ func (e *Editor) redrawAfter(redraw bool) bool {
 	if e.mode != HELP && searchState() != e.searchDrawn {
 		redraw = true
 	}
+	// A notice is up and the keys are no longer its own, nor a command
+	// line's typed over it: that line ended -- <esc>, an empty Enter, a
+	// command that showed nothing -- and the keys are the note's again.
+	// Draw the note, which is the end of the notice.
+	if e.notice.up && e.mode != HELP && e.mode != EX_COMMAND && e.mode != SEARCH {
+		redraw = true
+	}
 	return redraw
 }
 

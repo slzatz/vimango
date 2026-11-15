@@ -106,6 +106,15 @@ type Editor struct {
 		list  []string
 		index int
 	}
+	// notice is what is in the box over the text while one is up
+	// (showNotice): kept so that it can be put back when the text is drawn
+	// under it, and so that it is known to be there when the mode is not
+	// HELP -- a ':' line can be typed over it.
+	notice struct {
+		text string
+		hang int
+		up   bool
+	}
 	exCmds          map[string]func(*Editor) // map of ex commands
 	commandRegistry *pane.CommandRegistry[func(*Editor)]
 }
@@ -182,6 +191,21 @@ func Open(host Host, id int, title string) (*Editor, error) {
 type NoticeBox interface {
 	ShowNotice(text string, hang int)
 	NoticeKey(c int) (message string, handled bool)
+}
+
+// showNotice puts text in the notice box, over the note, and gives the keys
+// to it: HELP is the mode whose keys scroll a notice, and <esc> ends it. The
+// box and the mode go together, and this is the one place either starts.
+//
+// A notice ends when the text is drawn over it (drawText). That happens when
+// <esc> leaves HELP, and when a ':' line typed over the notice -- which
+// leaves it up, to be read while a command is typed -- ends in anything but
+// another notice (redrawAfter). Drawing the whole editor while in HELP puts
+// the notice back (Draw).
+func (e *Editor) showNotice(text string, hang int) {
+	e.mode = HELP
+	e.notice.text, e.notice.hang, e.notice.up = text, hang, true
+	e.Notices.ShowNotice(text, hang)
 }
 
 // What an editor says of itself to whoever opened it: the id of its note,

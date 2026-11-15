@@ -459,8 +459,7 @@ func (e *Editor) showVimMessages(msgs []vim.Message, problems []string) {
 		e.ShowMessage("%s", oneLine)
 	default:
 		// as a code block, so markdown rendering leaves vim's columns alone
-		e.mode = HELP
-		e.Notices.ShowNotice("```\n"+strings.Join(lines, "\n")+"\n```", 16)
+		e.showNotice("```\n"+strings.Join(lines, "\n")+"\n```", 16)
 	}
 }
 

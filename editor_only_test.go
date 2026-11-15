@@ -139,6 +139,40 @@ func TestEditorHelpWithNoOrganizer(t *testing.T) {
 	}
 }
 
+// A resize with :help up: the editor is redrawn and the help is put back
+// over it, laid out for the new size. It used to be gone, with the editor
+// still in HELP mode -- a note on screen that took no keys. vimango_hybrid
+// resizes the editor with every change to its window.
+func TestResizeKeepsTheNoticeUp(t *testing.T) {
+	a, ids := editorOnlyApp(t, "alpha\nbravo")
+	e := openIn(t, a, ids[0])
+	captureStdout(t, func() { runEx(e, "help") })
+	if e.Mode() != editor.HELP {
+		t.Fatalf(":help: mode %v", e.Mode())
+	}
+	captureStdout(t, func() { e.ProcessKey(' ') }) // scrolled down a page
+	wide := a.Screen.notice
+
+	a.Screen.screenLines, a.Screen.screenCols = 30, 50
+	out := captureStdout(t, func() { a.moveDividerPct(a.Screen.edPct) })
+
+	out = stripANSI(out)
+	note, help := strings.Index(out, "alpha"), strings.LastIndex(out, "Available Commands") // the help's first line
+	if note < 0 || help < note {
+		t.Errorf("the help was not drawn over the redrawn note (note at %d, help at %d)", note, help)
+	}
+	if e.Mode() != editor.HELP || a.Screen.noticeTop != 0 {
+		t.Errorf("mode %v, the help's top line %d", e.Mode(), a.Screen.noticeTop)
+	}
+	if len(a.Screen.notice) <= len(wide) {
+		t.Errorf("the help is %d lines at 50 columns and was %d at the width before: not laid out again", len(a.Screen.notice), len(wide))
+	}
+	captureStdout(t, func() { e.ProcessKey('\x1b') })
+	if e.Mode() != editor.NORMAL {
+		t.Errorf("Escape left mode %v", e.Mode())
+	}
+}
+
 // A resize redraws the editor, and only the editor.
 func TestResizeWithNoOrganizer(t *testing.T) {
 	a, ids := editorOnlyApp(t, "alpha\nbravo")

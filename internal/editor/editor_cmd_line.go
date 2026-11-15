@@ -152,8 +152,7 @@ func (e *Editor) help() {
 			helpText = fmt.Sprintf("Command or category '%s' not found.\nUse ':help' for ex commands or ':help normal' for normal mode.", arg)
 		}
 	}
-	e.mode = HELP
-	e.Notices.ShowNotice(helpText, 16)
+	e.showNotice(helpText, 16)
 	e.command_line = ""
 }
 
