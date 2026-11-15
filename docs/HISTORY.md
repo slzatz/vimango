@@ -1175,3 +1175,29 @@ repositories:
   a command line being typed disappears until the next key, and so does
   "-- INSERT --". Confirmed for `--editor` and the TUI; now under "Open
   items".
+
+- **Tab on the editor's command line writes only the line.** It wrote
+  "tab", and after a command with an argument "dir: . base: ...": two
+  debugging messages left in `ExModeKeyHandler`, sent to the aside line.
+  In the TUI that is under the organizer; where the editor has the whole
+  window -- vimango_hybrid -- it is the line the command is being typed on,
+  so `:sy` and Tab left "tab" there. Looking at what the code did besides:
+  - **It completed a file name after any command.** `:help s` and Tab put
+    the first file in the working directory that starts with an s on the
+    line (`:help schema`). Completion is now for a command whose arguments
+    vim's own table says are file names and which vimango forwards: `:read`
+    and `:source`, in any spelling, with a range. Anywhere else Tab does
+    nothing.
+  - **A directory could not be gone into.** `:read docs/` and Tab found
+    nothing: the name was split with `filepath.Dir` and `Base`, which take
+    `docs/` for a file called `docs`. A directory is now completed with its
+    `/`, so the next letter typed is inside it, and a name that ends in `/`
+    lists what is there. Hidden files are offered only after a dot.
+  - `~/` is kept on the line as typed (vim expands it) and found through
+    `$HOME`; `ioutil.ReadDir` and `user.Current` are gone.
+
+  The line is typed into vim and read back with `syncCmdline`, in place of
+  a copy set by hand. Tests, failing on the old code: `tab_test.go`. With
+  the two binaries on a pseudo-terminal: `:sy`, `:help s`, `:read
+  vimango.v` and `:read zzznope`, each with Tab, differ as described and
+  nothing else does; `compare-drawing.py` says `SAME`.

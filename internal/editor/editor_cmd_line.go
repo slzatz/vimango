@@ -34,7 +34,7 @@ func editorCommands() *pane.CommandRegistry[func(*Editor)] {
 
 	registry.Register("read", (*Editor).readFile, pane.CommandInfo{
 		Aliases:     []string{"r"},
-		Description: "Read contents from file into current note",
+		Description: "Read contents from file into current note; Tab completes the file name",
 		Usage:       "read <filename>",
 		Category:    "File Operations",
 		Examples:    []string{":read todo.txt", ":r /tmp/notes.md"},

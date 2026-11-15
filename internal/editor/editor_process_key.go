@@ -2,8 +2,7 @@ package editor
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os/user"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -261,55 +260,12 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 		// history on a concluded cmdline, and we never forward the CR)
 		vim.ExecuteCommand("call histadd(':', '" + strings.ReplaceAll(e.command_line, "'", "''") + "')")
 
-		e.tabCompletion.index = 0
 		e.tabCompletion.list = nil
 		return e.runExLine(e.command_line), true
 	} //end 'r'
 
 	if c == '\t' {
-		pos := strings.Index(e.command_line, " ")
-		if e.tabCompletion.list == nil {
-			e.ShowAside("tab")
-			var s string
-			if pos != -1 {
-				s = e.command_line[pos+1:]
-				//cl := p.command_line
-				dir := filepath.Dir(s)
-				if dir == "~" {
-					usr, _ := user.Current()
-					dir = usr.HomeDir
-				} else if strings.HasPrefix(dir, "~/") {
-					usr, _ := user.Current()
-					dir = filepath.Join(usr.HomeDir, dir[2:])
-				}
-
-				partial := filepath.Base(s)
-				paths, _ := ioutil.ReadDir(dir)
-				e.ShowAside("dir: %s  base: %s", dir, partial)
-
-				for _, path := range paths {
-					if strings.HasPrefix(path.Name(), partial) {
-						e.tabCompletion.list = append(e.tabCompletion.list, filepath.Join(dir, path.Name()))
-					}
-				}
-			}
-			if len(e.tabCompletion.list) == 0 {
-				return false, true
-			}
-		} else {
-			e.tabCompletion.index++
-			if e.tabCompletion.index > len(e.tabCompletion.list)-1 {
-				e.tabCompletion.index = 0
-			}
-		}
-		e.command_line = e.command_line[:pos+1] + e.tabCompletion.list[e.tabCompletion.index]
-		// write the completed line back into vim's cmdline buffer so vim and
-		// the display stay in sync (end, clear, retype)
-		vim.SendKey("<c-e>")
-		vim.SendKey("<c-u>")
-		vim.SendMultiInput(e.command_line)
-		e.cmdLineCursor = len(e.command_line)
-		e.ShowMessage(":%s", e.command_line)
+		e.completeFileName()
 		return false, true
 	}
 
@@ -344,6 +300,87 @@ func (e *Editor) ExModeKeyHandler(c int) (redraw, skip bool) {
 	return false, true
 }
 
+// completeFileName is Tab on a ':' line. Where the line is a command that
+// takes a file name (:read, :source) it puts on the line the first file whose
+// name starts with what is typed of one, and each Tab after it the next,
+// round again from the last. Anywhere else, and with no such file, it does
+// nothing. A key that is not Tab ends the round (syncCmdline).
+func (e *Editor) completeFileName() {
+	round := e.tabCompletion
+	if round.list == nil {
+		prefix, name, ok := fileNameArgument(e.command_line)
+		if !ok {
+			return
+		}
+		round.prefix, round.list, round.index = prefix, fileNamesStarting(name), 0
+		if len(round.list) == 0 {
+			return
+		}
+	} else {
+		round.index = (round.index + 1) % len(round.list)
+	}
+	// the line is vim's: clear it there (to its end, then back to its start),
+	// type the new one, and read it back
+	vim.SendKey("<c-e>")
+	vim.SendKey("<c-u>")
+	vim.SendMultiInput(round.prefix + round.list[round.index])
+	e.syncCmdline()
+	e.tabCompletion = round
+}
+
+// fileNameArgument splits a ':' line being typed into what is typed of a file
+// name, at its end, and everything before that. ok is false when the line is
+// not a command that takes a file name, is one vimango refuses (":e", ":w
+// name"), or has no blank after the command yet.
+func fileNameArgument(line string) (prefix, name string, ok bool) {
+	cmd, rest, found := vim.FindExCommand(skipExRange(line))
+	if !found || cmd.Flags&vim.ExXFile == 0 || classifyEx(line).action == exRefuse {
+		return "", "", false
+	}
+	name = strings.TrimLeft(rest, " \t")
+	// ":r !cmd" is a program, not a file; and a blank or a bar in what is
+	// left means the file name is not what is being typed
+	if name == rest || strings.HasPrefix(name, "!") || strings.ContainsAny(name, " \t|`") {
+		return "", "", false
+	}
+	return line[:len(line)-len(name)], name, true
+}
+
+// fileNamesStarting is the files whose names start with typed, in name order
+// and as they would be typed: with the directory typed in front, "~/"
+// included, and a "/" after a directory. Hidden files only when the name typed
+// starts with a dot.
+func fileNamesStarting(typed string) []string {
+	dir, start := filepath.Split(typed)
+	look := dir
+	switch {
+	case dir == "":
+		look = "."
+	case strings.HasPrefix(dir, "~/"):
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		look = filepath.Join(home, dir[2:])
+	}
+	entries, err := os.ReadDir(look)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, start) || (strings.HasPrefix(name, ".") && !strings.HasPrefix(start, ".")) {
+			continue
+		}
+		if entry.IsDir() {
+			name += "/"
+		}
+		names = append(names, dir+name)
+	}
+	return names
+}
+
 // syncCmdline brings the editor's idea of the command line into step with
 // vim's, where it is typed: which kind of line it is, what is on it, where
 // the cursor is. A ':' line is EX_COMMAND, whose <cr> vimango takes for
@@ -360,8 +397,7 @@ func (e *Editor) syncCmdline() {
 	e.searchPrefix = string(rune(kind))
 	e.command_line = vim.CommandLineGetText()
 	e.cmdLineCursor = vim.CommandLineGetPosition()
-	e.tabCompletion.index = 0
-	e.tabCompletion.list = nil
+	e.tabCompletion.list = nil // a round of file names ends with any change to the line
 	e.ShowMessage("%s%s", e.searchPrefix, e.command_line)
 }
 

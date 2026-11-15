@@ -237,6 +237,8 @@ Limits, from libvim:
 
 A range in front of a command (`'<,'>` is what vim writes when `:` is pressed in VISUAL) is skipped as vim skips it (`skipExRange`) to find the name, and the whole line, range included, is what reaches vim.
 
+**Tab on a `:` line completes a file name, and only where one goes**: for a command whose arguments vim's table says are file names and which vimango does not refuse — `:read`, `:source` (`completeFileName`, `editor_process_key.go`). It goes through the matching files in name order, a `/` after a directory, hidden files only after a dot; any other key ends the round. Anywhere else Tab does nothing: there is no completion of command names. The line is typed into vim and read back with `syncCmdline`, like every change to it. Tests: `tab_test.go`.
+
 ### vim's ex commands
 
 **Every other ex command is vim's, and is forwarded to libvim only if it is on the list in `ex_forward.go`** (`exAllowed`, 138 of vim's 558): `:s` `:g` `:v` `:d` `:y` `:pu` `:m` `:t` `:j` `:>` `:<` `:normal` `:sort` `:retab` `:u` `:red` `:noh` `:set` `:let` `:echo` `:call` `:execute` `:map` and its relatives, `:command`, `:autocmd`, `:marks`, `:source`, `:read`, a bare line number, and more — with ranges, modifiers such as `:silent`, and `|` chaining.

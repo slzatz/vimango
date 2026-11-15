@@ -100,11 +100,15 @@ type Editor struct {
 	// against, which is what separates "the row changed in the database
 	// since I read it" (news) from "I have unsaved edits" (not news). Set
 	// wherever a note is loaded into an editor or written back.
-	dbText        string
-	title         string   // title of the note
-	tabCompletion struct { // for tab completion
-		list  []string
-		index int
+	dbText string
+	title  string // title of the note
+	// tabCompletion is a round of Tab on a ':' line (completeFileName): the
+	// file names being gone through, which one is on the line, and what is
+	// on the line before it. list is nil when no round is under way.
+	tabCompletion struct {
+		prefix string
+		list   []string
+		index  int
 	}
 	// notice is what is in the box over the text while one is up
 	// (showNotice): kept so that it can be put back when the text is drawn
