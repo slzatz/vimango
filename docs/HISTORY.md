@@ -1090,3 +1090,43 @@ repositories:
   `:help`, then `:` and `<esc>` (or a command that draws nothing, `:noh`)
   leaves the notice on screen with the editor in NORMAL, and the keys go to
   the note under it.
+
+- **One copy of vim, made in one place.** The editor draws from a copy of
+  vim's text and cursor (`e.ss`, `e.fr`, `e.fc`), and decides whether to
+  draw from vim's change tick. The copy was made in five places, each
+  clamping differently -- four after the `<esc>` change above -- and the tick
+  compared in four. `resyncFromVim` now does both, and reports whether the
+  text changed; it is called after anything that touches vim: a key
+  (`followVim`), an ex command (`forwardEx`, `runExLine`), a note read into
+  the buffer (`Open`, `checkStale`). What changed with it:
+  - **`followVim` has no exceptions.** A key that left vim half way through
+    an operator returned before the copy, on the reasoning that an operator
+    has changed nothing yet. A mapping can: with `nnoremap ,x xd`, `,x`
+    deleted a character that was not drawn, and the tick that would have
+    drawn it later was already spent
+    (`TestMappingThatEndsInAnOperatorIsDrawn`, which fails on the old code).
+  - **`:checkstale` takes its cursor from vim.** It kept a cursor of its
+    own, clamped to one past the end of a row, and told vim -- which, in
+    NORMAL, put it on the last character. After a reload onto a shorter note
+    the cursor was drawn one column right of where the next key landed
+    (`TestCheckStaleKeepsTheCursorInTheText`, likewise). Seen with the two
+    binaries on a pseudo-terminal, a row shortened underneath by `sqlite3`:
+    the reload differs in the cursor's column and in nothing else. Learned
+    on the way: replacing a buffer's lines leaves vim's cursor where it was,
+    on a row that may no longer exist, until it is set -- so the
+    `vim.SetCursorPosition` there is not optional.
+  - **A spelling suggestion is followed like a key.** The digit's `{n}z=`
+    was sent and the copy made by hand; it goes through `followVim`, so
+    vim's messages and the buffer check apply to it too.
+  - **`:w` writes vim's text**, not the editor's copy of it
+    (`bufferToString` is gone): what is saved is what the tick recorded
+    beside it says is saved.
+  - **The mode is set in fewer places**: `runExLine` says NORMAL once, when
+    it starts, where three branches and `closeNote` each said it; `:` typed
+    over a notice asks vim what line is open (`syncCmdline`) in place of six
+    assignments.
+
+  No other change to what is drawn: `compare-drawing.py` says `SAME`
+  against the build from before both changes, and the run through the
+  `<esc>` cases says `SAME` against the build between them. Tests:
+  `resync_test.go`.

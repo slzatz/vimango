@@ -172,7 +172,7 @@ func (e *Editor) spellSuggest() {
 
 // case SPELLING: a digit replaces the word with that suggestion, by sending
 // vim "{n}z=" (so undo, . and :spellrepall work); any other key cancels.
-// <esc> never gets here: ProcessKey handles it first.
+// <esc> never gets here: handleKey sends it to vim first.
 func (e *Editor) SpellingModeKeyHandler(c int) (redraw, exit bool) {
 	e.mode = NORMAL
 	e.ShowMessage("")
@@ -180,20 +180,8 @@ func (e *Editor) SpellingModeKeyHandler(c int) (redraw, exit bool) {
 	if n < 1 || n > len(e.suggestions) {
 		return false, true
 	}
-
-	vim.SendInput(strconv.Itoa(n))
-	vim.SendInput("z")
-	vim.SendInput("=")
-
-	e.bufferTick = e.vbuf.GetLastChangedTick()
-	e.ss = e.vbuf.Lines()
-	if len(e.ss) == 0 {
-		e.ss = []string{""}
-	}
-	pos := vim.GetCursorPosition()
-	e.fr = min(max(pos[0]-1, 0), len(e.ss)-1)
-	e.fc = min(pos[1], len(e.ss[e.fr]))
-	return true, true
+	// vimango's own keys, so no mapping sees them; followed like any others
+	return e.followVim(NoKey, func() { vim.SendMultiInput(strconv.Itoa(n) + "z=") }), true
 }
 
 // spellListKey reports whether key c completes a command that changes the

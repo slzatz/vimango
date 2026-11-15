@@ -165,13 +165,12 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	e.id = id
 	e.title = title
 	e.dbText = note
-	e.ss = strings.Split(note, "\n")
 	e.vbuf = vim.NewBuffer(0)
 	vim.SetCurrentBuffer(e.vbuf)
-	e.vbuf.SetLines(0, -1, e.ss)
-	e.bufferTick = e.vbuf.GetLastChangedTick()
-	e.saveTick = e.bufferTick
-	vim.SetScreenLayout(e) // gj, gk, H, M, L
+	e.vbuf.SetLines(0, -1, strings.Split(note, "\n"))
+	e.resyncFromVim()
+	e.saveTick = e.bufferTick // the note as read is the note as saved
+	vim.SetScreenLayout(e)    // gj, gk, H, M, L
 	return e, nil
 }
 

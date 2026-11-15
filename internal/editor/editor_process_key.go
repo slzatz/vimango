@@ -136,24 +136,16 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		e.spellKeys = (e.spellKeys + string(rune(c)))[max(0, len(e.spellKeys)+len(string(rune(c)))-2):]
 	}
 
-	tick := e.vbuf.GetLastChangedTick()
-	if tick > e.bufferTick {
-		e.bufferTick = tick
-		redraw = true
-	} else {
-		redraw = false
-	}
+	// The text and the cursor, then the mode: all three are vim's, and are
+	// asked for after every key rather than worked out from it. A key that
+	// begins a longer mapping has done nothing yet; a mapping can do
+	// anything.
+	redraw = e.resyncFromVim()
 	mode := vim.GetCurrentMode()
 
 	// The switch performs side effects only; e.mode is set once from modeMap
-	// below, so no case should assign it. The early return is the exception,
-	// and says why it skips the buffer/cursor resync.
+	// below, so no case should assign it.
 	switch mode {
-	case vim.ModeOpPending: // delete, change, yank, etc
-		// half of an operator (the "d" of "d3w"): the buffer has not changed
-		// and the cursor has not settled, so there is nothing to resync yet
-		e.mode = PENDING
-		return false
 	case vim.ModeCmdline: // SEARCH and EX_COMMAND
 		// A command line is open in vim. This key may have opened it -- ':'
 		// '/' '?', a mapping that ends on one ("nnoremap ,s :%s/"), or
@@ -213,9 +205,6 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		redraw = true
 	}
 
-	//below is done for everything except OP_PENDING
-	e.resyncFromVim()
-
 	if spellRedraw {
 		redraw = true
 	}
@@ -237,15 +226,10 @@ func (e *Editor) HelpModeKeyHandler(c int) (redraw, exit bool) {
 		return false, true
 	}
 	switch c {
-	case ':': // COMMAND or SEARCH
-		e.ShowMessage(":")
+	case ':':
 		vim.SendKey("<esc>")
 		vim.SendInput(":") // put vim in cmdline mode (the line editor)
-		e.command_line = ""
-		e.cmdLineCursor = 0
-		e.mode = EX_COMMAND
-		e.tabCompletion.index = 0
-		e.tabCompletion.list = nil
+		e.syncCmdline()
 	}
 	return false, true
 }
@@ -386,6 +370,10 @@ func (e *Editor) syncCmdline() {
 //     is forwarded or refused.
 func (e *Editor) runExLine(line string) (redraw bool) {
 	e.exLine = line
+	// vim left its command line when the Enter was taken (ExModeKeyHandler).
+	// A command that puts up a notice (:help, a listing) or waits for a
+	// choice (:suggest) sets the mode for that itself.
+	e.mode = NORMAL
 	decision := classifyEx(line)
 
 	switch decision.action {
@@ -409,9 +397,6 @@ func (e *Editor) runExLine(line string) (redraw bool) {
 	}
 	if decision.action != exForward && decision.action != exRefuse {
 		e.command_line = ""
-		if e.mode != HELP {
-			e.mode = NORMAL
-		}
 		return false
 	}
 
@@ -424,25 +409,14 @@ func (e *Editor) runExLine(line string) (redraw bool) {
 	if cmd, found := e.exCmds[name]; found && !decision.owned {
 		cmd(e)
 		e.command_line = ""
-		// a command that put up its own screen (:help) or is waiting for a
-		// choice (:suggest) owns the mode from here; everything else lands
-		// back in NORMAL
-		if e.mode != HELP && e.mode != SPELLING {
-			e.mode = NORMAL
-		}
 		// A command that changed the buffer has to be drawn now: dispatch
 		// ends the keystroke, so otherwise the edit sits invisible until the
-		// next key happens to trip the tick check in ProcessKey.
-		if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick && e.mode != HELP {
-			e.bufferTick = tick
-			e.resyncFromVim()
-			return true
-		}
-		return false
+		// next key. Not over a notice the command put up: closing that draws
+		// the text.
+		return e.resyncFromVim() && e.mode != HELP
 	}
 
 	e.command_line = ""
-	e.mode = NORMAL
 	if decision.action == exRefuse {
 		e.ShowMessage("\x1b[41m%s\x1b[0m", decision.reason)
 		return false
@@ -451,8 +425,16 @@ func (e *Editor) runExLine(line string) (redraw bool) {
 	return redraw && e.mode != HELP // an overlay (:marks) is up: draw the text when it closes
 }
 
-// resyncFromVim copies vim's buffer and cursor into the editor, clamped.
-func (e *Editor) resyncFromVim() {
+// resyncFromVim brings the editor's copy of the note into line with vim's --
+// the text, and the cursor, kept inside it -- and reports whether the text
+// has changed since the last time it was asked: whether there is something
+// to draw.
+//
+// It is the one place that copy is made, and it is called after anything
+// that touches vim: a key (followVim), an ex command (forwardEx, runExLine),
+// a note read into the buffer (Open, checkStale). The copy is what is drawn;
+// nothing may change it but this.
+func (e *Editor) resyncFromVim() (changed bool) {
 	e.ss = e.vbuf.Lines()
 	if len(e.ss) == 0 {
 		e.ss = []string{""}
@@ -460,4 +442,9 @@ func (e *Editor) resyncFromVim() {
 	pos := vim.GetCursorPosition()
 	e.fr = min(max(pos[0]-1, 0), len(e.ss)-1)
 	e.fc = min(max(pos[1], 0), len(e.ss[e.fr]))
+	if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick {
+		e.bufferTick = tick
+		return true
+	}
+	return false
 }

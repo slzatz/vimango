@@ -411,11 +411,7 @@ func (e *Editor) forwardEx(line string) (redraw bool) {
 		problems = append(problems, "that command changed the working directory; vimango changed it back")
 	}
 
-	e.resyncFromVim()
-	if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick {
-		e.bufferTick = tick
-		redraw = true
-	}
+	redraw = e.resyncFromVim()
 
 	e.showVimMessages(msgs, problems)
 	return redraw

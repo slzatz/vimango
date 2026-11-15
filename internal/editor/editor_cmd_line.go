@@ -199,7 +199,9 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 // (dbText). On an error the database does not hold this text, and the buffer
 // stays modified so nothing treats it as safe to discard.
 func (e *Editor) save() error {
-	text := e.bufferToString()
+	// vim's text, not the editor's copy of it: what is saved is what the
+	// tick below says is saved
+	text := strings.Join(e.vbuf.Lines(), "\n")
 	if err := e.Store.SetNote(e.id, text); err != nil {
 		return err
 	}
@@ -281,7 +283,6 @@ func (e *Editor) closeNote(save, force bool) {
 		// :wq does the same here, for the same reason.
 		if e.isModified() {
 			if err := e.save(); err != nil {
-				e.mode = NORMAL
 				e.command_line = ""
 				e.ShowMessage("\x1b[41mNote %d NOT saved: %v\x1b[0m", e.id, err)
 				return
@@ -290,7 +291,6 @@ func (e *Editor) closeNote(save, force bool) {
 	case force:
 		// the user's call: close without saving
 	case e.isModified():
-		e.mode = NORMAL
 		e.command_line = ""
 		e.ShowMessage("No write since last change")
 		return
@@ -328,25 +328,15 @@ func (e *Editor) checkStale() {
 
 	e.dbText = dbText
 	e.title = title
-	e.ss = strings.Split(dbText, "\n")
-	if len(e.ss) == 0 {
-		e.ss = []string{""}
-	}
-	e.vbuf.SetLines(0, -1, e.ss)
-	// The reload is not an edit: keep the buffer clean so the quit guard
-	// and `:w` see it for what it is.
-	e.bufferTick = e.vbuf.GetLastChangedTick()
-	e.saveTick = e.bufferTick
-
-	// Hold the cursor where the user left it, clamped into the new text
-	// (the synced version can be shorter).
-	if e.fr >= len(e.ss) {
-		e.fr = len(e.ss) - 1
-	}
-	if e.fc > len(e.ss[e.fr]) {
-		e.fc = len(e.ss[e.fr])
-	}
+	e.vbuf.SetLines(0, -1, strings.Split(dbText, "\n"))
+	// Hold the cursor where the user left it. vim keeps it inside the new
+	// text, which can be shorter -- and must be told to: replacing the lines
+	// leaves vim's cursor where it was, on a row that may be gone.
 	vim.SetCursorPosition(e.fr+1, e.fc)
+	e.resyncFromVim()
+	// The reload is not an edit: the buffer is clean, so the quit guard and
+	// `:w` see it for what it is.
+	e.saveTick = e.bufferTick
 	e.scroll()
 
 	// the new text, and the title, which a sync can change too

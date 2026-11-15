@@ -66,11 +66,6 @@ func (e *Editor) drawHighlightedBraces() {
 	return
 }
 
-// used by updateNote
-func (e *Editor) bufferToString() string {
-	return strings.Join(e.ss, "\n")
-}
-
 // wrapWidth is the number of display columns available to wrapped buffer text.
 func (e *Editor) wrapWidth() int {
 	return e.ScreenCols - e.left_margin_offset
