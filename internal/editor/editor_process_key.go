@@ -478,6 +478,19 @@ func (e *Editor) runExLine(line string) (redraw bool) {
 // a note read into the buffer (Open, checkStale). The copy is what is drawn;
 // nothing may change it but this.
 func (e *Editor) resyncFromVim() (changed bool) {
+	e.copyFromVim()
+	if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick {
+		e.bufferTick = tick
+		return true
+	}
+	return false
+}
+
+// copyFromVim is the copy resyncFromVim makes, without the report: vim's
+// text and cursor. For Scroll alone, which libvim calls in the middle of a
+// key and which must leave the question of whether the text changed for the
+// resyncFromVim that follows the key.
+func (e *Editor) copyFromVim() {
 	e.ss = e.vbuf.Lines()
 	if len(e.ss) == 0 {
 		e.ss = []string{""}
@@ -485,9 +498,4 @@ func (e *Editor) resyncFromVim() (changed bool) {
 	pos := vim.GetCursorPosition()
 	e.fr = min(max(pos[0]-1, 0), len(e.ss)-1)
 	e.fc = min(max(pos[1], 0), len(e.ss[e.fr]))
-	if tick := e.vbuf.GetLastChangedTick(); tick > e.bufferTick {
-		e.bufferTick = tick
-		return true
-	}
-	return false
 }

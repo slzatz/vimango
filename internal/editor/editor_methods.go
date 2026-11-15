@@ -154,8 +154,8 @@ func (e *Editor) getLineInRowWW(r, c int) int {
 // yet. vim shows it at the cursor meanwhile, so that typing does not seem to
 // lag, and so does this; whatever happens next redraws the text over it.
 func (e *Editor) DrawAfterKey(redraw bool, c int) {
-	offsetChanged := e.scroll()
-	if redraw || offsetChanged || e.heldKeyShown {
+	viewMoved := e.followCursor()
+	if redraw || viewMoved || e.heldKeyShown {
 		e.drawText()
 		e.drawStatusBar()
 	}
@@ -174,7 +174,12 @@ func (e *Editor) DrawAfterKey(redraw bool, c int) {
 // clears the screen first -- and when its note is reloaded; a key redraws
 // only what it changed (DrawAfterKey). Nothing need be erased first: drawText
 // clears each line of the text area before it writes it.
+//
+// The view is worked out again first: a layout of another width wraps the
+// rows above the cursor onto other screen lines, and one of another height
+// may not hold the cursor's row.
 func (e *Editor) Draw() {
+	e.followCursor()
 	e.drawText()
 	e.drawFrame()
 	e.drawStatusBar()
@@ -202,7 +207,8 @@ func (e *Editor) drawText() {
 		ab.WriteString(erase_chars)
 		ab.WriteString(lf_ret)
 	}
-	e.drawRows(&ab)          // editor_rows.go
+	e.drawRows(&ab) // editor_rows.go
+	e.drawnView.top, e.drawnView.skip = e.firstVisibleRow, e.topSkip
 	e.drawSpellErrors(&ab)   // no-op unless :spell is on
 	e.drawSearchMatches(&ab) // no-op unless a search is being highlighted
 	if e.mode == VISUAL {
@@ -347,78 +353,6 @@ func (e *Editor) drawFrame() {
 	ab.WriteString("\x1b[?25h") //shows the cursor
 	ab.WriteString("\x1b[0m")   //or else subsequent editors are bold
 	fmt.Print(ab.String())
-}
-
-// scroll sets cx and cy, which Cursor() turns into the terminal's row and column
-func (e *Editor) scroll() (offset_changed bool) {
-
-	prevOffset := e.lineOffset
-
-	if e.fc == 0 && e.fr == 0 {
-		e.cy, e.cx, e.lineOffset, e.firstVisibleRow = 0, 0, 0, 0
-		return prevOffset != e.lineOffset
-	}
-
-	e.cx = e.getScreenXFromRowColWW(e.fr, e.fc)
-	cy := e.getScreenYFromRowColWW(e.fr, e.fc)
-
-	//deal with scroll insufficient to include the current line
-	if cy > e.ScreenLines+e.lineOffset-1 {
-		e.lineOffset = cy - e.ScreenLines + 1 ////
-		e.adjustFirstVisibleRow()             //can also change e.lineOffset
-	}
-
-	if cy < e.lineOffset {
-		e.lineOffset = cy
-		e.adjustFirstVisibleRow()
-	}
-
-	if e.lineOffset == 0 {
-		e.firstVisibleRow = 0
-	}
-
-	e.cy = cy - e.lineOffset
-
-	return prevOffset != e.lineOffset
-}
-
-// e.lineOffset determines the first
-// visible row but we want the whole row
-// visible so that can change e.lineOffset
-func (e *Editor) adjustFirstVisibleRow() {
-
-	if e.lineOffset == 0 {
-		e.firstVisibleRow = 0
-		return
-	}
-
-	rowNum := 0
-	lines := 0
-
-	for {
-		lines += e.getLinesInRowWW(rowNum)
-		rowNum++
-
-		/*
-			there is no need to adjust line_offset
-			if it happens that we start
-			on the first line of the first visible row
-		*/
-		if lines == e.lineOffset {
-			break
-		}
-
-		/*
-			need to adjust line_offset
-			so we can start on the first
-			line of the top row
-		*/
-		if lines > e.lineOffset {
-			e.lineOffset = lines
-			break
-		}
-	}
-	e.firstVisibleRow = rowNum
 }
 
 // this func is reason that we are writing notes to file

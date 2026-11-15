@@ -24,7 +24,7 @@ func searchEditor(t *testing.T, lines ...string) *Editor {
 func highlighted(t *testing.T, e *Editor) (texts []string, rows []int) {
 	t.Helper()
 	var ab strings.Builder
-	e.scroll()
+	e.followCursor()
 	e.drawSearchMatches(&ab)
 	out := ab.String()
 	if out == "" {

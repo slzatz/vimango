@@ -1263,3 +1263,90 @@ repositories:
   header test's probe the enum. **`libvim.a` must be rebuilt**: an older
   one does not link (`undefined: vimSetCursorMoveScreenColumnCallback`);
   `docs/UPDATING_A_MAC.md` names the commit.
+
+- **The scrolling commands work, and the view follows the cursor as vim's
+  does.** Ctrl-D, Ctrl-U, Ctrl-F, Ctrl-Y, `zt`, `zz`, `zb` (and `z<CR>`,
+  `z.`, `z-`, `<PageDown>`, `<PageUp>`) did nothing: libvim carries none of
+  them out and hands each to the embedder (`vimSetScrollCallback`), and
+  vimango registered no callback. All of it is on this side; the fork is
+  unchanged and `libvim.a` need not be rebuilt.
+  - **The binding** (`vim/screen.go`): `ScreenLayout` has a fourth method,
+    `Scroll(s, count)`, set and cleared with the layout like the column
+    callback, and `vim.ScrollCursorTo(line, startOfLine)` moves the cursor
+    from inside it the way vim's own scrolling does -- to the column vim
+    wants (`update_curswant`, `coladvance`), or to the first non-blank
+    unless `'nostartofline'` (`beginline`). Those three are vim's
+    internals, declared in `libvim_api.h` like `getvcol`. The sideways
+    commands (`zh`, `zl`, `zs`, `ze`) are for a window that does not wrap
+    and are not passed on.
+  - **The view** (`internal/editor/view.go`, new). `scroll()` and
+    `adjustFirstVisibleRow()` went. The view is now a row, the first on
+    screen, set in one place (`setView`); `followCursor` moves it when the
+    cursor leaves, and `Scroll` when vim asks. `Scroll` runs in the middle
+    of the key, from vim's text and cursor as they are then
+    (`copyFromVim`), so a mapping or `:normal` can move, scroll and edit in
+    one go: `:execute "normal \<C-d>dd"` deletes the line Ctrl-D went to.
+  - **vim 9.1's rules, not 8.1's.** The first port was of vim 8.1's
+    `halfpage()` and `onepage()`, from memory of the source, and it agreed
+    with the vim on this machine (9.1.1752) for every case with rows of
+    one screen line and differed by a row where rows wrap: 9.1 pages and
+    moves the cursor by screen lines, 8.1 by lines. A note is wrapped
+    prose, and 9.1 is the vim there is to compare with, so the rules are
+    9.1's, read from its `move.c` (`pagescroll`, `scroll_with_sms`,
+    `get_scroll_overlap`, `scroll_cursor_halfway` with `prefer_above`).
+  - **How it was checked.** `scripts/ask-vim.py` (new) types keys into
+    stock vim on a pseudo-terminal, in a window the size of the test
+    editor's pane, and prints the top line, the cursor's line and its
+    column. Keys have to be typed one at a time: given to `:normal`, vim
+    scrolls from a window it has not yet brought up to date. 400 random
+    sequences of 3 to 10 motions and scrolls over five sets of rows (one
+    screen line each; two; three; mixed; one to four in turn), run with
+    vim's off-by-one, below, copied for the comparison: 394 the same as
+    the editor, and the 6 others not the view's -- 5 a count given to
+    Ctrl-U on the first line or Ctrl-D on the last, which libvim refuses
+    before the editor hears of it, 1 the wanted column after `gj`, below.
+    As built, of 285 sequences 277 are the same, 6 are that off-by-one and
+    2 the wanted column after `$`. 229 sequences and vim's answers are now
+    a test (`vimAnswers`, `view_vim_test.go`).
+  - **One thing of vim's left out.** When half a page ends two or more
+    screen lines into a wrapped row, vim 9.1 brings the view back to the
+    start of that row and the cursor back one screen line fewer:
+    `count = 1 + (w_skipcol - width1 - 1) / width2` in `scroll_with_sms` is
+    one short for every row but the first. With that off-by-one copied the
+    editor matched vim on all 47 cases written to find it; without it, 6
+    differ by a row. It is not copied: the cursor goes as far as the view,
+    which is what vim's comment says it means
+    (`TestHalfPageKeepsTheCursorsPlace`).
+  - **What changes for a note already open.** `G`, a search or a mark that
+    lands more than about half a pane away now puts the cursor's row in
+    the middle, not on the last line of the pane with nothing under it.
+    The cursor's row is shown whole: `G` onto a last paragraph of ten
+    screen lines used to show its first line only. `Draw` works the view
+    out again, so a resize places the cursor for the new width at once and
+    not at the next key. `compare-drawing.py` differs in exactly those
+    steps (the resize; `G` in the TUI and what follows it).
+  - **Two bugs it fixed on the way.** Going up with `k` into the second
+    screen line of a wrapped row above the pane left the cursor drawn
+    above the pane and the row not drawn: the old code set the offset to
+    the cursor's screen line and then rounded it up to the next row. And a
+    row taller than the whole pane with the cursor far into it had the
+    same end; it is now shown from the screen line that keeps the cursor
+    on screen (`topSkip`). 60 of 5,922 notes have a paragraph over 1,000
+    characters, 3 over 2,000.
+  - **Found and not fixed** (CLAUDE.md, "Open items"): after `$`, `0` then
+    `j` goes to the end of the next line -- libvim's, with or without the
+    editor, and there before this change (the same keys give the same
+    answer at `60c0539`); after `gj` along a wrapped row, `gg` then `j`
+    goes back to `gj`'s column, probably the same fault; `z+` and `z^` go
+    by libvim's own window; and in a note Ctrl-E and Ctrl-B are
+    `vimango.vim`'s code and bold, so of vim's scrolling keys those two
+    are not available.
+
+  Tests: `vim/scroll_test.go` (every command reaches the layout with its
+  count; `ScrollCursorTo`), `internal/editor/view_test.go` (each command,
+  rows that wrap, the view following the cursor, a row taller than the
+  pane, a scroll inside a mapping and in VISUAL, the redraw, a resize) and
+  `view_vim_test.go`. With the binary in `--editor` on a pseudo-terminal of
+  40 lines, on the longest note: `zt`, `zz` and `zb` put the cursor on
+  lines 1, 19 and 38 of the pane, `<PageUp>` on 38, and Ctrl-D leaves it
+  on the line it was on. `BenchmarkRedrawAtBottomOfLongNote`: 84 µs.

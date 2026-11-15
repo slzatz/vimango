@@ -100,6 +100,7 @@ func (e *Editor) drawRows(pab *strings.Builder) {
 	}
 
 	y := 0
+	skip := e.topSkip // the first row's screen lines above the pane (view.go)
 	e.visibleRows(func(n int, row string) bool {
 		if e.numberLines {
 			// (both colours are put back: whatever is drawn next -- the status
@@ -107,6 +108,10 @@ func (e *Editor) drawRows(pab *strings.Builder) {
 			fmt.Fprintf(&numCols, "\x1b[48;5;235m\x1b[38;5;245m%3d \x1b[39;49m", n+1)
 		}
 		for _, line := range strings.Split(row, "\t") {
+			if skip > 0 {
+				skip--
+				continue
+			}
 			if y == e.ScreenLines {
 				return false // the row runs past the bottom of the pane
 			}

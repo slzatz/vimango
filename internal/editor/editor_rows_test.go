@@ -228,13 +228,13 @@ func longNote() []string {
 func BenchmarkRedrawAtBottomOfLongNote(b *testing.B) {
 	e := highlightEditor(b, longNote())
 	e.fr = len(e.ss) - 1
-	e.scroll()
+	e.followCursor()
 	var ab strings.Builder
 	e.drawRows(&ab)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		e.ss[len(e.ss)-5] = fmt.Sprintf("A second line of it, as typed %d.", i)
-		e.scroll()
+		e.followCursor()
 		ab.Reset()
 		e.drawRows(&ab)
 	}

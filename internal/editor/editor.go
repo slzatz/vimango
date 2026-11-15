@@ -76,7 +76,7 @@ type Editor struct {
 	Host                         // what else it is given
 	cx, cy             int       // cursor position in the text area: column and line, from 0
 	fc, fr             int       // file cursor: fc is a byte offset into ss[fr], as libvim reports it; fr is the 0-based row
-	lineOffset         int       //first row based on user scroll
+	lineOffset         int       // the screen lines of the note above the pane's first (setView)
 	left_margin_offset int       // 0 if no line numbers
 	highlight          [2][2]int // [line col][line col] -> note line is 1-based not zero-based
 	mode               Mode
@@ -84,7 +84,8 @@ type Editor struct {
 	command_line       string //for commands on the command line; string doesn't include ':'
 	exLine             string // the ex command line being carried out, range and all (runExLine)
 	cmdLineCursor      int    //byte offset of the cursor within command_line (EX_COMMAND: mirrors vim's cmdline position)
-	firstVisibleRow    int
+	firstVisibleRow    int    // the view: the first row on screen (view.go)
+	topSkip            int    // ...and the screen lines of it left out, for a row taller than the pane
 	highlightSyntax    bool
 	numberLines        bool
 	id                 int //db id of entry
@@ -98,8 +99,14 @@ type Editor struct {
 	searchDrawn  string     // vim's search state when the text was last drawn (searchState)
 	heldKeyShown bool       // a key vim is holding is drawn at the cursor (DrawAfterKey)
 	screenWant   screenWant // where gj/gk left the cursor, and the column wanted (screen_motion.go)
-	bufferTick   int
-	saveTick     int
+	// drawnView is the view the text was last drawn with: when it is not
+	// the view any more, the text is drawn again (followCursor).
+	drawnView struct{ top, skip int }
+	// scrollCount is the count last given to CTRL-D or CTRL-U, in screen
+	// lines, and the height of the pane it was given for (halfPage).
+	scrollCount struct{ lines, pane int }
+	bufferTick  int
+	saveTick    int
 	// dbText is the note exactly as this editor last read it from — or
 	// wrote it to — the database. It is the baseline :checkstale compares
 	// against, which is what separates "the row changed in the database
@@ -188,7 +195,7 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	e.vbuf.SetLines(0, -1, strings.Split(note, "\n"))
 	e.resyncFromVim()
 	e.saveTick = e.bufferTick // the note as read is the note as saved
-	vim.SetScreenLayout(e)    // gj, gk, H, M, L, g0, g^, gm, g$
+	vim.SetScreenLayout(e)    // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
 	return e, nil
 }
 

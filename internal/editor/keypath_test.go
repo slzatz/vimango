@@ -141,14 +141,14 @@ func TestCursorColumnOnMultiByteLine(t *testing.T) {
 	e := newTestEditor(t, "‘x“y’") // each quote is 3 bytes, 1 column
 
 	e.ProcessKey('$')
-	e.scroll()
+	e.followCursor()
 	if e.fc != 8 || e.cx != 4 {
 		t.Errorf("after $: fc=%d cx=%d, want fc=8 cx=4", e.fc, e.cx)
 	}
 
 	e.ProcessKey('0')
 	e.sendKeys("ll")
-	e.scroll()
+	e.followCursor()
 	if e.fc != 4 || e.cx != 2 {
 		t.Errorf("after 0ll: fc=%d cx=%d, want fc=4 cx=2", e.fc, e.cx)
 	}

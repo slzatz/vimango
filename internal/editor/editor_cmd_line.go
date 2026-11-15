@@ -336,7 +336,7 @@ func (e *Editor) checkStale() {
 	// The reload is not an edit: the buffer is clean, so the quit guard and
 	// `:w` see it for what it is.
 	e.saveTick = e.bufferTick
-	e.scroll()
+	e.followCursor()
 
 	// the new text, and the title, which a sync can change too
 	e.Draw()

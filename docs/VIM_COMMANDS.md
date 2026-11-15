@@ -11,7 +11,7 @@ It is not exhaustive. 138 of vim's 558 ex commands are forwarded; the
 authoritative list is `exAllowed` in `internal/editor/ex_forward.go`, and the reasons for the
 rest are `exReasons` in the same file. Written 2026-11-11, after the libvim
 work of that day (multi-key mappings, listings, typed search, Ctrl-R, no more
-freezes); `docs/HISTORY.md` has the account of each.
+freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
 
 ## Before you start
 
@@ -76,6 +76,32 @@ freezes); `docs/HISTORY.md` has the account of each.
 | `g0`, `g$` on a row that wraps | the start and the end of the screen line the cursor is on, not of the row. The end is the last character drawn on that line, which is the space the row is wrapped after. `dg$` deletes to there, `vg$` selects to there; `j` after `g$` keeps that column. `3g$`: the end of the screen line two further down (before 2026-11-15 these went to columns of an 80-wide window nobody sees) |
 | `g^`, `gm` | the first non-blank of the screen line; the character half the pane's width along it, or its last when the line is shorter |
 | `H`, `M`, `L` | the first, middle and last row on screen, counting only rows shown whole; `3H` the third from the top |
+
+### Scrolling (did nothing before 2026-11-15)
+
+A "row" is a line of the note, however many screen lines it wraps onto. The
+view always starts at the top of a row, and moves by whole rows.
+
+| Try | Expect |
+|---|---|
+| `zt`, `zz`, `zb` | the cursor's row goes to the top, the middle or the bottom of the pane; the cursor does not move |
+| `z<CR>`, `z.`, `z-` | the same, and the cursor goes to the first non-blank |
+| `50zt` | line 50 at the top, with the cursor on it |
+| Ctrl-Y, `3` Ctrl-Y | the text moves down a row, or three; the cursor stays on its row until that would leave the pane, and then is on the last row shown whole |
+| Ctrl-D, Ctrl-U | the view moves half a pane, and the cursor as far, so it stays on the same line of the pane; it ends on the first non-blank of its row |
+| `5` Ctrl-D, then Ctrl-D and Ctrl-U | five screen lines, and five again: the count is kept |
+| Ctrl-D with the end of the note showing | the view stays and the cursor goes half a pane on, to the last row at most; the same with Ctrl-U at the top |
+| Ctrl-F or PageDown | a pane on, less two screen lines; the cursor on the top row. With the end of the note showing, its last row goes to the top |
+| PageUp | a pane back, the cursor on the bottom row. (vim's Ctrl-B; here Ctrl-B is bold) |
+| PageDown in INSERT | pages, and INSERT goes on |
+| `V` Ctrl-D | the selection goes with the cursor |
+| `:set nostartofline`, then Ctrl-D | the cursor keeps its column |
+| `G` on a long note, a search, `` ` `` to a mark | the last row at the bottom; a row found more than about half a pane away is shown in the middle of the pane, not on its last line |
+| `j` onto a paragraph at the bottom of the pane | the view moves until the whole paragraph is shown |
+
+**Ctrl-E is not vim's here**: `vimango.vim` maps it to code, as it maps
+Ctrl-B to bold. `3` Ctrl-Y has no partner unless one of them is given
+another key.
 
 ### Listings (silent before 2026-11-11)
 
@@ -230,7 +256,12 @@ Worth confirming that these fail the way described, and not some other way.
 | After a search, `/pattern` stays on the message line | harmless; vim leaves it there too until something else is said |
 | The search match under the cursor | highlighted like the others, not differently |
 | `$` as the very first key after opening a note, then `gj`/`gk` | they keep the column instead of going to the end of each screen line (libvim forgets the "end" on the first command in a new buffer); any `$` after that is fine |
-| Ctrl-D, Ctrl-U, Ctrl-F, Ctrl-Y, `zt`, `zz`, `zb`, `z<CR>`, `z.`, `z-` | nothing: the cursor and the text stay where they are. libvim leaves scrolling to the program around it, and vimango does not answer yet. (Ctrl-B and Ctrl-E are bold and code, from `vimango.vim`.) Move with `{count}G`, `gg`, `G`, `H`/`M`/`L`, `{count}j` |
+| `$` then `0` (or `^`, `gg`) then `j` | the cursor goes to the end of the next line: vim goes on wanting "the end". It should be in column 1. `$hj` is right. libvim's |
+| `gj` on a row that wraps, then `gg` or `H`, then `j` | goes back to the column `gj` was in; probably the same fault |
+| `z+`, `z^` | `z+` puts line 41 at the top and `z^` goes to line 1: they are worked out from libvim's own window of 40 lines, not the pane |
+| A count to Ctrl-U on the first line, or Ctrl-D on the last | not remembered for the next Ctrl-D: libvim refuses the key there before the editor hears of it |
+| Ctrl-D ending two or more screen lines into a wrapped row | on purpose: the cursor goes exactly as far as the view. vim 9.1 moves it one screen line further, so it can be a row lower there |
+| `:set scroll=5`, `:set scrolloff=3` | not consulted: give Ctrl-D the count itself; the cursor may be on the first or last row of the pane |
 | `H`/`L` and `'scrolloff'` | `H` and `L` go to the top and bottom row exactly, as with `'scrolloff'` 0 |
 | Editing a title in the organizer (TUI) | shows none of vim's messages, and expands no mappings |
 

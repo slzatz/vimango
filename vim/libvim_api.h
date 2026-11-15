@@ -105,6 +105,36 @@ typedef enum
 typedef void (*CursorMoveScreenColumnCallback)(
     screenColumnMotion_T motion, linenr_T lnum, colnr_T col, colnr_T *destCol);
 
+/* What ScrollCallback is asked for: the window moved over the text, or the
+ * line the cursor is on moved to a place in the window. */
+typedef enum
+{
+  SCROLL_CURSOR_CENTERV, /* zz, z. */
+  SCROLL_CURSOR_CENTERH,
+  SCROLL_CURSOR_TOP,    /* zt, z<CR> */
+  SCROLL_CURSOR_BOTTOM, /* zb, z- */
+  SCROLL_CURSOR_LEFT,   /* zs */
+  SCROLL_CURSOR_RIGHT,  /* ze */
+  SCROLL_LINE_UP,       /* CTRL-E */
+  SCROLL_LINE_DOWN,     /* CTRL-Y */
+  SCROLL_HALFPAGE_DOWN, /* CTRL-D */
+  SCROLL_HALFPAGE_UP,   /* CTRL-U */
+  SCROLL_PAGE_DOWN,     /* CTRL-F, <PageDown> */
+  SCROLL_PAGE_UP,       /* CTRL-B, <PageUp> */
+  SCROLL_HALFPAGE_LEFT,  /* zL */
+  SCROLL_HALFPAGE_RIGHT, /* zH */
+  SCROLL_COLUMN_LEFT,    /* zl */
+  SCROLL_COLUMN_RIGHT    /* zh */
+} scrollDirection_T;
+
+/* count is the one typed, except for CTRL-D and CTRL-U, where none typed is
+ * 0, and the commands that put the cursor's line somewhere, where it is 1. */
+typedef void (*ScrollCallback)(scrollDirection_T dir, long count);
+
+/* beginline()'s flags. */
+#define BL_SOL 2 /* to the first non-blank if 'startofline', else keep the column */
+#define BL_FIX 4 /* not onto the NUL of a line of blanks */
+
 /* The direction of a motion. */
 #define FORWARD 1
 #define BACKWARD (-1)
@@ -133,6 +163,13 @@ void vim_free(void *x);
  * them -- 'tabstop', double-width characters. */
 void getvcol(win_T *wp, pos_T *pos, colnr_T *start, colnr_T *cursor, colnr_T *end);
 
+/* vim's own, for moving the cursor to another line as a scrolling command
+ * does: the wanted column brought up to date, the cursor put at a virtual
+ * column of its line, and at the start of its line. */
+void update_curswant(void);
+int coladvance(colnr_T wcol);
+void beginline(int flags);
+
 void vimInit(int argc, char **argv);
 
 buf_T *vimBufferNew(int flags);
@@ -151,6 +188,7 @@ int vimGetMode(void);
 
 pos_T vimCursorGetPosition(void);
 void vimCursorSetPosition(pos_T pos);
+colnr_T vimCursorGetColumnWant(void);
 
 int vimVisualGetType(void);
 void vimVisualGetRange(pos_T *startPos, pos_T *endPos);
@@ -168,6 +206,7 @@ void vimSetMessageCallback(MessageCallback messageCallback);
 void vimSetCursorMoveScreenLineCallback(CursorMoveScreenLineCallback cursorMoveScreenLineCallback);
 void vimSetCursorMoveScreenPositionCallback(CursorMoveScreenPositionCallback cursorMoveScreenPositionCallback);
 void vimSetCursorMoveScreenColumnCallback(CursorMoveScreenColumnCallback cursorMoveScreenColumnCallback);
+void vimSetScrollCallback(ScrollCallback callback);
 
 pos_T *vimSearchGetMatchingPair(int initc);
 char_u *vimSearchGetPattern(void);
