@@ -173,6 +173,43 @@ func TestResizeKeepsTheNoticeUp(t *testing.T) {
 	}
 }
 
+// A resize clears the screen and redraws the editor, and the editor writes
+// its message line again where its mode keeps something there: a command
+// half typed, "-- INSERT --". With and without an organizer.
+func TestResizeKeepsTheMessageLine(t *testing.T) {
+	for _, editorOnly := range []bool{true, false} {
+		a, ids := testApp(t, editorOnly, "alpha\nbravo")
+		e := openIn(t, a, ids[0])
+		resize := func(rows, cols int) string {
+			a.Screen.screenLines, a.Screen.screenCols = rows, cols
+			out := captureStdout(t, func() { a.moveDividerPct(a.Screen.edPct) })
+			cleared := strings.LastIndex(out, "\x1b[2J")
+			if cleared < 0 {
+				t.Fatal("the resize did not clear the screen")
+			}
+			return stripANSI(out[cleared:])
+		}
+
+		captureStdout(t, func() { pressKeys(e, ":s/alpha/x") })
+		if out := resize(30, 90); !strings.Contains(out, ":s/alpha/x") {
+			t.Errorf("editor only %v: the command line is not on screen after a resize", editorOnly)
+		}
+		captureStdout(t, func() { pressKeys(e, "/\r") })
+		if got := noteLines(); got != "x|bravo" {
+			t.Errorf("editor only %v: the command typed across a resize gave %q", editorOnly, got)
+		}
+
+		captureStdout(t, func() { pressKeys(e, "i") })
+		if out := resize(24, 70); !strings.Contains(out, "-- INSERT --") {
+			t.Errorf("editor only %v: -- INSERT -- is not on screen after a resize", editorOnly)
+		}
+		captureStdout(t, func() { e.ProcessKey('\x1b') })
+		if out := resize(30, 90); strings.Contains(out, "-- INSERT --") {
+			t.Errorf("editor only %v: -- INSERT -- is on screen after a resize in NORMAL", editorOnly)
+		}
+	}
+}
+
 // A resize redraws the editor, and only the editor.
 func TestResizeWithNoOrganizer(t *testing.T) {
 	a, ids := editorOnlyApp(t, "alpha\nbravo")

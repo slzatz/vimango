@@ -62,6 +62,10 @@ type MessageLine struct {
 // (left_margin_offset, while they are on).
 const lineNumberCols = 4
 
+// insertMessage is what the message line says throughout an insert, as vim's
+// does. It is the only mode vim announces.
+const insertMessage = "\x1b[1m-- INSERT --\x1b[0m"
+
 // sgrReset ends whatever colours and attributes are set.
 const sgrReset = "\x1b[0m"
 
@@ -89,6 +93,7 @@ type Editor struct {
 	ss           []string
 	searchPrefix string
 	suggestions  []string   // spelling suggestions offered in SPELLING mode
+	suggestWord  string     // ...and the word they are for
 	spellKeys    string     // last NORMAL keys typed, to spot zg/zw (spellListKey)
 	searchDrawn  string     // vim's search state when the text was last drawn (searchState)
 	heldKeyShown bool       // a key vim is holding is drawn at the cursor (DrawAfterKey)
@@ -238,6 +243,25 @@ func (e *Editor) writeMessage(line MessageLine, format string, a ...interface{})
 	// counted the bytes of an escape sequence ("-- INSERT --" is sent bold)
 	str, _ := pane.ClipColumns(fmt.Sprintf(format, a...), 0, line.Width)
 	fmt.Print(str)
+}
+
+// drawModeLine writes on the message line what the editor's mode keeps
+// there: the command line being typed, "-- INSERT --", the spelling
+// suggestions to choose from. In any other mode the line holds a report
+// that has been made -- "Saved note 5", what vim said about a key -- and
+// this leaves it alone.
+//
+// Each of those is written when it starts and when it changes. This is for
+// when the screen under it has gone: Draw, after a resize.
+func (e *Editor) drawModeLine() {
+	switch e.mode {
+	case EX_COMMAND, SEARCH:
+		e.ShowMessage("%s%s", e.searchPrefix, e.command_line)
+	case INSERT:
+		e.ShowMessage(insertMessage)
+	case SPELLING:
+		e.showSuggestions()
+	}
 }
 
 // Cursor is where the terminal's cursor belongs while the editor has the

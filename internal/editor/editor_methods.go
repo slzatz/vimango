@@ -168,11 +168,12 @@ func (e *Editor) DrawAfterKey(redraw bool, c int) {
 	}
 }
 
-// Draw draws the whole editor: the text, the frame, the status bar, and the
-// notice over them if one is up. For when it is opened, when its layout
-// changes, and when its note is reloaded; a key redraws only what it changed
-// (DrawAfterKey). Nothing need be erased first: drawText clears each line of
-// the text area before it writes it.
+// Draw draws the whole editor: the text, the frame, the status bar, the
+// notice over them if one is up, and what its mode keeps on the message
+// line. For when it is opened, when its layout changes -- a resize, which
+// clears the screen first -- and when its note is reloaded; a key redraws
+// only what it changed (DrawAfterKey). Nothing need be erased first: drawText
+// clears each line of the text area before it writes it.
 func (e *Editor) Draw() {
 	e.drawText()
 	e.drawFrame()
@@ -183,6 +184,7 @@ func (e *Editor) Draw() {
 	if e.mode == HELP {
 		e.showNotice(e.notice.text, e.notice.hang)
 	}
+	e.drawModeLine()
 }
 
 // drawText draws the text area: the rows, and what is marked on them. It

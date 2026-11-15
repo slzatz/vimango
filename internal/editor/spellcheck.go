@@ -159,11 +159,17 @@ func (e *Editor) spellSuggest() {
 		return
 	}
 
-	e.suggestions = suggestions
+	e.suggestWord, e.suggestions = word, suggestions
 	e.mode = SPELLING
+	e.showSuggestions()
+}
+
+// showSuggestions writes the list a suggestion is chosen from, on the
+// message line: SPELLING mode's line (drawModeLine).
+func (e *Editor) showSuggestions() {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%q ->", word)
-	for i, s := range suggestions {
+	fmt.Fprintf(&b, "%q ->", e.suggestWord)
+	for i, s := range e.suggestions {
 		fmt.Fprintf(&b, "  \x1b[1m%d\x1b[0m %s", i+1, s)
 	}
 	b.WriteString("   (any other key cancels)")

@@ -192,10 +192,10 @@ func (e *Editor) followVim(c int, run func()) (redraw bool) {
 		// an <esc> can leave the insert going: it ended a CTRL-R, or the
 		// expression typed for one
 		if e.mode == INSERT {
-			e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
+			e.ShowMessage(insertMessage)
 		}
 	case e.mode == INSERT && was != INSERT:
-		e.ShowMessage("\x1b[1m-- INSERT --\x1b[0m")
+		e.ShowMessage(insertMessage)
 	}
 
 	// What has to be drawn though the text is the same -- the tick check

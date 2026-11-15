@@ -1201,3 +1201,22 @@ repositories:
   the two binaries on a pseudo-terminal: `:sy`, `:help s`, `:read
   vimango.v` and `:read zzznope`, each with Tab, differ as described and
   nothing else does; `compare-drawing.py` says `SAME`.
+
+- **A resize keeps the message line.** The one noted in the entry on
+  notices. A resize clears the screen and has the editor draw itself, and
+  `Draw` wrote the text, the frame and the status bar but not the message
+  line: a command half typed when the window changed size was gone from the
+  screen until the next key (vim still had it, and the cursor sat after
+  nothing), and so was "-- INSERT --". `Draw` now ends with `drawModeLine`,
+  which writes what the editor's mode keeps on that line -- the command
+  line (`:`, `/`, `?`, an expression's), "-- INSERT --", the list a
+  spelling suggestion is chosen from -- and leaves it alone in any other
+  mode, where what was there was a report already made.
+
+  Tests, failing on the old code: `draw_message_test.go`, and
+  `TestResizeKeepsTheMessageLine` in the root package, with and without
+  an organizer. With the binaries from before and after on a
+  pseudo-terminal, resized on a `:` line, on a search line, in INSERT, in
+  VISUAL, with `:help` up and in NORMAL: the first three differ, by the
+  line now written, and the others are byte for byte the same.
+  `compare-drawing.py` says `SAME`.
