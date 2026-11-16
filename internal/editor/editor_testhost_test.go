@@ -2,6 +2,7 @@ package editor
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/slzatz/vimango/terminal"
@@ -67,7 +68,7 @@ var (
 //
 // It is a bare editor, not newEditor's: no line numbers and no highlighting,
 // so that a test's columns are the text's.
-func newTestEditor(t *testing.T, lines ...string) *Editor {
+func newTestEditor(t testing.TB, lines ...string) *Editor {
 	t.Helper()
 	vim.InitializeVim(0)
 	h := &testHost{}
@@ -87,7 +88,7 @@ func newTestEditor(t *testing.T, lines ...string) *Editor {
 	e.vbuf.SetLines(0, -1, lines)
 	vim.SetCursorPosition(1, 0)
 	e.ss = e.vbuf.Lines()
-	e.saveTick = e.vbuf.GetLastChangedTick()
+	e.noteIs(strings.Join(lines, "\n"))
 	e.mode = NORMAL
 	vim.SetScreenLayout(e)
 	return e

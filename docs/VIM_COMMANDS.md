@@ -185,6 +185,8 @@ Typed at the `:` line they last until the editor closes; put them in
 | `:x`, `:wq`, `:exi` | written if changed, then closed |
 | `:q`, `:clo`, `:qa` | closed; with unsaved changes, `No write since last change` and it stays open |
 | `:q!` | closed without saving |
+| `x`, `u`, then `:q` | closed: the note is as saved, and `:x` there writes nothing. So is a word deleted and typed again. Before 2026-11-16 any change, undone or not, left the note modified |
+| `x`, `:w`, `u`, then `:q` | `No write since last change`: the undo went back past the save, to a text the database does not hold. Ctrl-R, and `:q` closes |
 | `x`, `:w`, then a sync that changes the note (`Note N reloaded`), then `u` | nothing changes: the reloaded text is not an edit to undo, and what was done before it is forgotten. Before 2026-11-16 `u` put a line of the old text over the new, and `:x` saved the mixture. What is typed after the reload is undone as usual |
 
 ### vimango's own commands

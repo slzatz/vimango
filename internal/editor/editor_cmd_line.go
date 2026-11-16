@@ -194,18 +194,17 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"Mappings live in vimango.vim, next to config.json.\n"
 
 // save writes the buffer to the database. Once the note is in, the buffer is
-// clean (saveTick) and its text is the baseline :checkstale compares against
-// (dbText). On an error the database does not hold this text, and the buffer
-// stays modified so nothing treats it as safe to discard.
+// clean and its text is the baseline :checkstale compares against (noteIs).
+// On an error the database does not hold this text, and the buffer stays
+// modified so nothing treats it as safe to discard.
 func (e *Editor) save() error {
 	// vim's text, not the editor's copy of it: what is saved is what the
-	// tick below says is saved
+	// tick noteIs takes says is saved
 	text := strings.Join(e.vbuf.Lines(), "\n")
 	if err := e.Store.SetNote(e.id, text); err != nil {
 		return err
 	}
-	e.dbText = text
-	e.saveTick = e.vbuf.GetLastChangedTick()
+	e.noteIs(text)
 	e.stale = false // the row is this text now, whatever it was
 	return nil
 }
@@ -329,7 +328,6 @@ func (e *Editor) checkStale() {
 		return
 	}
 
-	e.dbText = dbText
 	e.title = title
 	e.stale = false
 	e.vbuf.SetLines(0, -1, strings.Split(dbText, "\n"))
@@ -340,7 +338,7 @@ func (e *Editor) checkStale() {
 	e.resyncFromVim()
 	// The reload is not an edit: the buffer is clean, so the quit guard and
 	// `:w` see it for what it is.
-	e.saveTick = e.bufferTick
+	e.noteIs(dbText)
 	e.followCursor()
 
 	// the new text, and the title, which a sync can change too

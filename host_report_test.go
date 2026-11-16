@@ -52,8 +52,14 @@ func TestEditorReportsToItsHost(t *testing.T) {
 	captureStdout(t, func() { runEx(e, "w") })
 	want("saved", "modified=0 stale=0")
 
+	// modified is the text against the database's, not that keys were typed
 	captureStdout(t, func() { pressKeys(e, "x") })
 	want("an edit", "modified=1 stale=0")
+	captureStdout(t, func() { pressKeys(e, "u") })
+	want("the edit undone", "modified=0 stale=0")
+	captureStdout(t, func() { pressKeys(e, "u") })
+	want("undone past the save", "modified=1 stale=0")
+
 	if err := a.Store.SetNote(id, "from a sync"); err != nil {
 		t.Fatal(err)
 	}

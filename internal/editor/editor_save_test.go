@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/slzatz/vimango/internal/localdb"
+	"github.com/slzatz/vimango/vim"
 )
 
 // oldStamp is a modified time no test run can produce, so a write shows up as
@@ -362,5 +363,120 @@ func TestEditorClosesThroughOnClose(t *testing.T) {
 	})
 	if text, _ := e.Store.Note(id); text != "lpha" {
 		t.Errorf(":x left %q in the database, want \"lpha\"", text)
+	}
+}
+
+// Modified is that the buffer's text is not the text the database holds. It
+// used to go by vim's change tick, which only goes up: after x and u the
+// note was "modified" -- :q was refused, :x wrote a row that had not changed
+// and gave it a new modified time for a sync to push, and a host was told of
+// unsaved changes there were none of.
+func TestUndoneChangeIsNotAModifiedNote(t *testing.T) {
+	e, h := savedNoteEditor(t, "alpha")
+
+	e.sendKeys("x")
+	if e.line(0) != "lpha" || !e.Modified() {
+		t.Fatalf("after x the note is %q, modified %v", e.line(0), e.Modified())
+	}
+	e.sendKeys("u")
+	if e.line(0) != "alpha" || e.Modified() {
+		t.Errorf("after x and u the note is %q, modified %v: it is the note as saved", e.line(0), e.Modified())
+	}
+
+	// typed back and not undone: the same text is the same note
+	e.sendKeys("xia\x1b")
+	if e.line(0) != "alpha" || e.Modified() {
+		t.Errorf("with the letter typed back the note is %q, modified %v", e.line(0), e.Modified())
+	}
+
+	e.exCommand("x")
+	if note, modified := noteInDB(t, e); note != "alpha" || modified != oldStamp {
+		t.Errorf(":x wrote a note that had not changed: %q, modified %s", note, modified)
+	}
+	if h.open() {
+		t.Error(":x did not close the note")
+	}
+}
+
+// :q after x and u closes: there is nothing to lose.
+func TestQuitAfterUndoCloses(t *testing.T) {
+	e, h := savedNoteEditor(t, "alpha")
+	e.sendKeys("xu")
+	e.exCommand("q")
+	if h.open() {
+		t.Error(":q after x and u was refused")
+	}
+}
+
+// A save moves what "as saved" is. Undo from there goes to a text the
+// database no longer holds, and that is a change like any other: :q must not
+// close on it. Redo comes back to the saved text.
+func TestUndoPastASaveIsAModifiedNote(t *testing.T) {
+	e, h := savedNoteEditor(t, "alpha")
+	e.sendKeys("x")
+	e.exCommand("w")
+	if note, _ := noteInDB(t, e); note != "lpha" || e.Modified() {
+		t.Fatalf("after x and :w the row is %q and the note modified %v", note, e.Modified())
+	}
+
+	e.sendKeys("u")
+	if e.line(0) != "alpha" || !e.Modified() {
+		t.Fatalf("after u the note is %q, modified %v: the database holds \"lpha\"", e.line(0), e.Modified())
+	}
+	if msg := exMessage(t, e, "q"); !strings.Contains(msg, "No write since last change") || !h.open() {
+		t.Fatalf(":q on a note undone past its save said %q, and left it open: %v", msg, h.open())
+	}
+
+	e.ProcessKey(ctrlKey('r'))
+	if e.line(0) != "lpha" || e.Modified() {
+		t.Errorf("after the redo the note is %q, modified %v", e.line(0), e.Modified())
+	}
+	e.exCommand("q")
+	if h.open() {
+		t.Error(":q on the note as saved was refused")
+	}
+}
+
+// A reload is a new "as saved" too: undo has nothing to go back to, and a
+// change undone is the reloaded text again.
+func TestReloadedNoteUndoneChangeIsNotModified(t *testing.T) {
+	e, _ := savedNoteEditor(t, "alpha")
+	if _, err := e.Store.DB().Exec("UPDATE task SET note='bravo' WHERE id=?;", e.id); err != nil {
+		t.Fatal(err)
+	}
+	captureStdout(t, func() { e.exCommand("checkstale") })
+	if e.line(0) != "bravo" || e.Modified() {
+		t.Fatalf("after the reload the note is %q, modified %v", e.line(0), e.Modified())
+	}
+	e.sendKeys("x")
+	if !e.Modified() {
+		t.Error("after x the reloaded note is not modified")
+	}
+	e.sendKeys("u")
+	if e.line(0) != "bravo" || e.Modified() {
+		t.Errorf("after x and u the reloaded note is %q, modified %v", e.line(0), e.Modified())
+	}
+}
+
+// What asking costs on a long note, 900 rows: the text is read from vim and
+// compared once for each change to it, which is once for a key that changes
+// the text. Asked again without a change it costs a tick read from vim.
+func BenchmarkModifiedAfterAChange(b *testing.B) {
+	e := newTestEditor(b, longNote()...)
+	vim.SendInput("x")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e.comparedTick = -1 // as after a change
+		if !e.isModified() {
+			b.Fatal("a changed note is not modified")
+		}
+	}
+}
+
+func BenchmarkModifiedAskedAgain(b *testing.B) {
+	e := newTestEditor(b, longNote()...)
+	vim.SendInput("x")
+	for i := 0; i < b.N; i++ {
+		e.isModified()
 	}
 }

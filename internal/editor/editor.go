@@ -106,13 +106,19 @@ type Editor struct {
 	// lines, and the height of the pane it was given for (halfPage).
 	scrollCount struct{ lines, pane int }
 	bufferTick  int
-	saveTick    int
 	// dbText is the note exactly as this editor last read it from — or
-	// wrote it to — the database. It is the baseline :checkstale compares
-	// against, which is what separates "the row changed in the database
-	// since I read it" (news) from "I have unsaved edits" (not news). Set
-	// wherever a note is loaded into an editor or written back.
-	dbText string
+	// wrote it to — the database, and saveTick vim's change tick when the
+	// buffer held exactly that (noteIs sets the two). dbText is what the
+	// buffer is compared with to say whether it is modified (isModified),
+	// and the baseline :checkstale compares the row against, which is what
+	// separates "the row changed in the database since I read it" (news)
+	// from "I have unsaved edits" (not news).
+	dbText   string
+	saveTick int
+	// differs is what isModified found at comparedTick, so that the text is
+	// compared once for each change and not each time it is asked.
+	differs      bool
+	comparedTick int
 	// stale is that the row and the buffer have parted and :checkstale could
 	// not settle it: the row changed in the database while the buffer has
 	// unsaved changes, or it was deleted. The editor only says so (Stale);
@@ -195,13 +201,12 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	e := newEditor(host)
 	e.id = id
 	e.title = title
-	e.dbText = note
 	e.vbuf = vim.NewBuffer(0)
 	vim.SetCurrentBuffer(e.vbuf)
 	e.vbuf.SetLines(0, -1, strings.Split(note, "\n"))
 	e.resyncFromVim()
-	e.saveTick = e.bufferTick // the note as read is the note as saved
-	vim.SetScreenLayout(e)    // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
+	e.noteIs(note)         // the note as read is the note as saved
+	vim.SetScreenLayout(e) // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
 	return e, nil
 }
 

@@ -1486,3 +1486,46 @@ repositories:
   (`TestWantedColumnAfterDollar`, which is also what says a `libvim.a` is
   too old, since an old one links), the 31 rows of `vimAnswers`, and
   `TestScreenLineMotionsAfterDollar` without its `0`.
+
+- **A change undone is not a modified note.** Seen earlier the same day
+  while writing the host's report: `x`, `u`, and `:q` was refused, "No
+  write since last change". `isModified` compared vim's change tick with
+  the tick at the last save, and the tick only goes up.
+  - **What it cost**, tried in the `--editor` binary on a pseudo-terminal
+    over a copy of the database: `x` `u` `:q` left the process running,
+    which to vimango_hybrid is "not saved" and a window kept open; `x` `u`
+    `:x` wrote the row though its text had not changed, with a new
+    modified time, so the note moved in every list and the next sync
+    pushed it; and the host was told `modified=1`.
+  - **What modified is now**: the buffer's text is not the text the
+    database holds, as the editor last read or wrote it (`dbText`), found
+    by comparing the two. The tick only says when to look: once for each
+    value of it, and not at all while it is the tick of the save. `noteIs`
+    sets `dbText` and `saveTick` together, where `Open`, `save` and
+    `checkStale` each set them before.
+  - **Why not ask vim**, which "Open items" proposed (`'modified'`, cleared
+    by an undo that reaches the saved state; the fork has
+    `vimBufferGetModified`). vim's flag is about a file it wrote, and it
+    writes none here. Tried: `vimBufferSetLines()` sets it and nothing
+    clears it; and with `:set nomodified` standing in for the save, `x`,
+    the "save", `u` gives `&modified` 0 with the text from before the save
+    in the buffer -- a clean note holding what the database does not, for
+    `:q` to close on. Doing it properly is what `buf_write()` does
+    (`u_unchanged()`, the save number), a new call in the fork, to get an
+    answer that comparing the text gives directly. And the text's answer
+    is the one the host's rule is written in: the editor closes only when
+    the buffer's text is in the database. It differs from vim in one way,
+    on purpose: a word deleted and typed again is a clean note.
+  - **Measured** on a note of 900 rows: 41 µs to read the text from vim and
+    compare it, once for a key that changes the text (a redraw is 71 µs),
+    and 16 ns when asked again with nothing changed.
+  - **Checked with the binary**, as above: `x` `u` `:q` ends the process and
+    the row is not written; `x` `u` `:x` the same; `x` `:w` `u` `:q` stays
+    open, and after Ctrl-R `:q` ends it. The titles written: `modified=`
+    0, 1, 0 for the first, and 0, 1, 0, 1, 0 for the last.
+
+  Tests: `TestUndoneChangeIsNotAModifiedNote`, `TestQuitAfterUndoCloses`,
+  `TestUndoPastASaveIsAModifiedNote`,
+  `TestReloadedNoteUndoneChangeIsNotModified` (`editor_save_test.go`), each
+  of which fails on the tick alone; `TestEditorReportsToItsHost` for the
+  report; `BenchmarkModifiedAfterAChange`.

@@ -355,15 +355,37 @@ func (e *Editor) drawFrame() {
 	fmt.Print(ab.String())
 }
 
-// this func is reason that we are writing notes to file
-// allows easy testing if a file is modified with BufferOption
+// isModified is whether the buffer's text is other than the text the
+// database holds, as this editor last read or wrote it (dbText). On it rest
+// the quit guard, what :x writes, and what a host is told.
+//
+// It is the text that is compared, and not whether vim has changed the
+// buffer since the save: vim's change tick only goes up, so by the tick
+// alone a change undone was a change still -- :q after x and u was refused,
+// and :x wrote a row that had not changed. The same text is the same note,
+// however it was come by: undone, typed again, or undone past a save and
+// done again. And a text the database does not hold is a modified note,
+// which is how undoing past a save is one.
+//
+// The tick says when to look: the text is read from vim and compared once
+// for each value of it, and not at all while it is the tick of the save.
 func (e *Editor) isModified() bool {
-	//return e.vbuf.IsModified()
-
 	tick := e.vbuf.GetLastChangedTick()
-	if tick > e.saveTick {
-		//e.bufferTick = tick
-		return true
+	if tick == e.saveTick {
+		return false
 	}
-	return false
+	if tick != e.comparedTick {
+		e.comparedTick = tick
+		e.differs = strings.Join(e.vbuf.Lines(), "\n") != e.dbText
+	}
+	return e.differs
+}
+
+// noteIs records that the database holds text and vim's buffer holds the
+// same: after a note is read into the buffer, and after the buffer is
+// written. It is the one place dbText and saveTick are set, since isModified
+// is right only while they are set together.
+func (e *Editor) noteIs(text string) {
+	e.dbText = text
+	e.saveTick = e.vbuf.GetLastChangedTick()
 }
