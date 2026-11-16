@@ -1422,3 +1422,67 @@ repositories:
     `isModified` goes by vim's change tick. CLAUDE.md, "Open items".
 
   Tests: `host_report_test.go`, `TestStaleIsWhatCheckStaleCouldNotSettle`.
+
+- **The column `j` and `k` want (libvim fork `fd63ffc37`, `5838803e9`).**
+  Three rows of `docs/VIM_COMMANDS.md`, part 3, and the first of the libvim
+  items under "Open items", found 2026-11-15 by comparing with vim and put
+  down as probably one fault. They were two, both the fork's, and no Go
+  changed.
+  - **`0$0j` went to the end of the next line** (`fd63ffc37`). Also `$^j`,
+    `$ggj`, `l$hj` from column 1, and `gj` along a wrapped row, then `gg`,
+    `H` or `0`, then `j`: any motion that brought the cursor back to the
+    column where a motion had last left it. libvim made `update_topline()`
+    a function that does nothing, since the embedder scrolls; in vim it
+    begins with `check_cursor_moved()`, and `curs_columns()` counts on that
+    when it marks the cursor's column as worked out. Without it the column
+    of the line's end stayed "worked out" for a cursor recorded where it had
+    been before the `$`, a motion back there looked like no motion, and that
+    stale column became the one wanted. The function now makes the check
+    and nothing else.
+  - **Why it was written down as rarer than it is.** After `$` it shows only
+    on a line of 80 characters or fewer: a longer one scrolls libvim's own
+    window sideways, 80 columns that nobody sees, and that put the column
+    right by another route. Measured: `$0j` wrong at 40, 78, 79 and 80
+    characters, right at 81, 82, 90 and 125. The editor's tests use rows of
+    125. A paragraph kept on one row was right; a heading, a list item, a
+    line of code were not.
+  - **`$` as the first key in a note wanted the end of that row only**
+    (`5838803e9`): `$j` went to that column of the next row, not to its end,
+    and `$gj` kept the column. A buffer just entered has a wanted column
+    still to be worked out; vim does that before the next command
+    (`main_loop`), libvim did it only after the command, over what `$` had
+    just asked for. `vimInputCore()` now does it before the key as well.
+    `TestScreenLineMotionsAfterDollar` had a `0` in front of its `$` for
+    this since 2026-11-11, and many rows of `vimAnswers` begin with `l0`.
+  - **Checked against vim**, not memory: `scripts/ask-vim.py` answered 31
+    sequences over the table's four sets of rows, and they are in
+    `vimAnswers` now. Against the library as it was 19 fail, with the first
+    fix alone 6, with both none. In the fork, 60 sequences in
+    `apitest/compare/cases/curswant.txt`: 21 of the first 56 differed from
+    vim, none do, and the five older case files differ where they did.
+  - **Checked with the binary** in `--editor` on a pseudo-terminal, on a copy
+    of the database, a note of three short lines: the keys, `iX`, `:x`, and
+    the row read back. Line 2 after `0$0j`, after `$^j` and after `$j` as
+    the first keys was `bravo twXo x` with the old library; with the new one
+    `Xbravo two x`, `Xbravo two x` and `bravo two Xx`.
+  - **Learned the hard way: `go test` does not know `libvim.a` changed.**
+    Two of the comparisons made on the way, old library against new, showed
+    no difference at all, and were the first run's results printed twice:
+    `ok (cached)`. The library is named in a linker flag and is not an
+    input `go test` keeps track of. With the old one copied in,
+    `go test ./vim/` said `ok (cached)` for a test that fails against it,
+    and `-count=1` said `FAIL`. `go build` does link again. The full suite
+    run after the first fix had `vim (cached)` in it, so it had not tested
+    the new library there. Now a rule in CLAUDE.md, "Tests", and
+    `docs/UPDATING_A_MAC.md` runs the suite with `-count=1`.
+  - **Looked at and left.** `vim.SetCursorPosition` leaves the wanted column
+    as it was, where vim's `cursor()` makes it the column given: `7l`, the
+    cursor set to column 2, `j` goes to column 7. The editor's one caller,
+    `:checkstale`'s reload, puts the cursor back where it was, so the column
+    wanted before is the right one unless the row came back shorter; and
+    `ScrollCursorTo` (`vim/screen.go`) counts on it staying.
+
+  Tests: the fork's `apitest/normal_mode_curswant.c`; `vim/curswant_test.go`
+  (`TestWantedColumnAfterDollar`, which is also what says a `libvim.a` is
+  too old, since an old one links), the 31 rows of `vimAnswers`, and
+  `TestScreenLineMotionsAfterDollar` without its `0`.

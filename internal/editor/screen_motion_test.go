@@ -62,9 +62,9 @@ func TestScreenLineMotionsKeepTheColumn(t *testing.T) {
 // After $, gj and gk go to the end of each screen line.
 func TestScreenLineMotionsAfterDollar(t *testing.T) {
 	e := newTestEditor(t, threeScreenLines)
-	// "0" first: in libvim the first command in a new buffer finishes with
-	// vim recomputing the wanted column, which would undo $'s "the end"
-	e.sendKeys("0$")
+	// "$" as the first key in the buffer: libvim used to work the wanted
+	// column out after the first command, which undid its "the end"
+	e.sendKeys("$")
 	expectCursor(t, "$", 1, 124)
 	e.sendKeys("gk")
 	expectCursor(t, "$ gk", 1, 99)

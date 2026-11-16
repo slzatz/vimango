@@ -26,8 +26,7 @@ import (
 // ends two or more screen lines into a wrapped row
 // (TestHalfPageKeepsTheCursorsPlace), a count given to CTRL-U on the first
 // line or CTRL-D on the last, which libvim refuses before the editor hears of
-// it, and two things libvim gets wrong with the wanted column that have
-// nothing to do with scrolling (docs/VIM_COMMANDS.md, part 3).
+// it.
 var vimAnswers = []struct {
 	rows string // vimRows
 	keys string // as vim writes them: <C-d>, <PageDown>, <CR>
@@ -262,6 +261,44 @@ var vimAnswers = []struct {
 	{"mixed", "l0<C-d>10G54G<C-y>$28Gz-<PageDown>3<C-y>", "24 27 1"},
 	{"numbered", "l0<PageDown>z.<PageDown>j3<C-e>28G3<C-e>", "17 28 1"},
 	{"mixed", "l03<C-y>M<C-u>3<C-y>gg<PageUp>37G<C-e>", "13 37 1"},
+
+	// The column j, k, gj and gk want. Nothing scrolls here; these were left
+	// out of the table while libvim had them wrong (the fork's PATCHES.md,
+	// "The column wanted after $" and the section after it): the end went on
+	// being wanted after a motion back to where the cursor had been, the
+	// column of a gj likewise, and "$" as the first key in a note wanted the
+	// end of that row only. Many of the cases above begin with l0 for that.
+	{"tall3", "gjggj", "1 2 1"},
+	{"tall3", "gjHj", "1 2 1"},
+	{"tall3", "gj0j", "1 2 1"},
+	{"tall3", "$gj", "1 2 50"},
+	{"tall3", "$gjgk", "1 1 125"},
+	{"tall3", "gjggjgj", "1 2 51"},
+	{"tall3", "$gjgj", "1 2 100"},
+	{"tall3", "$j", "1 2 125"},
+	{"tall3", "0$0j", "1 2 1"},
+	{"tall3", "0$ggj", "1 2 1"},
+	{"tall3", "l$hj", "1 2 124"},
+	{"uneven", "$0j", "1 2 1"},
+	{"uneven", "0$0j", "1 2 1"},
+	{"uneven", "$j", "1 2 75"},
+	{"uneven", "$jj", "1 3 125"},
+	{"uneven", "j$0j", "1 3 1"},
+	{"uneven", "2j$ggj", "1 2 1"},
+	{"uneven", "jgjkj", "1 2 51"},
+	{"uneven", "2Ggj0j", "1 3 1"},
+	{"uneven", "2Ggj^k", "1 1 1"},
+	{"uneven", "$gj", "1 2 50"},
+	{"uneven", "2G$0k", "1 1 1"},
+	{"tall2", "gjggj", "1 2 1"},
+	{"tall2", "$0j", "1 2 1"},
+	{"tall2", "0$0j", "1 2 1"},
+	{"tall2", "$gj", "1 2 50"},
+	{"numbered", "$0j", "1 2 1"},
+	{"numbered", "0$0j", "1 2 1"},
+	{"numbered", "$j", "1 2 17"},
+	{"numbered", "5l$hj", "1 2 16"},
+	{"numbered", "3G$0k", "1 2 1"},
 }
 
 // vimRows is a set of rows by name, the same as scripts/ask-vim.py makes.

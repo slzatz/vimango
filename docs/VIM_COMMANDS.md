@@ -20,7 +20,7 @@ freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
   `:echo input('x')`, freeze the editor. Check:
 
   ```bash
-  git -C ~/libvim merge-base --is-ancestor 9c14a01ae HEAD && echo "libvim is new enough"
+  git -C ~/libvim merge-base --is-ancestor 5838803e9 HEAD && echo "libvim is new enough"
   ```
 
   If not: `./scripts/build-libvim.sh && CGO_ENABLED=1 go build --tags=fts5`.
@@ -76,6 +76,7 @@ freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
 | `g0`, `g$` on a row that wraps | the start and the end of the screen line the cursor is on, not of the row. The end is the last character drawn on that line, which is the space the row is wrapped after. `dg$` deletes to there, `vg$` selects to there; `j` after `g$` keeps that column. `3g$`: the end of the screen line two further down (before 2026-11-15 these went to columns of an 80-wide window nobody sees) |
 | `g^`, `gm` | the first non-blank of the screen line; the character half the pane's width along it, or its last when the line is shorter |
 | `H`, `M`, `L` | the first, middle and last row on screen, counting only rows shown whole; `3H` the third from the top |
+| `$` then `0` (or `^`, `gg`), then `j` | column 1 of the next line. `$j` goes to the end of the next line, also when `$` is the first key typed in the note. `gj` on a row that wraps, then `gg`, then `j`: column 1 (before 2026-11-16 each of these went to the end, or to the column `gj` had been in; on the scratch note try `0$0j`) |
 
 ### Scrolling (did nothing before 2026-11-15)
 
@@ -256,9 +257,6 @@ Worth confirming that these fail the way described, and not some other way.
 | A register name after Ctrl-R is not shown | vim draws a `"` while it waits; here nothing is drawn until the name is typed |
 | After a search, `/pattern` stays on the message line | harmless; vim leaves it there too until something else is said |
 | The search match under the cursor | highlighted like the others, not differently |
-| `$` as the very first key after opening a note, then `gj`/`gk` | they keep the column instead of going to the end of each screen line (libvim forgets the "end" on the first command in a new buffer); any `$` after that is fine |
-| `$` then `0` (or `^`, `gg`) then `j` | the cursor goes to the end of the next line: vim goes on wanting "the end". It should be in column 1. `$hj` is right. libvim's |
-| `gj` on a row that wraps, then `gg` or `H`, then `j` | goes back to the column `gj` was in; probably the same fault |
 | `z+`, `z^` | `z+` puts line 41 at the top and `z^` goes to line 1: they are worked out from libvim's own window of 40 lines, not the pane |
 | A count to Ctrl-U on the first line, or Ctrl-D on the last | not remembered for the next Ctrl-D: libvim refuses the key there before the editor hears of it |
 | Ctrl-D ending two or more screen lines into a wrapped row | on purpose: the cursor goes exactly as far as the view. vim 9.1 moves it one screen line further, so it can be a row lower there |

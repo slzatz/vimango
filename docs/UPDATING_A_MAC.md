@@ -133,18 +133,18 @@ pulls `main`, builds, and copies `libvim.a` and the spell dictionary into
 `~/vimango`. The last lines should be:
 
 ```
-Done. /Users/<you>/vimango/libvim.a is libvim 9c14a01ae feat(api): ...
+Done. /Users/<you>/vimango/libvim.a is libvim 5838803e9 fix(input): ...
 Now build vimango:
 ```
 
-The commit must be **`9c14a01ae` or later** (`31301666c` is enough for a
+The commit must be **`5838803e9` or later** (`31301666c` is enough for a
 vimango at `108a96e` or earlier, `77fc72a6d` for one at `0556725` or earlier,
 `76bc49547` for one at `d1c54c4` or earlier, `928659d8f` for one at `9440661`
-or earlier).
+or earlier, `9c14a01ae` for one at `7c9f840` or earlier).
 To check afterwards:
 
 ```bash
-git -C ~/libvim merge-base --is-ancestor 9c14a01ae HEAD && echo "libvim is new enough"
+git -C ~/libvim merge-base --is-ancestor 5838803e9 HEAD && echo "libvim is new enough"
 ```
 
 The script refuses to build from a checkout that would give the wrong library,
@@ -199,6 +199,8 @@ refused. And one before `6bc47d62d`: a typed `/pattern` warns of wraps that
 did not happen, and `/pattern/e` reports "Pattern not found". And one before
 `3674896fb`: Ctrl-R inserts `^R`, and `"=` in NORMAL mode freezes the editor.
 And one before `76bc49547`: `:echo input('x')` freezes it.
+And one before `5838803e9`: `0$0j` puts the cursor at the end of the next
+line, not in its first column.
 That is why step 3 checks the commit rather than trusting the build.
 
 `undefined: thisBinaryRequiresBuildTagFts5` means `--tags=fts5` was left off.
@@ -210,10 +212,12 @@ Optional, about ten seconds — the test suite, which exercises the new
 `libvim.a`:
 
 ```bash
-CGO_ENABLED=1 go test --tags=fts5 ./...
+CGO_ENABLED=1 go test --tags=fts5 -count=1 ./...
 ```
 
-Every line should start `ok` (or say `no test files`).
+Every line should start `ok` (or say `no test files`). `-count=1` matters
+here: without it `go test` repeats the answers it had with the old
+`libvim.a`, marked `(cached)`.
 
 ---
 
@@ -369,7 +373,7 @@ cd ~/vimango
 sqlite3 vimango.db ".backup vimango-before-update.db.bak"
 git switch dev && git pull --ff-only
 rm -f go.work go.work.sum
-./scripts/build-libvim.sh --clean          # must end: libvim 9c14a01ae or later
+./scripts/build-libvim.sh --clean          # must end: libvim 5838803e9 or later
 CGO_ENABLED=1 go build --tags=fts5
 ./vimango --migrate                        # two lines; a second run: already up to date
 cd ~/vimango_hybrid
