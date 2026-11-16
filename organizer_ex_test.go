@@ -415,3 +415,29 @@ func TestNoticeOpensAtItsTopAfterThePreviewWasScrolled(t *testing.T) {
 		t.Errorf("entry info: %d lines, from line %d", len(o.Screen.notice), o.Screen.noticeTop)
 	}
 }
+
+// The titles a refresh brings are not an edit to undo. With a title edited
+// and the rows then replaced by those of another context, u gave the note
+// now in the first row the title of the note that had been there, as an
+// unsaved change.
+func TestRowsReadAgainForgetUndo(t *testing.T) {
+	o, _ := newDBOrganizer(t, "alpha", "bravo")
+	captureStdout(t, func() { o.organizerProcessKey('x') })
+	if o.rows[0].title != "lpha" {
+		t.Fatalf("after x the first title is %q", o.rows[0].title)
+	}
+
+	o.rows = []Row{{id: 101, title: "another note"}, {id: 102, title: "and a second"}}
+	o.fr, o.fc = 0, 0
+	o.readRowsIntoBuffer()
+	vim.SetCursorPosition(1, 0)
+	o.bufferTick = o.vbuf.GetLastChangedTick()
+
+	captureStdout(t, func() { o.organizerProcessKey('u') })
+	if got := strings.Join(o.vbuf.Lines(), "|"); got != "another note|and a second" {
+		t.Errorf("u after the rows were read again left %q", got)
+	}
+	if o.rows[0].title != "another note" || o.rows[0].dirty {
+		t.Errorf("the first row is %q (dirty %v)", o.rows[0].title, o.rows[0].dirty)
+	}
+}

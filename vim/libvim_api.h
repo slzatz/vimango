@@ -179,6 +179,7 @@ long vimBufferGetLastChangedTick(buf_T *buf);
 char_u *vimBufferGetLine(buf_T *buf, linenr_T lnum);
 size_t vimBufferGetLineCount(buf_T *buf);
 void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
+void vimUndoClear(buf_T *buf);
 
 void vimInput(char_u *input);
 void vimKey(char_u *key);

@@ -133,17 +133,18 @@ pulls `main`, builds, and copies `libvim.a` and the spell dictionary into
 `~/vimango`. The last lines should be:
 
 ```
-Done. /Users/<you>/vimango/libvim.a is libvim 928659d8f feat(api): ...
+Done. /Users/<you>/vimango/libvim.a is libvim 9c14a01ae feat(api): ...
 Now build vimango:
 ```
 
-The commit must be **`928659d8f` or later** (`31301666c` is enough for a
+The commit must be **`9c14a01ae` or later** (`31301666c` is enough for a
 vimango at `108a96e` or earlier, `77fc72a6d` for one at `0556725` or earlier,
-`76bc49547` for one at `d1c54c4` or earlier).
+`76bc49547` for one at `d1c54c4` or earlier, `928659d8f` for one at `9440661`
+or earlier).
 To check afterwards:
 
 ```bash
-git -C ~/libvim merge-base --is-ancestor 928659d8f HEAD && echo "libvim is new enough"
+git -C ~/libvim merge-base --is-ancestor 9c14a01ae HEAD && echo "libvim is new enough"
 ```
 
 The script refuses to build from a checkout that would give the wrong library,
@@ -188,6 +189,7 @@ checkout:
 | `undefined: vimSetFileWritesEnabled` (or `_vimSetFileWritesEnabled` from the linker) | fork `31301666c` |
 | `undefined: vimInputPending` | fork `d93698bc8` |
 | `undefined: vimSetCursorMoveScreenColumnCallback` (or `_vimSetCursorMoveScreenColumnCallback` from the linker) | fork `928659d8f` |
+| `undefined: vimUndoClear` (or `_vimUndoClear` from the linker) | fork `9c14a01ae` |
 
 A `libvim.a` between `a036ecafe` and `77fc72a6d` links without complaint and
 is still too old (vim's errors show, its reports — "5 lines yanked" — do
@@ -367,7 +369,7 @@ cd ~/vimango
 sqlite3 vimango.db ".backup vimango-before-update.db.bak"
 git switch dev && git pull --ff-only
 rm -f go.work go.work.sum
-./scripts/build-libvim.sh --clean          # must end: libvim 928659d8f or later
+./scripts/build-libvim.sh --clean          # must end: libvim 9c14a01ae or later
 CGO_ENABLED=1 go build --tags=fts5
 ./vimango --migrate                        # two lines; a second run: already up to date
 cd ~/vimango_hybrid

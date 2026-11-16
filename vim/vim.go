@@ -124,7 +124,13 @@ func (b *Buffer) Lines() []string {
 // with lines; end -1 means through the last line, so SetLines(0, -1, lines)
 // replaces the whole buffer and SetLines(0, 0, lines) inserts at the top.
 //
+// It is for text that is new -- a note read, or read again -- and not an
+// edit: the buffer's undo history is forgotten. libvim saves nothing for
+// undo when lines are set, so the history would go on describing the old
+// lines, and u would put one of them back over the new text.
+//
 // void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
+// void vimUndoClear(buf_T *buf);
 func (b *Buffer) SetLines(start, end int, lines []string) {
 	count := len(lines)
 	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
@@ -135,6 +141,7 @@ func (b *Buffer) SetLines(start, end int, lines []string) {
 		defer C.free(unsafe.Pointer(view[i]))
 	}
 	C.vimBufferSetLines(b.buf, C.long(start), C.long(end), (**C.uchar)(p), C.int(count))
+	C.vimUndoClear(b.buf)
 }
 
 // GetLastChangedTick returns vim's b:changedtick: it goes up every time the

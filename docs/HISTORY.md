@@ -1350,3 +1350,43 @@ repositories:
   40 lines, on the longest note: `zt`, `zz` and `zb` put the cursor on
   lines 1, 19 and 38 of the pane, `<PageUp>` on 38, and Ctrl-D leaves it
   on the line it was on. `BenchmarkRedrawAtBottomOfLongNote`: 84 µs.
+
+## 2026-11-16
+
+- **Text that is set forgets undo (libvim fork `9c14a01ae`, and the binding).**
+  Found while looking for what to do next, by trying it: a note open in the
+  editor, `x` and `:w`, the row changed as a sync changes it, `:checkstale`,
+  then `u` — and line 1 of the old text was back over line 1 of the new, the
+  buffer modified. `:x` wrote that to the database, from where the next sync
+  would have sent it to every client as the newest version. In hybrid that is
+  a pop-out left open across a sync, and one `u`.
+  - **Why.** `vimBufferSetLines()` saves nothing for undo and leaves the
+    history as it was, describing lines that are gone or have moved (entry 2
+    of the fork's `TODO.md`, written 2026-11-12). The organizer had the same
+    fault: a title edited, the rows read again for another context, and `u`
+    gave the note now in the first row the title of the one that had been
+    there, as an unsaved change.
+  - **What was decided.** A reload is not an edit: `u` after it does nothing
+    (Steve, 2026-11-16). The other choice, a reload that `u` undoes, brings
+    back text from before the sync for `:w` to put over the synced version.
+  - **The fork.** `vimUndoClear(buf)`, which is what vim's own `buf_reload()`
+    does (`u_blockfree`, `u_clearall`). **The first attempt cleared inside
+    `vimBufferSetLines()`, and upstream's `test_undo_save` failed**: an
+    embedder can call `vimUndoSaveRegion()` before setting lines, which makes
+    the set a change `u` undoes, and clearing threw away what that had just
+    saved. So it is a call of its own, and an embedder that does not make it
+    sees no change, which is the fork's rule anyway.
+  - **Here.** `Buffer.SetLines` (`vim/vim.go`) calls it after setting the
+    lines, so all four callers have it and a fifth cannot leave it out.
+    vimango has no binding for `vimUndoSaveRegion()` and no use for one:
+    what should be undoable is typed into vim.
+  - **Checked** with the binary in `--editor` on a pseudo-terminal, on a copy
+    of the database, with the keys hybrid injects: before, the row held
+    `alpha one / second / third / fourth` after `:x`; after, the four lines
+    the sync wrote. The process exited after `:x` both times.
+  - **Not done**: marks are not adjusted either (the same `TODO.md` entry);
+    CLAUDE.md, "Open items".
+
+  Tests: the fork's `apitest/undo_redo.c`; `vim/undo_test.go`,
+  `TestCheckStaleReloadForgetsUndo`, `TestRowsReadAgainForgetUndo`. Each of
+  the three fails with the call taken out of `SetLines`.

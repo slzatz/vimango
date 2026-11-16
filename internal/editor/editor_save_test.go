@@ -170,6 +170,53 @@ func TestCheckStaleReloadsACleanBuffer(t *testing.T) {
 	}
 }
 
+// The text a reload brings is not an edit to undo, and what was there to undo
+// before it was about the old text. With an edit saved, the note changed by a
+// sync and reloaded, u put line 1 of the old text over line 1 of the new, and
+// :x wrote the mixture to the database -- from where it went to every client
+// as the newest version.
+func TestCheckStaleReloadForgetsUndo(t *testing.T) {
+	e, h := savedNoteEditor(t, "alpha one\nbravo two\ncharlie three")
+	e.vbuf.SetLines(0, -1, strings.Split(e.dbText, "\n")) // as Open reads a note
+	e.ss = e.vbuf.Lines()
+	e.saveTick = e.vbuf.GetLastChangedTick()
+	captureStdout(t, func() {
+		e.sendKeys("ggx")
+		e.exCommand("w")
+	})
+	assertLines(t, e, "lpha one", "bravo two", "charlie three")
+	const synced = "rewritten elsewhere\nsecond\nthird\nfourth"
+	if _, err := e.Store.DB().Exec("UPDATE task SET note=? WHERE id=?;", synced, e.id); err != nil {
+		t.Fatal(err)
+	}
+	captureStdout(t, func() { e.exCommand("checkstale") })
+
+	captureStdout(t, func() { e.sendKeys("u") })
+	if got := strings.Join(e.vbuf.Lines(), "\n"); got != synced {
+		t.Fatalf("u after the reload left %q, want the row's text", got)
+	}
+	vimAndEditorAgree(t, e, "after u")
+	if e.isModified() {
+		t.Error("u after the reload counts as an edit")
+	}
+
+	// what is typed after the reload is undone, back to the reloaded text
+	captureStdout(t, func() { e.sendKeys("ddx") })
+	assertLines(t, e, "econd", "third", "fourth")
+	captureStdout(t, func() { e.sendKeys("uuu") })
+	if got := strings.Join(e.vbuf.Lines(), "\n"); got != synced {
+		t.Errorf("undoing what was typed after the reload left %q", got)
+	}
+
+	captureStdout(t, func() { e.exCommand("x") })
+	if h.open() {
+		t.Error(":x did not close the note")
+	}
+	if note, _ := noteInDB(t, e); note != synced {
+		t.Errorf("the row holds %q after :x, want what the sync wrote", note)
+	}
+}
+
 // Both sides changed: only the user can choose, so it says so and touches
 // nothing. A note deleted elsewhere is said too.
 func TestCheckStaleWarnsAndTouchesNothing(t *testing.T) {
