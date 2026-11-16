@@ -42,6 +42,7 @@ type App struct {
 	// Application state
 	SyncInProcess      bool
 	Run                bool
+	hostReported       string // what reportToHost last told the host (--editor)
 	kitty              bool   // true if running in kitty-graphics-compatible terminal (kitty, ghostty, etc.)
 	kittyVersion       string // kitty version (only set for actual kitty terminal)
 	kittyPlace         bool   // true if terminal supports Unicode placeholders
@@ -551,6 +552,9 @@ func (a *App) handleEvents() {
 	var mappingTimeout <-chan time.Time
 
 	for a.Run {
+		// before waiting for the next event: what the last one left, and at
+		// the start, the note as it was opened (host_report.go)
+		a.reportToHost()
 		select {
 		case key := <-a.keyEvents:
 			mappingTimeout = nil // the key settles it, one way or the other

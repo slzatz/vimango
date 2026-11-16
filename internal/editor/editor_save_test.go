@@ -243,6 +243,71 @@ func TestCheckStaleWarnsAndTouchesNothing(t *testing.T) {
 	}
 }
 
+// Stale is what :checkstale found and could not settle, for a host to show:
+// the row changed under unsaved changes, or is gone. It ends when the two
+// are the same again -- a save that goes through, a reload, or the row back
+// as it was read.
+func TestStaleIsWhatCheckStaleCouldNotSettle(t *testing.T) {
+	e, _ := savedNoteEditor(t, "alpha")
+	setRow := func(text string) {
+		t.Helper()
+		if _, err := e.Store.DB().Exec("UPDATE task SET note=? WHERE id=?;", text, e.id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	check := func(want bool, when string) {
+		t.Helper()
+		captureStdout(t, func() { e.exCommand("checkstale") })
+		if e.Stale() != want {
+			t.Fatalf("%s: Stale() is %v", when, e.Stale())
+		}
+	}
+
+	check(false, "the row as it was read")
+	setRow("newer")
+	captureStdout(t, func() { e.sendKeys("x") })
+	check(true, "the row changed under unsaved changes")
+	check(true, "and asked again")
+	setRow("alpha")
+	check(false, "the row back as it was read")
+
+	setRow("newer still")
+	check(true, "changed again")
+	captureStdout(t, func() { e.exCommand("w") })
+	if e.Stale() {
+		t.Error("stale after :w put the buffer in the row")
+	}
+
+	// a clean buffer is reloaded, and that is not stale
+	setRow("from a sync")
+	check(false, "a clean buffer, reloaded")
+	if e.line(0) != "from a sync" {
+		t.Fatalf("the buffer is %q", e.line(0))
+	}
+
+	// a read that fails says nothing either way
+	captureStdout(t, func() { e.sendKeys("x") })
+	setRow("and again")
+	check(true, "changed under unsaved changes")
+	if _, err := e.Store.DB().Exec("ALTER TABLE task RENAME TO task_gone;"); err != nil {
+		t.Fatal(err)
+	}
+	check(true, "the row cannot be read")
+	if _, err := e.Store.DB().Exec("ALTER TABLE task_gone RENAME TO task;"); err != nil {
+		t.Fatal(err)
+	}
+
+	// a deleted row is stale, and :w, which cannot write it, leaves it so
+	if _, err := e.Store.DB().Exec("DELETE FROM task WHERE id=?;", e.id); err != nil {
+		t.Fatal(err)
+	}
+	check(true, "the row deleted")
+	captureStdout(t, func() { e.exCommand("w") })
+	if !e.Stale() {
+		t.Error("not stale after a :w that had no row to write")
+	}
+}
+
 // Not being able to read the row is not "the row is now empty". A read that
 // failed used to come back as empty text, which a clean buffer was then
 // reloaded with: the note blanked on screen.

@@ -206,6 +206,7 @@ func (e *Editor) save() error {
 	}
 	e.dbText = text
 	e.saveTick = e.vbuf.GetLastChangedTick()
+	e.stale = false // the row is this text now, whatever it was
 	return nil
 }
 
@@ -302,6 +303,7 @@ func (e *Editor) closeNote(save, force bool) {
 func (e *Editor) checkStale() {
 	title, dbText, err := e.Store.TitleAndNote(e.id)
 	if errors.Is(err, store.ErrNotFound) {
+		e.stale = true
 		e.ShowMessage("Note %d was deleted elsewhere — :w will not bring it back", e.id)
 		return
 	}
@@ -314,6 +316,7 @@ func (e *Editor) checkStale() {
 	if dbText == e.dbText {
 		// Silence is the point: this runs after every sync, and most
 		// syncs don't touch the note you happen to have open.
+		e.stale = false
 		return
 	}
 
@@ -321,12 +324,14 @@ func (e *Editor) checkStale() {
 		// Both sides changed. Reloading would discard the user's edits and
 		// `:w` will discard the database's — only they can choose, so
 		// say so and touch nothing.
+		e.stale = true
 		e.ShowMessage("Note %d changed in the database and you have unsaved changes — :w will overwrite it", e.id)
 		return
 	}
 
 	e.dbText = dbText
 	e.title = title
+	e.stale = false
 	e.vbuf.SetLines(0, -1, strings.Split(dbText, "\n"))
 	// Hold the cursor where the user left it. vim keeps it inside the new
 	// text, which can be shorter -- and must be told to: replacing the lines

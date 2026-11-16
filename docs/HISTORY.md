@@ -1390,3 +1390,35 @@ repositories:
   Tests: the fork's `apitest/undo_redo.c`; `vim/undo_test.go`,
   `TestCheckStaleReloadForgetsUndo`, `TestRowsReadAgainForgetUndo`. Each of
   the three fails with the call taken out of `SetLines`.
+
+- **The editor tells its host its state (`host_report.go`).** vimango_hybrid
+  could learn one thing from an editor, by injecting `:q` and watching
+  whether the process ended. So its export said "as last saved" whenever an
+  editor was open, changed or not; a pop-out with unsaved changes looked like
+  any other; and `:checkstale`'s warning, on the editor's message line, was
+  seen only by someone looking at that editor.
+  - **What is said.** The terminal's title, `vimango id=5 modified=1
+    stale=0`: the note, `Editor.Modified`, and `Editor.Stale`, which is new —
+    what `:checkstale` found and could not settle (the row changed under
+    unsaved changes, or was deleted), ended by a save that goes through, a
+    reload, or the row back as it was read. Key=value pairs so that one can
+    be added and an older host passes over it.
+  - **Who says it.** The app's event loop, before it waits for each event,
+    when the report differs from the last one written; in `--editor` only.
+    The editor package knows nothing of it: it answers `Modified` and
+    `Stale`, as it answers `ID`.
+  - **What it is not.** The "saved" signal. That is still the process ending
+    after `:q` or `:x`, because the report arrives after the key that caused
+    it: a host that quit on "modified=0" could do it between a keystroke and
+    the report of it. Hybrid's rule against mirroring the editor's state
+    (its CLAUDE.md, from a desync on 2026-07-12) was about a host guessing
+    and then acting on the guess; this is the editor's word, shown.
+  - **Checked** with the binary in `--editor` on a pseudo-terminal, on a copy
+    of the database: one title when the note opens, one at the first `x` and
+    none at the second, one at `:w`, one with `stale=1` when `:checkstale`
+    follows a change to the row under an unsaved edit, one at the `:w` over
+    it, and none for keys that only move, or for a reload.
+  - **Seen on the way**: `x` then `u` leaves the buffer modified, since
+    `isModified` goes by vim's change tick. CLAUDE.md, "Open items".
+
+  Tests: `host_report_test.go`, `TestStaleIsWhatCheckStaleCouldNotSettle`.

@@ -113,7 +113,13 @@ type Editor struct {
 	// since I read it" (news) from "I have unsaved edits" (not news). Set
 	// wherever a note is loaded into an editor or written back.
 	dbText string
-	title  string // title of the note
+	// stale is that the row and the buffer have parted and :checkstale could
+	// not settle it: the row changed in the database while the buffer has
+	// unsaved changes, or it was deleted. The editor only says so (Stale);
+	// a save that goes through ends it, and so does a later :checkstale
+	// that finds the row as it was read, or reloads it.
+	stale bool
+	title string // title of the note
 	// tabCompletion is a round of Tab on a ':' line (completeFileName): the
 	// file names being gone through, which one is on the line, and what is
 	// on the line before it. list is nil when no round is under way.
@@ -231,6 +237,11 @@ func (e *Editor) ID() int        { return e.id }
 func (e *Editor) Title() string  { return e.title }
 func (e *Editor) Mode() Mode     { return e.mode }
 func (e *Editor) Modified() bool { return e.isModified() }
+
+// Stale reports that the note changed in the database, or was deleted, under
+// text the editor could not give up: what :checkstale last found and warned
+// of. :w would put the buffer over the newer row.
+func (e *Editor) Stale() bool { return e.stale }
 
 // ShowMessage writes a message on the editor's message line, in place of the
 // last one. ShowAside writes one beside the note, for what is not about the
