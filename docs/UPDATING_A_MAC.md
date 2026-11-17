@@ -351,6 +351,9 @@ ls fts5_vimango.db* webview_worker .venv go.work* 2>/dev/null
 - in `config.json`, the `"fts_db"` and `"claude"` entries are ignored; they
   can stay or go
 - `~/glamour` and `~/libvim.upstream`, if nothing else of yours uses them
+- the Homebrew `hunspell` package (`brew uninstall hunspell`): spell
+  checking is libvim's own now, and nothing else of vimango's uses it
+  (`brew uses --installed hunspell` shows whether anything does)
 
 **Going back**, if something is badly wrong: check out the previous commits
 in `~/vimango` and `~/vimango_hybrid` and rebuild both. The converted database
