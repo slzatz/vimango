@@ -1538,3 +1538,11 @@ repositories:
   host passing it would now fail with an unknown flag). The comment in
   `common.go` about an ignored `"fts_db"` key went too: an unknown key in
   `config.json` is ignored by the decoder anyway.
+- **chroma is no longer used directly.** The editor stopped highlighting with
+  it on 2026-11-14; the one direct use left was `TestSplitMatchesChroma`,
+  which checked `frontmatter.Split` against chroma's markdown lexer. That
+  agreement stopped mattering when the editor and the preview both came to
+  call `Split`, so the test's cases now check `Split` alone (`TestSplit`)
+  and chroma is `// indirect` in `go.mod`. It stays in the build: glamour
+  colours code blocks in the TUI's preview with it, and the `"chroma"`
+  sections of `darkslz.json` and `default.json` are those colours.

@@ -11,7 +11,7 @@ import (
 	"github.com/slzatz/vimango/internal/store"
 )
 
-// The editor finds vimango.vim, spell/ and the chroma style relative to the
+// The editor finds vimango.vim and spell/ relative to the
 // working directory, which for vimango is its own directory. go test runs a
 // package's tests in the package's directory, so they start by going there.
 func TestMain(m *testing.M) {

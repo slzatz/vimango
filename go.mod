@@ -3,7 +3,6 @@ module github.com/slzatz/vimango
 go 1.26.0
 
 require (
-	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/charmbracelet/glamour v1.0.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/google/uuid v1.6.0
@@ -19,6 +18,7 @@ require (
 	cloud.google.com/go/auth v0.24.1-0.20261001053825-dbc26066f70a // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.3.1 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
+	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect

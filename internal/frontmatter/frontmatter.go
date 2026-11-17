@@ -29,9 +29,10 @@ import (
 	"strings"
 )
 
-// Split peels a leading "---" fenced block off src. It is a deliberate
-// transcription of chroma's own splitFrontmatter (lexers/markdown.go),
-// which the editor highlighted with until 2026-11-14.
+// Split peels a leading "---" fenced block off src: "---" alone on the first
+// line, to the next line that is "---" alone with a line break after it.
+// (The rule is the one chroma's markdown lexer used when the editor
+// highlighted with it, until 2026-11-14.)
 //
 // The strict "---\n" prefix is load-bearing rather than incidental: there
 // are notes in the wild that open "---- Task Type: URL ----" and follow it
@@ -118,8 +119,8 @@ var itemRe = regexp.MustCompile(`^\s*-[ \t]+(\S.*)$`)
 // below, which this parser would otherwise render as nested keys of a.
 // Bailing hands those notes back to the markdown path unchanged.
 //
-// The set is chroma's, lifted from the plain-scalar rule in its YAML
-// lexer.
+// These are YAML's indicator characters, which a plain scalar may not start
+// with.
 const reservedLeaders = `{}[]?,:!-*&@`
 
 // Parse turns the block Split returned into ordered rows, or returns nil if

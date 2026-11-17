@@ -3,34 +3,13 @@ package frontmatter
 import (
 	"strings"
 	"testing"
-
-	"github.com/alecthomas/chroma/v2"
-	"github.com/alecthomas/chroma/v2/lexers"
 )
 
-// Split is a transcription of the rule chroma's markdown lexer uses, and
-// that is only worth anything if it is checked against chroma rather than
-// against the transcription: the two live in different repos and only one
-// of them is ours to keep in step. So the test asks chroma -- did you lex
-// this as YAML -- and requires the same answer.
-func chromaSawFrontmatter(t *testing.T, src string) bool {
-	t.Helper()
-	it, err := lexers.Get("markdown").Tokenise(nil, src)
-	if err != nil {
-		t.Fatalf("chroma tokenise: %v", err)
-	}
-	// NameTag is the YAML lexer's token for the key half of a pair, and
-	// the markdown rules have no rule that emits it. Its presence is
-	// therefore exactly "chroma handed this to the YAML lexer".
-	for _, tok := range it.Tokens() {
-		if tok.Type == chroma.NameTag {
-			return true
-		}
-	}
-	return false
-}
-
-func TestSplitMatchesChroma(t *testing.T) {
+// Where a note's frontmatter starts and ends. The rule came from chroma's
+// markdown lexer, which the editor highlighted with until 2026-11-14; what
+// matters now is only that the editor and the preview agree, and both call
+// Split.
+func TestSplit(t *testing.T) {
 	cases := []struct {
 		name string
 		src  string
@@ -53,18 +32,12 @@ func TestSplitMatchesChroma(t *testing.T) {
 			if ok != tc.want {
 				t.Errorf("Split ok = %v, want %v", ok, tc.want)
 			}
-			if got := chromaSawFrontmatter(t, tc.src); got != tc.want {
-				t.Errorf("chroma disagrees: saw frontmatter = %v, want %v", got, tc.want)
-			}
 		})
 	}
 }
 
-// Checked apart from the chroma table above rather than in it: the probe
-// there is "did chroma emit a NameTag", and a block with no keys has
-// nothing to tag either way, so the comparison would be vacuous. Splitting
-// it is still the right answer -- Parse is what declines an
-// empty block, and it declines it as a fall-through.
+// An empty block splits; it is Parse that declines it, and it declines it
+// as a fall-through.
 func TestSplitEmptyBlock(t *testing.T) {
 	if _, _, ok := Split("---\n---\n\nBody.\n"); !ok {
 		t.Error("expected an empty fenced block to split")
