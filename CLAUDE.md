@@ -161,7 +161,6 @@ Full-text search is the FTS5 table `task_fts` inside `vimango.db`: one row per n
 - A note is searchable as soon as it exists. Keywords hang off the server `tid` (`task_keyword.task_tid`), so tags appear once the note has synced.
 - **The index is derived data.** `Migrate` compares the table and trigger definitions in `sqlite_master` with those in the code and rebuilds everything from the notes when they differ — so changing a trigger's SQL in `searchObjects` re-indexes every machine at its next start (about half a second for 5,900 notes), and a damaged index is repaired the same way. `INSERT INTO task_fts(task_fts) VALUES ('integrity-check')` verifies one.
 - Anything that drops and recreates `task` loses the triggers on it; `Migrate` puts them back.
-- `fts5_vimango.db` is no longer read or written by anything.
 
 ### Containers and UUIDs
 

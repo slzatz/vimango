@@ -1529,3 +1529,12 @@ repositories:
   `TestReloadedNoteUndoneChangeIsNotModified` (`editor_save_test.go`), each
   of which fails on the tick alone; `TestEditorReportsToItsHost` for the
   report; `BenchmarkModifiedAfterAChange`.
+
+## 2026-11-17
+
+- **The last of the old search index.** `fts5_vimango.db` and its two
+  backups were deleted on this machine; every Mac now runs a hybrid that
+  does not pass `--fts-db`, so `vimango-sync` no longer accepts it (an old
+  host passing it would now fail with an unknown flag). The comment in
+  `common.go` about an ignored `"fts_db"` key went too: an unknown key in
+  `config.json` is ignored by the decoder anyway.

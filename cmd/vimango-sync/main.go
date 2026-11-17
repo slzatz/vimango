@@ -43,10 +43,6 @@ type postgresConfig struct {
 
 func main() {
 	dbPath := flag.String("db", "", "path to SQLite main database (required)")
-	// The search index was a second database file until 2026-11-10; it is now
-	// a table in --db, maintained by triggers. The flag is still accepted so a
-	// host built before that keeps working.
-	flag.String("fts-db", "", "ignored (the search index is in --db now)")
 	reportOnly := flag.Bool("report-only", false, "only report changes; do not apply them")
 	probe := flag.Bool("probe", false, "print the number of server changes since the last sync and exit")
 	flag.Parse()

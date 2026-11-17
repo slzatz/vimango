@@ -5,7 +5,6 @@ This document describes the schema of a machine's vimango SQLite database. The d
 ## Database Files
 
 - **vimango.db** - The one database: tasks/notes, contexts, folders, keywords, sync data, and the full-text search index (`task_fts`). It is in write-ahead-log mode, so `vimango.db-wal` and `vimango.db-shm` sit beside it while it is open; copy it with `sqlite3 vimango.db ".backup copy.db"`, not `cp`.
-- **fts5_vimango.db** - No longer used. It held the search index until 2026-11-10.
 
 ## Main Database: vimango.db
 
