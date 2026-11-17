@@ -14,6 +14,8 @@ func newVimrcEditor(t *testing.T, lines ...string) *Editor {
 	e := newTestEditor(t, lines...)
 	vim.ExecuteCommand("mapclear | mapclear!")
 	SourceVimrc()
+	// a space leader left mapped would make a space typed in a later test wait
+	t.Cleanup(func() { vim.ExecuteCommand("mapclear | mapclear!") })
 	return e
 }
 
@@ -162,7 +164,50 @@ func TestVimrcMappingsDoNotTouchInternalKeys(t *testing.T) {
 	assertLines(t, e, "econd")
 }
 
-// ---- Ctrl-B / Ctrl-I / Ctrl-E (VimangoDecorate in vimango.vim) ----
+// ---- <Leader>b / <Leader>i / <Leader>c (VimangoDecorate in vimango.vim) ----
+
+// leader types vimango.vim's leader (a space) and then k, and returns what
+// the second key returned.
+func (e *Editor) leader(k byte) (redraw bool) {
+	e.ProcessKey(' ')
+	return e.ProcessKey(int(k))
+}
+
+// The leader is the space, and a space with no mapping after it is still a
+// space once 'timeoutlen' runs out.
+func TestVimrcLeaderIsSpace(t *testing.T) {
+	e := newVimrcEditor(t, "alpha bravo").at(0)
+	if got := vim.EvaluateExpression("g:mapleader"); got != " " {
+		t.Fatalf("g:mapleader = %q, want a space", got)
+	}
+
+	e.ProcessKey(' ')
+	if _, waiting := MappingWait(); !waiting {
+		t.Fatal("a space did not wait for the rest of a <Leader> mapping")
+	}
+	e.MappingTimeout()
+	if got := vim.GetCursorPosition(); got != [2]int{1, 1} {
+		t.Errorf("cursor = %v after a lone space, want [1 1]", got)
+	}
+	assertLines(t, e, "alpha bravo")
+}
+
+// TEMPORARY: the Ctrl keys vimango.vim keeps alongside the <Leader> ones for
+// now. Delete this test with that block.
+func TestVimrcDecorateCtrlKeysForNow(t *testing.T) {
+	e := newVimrcEditor(t, "alpha bravo charlie").at(6)
+	e.ProcessKey(ctrlKey('b'))
+	assertLines(t, e, "alpha **bravo** charlie")
+	e.ProcessKey(ctrlKey('i'))
+	assertLines(t, e, "alpha *bravo* charlie")
+	e.ProcessKey(ctrlKey('e'))
+	assertLines(t, e, "alpha `bravo` charlie")
+
+	e2 := newVimrcEditor(t, "alpha bravo charlie").at(6)
+	e2.sendKeys("ve")
+	e2.ProcessKey(ctrlKey('b'))
+	assertLines(t, e2, "alpha **bravo** charlie")
+}
 
 // at puts vim's cursor and the editor's copy of it on line 1, byte col.
 func (e *Editor) at(col int) *Editor {
@@ -175,20 +220,20 @@ func (e *Editor) at(col int) *Editor {
 func TestVimrcDecorateWordNormalMode(t *testing.T) {
 	e := newVimrcEditor(t, "alpha bravo charlie").at(6) // on "bravo"
 
-	e.ProcessKey(ctrlKey('b'))
+	e.leader('b')
 	assertLines(t, e, "alpha **bravo** charlie")
 
 	// same key again toggles it off -- the cursor was parked on the word
-	e.ProcessKey(ctrlKey('b'))
+	e.leader('b')
 	assertLines(t, e, "alpha bravo charlie")
 
 	// a different style replaces rather than nests
-	e.ProcessKey(ctrlKey('b'))
-	e.ProcessKey(ctrlKey('i'))
+	e.leader('b')
+	e.leader('i')
 	assertLines(t, e, "alpha *bravo* charlie")
-	e.ProcessKey(ctrlKey('e'))
+	e.leader('c')
 	assertLines(t, e, "alpha `bravo` charlie")
-	e.ProcessKey(ctrlKey('e'))
+	e.leader('c')
 	assertLines(t, e, "alpha bravo charlie")
 }
 
@@ -197,12 +242,12 @@ func TestVimrcDecorateWordNormalMode(t *testing.T) {
 func TestVimrcDecorateCursorOnMarker(t *testing.T) {
 	for _, col := range []int{6, 7, 13, 14} { // each * of "**bravo**"
 		e := newVimrcEditor(t, "alpha **bravo** charlie").at(col)
-		e.ProcessKey(ctrlKey('b'))
+		e.leader('b')
 		assertLines(t, e, "alpha bravo charlie")
 	}
 
 	e := newVimrcEditor(t, "say `x`, then").at(4) // on the opening `
-	e.ProcessKey(ctrlKey('e'))
+	e.leader('c')
 	assertLines(t, e, "say x, then")
 }
 
@@ -210,16 +255,16 @@ func TestVimrcDecorateCursorOnMarker(t *testing.T) {
 // cursor means there is nothing to decorate.
 func TestVimrcDecorateWordBoundaries(t *testing.T) {
 	e := newVimrcEditor(t, "(alpha), bravo.").at(2)
-	e.ProcessKey(ctrlKey('b'))
+	e.leader('b')
 	assertLines(t, e, "(**alpha**), bravo.")
 
 	e2 := newVimrcEditor(t, "alpha bravo").at(5) // the space
-	e2.ProcessKey(ctrlKey('b'))
+	e2.leader('b')
 	assertLines(t, e2, "alpha bravo")
 
 	// non-ASCII letters are word characters
 	e3 := newVimrcEditor(t, "un café noir").at(4)
-	e3.ProcessKey(ctrlKey('i'))
+	e3.leader('i')
 	assertLines(t, e3, "un *café* noir")
 }
 
@@ -229,7 +274,7 @@ func TestVimrcDecorateVisualSelection(t *testing.T) {
 	if e.mode != VISUAL {
 		t.Fatalf("expected VISUAL, got %v", e.mode)
 	}
-	redraw := e.ProcessKey(ctrlKey('b'))
+	redraw := e.leader('b')
 	assertLines(t, e, "alpha **bravo** charlie")
 	if !redraw {
 		t.Error("visual Ctrl-B returned redraw=false")
@@ -242,35 +287,35 @@ func TestVimrcDecorateVisualSelection(t *testing.T) {
 	// markers outside the selection are found
 	e2 := newVimrcEditor(t, "say hello world now").at(4)
 	e2.sendKeys("vee")
-	e2.ProcessKey(ctrlKey('b'))
+	e2.leader('b')
 	assertLines(t, e2, "say **hello world** now")
 	e2.at(6).sendKeys("vee") // "hello world" inside the markers
-	e2.ProcessKey(ctrlKey('b'))
+	e2.leader('b')
 	assertLines(t, e2, "say hello world now")
 
 	// selecting the markers too works the same
 	e3 := newVimrcEditor(t, "a *b c* d").at(2)
 	e3.sendKeys("v4l")
-	e3.ProcessKey(ctrlKey('i'))
+	e3.leader('i')
 	assertLines(t, e3, "a b c d")
 
 	// V decorates the line's text, not its indentation
 	e4 := newVimrcEditor(t, "  whole line  ")
 	e4.sendKeys("V")
-	e4.ProcessKey(ctrlKey('e'))
+	e4.leader('c')
 	assertLines(t, e4, "  `whole line`  ")
 
 	// a selection over two lines is left alone
 	e5 := newVimrcEditor(t, "alpha", "bravo")
 	e5.sendKeys("vj")
-	e5.ProcessKey(ctrlKey('b'))
+	e5.leader('b')
 	assertLines(t, e5, "alpha", "bravo")
 }
 
 // One decoration is one undo step.
 func TestVimrcDecorateUndo(t *testing.T) {
 	e := newVimrcEditor(t, "alpha bravo").at(0)
-	e.ProcessKey(ctrlKey('b'))
+	e.leader('b')
 	assertLines(t, e, "**alpha** bravo")
 	e.sendKeys("u")
 	assertLines(t, e, "alpha bravo")
@@ -299,7 +344,7 @@ func TestEditorInterceptsNoNormalKeys(t *testing.T) {
 func TestLeavingVisualWithoutChangeRedraws(t *testing.T) {
 	e := newVimrcEditor(t, "alpha", "bravo")
 	e.sendKeys("vj")
-	if redraw := e.ProcessKey(ctrlKey('b')); !redraw { // two lines: no-op
+	if redraw := e.leader('b'); !redraw { // two lines: no-op
 		t.Error("no-op mapping out of VISUAL returned redraw=false")
 	}
 

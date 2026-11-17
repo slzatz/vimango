@@ -93,16 +93,23 @@ view always starts at the top of a row, and moves by whole rows.
 | `5` Ctrl-D, then Ctrl-D and Ctrl-U | five screen lines, and five again: the count is kept |
 | Ctrl-D with the end of the note showing | the view stays and the cursor goes half a pane on, to the last row at most; the same with Ctrl-U at the top |
 | Ctrl-F or PageDown | a pane on, less two screen lines; the cursor on the top row. With the end of the note showing, its last row goes to the top |
-| PageUp | a pane back, the cursor on the bottom row. (vim's Ctrl-B; here Ctrl-B is bold) |
+| PageUp | a pane back, the cursor on the bottom row. (vim's Ctrl-B; here Ctrl-B is still bold, for now) |
 | PageDown in INSERT | pages, and INSERT goes on |
 | `V` Ctrl-D | the selection goes with the cursor |
 | `:set nostartofline`, then Ctrl-D | the cursor keeps its column |
 | `G` on a long note, a search, `` ` `` to a mark | the last row at the bottom; a row found more than about half a pane away is shown in the middle of the pane, not on its last line |
 | `j` onto a paragraph at the bottom of the pane | the view moves until the whole paragraph is shown |
 
-**Ctrl-E is not vim's here**: `vimango.vim` maps it to code, as it maps
-Ctrl-B to bold. `3` Ctrl-Y has no partner unless one of them is given
-another key.
+**Ctrl-E is not vim's here, for now**: `vimango.vim` maps it to code, as it
+maps Ctrl-B to bold, alongside `<Leader>c` and `<Leader>b` (the leader is the
+space). Those Ctrl mappings are temporary; once they go, Ctrl-E, Ctrl-B and
+Ctrl-I (jump forward) are vim's again and belong in this table.
+
+| Try | Expect |
+|---|---|
+| space `b`, space `i`, space `c` on a word | bold, italic, code; the same keys again take it off |
+| `ve`, then space `b` | the selection is bold |
+| space on its own | after 'timeoutlen' (1 second), the cursor moves right |
 
 ### Listings (silent before 2026-11-11)
 

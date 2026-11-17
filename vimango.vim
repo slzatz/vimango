@@ -5,6 +5,15 @@
 " the rest, as in vim. <C-r> works in an insert-mode right-hand side:
 " "inoremap <F5> <C-r>=strftime('%F')<CR>". See vimrc.go.
 
+" The leader: the key that begins vimango's own commands (<Leader>b for bold
+" and so on, below). Change it here, and keep it above every mapping that uses
+" it: <Leader> is replaced when a mapping is defined, so a mapleader set after
+" a mapping does not change that mapping. A space on its own still moves the
+" cursor, after waiting 'timeoutlen' to see whether a mapping follows. Use the
+" leader only in normal and visual mode: an insert-mode <Leader> mapping would
+" make every space typed wait.
+let mapleader = " "
+
 " Markdown list markers, by kind: what is recognized after a line's
 " indentation, and what is written. Every numbered line gets "1. " -- markdown
 " renders 1, 2, 3, and reordering lines never needs renumbering. "*" only counts
@@ -92,12 +101,11 @@ inoremap <expr> <CR> VimangoListEnter()
 " ---------------------------------------------------------------------------
 " Bold, italic, code.
 "
-" Ctrl-B (bold **), Ctrl-I (italic *), Ctrl-E (code `): in normal mode they
-" act on the word under the cursor, in visual mode on the selection (one line).
-" Pressing the same key again takes the decoration off; a different key
-" replaces it (Ctrl-I on **word** gives *word*). Ctrl-I and Tab are the same
-" byte in a terminal, so Tab does italic too in normal and visual mode -- not in
-" insert mode, which has no mapping here.
+" <Leader>b (bold **), <Leader>i (italic *), <Leader>c (code `): in normal
+" mode they act on the word under the cursor, in visual mode on the selection
+" (one line). Pressing the same keys again takes the decoration off; a
+" different decoration replaces it (<Leader>i on **word** gives *word*).
+" Ctrl-B, Ctrl-I and Ctrl-E do the same for now; see the end of this section.
 "
 " This is plain string editing on the line -- never iw or gv. After a
 " decoration the text has moved, so vim's word motions and the '< '> marks no
@@ -186,6 +194,18 @@ function! VimangoDecorate(marker, mode) abort
   call s:DecorateSpan(lnum, b, e, a:marker)
 endfunction
 
+nnoremap <Leader>b :<C-u>call VimangoDecorate('**', 'n')<CR>
+nnoremap <Leader>i :<C-u>call VimangoDecorate('*', 'n')<CR>
+nnoremap <Leader>c :<C-u>call VimangoDecorate('`', 'n')<CR>
+xnoremap <Leader>b :<C-u>call VimangoDecorate('**', visualmode())<CR>
+xnoremap <Leader>i :<C-u>call VimangoDecorate('*', visualmode())<CR>
+xnoremap <Leader>c :<C-u>call VimangoDecorate('`', visualmode())<CR>
+
+" TEMPORARY (2026-11-17): the old Ctrl keys, kept while getting used to the
+" <Leader> ones. Delete this block -- and the line for them in
+" editorNormalModeHelp (internal/editor/editor_cmd_line.go) -- to give Ctrl-B
+" (page up), Ctrl-I (jump forward; Tab is the same key to a terminal) and
+" Ctrl-E (scroll a line) back to vim.
 nnoremap <C-b> :<C-u>call VimangoDecorate('**', 'n')<CR>
 nnoremap <C-i> :<C-u>call VimangoDecorate('*', 'n')<CR>
 nnoremap <C-e> :<C-u>call VimangoDecorate('`', 'n')<CR>

@@ -178,9 +178,10 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"Normal and visual mode are vim's own: vimango intercepts no keys, so vim's\n" +
 	"commands work as they do in vim.\n\n" +
 	"## vimango.vim mappings:\n" +
-	"`  Ctrl-B         ` - bold (**): the word under the cursor, or the selection\n" +
-	"`  Ctrl-I         ` - italic (*); also Tab, the same key to a terminal\n" +
-	"`  Ctrl-E         ` - code (`)\n" +
+	"`  <Leader>b      ` - bold (**): the word under the cursor, or the selection\n" +
+	"`  <Leader>i      ` - italic (*)\n" +
+	"`  <Leader>c      ` - code (`)\n" +
+	"`  Ctrl-B/I/E     ` - the same three, for now (Tab is Ctrl-I to a terminal)\n" +
 	"`  - (visual)     ` - toggle the selected lines as a bulleted list\n" +
 	"`  # (visual)     ` - toggle the selected lines as a numbered list\n" +
 	"`  Enter (insert) ` - on a list item, start the next one with the same marker\n\n" +
