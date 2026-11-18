@@ -160,11 +160,13 @@ func (b *Buffer) GetLastChangedTick() int {
 //
 // void vimInput(char_u *input);
 func SendInput(s string) {
+	defer leave(enter())
 	C.vimInput(ucharP(s))
 }
 
 // SendMultiInput sends a string one character at a time.
 func SendMultiInput(s string) {
+	defer leave(enter())
 	for _, r := range s {
 		C.vimInput(ucharP(string(r)))
 	}
@@ -174,6 +176,7 @@ func SendMultiInput(s string) {
 //
 // void vimKey(char_u *key);
 func SendKey(s string) {
+	defer leave(enter())
 	C.vimKey(ucharP(s))
 }
 
@@ -181,6 +184,7 @@ func SendKey(s string) {
 //
 // void vimExecute(char_u *cmd);
 func ExecuteCommand(s string) {
+	defer leave(enter())
 	C.vimExecute(ucharP(s))
 }
 
@@ -218,6 +222,7 @@ func InputPending() int {
 //
 // void vimInputTimeout(void);
 func InputTimeout() {
+	defer leave(enter())
 	C.vimInputTimeout()
 }
 
@@ -226,12 +231,17 @@ func InputTimeout() {
 //
 // char_u *vimEval(char_u *str);
 func EvaluateExpression(expr string) string {
-	r := C.vimEval(ucharP(expr))
+	r := evaluate(expr)
 	if r == nil {
 		return ""
 	}
 	defer C.vim_free(unsafe.Pointer(r)) // vimEval returns an allocated copy
 	return goString(r)
+}
+
+func evaluate(expr string) *C.uchar {
+	defer leave(enter())
+	return C.vimEval(ucharP(expr))
 }
 
 // ---- Cursor, mode, selection

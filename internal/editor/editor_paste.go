@@ -39,9 +39,9 @@ func (e *Editor) PasteText(raw string) (redraw bool) {
 // for every key vimango sends itself. Being typed, it is one insert: "u"
 // takes it back and "." repeats it.
 //
-// libvim has vim's own code for this (bracketed_paste, behind <PasteStart>),
-// but it reads the keys that follow from a terminal libvim does not have, and
-// in the fork as it stands it crashes.
+// vim has code of its own for this (bracketed_paste, behind <PasteStart>),
+// but it reads the keys that follow from a terminal, which libvim does not
+// have; the fork makes <PasteStart> a key that does nothing.
 func pasteIntoVim(text string) {
 	if vim.EvaluateExpression("&paste") != "1" {
 		vim.ExecuteCommand("set paste")

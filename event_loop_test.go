@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -75,5 +76,51 @@ func TestEventLoopPastes(t *testing.T) {
 
 	if text, err := a.Store.Note(ids[0]); err != nil || text != "- foo\n- bar\n  - baz" {
 		t.Errorf("the note is %q (%v)", text, err)
+	}
+}
+
+// A mapping that types itself again never ends: the event loop is inside
+// libvim for good. A Ctrl-C the key reader reads meanwhile stops it, the
+// message line says so, and the note goes on as before -- here an x and :x,
+// which save it.
+func TestCtrlCInterruptsACommandThatNeverEnds(t *testing.T) {
+	a, ids := editorOnlyApp(t, "alpha\nbravo")
+	a.keyEvents = make(chan terminal.Key, 16)
+	vim.ExecuteCommand("mapclear | mapclear!")
+	vim.ExecuteCommand("nmap Q jkQ")
+	t.Cleanup(func() { vim.ExecuteCommand("mapclear | mapclear!") })
+
+	ctrlCKey := terminal.Key{Regular: ctrlC}
+	if a.readerTakes(ctrlCKey) {
+		t.Fatal("a Ctrl-C with nothing running was not passed on")
+	}
+
+	took := make(chan bool, 1)
+	out := captureStdout(t, func() {
+		if err := a.openEditor(ids[0], ""); err != nil {
+			t.Fatal(err)
+		}
+		a.keyEvents <- terminal.Key{Regular: 'Q'}
+		go func() {
+			time.Sleep(200 * time.Millisecond) // the loop is inside Q
+			took <- a.readerTakes(ctrlCKey)
+			for _, r := range "gg0x:x\r" {
+				a.keyEvents <- terminal.Key{Regular: r}
+			}
+		}()
+		a.handleEvents() // :x ends it: --editor has one note
+	})
+
+	if !<-took {
+		t.Error("the reader passed on a Ctrl-C while a command ran")
+	}
+	if !strings.Contains(out, "Interrupted") {
+		t.Error("the message line did not say Interrupted")
+	}
+	if strings.Contains(out, ":qa") {
+		t.Error("the interrupt was taken as a typed Ctrl-C")
+	}
+	if text, err := a.Store.Note(ids[0]); err != nil || text != "lpha\nbravo" {
+		t.Errorf("the note is %q (%v), want \"lpha\\nbravo\"", text, err)
 	}
 }

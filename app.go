@@ -31,10 +31,14 @@ type App struct {
 
 	RenderManager *RenderManager // Renders the organizer's preview; loads images in the background
 
-	// Events for MainLoop, each posted by another goroutine
-	keyEvents chan terminal.Key // Key events from reader goroutine
-	keyErrors chan error        // Key read errors
-	resizeCh  chan struct{}     // Terminal resized (SIGWINCH)
+	// Events for MainLoop, each posted by another goroutine.
+	//
+	// Key events from the reader goroutine. Room for 1,024: the keys typed
+	// while a command runs wait here, and when it is full the reader stops
+	// reading, and cannot see a Ctrl-C to interrupt with (readerTakes).
+	keyEvents chan terminal.Key
+	keyErrors chan error    // Key read errors
+	resizeCh  chan struct{} // Terminal resized (SIGWINCH)
 
 	// Database connections and other config
 	Config *dbConfig
@@ -63,7 +67,7 @@ func CreateApp() *App {
 	return &App{
 		Session:   sess,
 		Screen:    screen,
-		keyEvents: make(chan terminal.Key, 16),
+		keyEvents: make(chan terminal.Key, 1024),
 		keyErrors: make(chan error, 1),
 		resizeCh:  make(chan struct{}, 1),
 		Run:       true,
@@ -519,10 +523,26 @@ func (a *App) startKeyReader() {
 				}
 				continue
 			}
+			if a.readerTakes(key) {
+				continue
+			}
 			a.keyEvents <- key
 		}
 	}()
 }
+
+// readerTakes is what the key reader does with a key itself, instead of
+// passing it to MainLoop: Ctrl-C while vim is running a command. A command
+// can run for ever -- ":while 1 | endwhile", a mapping that types itself
+// again -- and MainLoop is the goroutine inside it, so the Ctrl-C would wait
+// behind it for good. vim.Interrupt, the one libvim call any goroutine may
+// make, stops it; the key was the interrupt, as it is in vim, and goes no
+// further. A Ctrl-C with nothing running is a key like any other.
+func (a *App) readerTakes(key terminal.Key) bool {
+	return key.Regular == ctrlC && vim.Interrupt()
+}
+
+const ctrlC = 0x03
 
 // MainLoop is the one goroutine that draws, changes editor and organizer
 // state, and calls libvim (which is not thread-safe). Everything else -- the

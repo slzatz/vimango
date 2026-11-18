@@ -166,6 +166,9 @@ Typed at the `:` line they last until the editor closes; put them in
 | `:command! Hi echo 'hi there'` then `:Hi` | `hi there` |
 | `:source vimango.vim` | re-reads it |
 | `:r somefile.txt` | the file's text is read *into* the note (reading is allowed; writing is not) |
+| `:execute 'while 1 \| endwhile'`, then Ctrl-C | the editor stops being busy, `Interrupted` on the message line, and the next key works. (A `:while` typed on its own is refused: it needs more than one line) |
+| `:nmap Q jkQ`, then `Q`, then Ctrl-C | the same: the mapping that types itself again stops |
+| `:execute 'cq'` | nothing happens: the editor stays open (it used to end the process without saving) |
 
 ### Keys that changed with the same work
 

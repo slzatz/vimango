@@ -1570,3 +1570,35 @@ repositories:
   table against the live database: 6,032 tasks, 849 task keywords, 139
   keywords, 33 contexts, 19 folders. The files are in `scripts/server/`;
   `BACKUP_RESTORE.md` says how to install and check them.
+- **Ctrl-C stops a command that does not end; `:cq` and `<PasteStart>` end
+  nothing.** Two libvim fork commits and their vimango side.
+  - **The interrupt** (fork `97d397b37`, its TODO.md entry 6). `:while 1 |
+    endwhile`, `nmap Q jkQ` then `Q`, a function that never returns: libvim
+    reads no keys while it runs one, so the editor froze for good -- in
+    hybrid, a window to kill, losing what had not been saved. vim's
+    `got_int` stops such loops, but nothing could set it, and set from
+    outside it was never cleared: every later key was answered with
+    Ctrl-C. The fork adds `vimInterrupt()`, which only sets it; `sm_run()`
+    stops after the one key `vgetorpeek()` gives for it (dropping it in
+    Normal mode, where it said "Type :qa and press <Enter>"), and each call
+    that runs commands clears it and flushes the typeahead on the way in and
+    out, as vim's `main_loop()` does. Here the key reader, which reads on
+    while `MainLoop` is stuck in C, calls `vim.Interrupt` on a Ctrl-C while
+    a command runs (`App.readerTakes`) and passes the key on otherwise;
+    `vim/` counts the calls that run commands, so it knows. vim says
+    nothing for a stopped `:while`, so `CaptureMessages` adds
+    `Interrupted`. `keyEvents` went from 16 to 1,024 keys, so a reader with
+    keys typed into a frozen editor is still reading when Ctrl-C comes.
+    The fork's `apitest/compare` gives the same answers for all 2,692 cases
+    as before.
+  - **`:cq` and `<PasteStart>`** (fork `d57f18c3c`, entries 4 and 5).
+    vimango refused a typed `:cq`, but `:execute 'cq'` or a mapping reached
+    libvim's `exit(1)`: the process ended without saving, which hybrid
+    would have read as a close. It now calls the quit callback as `:qa!`
+    does, and vimango registers none, so it does nothing, like
+    `:execute 'q'`. `<PasteStart>` in a mapping or `:normal` crashed; it is
+    now a key that does nothing.
+
+  Tests: `TestCtrlCInterruptsACommandThatNeverEnds` (`event_loop_test.go`),
+  `vim/interrupt_test.go`; in the fork `apitest/interrupt.c`,
+  `apitest/paste_start.c` and `test_cquit` in `apitest/quit.c`.

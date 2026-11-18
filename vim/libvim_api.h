@@ -201,6 +201,7 @@ int vimCommandLineGetPosition(void);
 void vimSetMappingsEnabled(int enabled);
 int vimInputPending(void);
 void vimInputTimeout(void);
+void vimInterrupt(void);
 void vimSetFileWritesEnabled(int enabled);
 void vimSetMessageCallback(MessageCallback messageCallback);
 

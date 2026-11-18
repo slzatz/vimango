@@ -22,11 +22,19 @@ type Message struct {
 // CaptureMessages runs fn and returns the messages vim produced while it ran.
 // Outside a capture vim's messages are dropped, as they always were: the
 // application draws its own message line.
+//
+// A call Interrupt stopped ends with the error "Interrupted", which vim
+// says for some commands and not for a ":while" or a mapping: either way
+// the user who pressed CTRL-C is told it took.
 func CaptureMessages(fn func()) []Message {
 	capturing = true
 	captured = nil
+	interrupted.Store(false)
 	defer func() { capturing = false; captured = nil }()
 	fn()
+	if interrupted.Swap(false) {
+		captured = append(captured, interruptedMessage)
+	}
 	return captured
 }
 
