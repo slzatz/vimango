@@ -88,22 +88,21 @@ view always starts at the top of a row, and moves by whole rows.
 | `zt`, `zz`, `zb` | the cursor's row goes to the top, the middle or the bottom of the pane; the cursor does not move |
 | `z<CR>`, `z.`, `z-` | the same, and the cursor goes to the first non-blank |
 | `50zt` | line 50 at the top, with the cursor on it |
+| Ctrl-E, `3` Ctrl-E | the text moves up a row, or three; the cursor stays on its row until that would leave the pane, and then is on the first row shown |
 | Ctrl-Y, `3` Ctrl-Y | the text moves down a row, or three; the cursor stays on its row until that would leave the pane, and then is on the last row shown whole |
 | Ctrl-D, Ctrl-U | the view moves half a pane, and the cursor as far, so it stays on the same line of the pane; it ends on the first non-blank of its row |
 | `5` Ctrl-D, then Ctrl-D and Ctrl-U | five screen lines, and five again: the count is kept |
 | Ctrl-D with the end of the note showing | the view stays and the cursor goes half a pane on, to the last row at most; the same with Ctrl-U at the top |
 | Ctrl-F or PageDown | a pane on, less two screen lines; the cursor on the top row. With the end of the note showing, its last row goes to the top |
-| PageUp | a pane back, the cursor on the bottom row. (vim's Ctrl-B; here Ctrl-B is still bold, for now) |
+| Ctrl-B or PageUp | a pane back, the cursor on the bottom row |
 | PageDown in INSERT | pages, and INSERT goes on |
 | `V` Ctrl-D | the selection goes with the cursor |
 | `:set nostartofline`, then Ctrl-D | the cursor keeps its column |
 | `G` on a long note, a search, `` ` `` to a mark | the last row at the bottom; a row found more than about half a pane away is shown in the middle of the pane, not on its last line |
 | `j` onto a paragraph at the bottom of the pane | the view moves until the whole paragraph is shown |
 
-**Ctrl-E is not vim's here, for now**: `vimango.vim` maps it to code, as it
-maps Ctrl-B to bold, alongside `<Leader>c` and `<Leader>b` (the leader is the
-space). Those Ctrl mappings are temporary; once they go, Ctrl-E, Ctrl-B and
-Ctrl-I (jump forward) are vim's again and belong in this table.
+Ctrl-I (or Tab, the same key to a terminal) after Ctrl-O jumps forward
+again, as in vim.
 
 | Try | Expect |
 |---|---|

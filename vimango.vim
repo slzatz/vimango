@@ -105,7 +105,6 @@ inoremap <expr> <CR> VimangoListEnter()
 " mode they act on the word under the cursor, in visual mode on the selection
 " (one line). Pressing the same keys again takes the decoration off; a
 " different decoration replaces it (<Leader>i on **word** gives *word*).
-" Ctrl-B, Ctrl-I and Ctrl-E do the same for now; see the end of this section.
 "
 " This is plain string editing on the line -- never iw or gv. After a
 " decoration the text has moved, so vim's word motions and the '< '> marks no
@@ -200,18 +199,6 @@ nnoremap <Leader>c :<C-u>call VimangoDecorate('`', 'n')<CR>
 xnoremap <Leader>b :<C-u>call VimangoDecorate('**', visualmode())<CR>
 xnoremap <Leader>i :<C-u>call VimangoDecorate('*', visualmode())<CR>
 xnoremap <Leader>c :<C-u>call VimangoDecorate('`', visualmode())<CR>
-
-" TEMPORARY (2026-11-17): the old Ctrl keys, kept while getting used to the
-" <Leader> ones. Delete this block -- and the line for them in
-" editorNormalModeHelp (internal/editor/editor_cmd_line.go) -- to give Ctrl-B
-" (page up), Ctrl-I (jump forward; Tab is the same key to a terminal) and
-" Ctrl-E (scroll a line) back to vim.
-nnoremap <C-b> :<C-u>call VimangoDecorate('**', 'n')<CR>
-nnoremap <C-i> :<C-u>call VimangoDecorate('*', 'n')<CR>
-nnoremap <C-e> :<C-u>call VimangoDecorate('`', 'n')<CR>
-xnoremap <C-b> :<C-u>call VimangoDecorate('**', visualmode())<CR>
-xnoremap <C-i> :<C-u>call VimangoDecorate('*', visualmode())<CR>
-xnoremap <C-e> :<C-u>call VimangoDecorate('`', visualmode())<CR>
 
 " ---------------------------------------------------------------------------
 " Spell checking (:spell toggles it; see spellcheck.go).

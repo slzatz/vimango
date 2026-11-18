@@ -1546,3 +1546,16 @@ repositories:
   and chroma is `// indirect` in `go.mod`. It stays in the build: glamour
   colours code blocks in the TUI's preview with it, and the `"chroma"`
   sections of `darkslz.json` and `default.json` are those colours.
+
+## 2026-11-18
+
+- **Ctrl-B, Ctrl-E and Ctrl-I are vim's again.** On 2026-11-17 (`e1e2a5a`)
+  bold, italic and code moved to `<Leader>b`, `<Leader>i` and `<Leader>c`,
+  and the old Ctrl mappings were kept in a temporary block of `vimango.vim`
+  while getting used to the leader. That block is gone, with its line in
+  `:help normal`, so in a note Ctrl-B pages back, Ctrl-E scrolls a row (both
+  through the editor's `Scroll`, like Ctrl-F and Ctrl-Y) and Ctrl-I -- Tab,
+  to a terminal -- jumps forward in the jump list.
+  `TestVimrcDecorateCtrlKeysForNow` became `TestVimrcLeavesCtrlBEIToVim`,
+  which sources `vimango.vim` and checks each key does vim's thing and
+  leaves the text alone; it fails on all four counts with the old file.

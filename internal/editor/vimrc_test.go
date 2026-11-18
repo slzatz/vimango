@@ -192,21 +192,31 @@ func TestVimrcLeaderIsSpace(t *testing.T) {
 	assertLines(t, e, "alpha bravo")
 }
 
-// TEMPORARY: the Ctrl keys vimango.vim keeps alongside the <Leader> ones for
-// now. Delete this test with that block.
-func TestVimrcDecorateCtrlKeysForNow(t *testing.T) {
-	e := newVimrcEditor(t, "alpha bravo charlie").at(6)
-	e.ProcessKey(ctrlKey('b'))
-	assertLines(t, e, "alpha **bravo** charlie")
-	e.ProcessKey(ctrlKey('i'))
-	assertLines(t, e, "alpha *bravo* charlie")
-	e.ProcessKey(ctrlKey('e'))
-	assertLines(t, e, "alpha `bravo` charlie")
+// Ctrl-B, Ctrl-E and Ctrl-I are vim's with vimango.vim sourced: they were
+// bold, code and italic until 2026-11-18. Ctrl-E scrolls a row, Ctrl-B a
+// page back, Ctrl-I jumps forward in the jump list; none touches the text.
+func TestVimrcLeavesCtrlBEIToVim(t *testing.T) {
+	rows := numberedRows(100)
+	e := newVimrcEditor(t, rows...)
 
-	e2 := newVimrcEditor(t, "alpha bravo charlie").at(6)
-	e2.sendKeys("ve")
-	e2.ProcessKey(ctrlKey('b'))
-	assertLines(t, e2, "alpha **bravo** charlie")
+	e.typeKeys(ctrlKey('e'))
+	expectView(t, e, "Ctrl-E", 2, 2)
+
+	e.typeString("G")
+	e.typeKeys(ctrlKey('b'))
+	expectView(t, e, "G Ctrl-B", 43, 72)
+
+	e.typeString("gg50G")
+	e.typeKeys(ctrlKey('o'))
+	expectView(t, e, "Ctrl-O", 1, 1)
+	e.typeKeys(ctrlKey('i'))
+	if got := vim.GetCursorPosition()[0]; got != 50 {
+		t.Errorf("Ctrl-I after Ctrl-O: line %d, want 50", got)
+	}
+
+	e.typeString("v")
+	e.typeKeys(ctrlKey('e'), ctrlKey('b'), ctrlKey('i'))
+	assertLines(t, e, rows...)
 }
 
 // at puts vim's cursor and the editor's copy of it on line 1, byte col.

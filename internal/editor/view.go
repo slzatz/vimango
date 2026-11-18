@@ -322,7 +322,7 @@ func (e *Editor) rowAtScreenLine(n int) int {
 //     the note the view stops with the last row at the bottom, and at the
 //     start with the first at the top, and the cursor goes the distance
 //     alone.
-//   - CTRL-F and CTRL-B (here <PageDown> and <PageUp>: CTRL-B is bold) move
+//   - CTRL-F and CTRL-B (and <PageDown> and <PageUp>) move
 //     the view a pane less two screen lines, and put the cursor on the top
 //     row of the page after, the bottom row of the page before.
 //
