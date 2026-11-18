@@ -586,7 +586,9 @@ func TestVimMessagesForKeysAreShown(t *testing.T) {
 
 	// vim has nothing to say about most keys, and then the message line is
 	// left alone: nothing is written at all
-	for _, keys := range []string{"l", "w", "j", "k", "x", "yy", "p", "J", "r!"} {
+	// -- Ctrl-C too, which vim answers with how to quit it ("Type :qa! and
+	// press <Enter> to abandon all changes"), and the fork does not
+	for _, keys := range []string{"l", "w", "j", "k", "x", "yy", "p", "J", "r!", "\x03"} {
 		if msg := keyMessage(t, e, keys); msg != "" {
 			t.Errorf("%q wrote %q to the screen", keys, msg)
 		}

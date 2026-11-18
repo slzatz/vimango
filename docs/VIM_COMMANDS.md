@@ -169,6 +169,7 @@ Typed at the `:` line they last until the editor closes; put them in
 | `:execute 'while 1 \| endwhile'`, then Ctrl-C | the editor stops being busy, `Interrupted` on the message line, and the next key works. (A `:while` typed on its own is refused: it needs more than one line) |
 | `:nmap Q jkQ`, then `Q`, then Ctrl-C | the same: the mapping that types itself again stops |
 | `:execute 'cq'` | nothing happens: the editor stays open (it used to end the process without saving) |
+| Ctrl-C in NORMAL, with nothing running | nothing is said (vim says "Type :qa! and press <Enter> to abandon all changes", which in vimango would close the note); `3d` then Ctrl-C cancels the `3d` |
 
 ### Keys that changed with the same work
 

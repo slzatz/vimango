@@ -1599,6 +1599,17 @@ repositories:
     `:execute 'q'`. `<PasteStart>` in a mapping or `:normal` crashed; it is
     now a key that does nothing.
 
+  - **Ctrl-C says nothing** (fork `126388a93`). vim answers a Ctrl-C in
+    Normal mode with nothing to cancel with "Type :qa! and press <Enter>
+    to abandon all changes and exit Vim"; in vimango `:qa!` closes the
+    note, so it told whoever pressed Ctrl-C that their changes were about
+    to go. The fork's `nv_esc()` no longer says it. With nothing to avoid,
+    the CTRL-C an interrupt leaves in Normal mode goes to vim as any key
+    would, and the fork's first version of the interrupt, which dropped it,
+    lost that special case.
+
   Tests: `TestCtrlCInterruptsACommandThatNeverEnds` (`event_loop_test.go`),
-  `vim/interrupt_test.go`; in the fork `apitest/interrupt.c`,
-  `apitest/paste_start.c` and `test_cquit` in `apitest/quit.c`.
+  `vim/interrupt_test.go`, Ctrl-C among the quiet keys of
+  `TestVimMessagesForKeysAreShown`; in the fork `apitest/interrupt.c`,
+  `apitest/paste_start.c`, `test_cquit` in `apitest/quit.c` and
+  `test_ctrl_c_says_nothing` in `apitest/messages_reports.c`.
