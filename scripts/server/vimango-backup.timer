@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup of the vimango Postgres database
+
+[Timer]
+OnCalendar=*-*-* 09:30:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

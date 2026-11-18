@@ -1,0 +1,41 @@
+#!/bin/bash
+# vimango-backup: a daily pg_dump of the vimango database, keeping the newest
+# KEEP dumps. Run by ~/.config/systemd/user/vimango-backup.timer; output goes
+# to the journal (journalctl --user -u vimango-backup).
+#
+# The source is scripts/server/ in the vimango repo; BACKUP_RESTORE.md says
+# how to install it.
+#
+# Restore: see BACKUP_RESTORE.md in the vimango repo
+# (pg_restore --clean --if-exists -d vimango <dump>).
+set -euo pipefail
+umask 077
+
+DIR="$HOME/backups/vimango"
+KEEP=30
+DB=vimango
+
+mkdir -p "$DIR"
+stamp=$(date -u +%Y%m%d-%H%M)
+out="$DIR/vimango-$stamp.dump"
+tmp="$DIR/.partial-$stamp.dump"
+trap 'rm -f "$tmp"' EXIT
+
+# Peer authentication over the local socket: no password is stored.
+pg_dump -Fc -d "$DB" -f "$tmp"
+
+# A dump that cannot be listed is not a backup.
+entries=$(pg_restore --list "$tmp" | grep -c ' TABLE DATA ')
+if [ "$entries" -eq 0 ]; then
+  echo "vimango-backup: $tmp has no table data" >&2
+  exit 1
+fi
+
+mv "$tmp" "$out"
+echo "vimango-backup: $out, $(du -h "$out" | cut -f1), $entries tables"
+
+# Keep the newest KEEP dumps.
+ls -1t "$DIR"/vimango-*.dump | tail -n +$((KEEP + 1)) | while read -r old; do
+  rm -f "$old"
+  echo "vimango-backup: removed $old"
+done

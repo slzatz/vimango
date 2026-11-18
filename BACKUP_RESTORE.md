@@ -26,6 +26,34 @@ To restore one, copy it to a Mac and follow "Restore" below, or run
 `pg_restore` on the server itself. To stop it:
 `systemctl --user disable --now vimango-backup.timer`.
 
+### Installing it
+
+The three files are in `scripts/server/`; the copies on the server are
+these. On a new server, or after changing one here:
+
+```bash
+scp scripts/server/vimango-backup <host>:bin/
+scp scripts/server/vimango-backup.{service,timer} <host>:.config/systemd/user/
+ssh <host> 'chmod 755 ~/bin/vimango-backup && systemctl --user daemon-reload &&
+  systemctl --user enable --now vimango-backup.timer &&
+  systemctl --user start vimango-backup.service &&
+  journalctl --user -u vimango-backup -n 3'
+```
+
+(`mkdir -p ~/bin ~/.config/systemd/user` first on a new server.) What it
+needs there:
+- `pg_dump` and `pg_restore` of the server's major version (the `postgresql`
+  package).
+- A Postgres role with the login user's name that can read every table, and
+  `local` connections by `peer` in `pg_hba.conf`: `psql -d vimango -c 'select
+  1'` must work with no password.
+- Lingering, so the user's timers run with nobody logged in:
+  `loginctl show-user $USER -p Linger` says `yes`; if not,
+  `sudo loginctl enable-linger $USER`.
+
+The last line of the install runs a backup at once; it should say
+`vimango-backup: .../vimango-....dump, 2.3M, 5 tables`.
+
 ## By hand, from a Mac
 
 Every client — the TUI, vimango_hybrid (through `vimango-sync`) and the iOS

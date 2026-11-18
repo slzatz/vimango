@@ -1559,3 +1559,14 @@ repositories:
   `TestVimrcDecorateCtrlKeysForNow` became `TestVimrcLeavesCtrlBEIToVim`,
   which sources `vimango.vim` and checks each key does vim's thing and
   leaves the text alone; it fails on all four counts with the old file.
+- **The server backs itself up.** The Postgres server had never been backed
+  up; the local SQLite databases were its copies. They cover losing the
+  server, not a mass delete or bad edit that sync carries to every client,
+  since they keep no deleted notes and no history. A systemd user timer on
+  the server now runs `pg_dump -Fc` daily at about 09:30 UTC and keeps 30
+  dumps in `~/backups/vimango` (cron is not installed on Arch; lingering was
+  already on, so no sudo was needed). Peer authentication over the local
+  socket, so no password is stored. The first dump was checked table by
+  table against the live database: 6,032 tasks, 849 task keywords, 139
+  keywords, 33 contexts, 19 folders. The files are in `scripts/server/`;
+  `BACKUP_RESTORE.md` says how to install and check them.

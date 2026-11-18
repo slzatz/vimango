@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up the vimango Postgres database
+
+[Service]
+Type=oneshot
+ExecStart=%h/bin/vimango-backup
