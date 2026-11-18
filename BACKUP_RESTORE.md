@@ -1,5 +1,33 @@
 # Backing up and restoring the sync server
 
+## The daily backup on the server
+
+Since 2026-11-18 the server backs itself up once a day, at about 09:30 UTC: a
+systemd user timer (`~/.config/systemd/user/vimango-backup.timer`, with
+lingering on, so it runs with nobody logged in) runs `~/bin/vimango-backup`,
+which writes `~/backups/vimango/vimango-YYYYMMDD-HHMM.dump` (`pg_dump -Fc`,
+about 2 MB), checks the dump lists its tables' data, and keeps the newest 30.
+It connects over the local socket as the login user, by peer authentication,
+so no password is stored. A run missed while the server was down happens at
+the next boot.
+
+The local SQLite databases already cover losing the server. These dumps
+cover what they do not: a mass delete or a bad edit that sync carries to
+every client, since the local copies keep no deleted notes and no history.
+
+```bash
+ssh <host> 'journalctl --user -u vimango-backup -n 5'     # the last runs
+ssh <host> 'systemctl --user list-timers vimango-backup.timer'
+ssh <host> 'ls -lt ~/backups/vimango | head'
+scp <host>:backups/vimango/vimango-YYYYMMDD-HHMM.dump ~/backups/   # to restore from a Mac
+```
+
+To restore one, copy it to a Mac and follow "Restore" below, or run
+`pg_restore` on the server itself. To stop it:
+`systemctl --user disable --now vimango-backup.timer`.
+
+## By hand, from a Mac
+
 Every client — the TUI, vimango_hybrid (through `vimango-sync`) and the iOS
 app — syncs against one Postgres database. These commands run from a Mac over
 the same TLS connection the clients use, so no SSH access to the server is
@@ -9,7 +37,7 @@ Connection values are in the `postgres` section of `config.json`. This repo is
 public, so they are placeholders here: `<host>`, `<db user>` and the database
 name (`vimango`).
 
-## Setup (once)
+### Setup (once)
 
 ```bash
 brew install libpq    # pg_dump / pg_restore / psql; must be >= the server's major version (18)
@@ -26,7 +54,7 @@ export PGSSLMODE=verify-ca PGSSLROOTCERT="$HOME/vimango_ios/VimNotes/VimNotes/ca
 Each command then prompts for the database password. To skip the prompt, add
 it to `~/.pgpass` with `chmod 600`.
 
-## Back up
+### Back up
 
 ```bash
 mkdir -p ~/backups
