@@ -30,6 +30,7 @@ const (
 	mdItalic                      // *text* or _text_, markers included
 	mdStrike                      // between ~~ and ~~ (the tildes are not struck)
 	mdCode                        // an inline code span, backticks included, or a fenced block's row
+	mdSpecial                     // a control character, drawn as ^X (expandRow): not markdown
 )
 
 // The colours: prose and italic in grey and headings and bold a near-white,
@@ -39,6 +40,9 @@ const (
 	mdTextColour   = "\x1b[38;2;196;196;196m" // #c4c4c4
 	mdStrongColour = "\x1b[38;2;232;236;241m" // #e8ecf1
 	mdCodeColour   = "\x1b[38;2;224;66;18m"   // #e04212
+	// a control character's ^X, so that it is not taken for the two
+	// characters ^ and X, as vim's SpecialKey highlight does
+	mdSpecialColour = "\x1b[38;2;95;175;255m" // #5fafff
 )
 
 // sgr returns the escape sequence that draws in style s, from a reset state.
@@ -54,6 +58,8 @@ func (s mdStyle) sgr() string {
 		b.WriteString("\x1b[9m")
 	}
 	switch {
+	case s&mdSpecial != 0:
+		b.WriteString(mdSpecialColour)
 	case s&mdCode != 0:
 		b.WriteString(mdCodeColour)
 	case s&(mdHeading|mdBold) != 0:

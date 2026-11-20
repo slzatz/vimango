@@ -10,17 +10,21 @@ import (
 // Drawing the note's rows, with markdown highlighting (markdown.go).
 
 // styledRow returns buffer row raw as it goes on screen, each byte in its
-// style: tabs as four spaces, and a tab between the screen lines it wraps
-// onto (the tab is the separator because no real one is left). Each screen
-// line starts and ends in a reset state.
+// style: tabs as four spaces, control characters as ^X in their own colour
+// (expandRow), and a tab between the screen lines it wraps onto (the tab is
+// the separator because no real one is left). Each screen line starts and
+// ends in a reset state.
 func (e *Editor) styledRow(raw string, styles []mdStyle) string {
-	row := strings.ReplaceAll(raw, "\t", "    ")
-	if len(row) != len(raw) { // a tab became four spaces: so did its style
+	row := expandRow(raw, "    ")
+	if len(row) != len(raw) { // a byte became several: so did its style
 		wide := make([]mdStyle, 0, len(row))
 		for i := 0; i < len(raw); i++ {
-			wide = append(wide, styles[i])
-			if raw[i] == '\t' {
-				wide = append(wide, styles[i], styles[i], styles[i])
+			s := styles[i]
+			if isControl(raw[i]) {
+				s |= mdSpecial
+			}
+			for n := expandedWidth(raw[i]); n > 0; n-- {
+				wide = append(wide, s)
 			}
 		}
 		styles = wide

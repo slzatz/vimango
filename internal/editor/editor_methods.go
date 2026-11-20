@@ -71,20 +71,21 @@ func (e *Editor) wrapWidth() int {
 	return e.ScreenCols - e.left_margin_offset
 }
 
-// wrapRowText returns buffer row r with tabs expanded and byte offset c
+// wrapRowText returns buffer row r expanded (expandRow) and byte offset c
 // adjusted to match the expansion, ready to hand to wrapRow. The four-character
 // "$$$$" stand-in keeps byte offsets and display width in step with the four
 // spaces the drawing code substitutes.
 func (e *Editor) wrapRowText(r, c int) (string, int) {
 	row := e.ss[r]
-	return strings.ReplaceAll(row, "\t", "$$$$"), expandedOffset(row, c)
+	return expandRow(row, "$$$$"), expandedOffset(row, c)
 }
 
 // visualRowText returns buffer row r exactly as the drawing code puts it on
-// screen — tabs widened to the four spaces styledRow emits —
-// so a highlight drawn over it lines up with the text underneath.
+// screen — tabs widened to the four spaces styledRow emits, control
+// characters as ^X — so a highlight drawn over it lines up with the text
+// underneath.
 func (e *Editor) visualRowText(r int) string {
-	return strings.ReplaceAll(e.ss[r], "\t", strings.Repeat(" ", tabWidth))
+	return expandRow(e.ss[r], strings.Repeat(" ", tabWidth))
 }
 
 // displayCol returns the display column of byte offset c in buffer row r,

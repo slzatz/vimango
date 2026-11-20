@@ -1,8 +1,6 @@
 package editor
 
 import (
-	"strings"
-
 	"github.com/mattn/go-runewidth"
 	"github.com/slzatz/vimango/internal/pane"
 	"github.com/slzatz/vimango/vim"
@@ -33,7 +31,7 @@ func (e *Editor) onItsBuffer() bool {
 // as wrapRow measures it, and the screen lines it is drawn on.
 func (e *Editor) screenLines(line int) (raw, text string, segs []wrapSegment) {
 	raw = e.vbuf.Line(line)
-	text = strings.ReplaceAll(raw, "\t", "$$$$")
+	text = expandRow(raw, "$$$$")
 	return raw, text, wrapRow(text, e.wrapWidth())
 }
 
@@ -146,14 +144,12 @@ func segmentIndex(segs []wrapSegment, c int) int {
 }
 
 // rawOffset is expandedOffset backwards: the byte of row that offset ec of
-// its tab-expanded text falls in. Inside a tab's four columns is the tab.
+// its expanded text falls in. Inside a tab's four columns is the tab, and
+// inside a control character's two the control character.
 func rawOffset(row string, ec int) int {
 	e := 0
 	for i := 0; i < len(row); i++ {
-		w := 1
-		if row[i] == '\t' {
-			w = tabWidth
-		}
+		w := expandedWidth(row[i])
 		if ec < e+w {
 			return i
 		}

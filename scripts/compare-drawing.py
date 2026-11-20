@@ -9,7 +9,8 @@ editor's layout, a package move): build the binary before and after, and run
 from the vimango directory. Each binary is run on a pseudo-terminal, in
 --editor mode and as the TUI, through the same keys, and everything it writes
 is compared step by step. "SAME" means byte for byte, but for the age vim
-gives an undo ("3 seconds ago").
+gives an undo ("3 seconds ago") and the process id in --editor's report to its
+host ("pid=1234").
 
 Nothing here touches the real database or the server: the runs happen in a
 temporary directory holding a backup copy of vimango.db (taken with sqlite3's
@@ -97,7 +98,8 @@ def run(binary, args, steps, snapshot):
 
 def canon(data):
     text = data.decode("utf8", "replace")
-    return re.sub(r"\d+ (seconds?|minutes?) ago", "N ago", text)
+    text = re.sub(r"\d+ (seconds?|minutes?) ago", "N ago", text)
+    return re.sub(r"pid=\d+", "pid=N", text)
 
 
 def main():

@@ -77,7 +77,68 @@ func wrapRow(row string, width int) []wrapSegment {
 // stand-in, so a tab never changes a row's length in bytes.
 const tabWidth = 4
 
-// expandedOffset maps byte offset c in row to its offset in the tab-expanded
+// A row is laid out by expandRow, and every measure of it is taken on that:
+// a tab is tabWidth columns, and a control character two, drawn as vim draws
+// it -- ^ and its letter, ^K for 0x0b, ^? for DEL -- in its own colour
+// (styledRow). Written to the terminal as it is, a control character is an
+// instruction to it: ^K moved the cursor down a line, and the screen stopped
+// showing the note (2026-11-20, Ctrl-K a Ctrl-K, which inserts a ^K in vim
+// as here). expandedOffset and rawOffset go from a byte of the row to the
+// expanded row and back.
+
+// isControl reports whether byte b is drawn as ^X: a C0 control other than
+// tab, or DEL. None of these is ever part of a multi-byte UTF-8 character.
+func isControl(b byte) bool { return (b < 0x20 && b != '\t') || b == 0x7f }
+
+// expandedWidth is the number of bytes, and columns, byte b of a row becomes.
+func expandedWidth(b byte) int {
+	switch {
+	case b == '\t':
+		return tabWidth
+	case isControl(b):
+		return 2
+	}
+	return 1
+}
+
+// controlText is how control byte b is drawn.
+func controlText(b byte) string {
+	if b == 0x7f {
+		return "^?"
+	}
+	return "^" + string(rune(b+'@'))
+}
+
+// expandRow is row as it is laid out: each tab as tab, which is four spaces
+// to draw it and "$$$$" to measure it (no wrap breaks after that), and each
+// control character as controlText.
+func expandRow(row, tab string) string {
+	plain := true
+	for i := 0; i < len(row); i++ {
+		if expandedWidth(row[i]) != 1 {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		return row
+	}
+	var b strings.Builder
+	b.Grow(len(row) + 8)
+	for i := 0; i < len(row); i++ {
+		switch c := row[i]; {
+		case c == '\t':
+			b.WriteString(tab)
+		case isControl(c):
+			b.WriteString(controlText(c))
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// expandedOffset maps byte offset c in row to its offset in the expanded
 // row, clamping c to the row.
 func expandedOffset(row string, c int) int {
 	if c > len(row) {
@@ -86,7 +147,11 @@ func expandedOffset(row string, c int) int {
 	if c < 0 {
 		c = 0
 	}
-	return c + (tabWidth-1)*strings.Count(row[:c], "\t")
+	e := c
+	for i := 0; i < c; i++ {
+		e += expandedWidth(row[i]) - 1
+	}
+	return e
 }
 
 // byteAtDisplayCol returns the byte offset of the rune covering display column

@@ -1662,3 +1662,20 @@ repositories:
   cases differ (58 on 2026-11-12), the rest of them completion. Tests: the
   fork's `apitest/digraph.c` and `insert_ctrl_bsl.c`; here
   `internal/editor/insert_keys_test.go`.
+
+- **Control characters in a note are drawn as ^X.** Steve, trying the
+  digraphs: Ctrl-K, a key or two, then Ctrl-K again "deletes the lines
+  above", and `u` brings them back. Nothing was deleted: Ctrl-K a Ctrl-K
+  is no digraph, so vim inserts its second key, a ^K (stock vim does the
+  same, and shows `^K`), and the editor wrote the ^K to the terminal as it
+  was -- a vertical tab, which moves the cursor down a line -- so what was
+  drawn after it was drawn in the wrong place; `u` took the ^K out and the
+  redraw was right again. Any control character already in a note (a ^N
+  from before the fork's `8cca54f72`, say) did the same. The layout now has
+  one place, `expandRow` (`editor_wrap.go`): a tab is four columns, a
+  control character two, `^` and its letter in a colour of its own, and the
+  seven places that expanded tabs each by hand -- drawing, the cursor, the
+  selection and search highlights, wrapping, `gj`/`g$` -- use it.
+  `scripts/compare-drawing.py` (which now masks the report's `pid=`) found
+  nothing else drawn differently, in either mode. Tests:
+  `internal/editor/control_chars_test.go`.
