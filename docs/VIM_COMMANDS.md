@@ -187,6 +187,14 @@ Typed at the `:` line they last until the editor closes; put them in
 | `/two` Enter, then ` `` ` | back where the search started |
 | `:set nowrapscan`, `G`, `/alpha` Enter | `E385`, and the cursor has not moved |
 
+### Listings fit the pane (2026-11-20)
+
+| Try | Expect |
+|---|---|
+| `:digraphs` | as many entries to a line as the pane holds, and none wrapped; narrow the window and run it again: fewer |
+| `:let @a = repeat('x', 200)`, then `:registers a` | the register runs to the edge of the box, not to 74 characters |
+| `:echo &columns` | the width the box gives a listing, not 80 |
+
 ### Keys in INSERT that used to type a control character (fixed 2026-11-20)
 
 | Try | Expect |
@@ -267,7 +275,7 @@ Worth confirming that these fail the way described, and not some other way.
 |---|---|
 | `:s` with the `c` flag | refused; there is no confirm prompt |
 | `:echo input('name: ')`, `inputlist()`, `inputsecret()` | returns at once with nothing (`''`, or `0`). It no longer freezes, but a script cannot ask you anything |
-| Listings are laid out for 80 columns | `:registers` cuts long lines at 74 characters whatever the pane's width; `:version`'s columns may wrap in a narrow pane |
+| Listings with characters of unusual width | vim pads `:digraphs` by its own count of each character's width, and the columns drift a little where a wide or combining character is drawn otherwise; real vim does the same |
 | `:filter /pat/ registers` | refused, with the "one window" reason, which is wrong: libvim could do it now |
 | `:highlight`, `:function` (to list) | refused; libvim could list them now |
 | `:2,3number` | toggles line numbering (vimango's `:number`) instead of printing lines |

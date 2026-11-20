@@ -17,6 +17,9 @@ type testHost struct {
 	shown  []string // what the editor put in its notice box
 	keys   []int    // the keys the editor offered the box while it was up
 	closed int      // times the editor said its note was closed
+	// listingWidth is what the box says a listing's line can take; 0 leaves
+	// vim's 'columns' alone
+	listingWidth int
 }
 
 // ShowNotice records the text and writes it out, as the screen's box draws
@@ -35,6 +38,10 @@ func (h *testHost) NoticeKey(c int) (string, bool) {
 	}
 	return "", false
 }
+
+// ListingWidth leaves vim's width alone: a test that wants one sets
+// listingWidth.
+func (h *testHost) ListingWidth() int { return h.listingWidth }
 
 // open reports whether the editor still has its note: it has not said it closed.
 func (h *testHost) open() bool { return h.closed == 0 }

@@ -1679,3 +1679,18 @@ repositories:
   `scripts/compare-drawing.py` (which now masks the report's `pid=`) found
   nothing else drawn differently, in either mode. Tests:
   `internal/editor/control_chars_test.go`.
+
+- **Listings fit the pane** (`'columns'`, the open item from 2026-11-11).
+  Steve, trying `:digraphs`: the formatting is not great. libvim believed
+  in 80 columns whatever the pane, so vim put six digraphs to a line and
+  `:registers` cut its lines at 74 characters; a wide window was mostly
+  empty, a narrow one wrapped every line. The overlay now says how wide a
+  listing may be in it (`Screen.ListingWidth`: the pane less its padding and
+  the 4 columns the glamour style indents a code block by, measured from the
+  style), and the editor sets vim's `'columns'` to that (`fitListings`)
+  when a note opens and before each forwarded command -- only then: setting
+  it runs a command, which drops the keys vim holds for a mapping.
+  `vimWindowSetWidth` was not used: it can only widen vim's screen. What is
+  left is vim's own: entries padded by vim's count of a character's width,
+  which drifts where the terminal draws a wide or combining one otherwise.
+  Tests: `internal/editor/listing_width_test.go`, `notice_listing_test.go`.

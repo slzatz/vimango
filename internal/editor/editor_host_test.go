@@ -17,6 +17,8 @@ type recordedNotices struct {
 
 func (n *recordedNotices) ShowNotice(text string, hang int) { n.shown = append(n.shown, text) }
 
+func (n *recordedNotices) ListingWidth() int { return 0 }
+
 func (n *recordedNotices) NoticeKey(c int) (string, bool) {
 	n.keys = append(n.keys, c)
 	return "", c == ' '

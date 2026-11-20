@@ -212,6 +212,7 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	e.resyncFromVim()
 	e.noteIs(note)         // the note as read is the note as saved
 	e.startRecovery()      // and what an editor that stopped unexpectedly left of it
+	e.fitListings()        // vim's listings laid out for the box they are shown in
 	vim.SetScreenLayout(e) // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
 	return e, nil
 }
@@ -224,6 +225,10 @@ func Open(host Host, id int, title string) (*Editor, error) {
 type NoticeBox interface {
 	ShowNotice(text string, hang int)
 	NoticeKey(c int) (message string, handled bool)
+	// ListingWidth is how many columns a line of a listing vim makes can
+	// take in the box without being wrapped (fitListings); 0 or less leaves
+	// vim's own width alone.
+	ListingWidth() int
 }
 
 // showNotice puts text in the notice box, over the note, and gives the keys

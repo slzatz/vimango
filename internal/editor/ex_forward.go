@@ -1,9 +1,11 @@
 package editor
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/slzatz/vimango/vim"
@@ -396,6 +398,7 @@ func classifyExCommand(line string, first bool) exDecision {
 // it).
 func (e *Editor) forwardEx(line string) (redraw bool) {
 	cwd, cwdErr := os.Getwd()
+	e.fitListings()
 	msgs := vim.CaptureMessages(func() { vim.SendInput(":" + line + "\r") })
 
 	var problems []string
@@ -415,6 +418,29 @@ func (e *Editor) forwardEx(line string) (redraw bool) {
 
 	e.showVimMessages(msgs, problems)
 	return redraw
+}
+
+// fitListings makes vim lay out what a command lists (:registers, :digraphs,
+// :marks, :set) for the width of the box it is shown in, as vim lays them out
+// for its window: libvim has none, and believed in 80 columns whatever the
+// pane -- a wide one was mostly empty, a narrow one wrapped every line, and
+// :registers cut its lines at 74 characters. 'columns' is a number only: what
+// is drawn where is still the editor's (see "The screen is the editor's").
+//
+// It runs a command, and libvim drops the keys it is holding for a mapping
+// when one is run, so it is called only where none can be held: when the
+// note is opened, and when a ':' line the user typed is about to run
+// (forwardEx). A listing from a mapping takes the width set last.
+func (e *Editor) fitListings() {
+	const vimMinimum = 12 // vim's MIN_COLUMNS
+	if e.Notices == nil {
+		return
+	}
+	w := e.Notices.ListingWidth()
+	if w < vimMinimum || vim.EvaluateExpression("&columns") == strconv.Itoa(w) {
+		return
+	}
+	vim.ExecuteCommand(fmt.Sprintf("set columns=%d", w))
 }
 
 // showVimMessages puts what vim said about a forwarded command where the user

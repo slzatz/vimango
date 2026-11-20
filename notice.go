@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
+	"github.com/mattn/go-runewidth"
 )
 
 // The notice: a box drawn over the right pane for text that is not a note --
@@ -38,6 +39,39 @@ func (s *Screen) ShowNotice(text string, hang int) {
 	s.notice = strings.Split(note, "\n")
 	s.noticeTop = 0
 	s.drawNotice()
+}
+
+// ListingWidth is how many columns a line of a listing vim makes (:registers,
+// :digraphs, :marks) can take in the box without being wrapped. A listing is
+// shown as a code block (the editor's showVimMessages): the box's width,
+// where ShowNotice wraps, less what the glamour style indents a code block
+// by. The editor makes vim lay its listings out for this many columns
+// (vim's 'columns'), as vim lays them out for its window.
+func (s *Screen) ListingWidth() int {
+	if !s.codeIndentKnown || s.codeIndentStyle != s.glamourStyle {
+		s.codeIndent, s.codeIndentStyle, s.codeIndentKnown = codeBlockIndent(s.glamourStyle), s.glamourStyle, true
+	}
+	return s.totaleditorcols - NOTICE_RIGHT_PADDING - s.codeIndent
+}
+
+// codeBlockIndent is the number of columns the glamour style puts before
+// the text of a code block: 4 in darkslz.json and default.json.
+func codeBlockIndent(style string) int {
+	const indentIfUnknown = 4
+	r, err := glamour.NewTermRenderer(glamour.WithStylePath(glamourStylePath(style)), glamour.WithWordWrap(0))
+	if err != nil {
+		return indentIfUnknown
+	}
+	out, err := r.Render("```\nX\n```")
+	if err != nil {
+		return indentIfUnknown
+	}
+	for _, line := range strings.Split(stripANSI(out), "\n") {
+		if i := strings.Index(line, "X"); i >= 0 {
+			return runewidth.StringWidth(line[:i])
+		}
+	}
+	return indentIfUnknown
 }
 
 // drawNotice draws the notice as it stands, from noticeTop.

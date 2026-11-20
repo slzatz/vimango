@@ -20,9 +20,14 @@ type Screen struct {
 	Session         *Session
 
 	// the notice: text shown in a box over the right pane (notice.go)
-	notice       []string // its lines, rendered and wrapped
-	noticeTop    int      // the first of them on screen
-	glamourStyle string   // the style file it is rendered with, as config.json names it
+	notice    []string // its lines, rendered and wrapped
+	noticeTop int      // the first of them on screen
+	// how far the glamour style indents a code block, measured once per
+	// style (ListingWidth)
+	codeIndent      int
+	codeIndentStyle string
+	codeIndentKnown bool
+	glamourStyle    string // the style file it is rendered with, as config.json names it
 }
 
 func (s *Screen) eraseScreenRedrawLines() {
