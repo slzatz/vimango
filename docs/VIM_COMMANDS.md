@@ -20,7 +20,7 @@ freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
   `:echo input('x')`, freeze the editor. Check:
 
   ```bash
-  git -C ~/libvim merge-base --is-ancestor 5838803e9 HEAD && echo "libvim is new enough"
+  git -C ~/libvim merge-base --is-ancestor 8cca54f72 HEAD && echo "libvim is new enough"
   ```
 
   If not: `./scripts/build-libvim.sh && CGO_ENABLED=1 go build --tags=fts5`.
@@ -187,6 +187,17 @@ Typed at the `:` line they last until the editor closes; put them in
 | `/two` Enter, then ` `` ` | back where the search started |
 | `:set nowrapscan`, `G`, `/alpha` Enter | `E385`, and the cursor has not moved |
 
+### Keys in INSERT that used to type a control character (fixed 2026-11-20)
+
+| Try | Expect |
+|---|---|
+| `i` Ctrl-K `a:` | `ä`; Ctrl-K `e'` is `é`, Ctrl-K `Eu` is `€`, Ctrl-K `->` is `→`. `:digraphs` lists them all |
+| `:echo '` Ctrl-K `a:` `'` Enter | `ä`: Ctrl-K works on the `:` line too |
+| `i` Ctrl-K Esc | the Ctrl-K is cancelled and INSERT goes on |
+| `:set digraph`, then `i` `a` Backspace `:` | `ä` |
+| `ix` Ctrl-\ Ctrl-N | back in NORMAL, as with Esc |
+| `A` Ctrl-N | nothing is inserted; `Completion is not available` |
+
 ### Saving and closing — vimango's meaning, in any spelling vim accepts
 
 | Try | Expect |
@@ -261,9 +272,9 @@ Worth confirming that these fail the way described, and not some other way.
 | `:highlight`, `:function` (to list) | refused; libvim could list them now |
 | `:2,3number` | toggles line numbering (vimango's `:number`) instead of printing lines |
 | `:set` | each option arrives as its own message, so the overlay has a `--- Options ---` line followed by them |
-| Ctrl-K (digraphs) in INSERT | inserts `^K`; digraphs are not compiled into libvim |
 | Function keys (F1–F12) | never reach vim: a mapping on `<F5>` can be defined and cannot be triggered. Use a letter or a two-key sequence |
-| Ctrl-\ Ctrl-N in INSERT | the two control characters are inserted into the text, instead of going to NORMAL |
+| Ctrl-N, Ctrl-P (completion) in INSERT | nothing is inserted, and the message line says `Completion is not available`: libvim has no completion. Ctrl-X and the Ctrl-X command after it do the same |
+| `r` Ctrl-K `a:` in NORMAL | digraphs are read in INSERT and on the `:` line, not after `r`, `f` or `t` |
 | Ctrl-\ e on the `:` line | the Ctrl-\ is dropped and `e` is typed |
 | `feedkeys('…', 'x')` in a script | does nothing; without the `x` the keys are run afterwards |
 | A register name after Ctrl-R is not shown | vim draws a `"` while it waits; here nothing is drawn until the name is typed |

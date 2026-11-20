@@ -1645,3 +1645,20 @@ repositories:
     once, kept; `:x` saved it and the file went.
   - Tests: `internal/editor/recovery_test.go`, `crash_test.go`, and the
     `pid` in `host_report_test.go`.
+
+- **Keys in INSERT that typed a control character into the note**
+  (fork `8cca54f72`). Found by the review of this day: Ctrl-N put an
+  invisible 0x0E in the text, saved and synced with it. Stock vim 9.1 was
+  asked what each Ctrl key does in INSERT; libvim differed on five, all by
+  inserting the key: Ctrl-N and Ctrl-P (completion), Ctrl-X (its submode),
+  Ctrl-K (digraphs) and Ctrl-\ Ctrl-N. (^B, ^F, ^L, ^S, ^Z and ^_ vim
+  inserts too, and they are left as vim has them.) Digraphs are compiled in
+  again, with Ctrl-K reading its two characters a call at a time in INSERT
+  and on the `:` line, as Ctrl-R reads its register; Ctrl-\ Ctrl-N, Ctrl-G
+  and Ctrl-O leave INSERT. Completion is a few thousand lines of vim the
+  fork no longer has, and would need a menu drawn by the editor: Ctrl-N,
+  Ctrl-P, Ctrl-X and the Ctrl-X command after it insert nothing and say
+  `Completion is not available`. The fork's comparison with vim: 38 INSERT
+  cases differ (58 on 2026-11-12), the rest of them completion. Tests: the
+  fork's `apitest/digraph.c` and `insert_ctrl_bsl.c`; here
+  `internal/editor/insert_keys_test.go`.
