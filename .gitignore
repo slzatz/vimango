@@ -34,6 +34,9 @@ vimango
 # Image cache
 image_cache/
 
+# The open notes' unsaved text, and crash logs (crash.go)
+/recovery/
+
 # libvim.a different on mac and linux
 libvim.a
 

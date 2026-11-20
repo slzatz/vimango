@@ -53,6 +53,7 @@ func main() {
 
 	app = CreateApp()
 	app.Session.editorOnly = editorOnly
+	app.recoveryDir = defaultRecoveryDir // unsaved text and crash logs (crash.go)
 
 	// Load user preferences (before DetectKittyCapabilities so we can override imageScale)
 	prefs := app.LoadPreferences("preferences.json")
@@ -148,7 +149,7 @@ func main() {
 
 	// Set up platform-specific signal handling
 	setupSignalHandling(app)
-	killHEICWorkerOnSignal()
+	app.keepNoteOnSignal() // the open note's recovery file, and the heic_worker (crash.go)
 
 	// Configure Vim settings
 	vim.ExecuteCommand("set iskeyword+=*")

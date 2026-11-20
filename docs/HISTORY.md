@@ -1613,3 +1613,35 @@ repositories:
   `TestVimMessagesForKeysAreShown`; in the fork `apitest/interrupt.c`,
   `apitest/paste_start.c`, `test_cquit` in `apitest/quit.c` and
   `test_ctrl_c_says_nothing` in `apitest/messages_reports.c`.
+
+## 2026-11-20
+
+- **The recovery file: no way of ending loses unsaved text.** Until now a
+  note's unsaved text lived only in vim's buffer. A panic, a crash in
+  libvim, a kill, or hybrid itself going away (its pty closing sends
+  SIGHUP) took it with the process -- and hybrid could not tell any of
+  those from `:q`: GhosttyTerminal's close callback carries no exit
+  status, so the window went back to the preview as if the note had been
+  closed, the panic's message vanished with the terminal, and nothing was
+  said. Now the editor keeps `recovery/<id>.<pid>.json` while its note is
+  open (`internal/editor/recovery.go`): written when the note opens, after
+  a save, and a second after an edit (the event loop's timer), with the
+  buffer's text whenever it differs from the database's; removed by
+  `closeNote` and by nothing else. The next editor on the note takes the
+  newest file a dead process left, with a notice (`:w` keeps, `:q!`
+  drops), stale if a sync has changed the note since. A panic in
+  `MainLoop` writes the file and `recovery/crash.<pid>.log` and exits 2;
+  SIGHUP, SIGTERM and SIGINT have `MainLoop` write the file before the
+  process dies (`crash.go`). The host report gains `pid=`, so hybrid
+  finds its editor's file after the exit and says the editor stopped.
+  - **Why the file and not a "closed" pair in the title**, which was the
+    first plan: the title is written to the pty just before the exit, and
+    nothing orders the terminal reading it before it notices the process
+    has ended. The file is removed before the exit, so its absence is
+    certain by the time anyone looks.
+  - Checked end to end with the built binary on a scratch copy of the
+    database: an edit, `kill -9` a second later, the file held it;
+    reopened, the text came back with the notice; an edit and SIGHUP at
+    once, kept; `:x` saved it and the file went.
+  - Tests: `internal/editor/recovery_test.go`, `crash_test.go`, and the
+    `pid` in `host_report_test.go`.

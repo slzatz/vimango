@@ -205,7 +205,8 @@ func (e *Editor) save() error {
 		return err
 	}
 	e.noteIs(text)
-	e.stale = false // the row is this text now, whatever it was
+	e.stale = false   // the row is this text now, whatever it was
+	e.WriteRecovery() // which holds no text now: there is nothing to recover
 	return nil
 }
 
@@ -295,6 +296,9 @@ func (e *Editor) closeNote(save, force bool) {
 		return
 	}
 
+	// The note is closed as it should be: its recovery file goes, and with
+	// it what tells a host the editor stopped some other way.
+	e.endRecovery()
 	// back to the organizer in the TUI; in --editor mode, the end of the process
 	e.OnClose()
 }

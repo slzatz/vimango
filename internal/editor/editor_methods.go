@@ -190,6 +190,16 @@ func (e *Editor) Draw() {
 		e.showNotice(e.notice.text, e.notice.hang)
 	}
 	e.drawModeLine()
+	// said once, when the editor is first drawn: changes recovered, or the
+	// recovery file that could not be written (recovery.go)
+	if text := e.recovery.notice; text != "" {
+		e.recovery.notice = ""
+		e.showNotice(text, 0)
+	}
+	if msg := e.recovery.opening; msg != "" {
+		e.recovery.opening = ""
+		e.ShowMessage("%s", msg)
+	}
 }
 
 // drawText draws the text area: the rows, and what is marked on them. It

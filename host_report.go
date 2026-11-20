@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/slzatz/vimango/internal/editor"
 )
@@ -20,9 +21,14 @@ import (
 // The report is the terminal's title (OSC 2), which a terminal hands to
 // whatever embeds it: the word vimango and then key=value pairs,
 //
-//	vimango id=5 modified=1 stale=0
+//	vimango id=5 pid=1234 modified=1 stale=0
 //
-// id is the note, modified is Editor.Modified and stale is Editor.Stale. A
+// id is the note, pid this process, modified is Editor.Modified and stale is
+// Editor.Stale. The pid names the editor's recovery file, recovery/<id>.<pid>.json,
+// which the editor removes when it closes the note with :q or :x and at no
+// other time: a host that finds it still there after the process has ended
+// knows the editor stopped some other way, and that what it had unsaved is
+// in that file (crash.go, and recovery.go in internal/editor). A
 // host takes the pairs it knows and passes over the rest, so a pair can be
 // added. It is written when the editor opens and whenever a value changes,
 // by the event loop and nowhere else, in --editor mode only: the TUI has no
@@ -36,7 +42,7 @@ func hostReport(e *editor.Editor) string {
 		}
 		return 0
 	}
-	return fmt.Sprintf("vimango id=%d modified=%d stale=%d", e.ID(), flag(e.Modified()), flag(e.Stale()))
+	return fmt.Sprintf("vimango id=%d pid=%d modified=%d stale=%d", e.ID(), os.Getpid(), flag(e.Modified()), flag(e.Stale()))
 }
 
 // reportToHost writes the report if it is not the one last written.

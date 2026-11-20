@@ -143,6 +143,7 @@ type Editor struct {
 		hang int
 		up   bool
 	}
+	recovery        recoveryState            // the recovery file (recovery.go)
 	exCmds          map[string]func(*Editor) // map of ex commands
 	commandRegistry *pane.CommandRegistry[func(*Editor)]
 }
@@ -163,6 +164,10 @@ type Host struct {
 	// SyncAnswer is what :sync is answered with. Sync is never the editor's
 	// to run; whose it is depends on who opened the editor (noSync).
 	SyncAnswer string
+	// RecoveryDir is where the editor keeps the unsaved text of its note
+	// while it is open, and where it looks for what an editor that stopped
+	// unexpectedly left (recovery.go). "" keeps none.
+	RecoveryDir string
 }
 
 // newEditor is an editor with no note in it: its settings as they start, and
@@ -206,6 +211,7 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	e.vbuf.SetLines(0, -1, strings.Split(note, "\n"))
 	e.resyncFromVim()
 	e.noteIs(note)         // the note as read is the note as saved
+	e.startRecovery()      // and what an editor that stopped unexpectedly left of it
 	vim.SetScreenLayout(e) // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
 	return e, nil
 }

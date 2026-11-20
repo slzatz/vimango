@@ -39,6 +39,12 @@ type App struct {
 	keyEvents chan terminal.Key
 	keyErrors chan error    // Key read errors
 	resizeCh  chan struct{} // Terminal resized (SIGWINCH)
+	// A signal that is about to end the process asks for the open note's
+	// recovery file to be written, and waits for it (crash.go).
+	recoveryRequests chan chan struct{}
+	// recoveryDir is where an open note's unsaved text is kept and crash
+	// logs are written (crash.go); "" keeps neither.
+	recoveryDir string
 
 	// Database connections and other config
 	Config *dbConfig
@@ -65,13 +71,14 @@ func CreateApp() *App {
 	screen := &Screen{Session: sess}
 	kitty := IsTermKitty()
 	return &App{
-		Session:   sess,
-		Screen:    screen,
-		keyEvents: make(chan terminal.Key, 1024),
-		keyErrors: make(chan error, 1),
-		resizeCh:  make(chan struct{}, 1),
-		Run:       true,
-		kitty:     kitty, // default to false
+		Session:          sess,
+		Screen:           screen,
+		keyEvents:        make(chan terminal.Key, 1024),
+		keyErrors:        make(chan error, 1),
+		resizeCh:         make(chan struct{}, 1),
+		recoveryRequests: make(chan chan struct{}),
+		Run:              true,
+		kitty:            kitty, // default to false
 	}
 }
 
@@ -80,10 +87,11 @@ func CreateApp() *App {
 // here.
 func (a *App) editorHost() editor.Host {
 	return editor.Host{
-		Store:      a.Store,
-		Notices:    a.Screen,
-		OnClose:    a.noteClosed,
-		SyncAnswer: a.syncAnswer(),
+		Store:       a.Store,
+		Notices:     a.Screen,
+		OnClose:     a.noteClosed,
+		SyncAnswer:  a.syncAnswer(),
+		RecoveryDir: a.recoveryDir,
 	}
 }
 
@@ -549,6 +557,7 @@ const ctrlC = 0x03
 // key reader, the resize signal, image loading -- runs elsewhere and reaches
 // the UI only as an event on one of the channels selected here.
 func (a *App) MainLoop() {
+	defer a.crashed() // a panic: the note's text kept, and said where (crash.go)
 	a.startKeyReader()
 	a.handleEvents()
 	a.Cleanup()
@@ -570,6 +579,16 @@ func (a *App) handleEvents() {
 	// has no clock, so the wait is kept here. nil -- never ready -- unless
 	// the last key left vim holding something.
 	var mappingTimeout <-chan time.Time
+
+	// The open note's recovery file is written a second after the first
+	// change since it was last written (recovery.go in the editor): at most
+	// once a second while text changes, and never more than a second behind.
+	var recoveryDue <-chan time.Time
+	recoveryWait := func() {
+		if ae := a.Session.editor; recoveryDue == nil && ae != nil && ae.RecoveryPending() {
+			recoveryDue = time.After(time.Second)
+		}
+	}
 
 	for a.Run {
 		// before waiting for the next event: what the last one left, and at
@@ -612,6 +631,7 @@ func (a *App) handleEvents() {
 				if wait, waiting := editor.MappingWait(); waiting {
 					mappingTimeout = time.After(wait)
 				}
+				recoveryWait()
 			} else {
 				var redraw RedrawScope
 				if pasted {
@@ -658,7 +678,18 @@ func (a *App) handleEvents() {
 			mappingTimeout = nil
 			if ae := a.Session.editor; ae != nil {
 				ae.DrawAfterKey(ae.MappingTimeout(), editor.NoKey)
+				recoveryWait()
 			}
+		case <-recoveryDue:
+			recoveryDue = nil
+			if ae := a.Session.editor; ae != nil {
+				ae.WriteRecovery()
+			}
+		case done := <-a.recoveryRequests:
+			if ae := a.Session.editor; ae != nil {
+				ae.WriteRecovery()
+			}
+			close(done)
 		case <-a.resizeCh:
 			a.handleResize()
 		case res := <-renderResults:

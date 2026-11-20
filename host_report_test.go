@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -19,7 +20,8 @@ func titlesSet(written string) (titles []string) {
 	return titles
 }
 
-// The report is the note, whether the buffer has unsaved changes, and
+// The report is the note, this process (whose recovery file a host looks
+// for when it ends), whether the buffer has unsaved changes, and
 // whether :checkstale found the row changed under them. It is written when
 // one of those changes and not otherwise: most keys change none.
 func TestEditorReportsToItsHost(t *testing.T) {
@@ -34,7 +36,7 @@ func TestEditorReportsToItsHost(t *testing.T) {
 		t.Helper()
 		line := ""
 		if pairs != "" {
-			line = "vimango id=" + strconv.Itoa(id) + " " + pairs
+			line = "vimango id=" + strconv.Itoa(id) + " pid=" + strconv.Itoa(os.Getpid()) + " " + pairs
 		}
 		if got := reported(); got != line {
 			t.Fatalf("%s: the host was told %q, want %q", when, got, line)
@@ -94,7 +96,7 @@ func TestEventLoopReportsToTheHost(t *testing.T) {
 		}
 		a.handleEvents() // :q ends it: --editor has one note
 	})
-	id := "vimango id=" + strconv.Itoa(ids[0])
+	id := "vimango id=" + strconv.Itoa(ids[0]) + " pid=" + strconv.Itoa(os.Getpid())
 	want := []string{id + " modified=0 stale=0", id + " modified=1 stale=0", id + " modified=0 stale=0"}
 	if got := titlesSet(written); strings.Join(got, " | ") != strings.Join(want, " | ") {
 		t.Errorf("the host was told %q, want %q", got, want)
