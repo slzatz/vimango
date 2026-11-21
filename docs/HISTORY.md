@@ -1694,3 +1694,35 @@ repositories:
   left is vim's own: entries padded by vim's count of a character's width,
   which drifts where the terminal draws a wide or combining one otherwise.
   Tests: `internal/editor/listing_width_test.go`, `notice_listing_test.go`.
+
+## 2026-11-21
+
+- **libvim run instrumented: nothing found** (`scripts/test-sanitized.sh`, the
+  first item left by the review of 2026-11-20). The library vimango links is
+  not instrumented, so a bad read inside vim showed only if it crashed, and
+  the fork's own tests instrument the test file and not the library. The
+  script builds libvim with AddressSanitizer, or with
+  UndefinedBehaviorSanitizer, from a copy of the fork's checkout and runs
+  against it vimango's suite (in a copy of this tree, since the linker takes
+  `libvim.a` from the directory `go` is run in), the fork's 70 API test
+  programs, and its nine case files: 2,626 key sequences, ex commands and
+  vimscript functions, a process each. On fork `8cca54f72`:
+  - **AddressSanitizer: no report** from any of them.
+  - **UndefinedBehaviorSanitizer: no report** either, where the fork's notes
+    expected vim's older code to have a good deal to say. (It is not silent
+    about everything: `:echo 9223372036854775807 + 1` is a signed overflow,
+    as in every vim, and no case does that.)
+  - **`api_edges.exe`**, the API called wrongly, gives three, all in the
+    fork's `TODO.md` already: a key typed in Insert mode after lines were set
+    under a cursor now past the end (entry 2: a read past the buffer's block,
+    in `ins_char_bytes`), a negative first line (entry 2), and
+    `vimSearchGetHighlights` with no buffer (entry 14). vimango makes none of
+    those calls: a caller of `SetLines` that can shorten the text sets the
+    cursor next (`checkStale`, the organizer's `setRows`). That is a rule
+    the callers keep, and the open item says so.
+  - Each checker was shown to be awake first: a call that makes libvim read
+    one pointer past a malloc'd array, and the overflow above, from a Go
+    test, each wrote its report and failed the script.
+  - Go's `-asan` is "not supported on darwin/arm64" (go 1.27); linking the
+    runtime with `CGO_LDFLAGS=-fsanitize=address` is enough, since libvim is
+    the code to check. Not run on Linux yet.
