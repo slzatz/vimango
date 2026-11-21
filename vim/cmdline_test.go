@@ -10,7 +10,7 @@ func TestCommandLineAPI(t *testing.T) {
 	InitializeVim(0)
 	vbuf := NewBuffer(0)
 	SetCurrentBuffer(vbuf)
-	vbuf.SetLines(0, 0, []string{"alpha bravo"})
+	vbuf.SetLines(0, -1, []string{"alpha bravo"})
 
 	// ':' should put vim in cmdline mode (mode 8), type ':'
 	SendInput(":")

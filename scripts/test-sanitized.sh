@@ -11,7 +11,10 @@
 #   3. the fork's case files (src/apitest/compare/cases: about 2,600 key
 #      sequences, ex commands and vimscript functions, each in a process of
 #      its own),
-#   4. api_edges.exe, which calls the C API with arguments it does not expect.
+#   4. setlines_stress.exe: keys and vimBufferSetLines() calls in a random
+#      order, 1,000 seeds, to see that nothing is left holding a line the
+#      buffer no longer has,
+#   5. api_edges.exe, which calls the C API with arguments it does not expect.
 #      Its reports are printed and not counted: they are misuse, and listed in
 #      the fork's TODO.md.
 #
@@ -22,13 +25,13 @@
 # scripts/build-libvim.sh does.
 #
 # Usage:
-#   ./scripts/test-sanitized.sh            # AddressSanitizer, all four
+#   ./scripts/test-sanitized.sh            # AddressSanitizer, all five
 #   ./scripts/test-sanitized.sh --ubsan    # UndefinedBehaviorSanitizer instead
 #   ./scripts/test-sanitized.sh --go-only  # vimango's suite alone
 #   ./scripts/test-sanitized.sh --clean    # throw the work directory away first
 #
 # Exit status 0 when every test passes and no sanitizer report was written for
-# 1 to 3. The reports are in the work directory, whose path is printed.
+# 1 to 4. The reports are in the work directory, whose path is printed.
 #
 set -euo pipefail
 
@@ -40,7 +43,7 @@ for arg in "$@"; do
     --ubsan) SAN=undefined ;;
     --go-only) GO_ONLY=1 ;;
     --clean) CLEAN=1 ;;
-    -h | --help) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "error: unknown option: $arg (see --help)" >&2; exit 1 ;;
   esac
 done
@@ -143,7 +146,8 @@ if [[ "${GO_ONLY}" -eq 0 ]]; then
   echo "  ${n} programs, ${bad} failed"
   [[ "${bad}" -eq 0 ]] || failed=1
 
-  # --- 3 and 4. The case files and the API's edges (apitest/compare/README.md).
+  # --- 3 to 5. The case files, the stress run and the API's edges
+  # (apitest/compare/README.md).
   echo "==> libvim's case files"
   if ! make -f Makefile -f apitest/compare/rules.mk compare-tools \
        SANITIZER_CFLAGS="${SANITIZER_CFLAGS}" EXTRA_LIBS="${EXTRA_LIBS}" > "${WORK}/compare-build.log" 2>&1; then
@@ -158,6 +162,15 @@ if [[ "${GO_ONLY}" -eq 0 ]]; then
     # and "did not come back" is what they should do.
     printf '  %-26s %s\n' "$(basename "$f" .txt)" "$(./sweep.sh "$f" 2>&1 | tail -1)"
   done
+
+  reports_to stress
+  if ./setlines_stress.exe 1000 > "${WORK}/stress.log" 2>&1; then
+    printf '  %-26s %s\n' "setlines_stress" "$(tail -1 "${WORK}/stress.log")"
+  else
+    tail -6 "${WORK}/stress.log" | cut -c1-400
+    echo "  setlines_stress failed (${WORK}/stress.log; ./setlines_stress.exe -s <seed> runs one)"
+    failed=1
+  fi
 
   reports_to edges
   ./api_edges.exe > "${WORK}/api_edges.log" 2>&1 || true
@@ -175,7 +188,7 @@ if [[ "${counted}" -gt 0 ]]; then
   find "${REPORTS}" -type f ! -name 'edges.*' -print0 | xargs -0 cat | summaries -
   failed=1
 else
-  echo "No sanitizer report from vimango's suite, the API tests or the case files."
+  echo "No sanitizer report from vimango's suite, the API tests, the case files or the stress run."
 fi
 if compgen -G "${REPORTS}/edges.*" > /dev/null; then
   echo "From api_edges.exe (misuse of the API; not counted, see the fork's TODO.md):"

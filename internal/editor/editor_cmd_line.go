@@ -335,9 +335,10 @@ func (e *Editor) checkStale() {
 	e.title = title
 	e.stale = false
 	e.vbuf.SetLines(0, -1, strings.Split(dbText, "\n"))
-	// Hold the cursor where the user left it. vim keeps it inside the new
-	// text, which can be shorter -- and must be told to: replacing the lines
-	// leaves vim's cursor where it was, on a row that may be gone.
+	// The cursor stays where the user left it, inside the new text, which
+	// can be shorter. libvim sees to that itself now (SetLines); a libvim.a
+	// from before 7f2ad2af7 links all the same and leaves the cursor on a row
+	// that may be gone, so it is still put there.
 	vim.SetCursorPosition(e.fr+1, e.fc)
 	e.resyncFromVim()
 	// The reload is not an edit: the buffer is clean, so the quit guard and

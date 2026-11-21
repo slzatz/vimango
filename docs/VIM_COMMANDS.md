@@ -20,7 +20,7 @@ freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
   `:echo input('x')`, freeze the editor. Check:
 
   ```bash
-  git -C ~/libvim merge-base --is-ancestor 8cca54f72 HEAD && echo "libvim is new enough"
+  git -C ~/libvim merge-base --is-ancestor 7f2ad2af7 HEAD && echo "libvim is new enough"
   ```
 
   If not: `./scripts/build-libvim.sh && CGO_ENABLED=1 go build --tags=fts5`.
@@ -216,6 +216,7 @@ Typed at the `:` line they last until the editor closes; put them in
 | `:q!` | closed without saving |
 | `x`, `u`, then `:q` | closed: the note is as saved, and `:x` there writes nothing. So is a word deleted and typed again. Before 2026-11-16 any change, undone or not, left the note modified |
 | `x`, `:w`, `u`, then `:q` | `No write since last change`: the undo went back past the save, to a text the database does not hold. Ctrl-R, and `:q` closes |
+| `ma` on a line, then a sync that changes the note (`Note N reloaded`), then `'a` | the same line: a reload leaves marks where they were. A mark on a line the new text does not have says `E20: Mark not set` (before 2026-11-21, `E19: Mark has invalid line number`) |
 | `x`, `:w`, then a sync that changes the note (`Note N reloaded`), then `u` | nothing changes: the reloaded text is not an edit to undo, and what was done before it is forgotten. Before 2026-11-16 `u` put a line of the old text over the new, and `:x` saved the mixture. What is typed after the reload is undone as usual |
 
 ### vimango's own commands
@@ -284,6 +285,7 @@ Worth confirming that these fail the way described, and not some other way.
 | Ctrl-N, Ctrl-P (completion) in INSERT | nothing is inserted, and the message line says `Completion is not available`: libvim has no completion. Ctrl-X and the Ctrl-X command after it do the same |
 | `r` Ctrl-K `a:` in NORMAL | digraphs are read in INSERT and on the `:` line, not after `r`, `f` or `t` |
 | Ctrl-\ e on the `:` line | the Ctrl-\ is dropped and `e` is typed |
+| `i` Ctrl-V Ctrl-O `.` Esc, then `.` | **freezes the editor** (do not try it on a note with unsaved changes; the recovery file keeps them). vim inserts `^O.` again. A control character typed after Ctrl-V is replayed by `.` as the command it is |
 | `feedkeys('…', 'x')` in a script | does nothing; without the `x` the keys are run afterwards |
 | A register name after Ctrl-R is not shown | vim draws a `"` while it waits; here nothing is drawn until the name is typed |
 | After a search, `/pattern` stays on the message line | harmless; vim leaves it there too until something else is said |

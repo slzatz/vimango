@@ -1726,3 +1726,40 @@ repositories:
   - Go's `-asan` is "not supported on darwin/arm64" (go 1.27); linking the
     runtime with `CGO_LDFLAGS=-fsanitize=address` is enough, since libvim is
     the code to check. Not run on Linux yet.
+
+- **`SetLines` looks after the cursor and the marks** (fork `7f2ad2af7`; its
+  `TODO.md` entry 2, the one memory error the instrumented run knew of).
+  libvim's `vimBufferSetLines()` appended and deleted lines and looked at
+  nothing else: a cursor on a row that was gone gave `E315` at the next
+  key, and in INSERT read past the buffer's memory; `'a` after a note was
+  reloaded shorter gave `E19: Mark has invalid line number`. vimango got
+  away with it because each caller put the cursor back at once. Now the
+  cursor and the marks go with their lines, as for vim's `setbufline()`
+  and `deletebufline()`: a row that is replaced keeps what is on it, rows
+  below the range move with theirs, a mark on a row that went is not set
+  (`E20`), and the cursor is brought inside the text. So a mark set in a
+  note is still on its row after a sync reloads the note.
+  - **A stress run found two more holders of stale positions**, and they
+    are fixed in the same commit. The fork's new `setlines_stress` types
+    random keys and sets random lines in between, a seed to a process,
+    under AddressSanitizer. `d` Ctrl-V, lines set, then a motion: the
+    operator kept the position it was typed at, and read past the end of a
+    row that had become shorter. A command half typed in NORMAL is now
+    forgotten when lines are set. And Ctrl-V `jj` `I`, lines set, `<esc>`:
+    the insert was copied to the block's other rows by their old numbers,
+    `E315` for each one that was gone. It is no longer copied. 5,000 seeds
+    of 400 steps pass, and `scripts/test-sanitized.sh` runs 1,000.
+  - **And one thing that is not about lines being set**: Ctrl-V Ctrl-O in
+    INSERT, then `.`, then `<esc>` and `.` never returns, in libvim with no
+    line set at all; vim inserts the two characters again. Not fixed; in
+    the open items and the fork's `TODO.md` (entry 4).
+  - **One behavior changes**: a line put in above the cursor moves the
+    cursor down with its text, as vim's `append()` does. `TestCommandLineAPI`
+    relied on the opposite, by putting its one line above the empty
+    buffer's instead of over it.
+  - `checkStale` still sets the cursor after the reload, for a `libvim.a`
+    from before this commit, which links without complaint.
+  - Tests: `vim/setlines_test.go`, `TestCheckStaleReloadKeepsMarks`; in
+    the fork `apitest/buffer_set_lines.c` and `apitest/compare/setlines_stress.c`.
+    Its comparison with vim gives the same numbers as before for every case
+    file.

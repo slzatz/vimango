@@ -218,6 +218,39 @@ func TestCheckStaleReloadForgetsUndo(t *testing.T) {
 	}
 }
 
+// A reload leaves a mark on its line, and a mark on a line the new text does
+// not have is a mark that is not set. Until the fork's vimBufferSetLines
+// looked after marks (2026-11-21) that one was "E19: Mark has invalid line
+// number". The cursor stays where it was, inside the new text.
+func TestCheckStaleReloadKeepsMarks(t *testing.T) {
+	e, _ := savedNoteEditor(t, "alpha one\nbravo two\ncharlie three\ndelta four")
+	e.vbuf.SetLines(0, -1, strings.Split(e.dbText, "\n")) // as Open reads a note
+	e.ss = e.vbuf.Lines()
+	e.saveTick = e.vbuf.GetLastChangedTick()
+	captureStdout(t, func() { e.sendKeys("ggjmaGmb$") })
+
+	if _, err := e.Store.DB().Exec("UPDATE task SET note=? WHERE id=?;", "one\ntwo, longer than it was\nthree", e.id); err != nil {
+		t.Fatal(err)
+	}
+	captureStdout(t, func() { e.exCommand("checkstale") })
+	assertLines(t, e, "one", "two, longer than it was", "three")
+	if e.fr != 2 || e.fc != 4 {
+		t.Errorf("the cursor is at row %d, column %d, want the end of the last row", e.fr, e.fc)
+	}
+	vimAndEditorAgree(t, e, "after the reload")
+
+	captureStdout(t, func() { e.sendKeys("gg'a") })
+	if e.fr != 1 {
+		t.Errorf("'a goes to row %d, want 1", e.fr)
+	}
+	if msg := keyMessage(t, e, "'b"); !strings.Contains(msg, "E20: Mark not set") {
+		t.Errorf("'b, a mark on a row the reload took away, said %q", msg)
+	}
+	if e.isModified() {
+		t.Error("the reloaded note counts as modified")
+	}
+}
+
 // Both sides changed: only the user can choose, so it says so and touches
 // nothing. A note deleted elsewhere is said too.
 func TestCheckStaleWarnsAndTouchesNothing(t *testing.T) {

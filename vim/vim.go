@@ -124,6 +124,12 @@ func (b *Buffer) Lines() []string {
 // with lines; end -1 means through the last line, so SetLines(0, -1, lines)
 // replaces the whole buffer and SetLines(0, 0, lines) inserts at the top.
 //
+// The cursor and the marks go with their lines (the fork, from 7f2ad2af7): a
+// line that is replaced keeps them, lines below the range move with theirs,
+// and when the new lines are fewer a mark on a line that went is no longer
+// set and the cursor is brought inside the text. A command half typed in
+// NORMAL -- a count, an operator waiting for its motion -- is forgotten.
+//
 // It is for text that is new -- a note read, or read again -- and not an
 // edit: the buffer's undo history is forgotten. libvim saves nothing for
 // undo when lines are set, so the history would go on describing the old
