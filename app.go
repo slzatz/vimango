@@ -717,16 +717,19 @@ func (a *App) writeRecovery() {
 //
 // So this is that loop's wait again, on MainLoop's own goroutine, for as
 // long as the question stands, and it does what the loop does between keys
-// except give the editor a key: a resize redraws (the editor's Draw puts the
-// question back), the recovery file is written when it is due, and when a
-// signal asks. Text that is pasted answers nothing and is dropped.
+// except give the editor a key: the host is told what changed, a resize
+// redraws (the editor's Draw puts the question back), the recovery file is
+// written when it is due, and when a signal asks. Text that is pasted
+// answers nothing and is dropped.
 //
 // A Ctrl-C comes through as a key, and answers the question: the key reader
 // takes one for itself only while vim is running something that could be
 // stopped (readerTakes; vim.Interrupt says no while a question is asked).
 func (a *App) waitKey() int {
 	for {
-		// the accepted changes so far are a change to keep, too
+		// the changes accepted so far are changes like any other: the host
+		// is told the note is modified, and they are kept for recovery
+		a.reportToHost()
 		a.recoveryWait()
 		a.returnCursor()
 		select {

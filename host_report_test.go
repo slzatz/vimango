@@ -102,3 +102,39 @@ func TestEventLoopReportsToTheHost(t *testing.T) {
 		t.Errorf("the host was told %q, want %q", got, want)
 	}
 }
+
+// A question vim asks in the middle of a command (":s" with the c flag) can
+// stand for a long time, and the changes accepted before it are unsaved
+// text: the host is told so while the loop waits for the answer, not only
+// when the command is over.
+func TestHostIsToldOfChangesWhileSubstituteAsks(t *testing.T) {
+	a, ids := editorOnlyApp(t, "foo\nfoo\nfoo")
+	a.keyEvents = make(chan terminal.Key, 64)
+
+	var reports []string
+	captureStdout(t, func() {
+		if err := a.openEditor(ids[0], ""); err != nil {
+			t.Fatal(err)
+		}
+		// what the host had been told when each answer was taken
+		a.Session.editor.WaitKey = func() int {
+			k := a.waitKey()
+			reports = append(reports, a.hostReported)
+			return k
+		}
+		for _, r := range ":%s/foo/X/c\ryq:q!\r" {
+			a.keyEvents <- terminal.Key{Regular: r}
+		}
+		a.handleEvents() // :q! ends it: --editor has one note
+	})
+
+	if len(reports) != 2 {
+		t.Fatalf("%d answers were taken, want 2: %q", len(reports), reports)
+	}
+	if !strings.Contains(reports[0], "modified=0") {
+		t.Errorf("at the first question the host had been told %q, want modified=0", reports[0])
+	}
+	if !strings.Contains(reports[1], "modified=1") {
+		t.Errorf("at the second question, the first change accepted, the host had been told %q, want modified=1", reports[1])
+	}
+}

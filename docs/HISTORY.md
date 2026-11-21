@@ -1825,3 +1825,8 @@ repositories:
     `TestCtrlCAnswersSubstituteConfirm` and
     `TestRecoveryFileIsKeptWhileSubstituteAsks`. Not tried in
     vimango_hybrid before it was committed.
+  - **The host is told of changes while a question stands** (the commit
+    after): the report to the host was written only by `handleEvents`, so
+    hybrid's mark for unsaved changes waited for the whole command to end.
+    `waitKey` writes it too. Found when Steve asked what the wait cost.
+    Test: `TestHostIsToldOfChangesWhileSubstituteAsks`.
