@@ -135,6 +135,9 @@ func SetScreenLayout(l ScreenLayout) {
 // always to the column vim wants (CTRL-E and CTRL-Y, when the cursor's line
 // has left the window).
 func ScrollCursorTo(line int, startOfLine bool) {
+	if refuseWhileAsking("ScrollCursorTo") {
+		return
+	}
 	sol := C.int(0)
 	if startOfLine {
 		sol = 1

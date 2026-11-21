@@ -24,7 +24,9 @@ libvim and a pure-Go engine, `govim`, which was removed in 2026-07.)
   whole (`ScreenLayout.Scroll`, `ScrollCursorTo`), and vim's virtual columns (`VirtualColumns`)
 - `substitute.go`, `substitute_callback.go` — `:s` with the `c` flag, which asks
   the application about each match (`SetSubstituteConfirm`): the one callback
-  that waits for the user
+  that waits for the user. While it waits the package refuses whatever would
+  change vim (`refuseWhileAsking`): a new function that sends a key, runs a
+  command or changes the buffer or the cursor asks it first
 - `excommands.go` — vim's command table, for resolving an ex command's name
   as vim does (`FindExCommand`)
 - `spell.go`, `spell_callback.go` — spell checking (the callback has to live

@@ -256,3 +256,45 @@ func TestRecoveryFileIsKeptWhileSubstituteAsks(t *testing.T) {
 		<-ended
 	})
 }
+
+// A resize while the question stands goes through the app's own redraw (what
+// handleResize does once it has the terminal's size), from inside the wait:
+// the question and the match are drawn again, vim is sent nothing, and the
+// answers that follow are taken as before.
+func TestResizeWhileSubstituteAsks(t *testing.T) {
+	a, ids := editorOnlyApp(t, "foo\nfoo")
+	a.keyEvents = make(chan terminal.Key, 64)
+	vim.TakeRefused()
+
+	resized := false
+	out := captureStdout(t, func() {
+		if err := a.openEditor(ids[0], ""); err != nil {
+			t.Fatal(err)
+		}
+		a.Session.editor.WaitKey = func() int {
+			if !resized {
+				resized = true
+				a.Screen.screenLines, a.Screen.screenCols = 30, 60
+				a.moveDividerPct(a.Screen.edPct)
+			}
+			return a.waitKey()
+		}
+		for _, r := range ":%s/foo/X/c\ryy:x\r" {
+			a.keyEvents <- terminal.Key{Regular: r}
+		}
+		a.handleEvents() // :x ends it: --editor has one note
+	})
+
+	if text, err := a.Store.Note(ids[0]); err != nil || text != "X\nX" {
+		t.Errorf("the note is %q (%v), want \"X\\nX\"", text, err)
+	}
+	// asked about the first match, drawn again after the resize, and asked
+	// about the second
+	if n := strings.Count(out, "replace with X (y/n/a/q/l)?"); n != 3 {
+		t.Errorf("the question was written %d times, want 3", n)
+	}
+	// the editor says so, when the command is over, if anything was
+	if i := strings.Index(out, "vimango bug"); i >= 0 {
+		t.Errorf("the resize sent vim something while it was asking: %q", stripANSI(out[i:]))
+	}
+}

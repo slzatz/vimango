@@ -92,6 +92,9 @@ func GetCurrentBuffer() *Buffer {
 //
 // void vimBufferSetCurrent(buf_T *buf);
 func SetCurrentBuffer(buf *Buffer) {
+	if refuseWhileAsking("SetCurrentBuffer") {
+		return
+	}
 	C.vimBufferSetCurrent(buf.buf)
 }
 
@@ -139,6 +142,9 @@ func (b *Buffer) Lines() []string {
 // void vimBufferSetLines(buf_T *buf, linenr_T start, linenr_T end, char_u **lines, int count);
 // void vimUndoClear(buf_T *buf);
 func (b *Buffer) SetLines(start, end int, lines []string) {
+	if refuseWhileAsking("SetLines") {
+		return
+	}
 	count := len(lines)
 	p := C.malloc(C.size_t(count) * C.size_t(unsafe.Sizeof(uintptr(0))))
 	defer C.free(p)
@@ -167,12 +173,18 @@ func (b *Buffer) GetLastChangedTick() int {
 //
 // void vimInput(char_u *input);
 func SendInput(s string) {
+	if refuseWhileAsking("SendInput") {
+		return
+	}
 	defer leave(enter())
 	C.vimInput(ucharP(s))
 }
 
 // SendMultiInput sends a string one character at a time.
 func SendMultiInput(s string) {
+	if refuseWhileAsking("SendMultiInput") {
+		return
+	}
 	defer leave(enter())
 	for _, r := range s {
 		C.vimInput(ucharP(string(r)))
@@ -183,6 +195,9 @@ func SendMultiInput(s string) {
 //
 // void vimKey(char_u *key);
 func SendKey(s string) {
+	if refuseWhileAsking("SendKey") {
+		return
+	}
 	defer leave(enter())
 	C.vimKey(ucharP(s))
 }
@@ -191,6 +206,9 @@ func SendKey(s string) {
 //
 // void vimExecute(char_u *cmd);
 func ExecuteCommand(s string) {
+	if refuseWhileAsking("ExecuteCommand") {
+		return
+	}
 	defer leave(enter())
 	C.vimExecute(ucharP(s))
 }
@@ -206,6 +224,9 @@ func ExecuteCommand(s string) {
 //
 // void vimSetMappingsEnabled(int enabled);
 func SendUserKey(send func()) {
+	if refuseWhileAsking("SendUserKey") {
+		return
+	}
 	C.vimSetMappingsEnabled(1)
 	defer C.vimSetMappingsEnabled(0)
 	send()
@@ -229,6 +250,9 @@ func InputPending() int {
 //
 // void vimInputTimeout(void);
 func InputTimeout() {
+	if refuseWhileAsking("InputTimeout") {
+		return
+	}
 	defer leave(enter())
 	C.vimInputTimeout()
 }
@@ -247,6 +271,9 @@ func EvaluateExpression(expr string) string {
 }
 
 func evaluate(expr string) *C.uchar {
+	if refuseWhileAsking("EvaluateExpression") {
+		return nil
+	}
 	defer leave(enter())
 	return C.vimEval(ucharP(expr))
 }
@@ -266,6 +293,9 @@ func GetCursorPosition() [2]int {
 //
 // void vimCursorSetPosition(pos_T pos);
 func SetCursorPosition(row, col int) {
+	if refuseWhileAsking("SetCursorPosition") {
+		return
+	}
 	var p C.pos_T
 	p.lnum = C.long(row)
 	p.col = C.int(col)

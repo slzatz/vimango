@@ -157,3 +157,84 @@ func TestInterruptIsAKeyWhileSubstituteAsks(t *testing.T) {
 		t.Errorf("x afterwards left %q", got)
 	}
 }
+
+// Whoever is asked may read from vim and must send it nothing: vim is in the
+// middle of a command. The package holds it to that. A key, a command, an
+// expression, lines set, another buffer made current, the cursor moved --
+// each made while the question is asked does nothing, and TakeRefused says
+// which; what was read is right, and afterwards everything works again.
+func TestNothingIsSentToVimWhileSubstituteAsks(t *testing.T) {
+	InitializeVim(0)
+	other := NewBuffer(0)
+	b := NewBuffer(0)
+	SetCurrentBuffer(b)
+	b.SetLines(0, -1, []string{"foo one", "foo two"})
+	SendKey("<esc>")
+	SendMultiInput("gg0")
+	TakeRefused()
+
+	var read []string
+	var evaluated string
+	var captured []Message
+	SetSubstituteConfirm(func(m SubstituteMatch) int {
+		// reading
+		read = append(read, fmt.Sprintf("%q cursor %v matches %d", b.Lines(), GetCursorPosition(), len(b.SearchMatches(1, 2))))
+		// and everything that is not
+		SendInput("x")
+		SendMultiInput("dd")
+		SendKey("<esc>")
+		SendUserKey(func() { SendInput("x") })
+		InputTimeout()
+		ExecuteCommand("normal dd")
+		evaluated = EvaluateExpression("execute('normal dd') . 'ran'")
+		captured = CaptureMessages(func() { ExecuteCommand("echo 'said'") })
+		b.SetLines(0, -1, []string{"gone"})
+		SetCurrentBuffer(other)
+		SetCursorPosition(2, 3)
+		ScrollCursorTo(2, true)
+		return 'n'
+	})
+	t.Cleanup(func() { SetSubstituteConfirm(nil); TakeRefused() })
+
+	msgs := CaptureMessages(func() { SendInput(":%s/foo/X/c\r") })
+
+	if got, want := b.Lines(), []string{"foo one", "foo two"}; !slices.Equal(got, want) {
+		t.Errorf("the buffer is %q, want %q: something sent during the question got through", got, want)
+	}
+	if GetCurrentBuffer().GetID() != b.GetID() {
+		t.Error("vim was taken to another buffer during the question")
+	}
+	wantRead := []string{
+		`["foo one" "foo two"] cursor [1 0] matches 2`,
+		`["foo one" "foo two"] cursor [2 0] matches 2`,
+	}
+	if !slices.Equal(read, wantRead) {
+		t.Errorf("read during the questions:\n%q\nwant:\n%q", read, wantRead)
+	}
+	if evaluated != "" || captured != nil {
+		t.Errorf("an expression gave %q and a capture %v during the question, want nothing from either", evaluated, captured)
+	}
+	for _, m := range msgs {
+		if m.Text == "said" {
+			t.Error("a command run during the question spoke into the command's own messages")
+		}
+	}
+	want := []string{"SendInput", "SendMultiInput", "SendKey", "SendUserKey", "InputTimeout", "ExecuteCommand",
+		"EvaluateExpression", "CaptureMessages", "SetLines", "SetCurrentBuffer", "SetCursorPosition", "ScrollCursorTo"}
+	if got := TakeRefused(); !slices.Equal(got, want) {
+		t.Errorf("refused %q, want %q", got, want)
+	}
+	if got := TakeRefused(); got != nil {
+		t.Errorf("refused calls were not forgotten once taken: %q", got)
+	}
+
+	// the question over, the same calls are vim's again
+	SendMultiInput("gg0x")
+	ExecuteCommand("2d")
+	if got, want := b.Lines(), []string{"oo one"}; !slices.Equal(got, want) {
+		t.Errorf("afterwards the buffer is %q, want %q", got, want)
+	}
+	if got := TakeRefused(); got != nil {
+		t.Errorf("calls after the question were refused: %q", got)
+	}
+}

@@ -27,6 +27,11 @@ type Message struct {
 // says for some commands and not for a ":while" or a mapping: either way
 // the user who pressed CTRL-C is told it took.
 func CaptureMessages(fn func()) []Message {
+	// in the middle of a command the capture under way is that command's,
+	// and starting another would throw away what it has
+	if refuseWhileAsking("CaptureMessages") {
+		return nil
+	}
 	capturing = true
 	captured = nil
 	interrupted.Store(false)

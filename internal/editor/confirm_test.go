@@ -20,6 +20,7 @@ func TestConfirmAsksAboutEachMatch(t *testing.T) {
 	e := newTestEditor(t, "foo bar foo", "foo", "bar foo")
 	h := hostOf(e)
 	h.answer("ynyq")
+	vim.TakeRefused()
 	var seen []string
 	h.whileAsked = func(int) {
 		if e.Mode() != CONFIRM {
@@ -58,6 +59,11 @@ func TestConfirmAsksAboutEachMatch(t *testing.T) {
 	}
 	if !slices.Equal(e.ss, e.vbuf.Lines()) {
 		t.Errorf("the editor's copy is %q, vim's %q", e.ss, e.vbuf.Lines())
+	}
+	// showing the question sent vim nothing: the editor would have said
+	// so when the command ended (redrawAfter)
+	if i := strings.Index(out, "vimango bug"); i >= 0 {
+		t.Errorf("the editor sent vim something while it was asking: %q", stripANSI(out[i:]))
 	}
 }
 
@@ -188,11 +194,17 @@ func TestConfirmKeysThatAreNotAnswers(t *testing.T) {
 }
 
 // A resize while the question stands clears the screen, and Draw puts all of
-// it back: the text with the match marked, and the question.
+// it back: the text with the match marked, and the question. It sends vim
+// nothing in doing so, with spell checking on too, whose option Draw
+// otherwise brings into line with a command.
 func TestDrawPutsTheQuestionBack(t *testing.T) {
 	e := newTestEditor(t, "foo", "foo")
 	h := hostOf(e)
 	h.answer("q")
+	wasOn := spellOn
+	spellOn = true
+	t.Cleanup(func() { spellOn = wasOn; syncSpellOption() })
+	vim.TakeRefused()
 	h.whileAsked = func(int) { e.Draw() }
 	out := captureStdout(t, func() { e.exCommand("%s/foo/X/c") })
 	if h.waits != 1 {
@@ -203,6 +215,32 @@ func TestDrawPutsTheQuestionBack(t *testing.T) {
 	}
 	if n := strings.Count(out, askedStyle); n != 2 {
 		t.Errorf("the match was marked %d times, want 2", n)
+	}
+	if i := strings.Index(out, "vimango bug"); i >= 0 {
+		t.Errorf("Draw sent vim something while it was asking: %q", stripANSI(out[i:]))
+	}
+}
+
+// Something that does send vim a command while it is asking -- a bug, in the
+// editor or in what its host does while it waits -- is refused by the
+// binding, so the note is unharmed, and is said when the command is over.
+func TestCallsRefusedWhileAskingAreSaid(t *testing.T) {
+	e := newTestEditor(t, "foo", "foo")
+	h := hostOf(e)
+	h.answer("nn")
+	vim.TakeRefused()
+	h.whileAsked = func(int) { vim.ExecuteCommand("normal dd") }
+
+	out := stripANSI(captureStdout(t, func() { e.exCommand("%s/foo/X/c") }))
+
+	if got := e.vbuf.Lines(); !slices.Equal(got, []string{"foo", "foo"}) {
+		t.Errorf("the note is %q: the command sent during the question ran", got)
+	}
+	if !strings.Contains(out, "vimango bug: refused ExecuteCommand while vim was asking") {
+		t.Errorf("the refusal was not said: %q", out[max(0, len(out)-200):])
+	}
+	if calls := vim.TakeRefused(); calls != nil {
+		t.Errorf("the refused calls were not taken: %q", calls)
 	}
 }
 

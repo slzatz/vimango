@@ -33,6 +33,43 @@ var substituteConfirm func(SubstituteMatch) int
 // it is waiting for a key, and CTRL-C is one (Interrupt).
 var asking atomic.Bool
 
+// refused is the calls that were turned away because they were made while
+// the question was being asked (refuseWhileAsking), each once.
+var refused []string
+
+// refuseWhileAsking reports whether call must not go to vim now, because
+// vim is in the middle of a command, waiting for substituteConfirm to
+// answer: every function of this package that sends vim a key, runs a
+// command, evaluates an expression or changes the buffer, the current
+// buffer or the cursor asks it first, and does nothing if it says so. What
+// it turned away is kept for TakeRefused.
+//
+// Reading is not refused: the text, the cursor, the mode, the matches of the
+// search pattern and the spelling errors are what whoever is asked draws.
+func refuseWhileAsking(call string) bool {
+	if !asking.Load() {
+		return false
+	}
+	for _, r := range refused {
+		if r == call {
+			return true
+		}
+	}
+	refused = append(refused, call)
+	return true
+}
+
+// TakeRefused returns the calls that were refused because they were made
+// while ":s" with the c flag was asking, and forgets them. Any is a bug in
+// the caller: whoever is asked may read from vim and must send it nothing.
+// The call did not happen, which is the safe thing, and the application
+// says so (the editor, when the command is over) so that it is found.
+func TakeRefused() []string {
+	calls := refused
+	refused = nil
+	return calls
+}
+
 // SetSubstituteConfirm sets who answers when ":s" with the c flag asks about
 // a match. ask returns the key the user typed: 'y' to change the match, 'n'
 // to leave it, 'a' for it and all the rest, 'l' for it and no more, and 'q',
@@ -44,7 +81,8 @@ var asking atomic.Bool
 // Meanwhile it may read what it likes -- the buffer and the cursor are what
 // vim would be showing, with the changes accepted so far in place and the
 // cursor on the match -- and must not send keys, run a command or change
-// the buffer.
+// the buffer. The package holds it to that: such a call made while ask is
+// running does nothing (refuseWhileAsking), and TakeRefused says which.
 //
 // With nil, the question is answered with <esc>: nothing more is changed.
 // Keys already typed are the answer before anyone is asked, as in vim: the

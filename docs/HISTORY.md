@@ -1830,3 +1830,14 @@ repositories:
     hybrid's mark for unsaved changes waited for the whole command to end.
     `waitKey` writes it too. Found when Steve asked what the wait cost.
     Test: `TestHostIsToldOfChangesWhileSubstituteAsks`.
+  - **Nothing can be sent to vim while it asks** (the commit after that).
+    That the editor only reads from vim during a question was a rule kept
+    by hand: its drawing, and a resize's, run inside vim's substitute loop,
+    and one `vim.ExecuteCommand` added to either would have run there. Now
+    the binding refuses: keys, commands, expressions, a capture of
+    messages, lines set, the current buffer and the cursor changed all do
+    nothing while a question is asked, and the editor says
+    `vimango bug: refused … while vim was asking` when the command ends.
+    Steve asked for it after hearing that this was the weakest part. The
+    test that draws during a question with spell checking on was shown to
+    fail when the editor's one such call (`syncSpellOption`) was put back.

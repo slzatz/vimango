@@ -33,7 +33,8 @@ const askedStyle = "\x1b[30;48;5;208m"
 // and CTRL-C, and asks again for anything else.
 //
 // It runs inside a call into vim, so it reads from vim and sends it nothing:
-// no key, no command.
+// no key, no command. The binding refuses one that is sent all the same
+// (vim.TakeRefused), here or from whatever the host does while it waits.
 func (e *Editor) confirmSubstitute(m vim.SubstituteMatch) int {
 	// Nobody to ask -- no host that can wait for a key, or vim is on some
 	// buffer that is not the note's -- is <esc>: nothing more is changed.
