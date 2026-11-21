@@ -1763,3 +1763,65 @@ repositories:
     the fork `apitest/buffer_set_lines.c` and `apitest/compare/setlines_stress.c`.
     Its comparison with vim gives the same numbers as before for every case
     file.
+
+- **`:%s/old/new/gc` works: vim asks about each match, and the editor
+  answers** (fork `44d4a6c10`). It was the one everyday vim command the
+  editor refused: vim shows each match and waits for a key, and libvim has
+  no window and no keyboard, so upstream turned the flag down with an error
+  and vimango refused it first. Three ways were tried in a scratch copy
+  before any was chosen:
+  - *The editor walks the matches* and has vim change one at a time. Not
+    robust: a pattern cannot be pinned to one match. `\%9cfoo\|bar`, meant
+    for the `foo` at column 9, changed a `bar`, the prefix belonging to the
+    first branch only; `\%(…\)` round the pattern fixes that and fails
+    (`E53`) when the pattern has `\v` in it. It would also have been a Go
+    copy of how `:s` reads its arguments, and typed commands only.
+  - *libvim's `do_sub()` as a state that returns for each key*, which is
+    what upstream meant to do. Not tried, on reading it: whatever ran the
+    command — the rest of a line after `|`, `:g`, a function, a mapping —
+    goes on when `do_sub()` returns, before the answers, so it could only
+    ever be a `:s` typed by itself; and the loop's thirty-odd locals, the
+    replacement (which points into the command line) and the caller's
+    `eap` would have to outlive the call.
+  - *vim's loop, asking a callback where it read the key.* Two lines
+    changed in the scratch copy and twelve cases behaved as in vim. Chosen.
+    Its cost is that a call into libvim now waits for the user, which
+    nothing did: the fork's rule was that `vimInput()` must return. Steve
+    agreed to that on the day.
+
+  So libvim calls `vimSetSubstituteConfirmCallback()`'s callback with each
+  match; the binding (`vim.SetSubstituteConfirm`) hands it to the editor
+  (`confirm.go`), which draws what vim would — the changes accepted so far,
+  the match marked, `replace with X (y/n/a/q/l)?` — and asks its host for
+  the next key (`Host.WaitKey`); the app's `waitKey` is the event loop's
+  own wait again, on `MainLoop`'s goroutine, with the resize, the recovery
+  file and the signals still served.
+  - **Checked against vim.** Thirteen key sequences (answers in every
+    order, a replacement that lengthens the line, `\r`, `:g`, `:&&`) leave
+    the cursor and the text exactly as vim 9.1 does. The fork's
+    `compare.sh` could not say so: its vim runs in silent Ex mode, where
+    `:s///c` takes a *line* for each answer, so every case with more than
+    one answer differs there. Run with `--not-a-term` instead of `-es`
+    they agree.
+  - **Keys already typed answer first**, as in vim: the rest of a mapping
+    or of a `:normal`. Inside `:normal` they are the only answer.
+  - **Ctrl-C at the question is an answer**, not an interrupt: the key
+    reader used to take every Ctrl-C typed while a call into libvim was in
+    progress, and one typed at the question would have set vim's interrupt
+    flag and never reached the wait. `vim.Interrupt` now says nothing is
+    running while a question is asked.
+  - **The recovery file is kept during a question**, which can stand for as
+    long as the user likes: the timer moved from a local of `handleEvents`
+    to the `App` so that both waits serve it.
+  - The terminal's cursor waits after the question, as in vim, not on the
+    match.
+  - Left out: Ctrl-E and Ctrl-Y at the question (vim scrolls), and
+    recording an answer into a register with `q`. `input()` is still not
+    asked, but the way to ask now exists.
+  - Tests: the fork's `apitest/substitute_confirm.c` (14, under
+    AddressSanitizer); `vim/substitute_test.go`; `confirm_test.go` in the
+    editor; and through the event loop,
+    `TestEventLoopAnswersSubstituteConfirm`,
+    `TestCtrlCAnswersSubstituteConfirm` and
+    `TestRecoveryFileIsKeptWhileSubstituteAsks`. Not tried in
+    vimango_hybrid before it was committed.

@@ -76,7 +76,7 @@ func TestForwardedCommandsDoNotHang(t *testing.T) {
 		}
 	}
 	lines = append(lines,
-		"s/a/b/", "%s/a/b/g", "g/a/d", "g/a/p", "v/a/d", "normal x", "ka", "mark b", "delmarks!", "@a", "goto 1", "sleep 1m",
+		"s/a/b/", "%s/a/b/g", "s/a/b/c", "%s/a/b/gc", "g/a/s//b/c", "&&", "g/a/d", "g/a/p", "v/a/d", "normal x", "ka", "mark b", "delmarks!", "@a", "goto 1", "sleep 1m",
 		"earlier 1f", "later 1f", "sort u", "copy 0", "move 0", "t 0", "put a", "z#", "history :", "history all", "retab 4",
 		"set all", "set ts=4", "set ts?", "setlocal all", "setglobal all", "set termcap",
 		"let g:x = 1", "let g:", "let b:", "let w:", "let v:version", "let g:probe", "unlet g:probe", "lockvar g:probe",

@@ -364,13 +364,8 @@ func classifyExCommand(line string, first bool) exDecision {
 				tail = exAfterPattern(delim + tail) // past the replacement
 			}
 		}
-		flags := tail
-		if i := strings.IndexAny(tail, " \t|"); i >= 0 {
-			flags = tail[:i]
-		}
-		if strings.Contains(flags, "c") {
-			return refuse(":s with the c flag asks before each change, and vimango has no prompt for that")
-		}
+		// (the c flag asks before each change, and vim asks the editor:
+		// confirm.go)
 		next, chained = exNextCommand(tail, false)
 
 	case cmd.Flags&vim.ExTrlBar != 0:

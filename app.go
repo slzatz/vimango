@@ -42,6 +42,9 @@ type App struct {
 	// A signal that is about to end the process asks for the open note's
 	// recovery file to be written, and waits for it (crash.go).
 	recoveryRequests chan chan struct{}
+	// recoveryDue is the timer for the open note's recovery file, nil --
+	// never ready -- when nothing is waiting to be written (recoveryWait)
+	recoveryDue <-chan time.Time
 	// recoveryDir is where an open note's unsaved text is kept and crash
 	// logs are written (crash.go); "" keeps neither.
 	recoveryDir string
@@ -92,6 +95,7 @@ func (a *App) editorHost() editor.Host {
 		OnClose:     a.noteClosed,
 		SyncAnswer:  a.syncAnswer(),
 		RecoveryDir: a.recoveryDir,
+		WaitKey:     a.waitKey,
 	}
 }
 
@@ -434,6 +438,7 @@ func (a *App) noteClosed() {
 	}
 	vim.ExecuteCommand("bw") // wipe out the buffer
 	vim.SetScreenLayout(nil)
+	vim.SetSubstituteConfirm(nil) // nobody for ":s" with the c flag to ask (g& on a title)
 	a.Session.editor = nil
 	vim.SetCurrentBuffer(a.Organizer.vbuf)
 	a.Screen.eraseRightScreen()
@@ -580,16 +585,6 @@ func (a *App) handleEvents() {
 	// the last key left vim holding something.
 	var mappingTimeout <-chan time.Time
 
-	// The open note's recovery file is written a second after the first
-	// change since it was last written (recovery.go in the editor): at most
-	// once a second while text changes, and never more than a second behind.
-	var recoveryDue <-chan time.Time
-	recoveryWait := func() {
-		if ae := a.Session.editor; recoveryDue == nil && ae != nil && ae.RecoveryPending() {
-			recoveryDue = time.After(time.Second)
-		}
-	}
-
 	for a.Run {
 		// before waiting for the next event: what the last one left, and at
 		// the start, the note as it was opened (host_report.go)
@@ -631,7 +626,7 @@ func (a *App) handleEvents() {
 				if wait, waiting := editor.MappingWait(); waiting {
 					mappingTimeout = time.After(wait)
 				}
-				recoveryWait()
+				a.recoveryWait()
 			} else {
 				var redraw RedrawScope
 				if pasted {
@@ -678,17 +673,12 @@ func (a *App) handleEvents() {
 			mappingTimeout = nil
 			if ae := a.Session.editor; ae != nil {
 				ae.DrawAfterKey(ae.MappingTimeout(), editor.NoKey)
-				recoveryWait()
+				a.recoveryWait()
 			}
-		case <-recoveryDue:
-			recoveryDue = nil
-			if ae := a.Session.editor; ae != nil {
-				ae.WriteRecovery()
-			}
+		case <-a.recoveryDue:
+			a.writeRecovery()
 		case done := <-a.recoveryRequests:
-			if ae := a.Session.editor; ae != nil {
-				ae.WriteRecovery()
-			}
+			a.writeRecovery()
 			close(done)
 		case <-a.resizeCh:
 			a.handleResize()
@@ -697,5 +687,64 @@ func (a *App) handleEvents() {
 			a.RenderManager.applyResult(res)
 		}
 		a.returnCursor()
+	}
+}
+
+// recoveryWait arms the timer for the open note's recovery file, which is
+// written a second after the first change since it was last written
+// (recovery.go in the editor): at most once a second while text changes, and
+// never more than a second behind.
+func (a *App) recoveryWait() {
+	if ae := a.Session.editor; a.recoveryDue == nil && ae != nil && ae.RecoveryPending() {
+		a.recoveryDue = time.After(time.Second)
+	}
+}
+
+// writeRecovery writes the open note's recovery file now: the timer ran out,
+// or a signal is about to end the process (crash.go).
+func (a *App) writeRecovery() {
+	a.recoveryDue = nil
+	if ae := a.Session.editor; ae != nil {
+		ae.WriteRecovery()
+	}
+}
+
+// waitKey waits for the next key the user types and returns it: what the
+// editor asks of its host (editor.Host.WaitKey) when vim puts a question in
+// the middle of a command -- ":s" with the c flag, at each match -- and the
+// answer cannot be handed to the editor, which is inside ProcessKey, inside
+// libvim, with handleEvents waiting for it to return.
+//
+// So this is that loop's wait again, on MainLoop's own goroutine, for as
+// long as the question stands, and it does what the loop does between keys
+// except give the editor a key: a resize redraws (the editor's Draw puts the
+// question back), the recovery file is written when it is due, and when a
+// signal asks. Text that is pasted answers nothing and is dropped.
+//
+// A Ctrl-C comes through as a key, and answers the question: the key reader
+// takes one for itself only while vim is running something that could be
+// stopped (readerTakes; vim.Interrupt says no while a question is asked).
+func (a *App) waitKey() int {
+	for {
+		// the accepted changes so far are a change to keep, too
+		a.recoveryWait()
+		a.returnCursor()
+		select {
+		case key := <-a.keyEvents:
+			switch {
+			case key.Special == terminal.KeyPaste:
+			case key.Regular != 0:
+				return int(key.Regular)
+			default:
+				return key.Special
+			}
+		case <-a.recoveryDue:
+			a.writeRecovery()
+		case done := <-a.recoveryRequests:
+			a.writeRecovery()
+			close(done)
+		case <-a.resizeCh:
+			a.handleResize()
+		}
 	}
 }

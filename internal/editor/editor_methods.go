@@ -222,6 +222,7 @@ func (e *Editor) drawText() {
 	e.drawnView.top, e.drawnView.skip = e.firstVisibleRow, e.topSkip
 	e.drawSpellErrors(&ab)   // no-op unless :spell is on
 	e.drawSearchMatches(&ab) // no-op unless a search is being highlighted
+	e.drawAskedMatch(&ab)    // no-op unless ":s" with the c flag is asking
 	if e.mode == VISUAL {
 		e.drawVisual(&ab)
 	}

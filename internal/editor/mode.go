@@ -5,8 +5,10 @@ import "github.com/slzatz/vimango/vim"
 // Mode is what the editor is doing with the keys it is given. Most of the
 // time that is vim's own mode, under the editor's name for it (modeMap); the
 // rest are the editor's: a ':' line whose Enter it takes for itself
-// (EX_COMMAND), the list a spelling suggestion is picked from (SPELLING), and
-// a notice over the text (HELP).
+// (EX_COMMAND), the list a spelling suggestion is picked from (SPELLING), a
+// notice over the text (HELP), and a question vim asks in the middle of a
+// command (CONFIRM), which no key handed to the editor ever meets: the
+// editor is inside the command, and takes the answer itself.
 //
 // The organizer has modes of its own, in a type of its own: until 2026-11-14
 // the two shared one.
@@ -23,6 +25,7 @@ const (
 	SPELLING // choosing a z= suggestion by number (spellcheck.go)
 	HELP     // a notice is up: :help, or what a vim command listed
 	PENDING  // half of an operator (the "d" of "d3w")
+	CONFIRM  // ":s" with the c flag is asking about a match (confirm.go)
 	OTHER    // Just in case
 )
 
@@ -58,6 +61,7 @@ func (m Mode) String() string {
 		"SPELLING",
 		"HELP",
 		"PENDING",
+		"CONFIRM",
 		"OTHER",
 	}[m]
 }

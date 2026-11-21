@@ -137,14 +137,14 @@ Done. /Users/<you>/vimango/libvim.a is libvim 5838803e9 fix(input): ...
 Now build vimango:
 ```
 
-The commit must be **`5838803e9` or later** (`31301666c` is enough for a
+The commit must be **`44d4a6c10` or later** for a vimango that has `:s///c` (2026-11-21); an older library does not link, and the link error names what is missing (the table under "libvim.a" in CLAUDE.md). Older vimangos needed less (`31301666c` is enough for a
 vimango at `108a96e` or earlier, `77fc72a6d` for one at `0556725` or earlier,
 `76bc49547` for one at `d1c54c4` or earlier, `928659d8f` for one at `9440661`
 or earlier, `9c14a01ae` for one at `7c9f840` or earlier).
 To check afterwards:
 
 ```bash
-git -C ~/libvim merge-base --is-ancestor 5838803e9 HEAD && echo "libvim is new enough"
+git -C ~/libvim merge-base --is-ancestor 44d4a6c10 HEAD && echo "libvim is new enough"
 ```
 
 The script refuses to build from a checkout that would give the wrong library,

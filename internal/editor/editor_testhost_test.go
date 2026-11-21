@@ -20,6 +20,34 @@ type testHost struct {
 	// listingWidth is what the box says a listing's line can take; 0 leaves
 	// vim's 'columns' alone
 	listingWidth int
+	// answers are the keys the host has for an editor that waits for one
+	// (Host.WaitKey), in order; when they run out no key is coming. waits
+	// counts the times it was asked, and whileAsked, if set, runs each time
+	// before the answer is given: the editor as it is while it waits.
+	answers    []int
+	waits      int
+	whileAsked func(n int)
+}
+
+// waitKey is the host's Host.WaitKey: the next of its answers.
+func (h *testHost) waitKey() int {
+	h.waits++
+	if h.whileAsked != nil {
+		h.whileAsked(h.waits)
+	}
+	if len(h.answers) == 0 {
+		return NoKey
+	}
+	c := h.answers[0]
+	h.answers = h.answers[1:]
+	return c
+}
+
+// answer gives the host keys to answer with.
+func (h *testHost) answer(keys string) {
+	for _, r := range keys {
+		h.answers = append(h.answers, int(r))
+	}
 }
 
 // ShowNotice records the text and writes it out, as the screen's box draws
@@ -83,6 +111,7 @@ func newTestEditor(t testing.TB, lines ...string) *Editor {
 		Notices:    h,
 		OnClose:    func() { h.closed++ },
 		SyncAnswer: "sync is not run from here",
+		WaitKey:    h.waitKey,
 	}}
 	e.Layout = tuiLayout
 	e.commandRegistry = editorCommands()
@@ -98,6 +127,7 @@ func newTestEditor(t testing.TB, lines ...string) *Editor {
 	e.noteIs(strings.Join(lines, "\n"))
 	e.mode = NORMAL
 	vim.SetScreenLayout(e)
+	vim.SetSubstituteConfirm(e.confirmSubstitute)
 	return e
 }
 

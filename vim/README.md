@@ -22,6 +22,9 @@ libvim and a pure-Go engine, `govim`, which was removed in 2026-07.)
   screen (`gj` `gk` `H` `M` `L`, `g0` `g^` `gm` `g$`), which libvim asks the application about
   (`ScreenLayout`), the commands that scroll (Ctrl-D, `zz`…), which it hands to the application
   whole (`ScreenLayout.Scroll`, `ScrollCursorTo`), and vim's virtual columns (`VirtualColumns`)
+- `substitute.go`, `substitute_callback.go` — `:s` with the `c` flag, which asks
+  the application about each match (`SetSubstituteConfirm`): the one callback
+  that waits for the user
 - `excommands.go` — vim's command table, for resolving an ex command's name
   as vim does (`FindExCommand`)
 - `spell.go`, `spell_callback.go` — spell checking (the callback has to live

@@ -143,6 +143,11 @@ type Editor struct {
 		hang int
 		up   bool
 	}
+	// asked is the match ":s" with the c flag is asking about, while it is
+	// (confirmSubstitute); askedShown, that the mark for one is still on
+	// screen, until the text is next drawn for a key (redrawAfter).
+	asked           *vim.SubstituteMatch
+	askedShown      bool
 	recovery        recoveryState            // the recovery file (recovery.go)
 	exCmds          map[string]func(*Editor) // map of ex commands
 	commandRegistry *pane.CommandRegistry[func(*Editor)]
@@ -168,6 +173,15 @@ type Host struct {
 	// while it is open, and where it looks for what an editor that stopped
 	// unexpectedly left (recovery.go). "" keeps none.
 	RecoveryDir string
+	// WaitKey waits for the next key the user types and returns it, as it
+	// would have been given to ProcessKey; NoKey if none can come. It is for
+	// a question vim asks in the middle of a command -- ":s" with the c flag
+	// (confirm.go) -- when the editor is inside ProcessKey and cannot be
+	// handed the answer. While it waits the host goes on with what it does
+	// between keys, giving the editor no other key: a resize draws the editor
+	// (Draw), the recovery file is written when it is due. nil is a host
+	// that cannot wait: the question is answered as <esc> answers it.
+	WaitKey func() int
 }
 
 // newEditor is an editor with no note in it: its settings as they start, and
@@ -210,10 +224,11 @@ func Open(host Host, id int, title string) (*Editor, error) {
 	vim.SetCurrentBuffer(e.vbuf)
 	e.vbuf.SetLines(0, -1, strings.Split(note, "\n"))
 	e.resyncFromVim()
-	e.noteIs(note)         // the note as read is the note as saved
-	e.startRecovery()      // and what an editor that stopped unexpectedly left of it
-	e.fitListings()        // vim's listings laid out for the box they are shown in
-	vim.SetScreenLayout(e) // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
+	e.noteIs(note)                                // the note as read is the note as saved
+	e.startRecovery()                             // and what an editor that stopped unexpectedly left of it
+	e.fitListings()                               // vim's listings laid out for the box they are shown in
+	vim.SetScreenLayout(e)                        // gj, gk, H, M, L, g0, g^, gm, g$, and the commands that scroll
+	vim.SetSubstituteConfirm(e.confirmSubstitute) // ":s" with the c flag asks the editor
 	return e, nil
 }
 
@@ -281,9 +296,9 @@ func (e *Editor) writeMessage(line MessageLine, format string, a ...interface{})
 
 // drawModeLine writes on the message line what the editor's mode keeps
 // there: the command line being typed, "-- INSERT --", the spelling
-// suggestions to choose from. In any other mode the line holds a report
-// that has been made -- "Saved note 5", what vim said about a key -- and
-// this leaves it alone.
+// suggestions to choose from, the question ":s" with the c flag is asking.
+// In any other mode the line holds a report that has been made -- "Saved
+// note 5", what vim said about a key -- and this leaves it alone.
 //
 // Each of those is written when it starts and when it changes. This is for
 // when the screen under it has gone: Draw, after a resize.
@@ -295,16 +310,22 @@ func (e *Editor) drawModeLine() {
 		e.ShowMessage(insertMessage)
 	case SPELLING:
 		e.showSuggestions()
+	case CONFIRM:
+		e.showQuestion()
 	}
 }
 
 // Cursor is where the terminal's cursor belongs while the editor has the
-// keys: in the text, or on the command line being typed. show is false when
-// no cursor should be seen (a spelling suggestion is being chosen).
+// keys: in the text, on the command line being typed, or after a question.
+// show is false when no cursor should be seen (a spelling suggestion is
+// being chosen).
 func (e *Editor) Cursor() (row, col int, show bool) {
 	switch e.mode {
 	case SPELLING:
 		return 0, 0, false
+	case CONFIRM:
+		row, col = e.questionCursor()
+		return row, col, true
 	case SEARCH, EX_COMMAND:
 		// vim's place on its command line (mirrored in cmdLineCursor),
 		// after the ':' or '/' the line starts with

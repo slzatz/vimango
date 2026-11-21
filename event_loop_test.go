@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -123,4 +125,134 @@ func TestCtrlCInterruptsACommandThatNeverEnds(t *testing.T) {
 	if text, err := a.Store.Note(ids[0]); err != nil || text != "lpha\nbravo" {
 		t.Errorf("the note is %q (%v), want \"lpha\\nbravo\"", text, err)
 	}
+}
+
+// ":s" with the c flag asks about each match in the middle of the command:
+// the loop is inside the Enter that ran it, and takes the answers itself
+// (waitKey). Keys typed are answers, in order; text pasted is not one; and
+// when the last match is answered the loop goes on as before -- here :x,
+// which saves what was accepted.
+func TestEventLoopAnswersSubstituteConfirm(t *testing.T) {
+	a, ids := editorOnlyApp(t, "foo bar foo\nfoo\nfoo")
+	a.keyEvents = make(chan terminal.Key, 64)
+
+	out := captureStdout(t, func() {
+		if err := a.openEditor(ids[0], ""); err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range ":%s/foo/X/gc\ry" {
+			a.keyEvents <- terminal.Key{Regular: r}
+		}
+		a.keyEvents <- terminal.Key{Special: terminal.KeyPaste, Paste: "yyyy"}
+		for _, r := range "nyq:x\r" {
+			a.keyEvents <- terminal.Key{Regular: r}
+		}
+		a.handleEvents() // :x ends it: --editor has one note
+	})
+
+	if text, err := a.Store.Note(ids[0]); err != nil || text != "X bar foo\nX\nfoo" {
+		t.Errorf("the note is %q (%v), want \"X bar foo\\nX\\nfoo\"", text, err)
+	}
+	if n := strings.Count(out, "replace with X (y/n/a/q/l)?"); n != 4 {
+		t.Errorf("the question was written %d times, want 4", n)
+	}
+}
+
+// While the question stands a Ctrl-C is not an interrupt: nothing is running
+// that one could stop, the key reader passes it on, and it answers -- the
+// command stops there, with what was accepted kept, and is not reported as
+// interrupted.
+func TestCtrlCAnswersSubstituteConfirm(t *testing.T) {
+	a, ids := editorOnlyApp(t, "foo\nfoo\nfoo")
+	a.keyEvents = make(chan terminal.Key, 64)
+	ctrlCKey := terminal.Key{Regular: ctrlC}
+
+	took := make(chan bool, 1)
+	out := captureStdout(t, func() {
+		if err := a.openEditor(ids[0], ""); err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range ":%s/foo/X/c\ry" {
+			a.keyEvents <- terminal.Key{Regular: r}
+		}
+		go func() {
+			time.Sleep(200 * time.Millisecond) // the second question stands
+			taken := a.readerTakes(ctrlCKey)
+			took <- taken
+			if !taken {
+				a.keyEvents <- ctrlCKey
+			}
+			for _, r := range ":x\r" {
+				a.keyEvents <- terminal.Key{Regular: r}
+			}
+		}()
+		a.handleEvents() // :x ends it: --editor has one note
+	})
+
+	if <-took {
+		t.Error("the reader kept a Ctrl-C typed at the question")
+	}
+	if text, err := a.Store.Note(ids[0]); err != nil || text != "X\nfoo\nfoo" {
+		t.Errorf("the note is %q (%v), want \"X\\nfoo\\nfoo\"", text, err)
+	}
+	if strings.Contains(out, "Interrupted") {
+		t.Error("the command was reported as interrupted")
+	}
+}
+
+// The question can stand for as long as the user likes, and what was
+// accepted before it is unsaved text like any other: the recovery file is
+// written a second after, and at once when a signal asks, while the loop
+// waits for the answer.
+func TestRecoveryFileIsKeptWhileSubstituteAsks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits for the one-second write")
+	}
+	a, ids := editorOnlyApp(t, "foo\nfoo\nfoo")
+	a.recoveryDir = t.TempDir()
+	a.keyEvents = make(chan terminal.Key, 64)
+	a.recoveryRequests = make(chan chan struct{})
+	path := editor.RecoveryPath(a.recoveryDir, ids[0], os.Getpid())
+	kept := func() string {
+		data, _ := os.ReadFile(path)
+		var f struct{ Text string }
+		json.Unmarshal(data, &f)
+		return f.Text
+	}
+	typed := func(s string) {
+		for _, r := range s {
+			a.keyEvents <- terminal.Key{Regular: r}
+		}
+		for len(a.keyEvents) > 0 {
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+
+	captureStdout(t, func() {
+		if err := a.openEditor(ids[0], ""); err != nil {
+			t.Fatal(err)
+		}
+		ended := make(chan struct{})
+		go func() {
+			a.handleEvents()
+			close(ended)
+		}()
+
+		typed(":%s/foo/X/c\ry") // the first is changed; the second is asked about
+		time.Sleep(1500 * time.Millisecond)
+		if text := kept(); text != "X\nfoo\nfoo" {
+			t.Errorf("a second into the question the recovery file holds %q, want \"X\\nfoo\\nfoo\"", text)
+		}
+
+		typed("y") // the second; the third is asked about
+		if !a.flushRecovery(time.Second) {
+			t.Error("the loop did not answer a flush while the question stood")
+		}
+		if text := kept(); text != "X\nX\nfoo" {
+			t.Errorf("flushed during the question: the recovery file holds %q, want \"X\\nX\\nfoo\"", text)
+		}
+
+		typed("q:q!\r")
+		<-ended
+	})
 }

@@ -20,7 +20,7 @@ freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
   `:echo input('x')`, freeze the editor. Check:
 
   ```bash
-  git -C ~/libvim merge-base --is-ancestor 7f2ad2af7 HEAD && echo "libvim is new enough"
+  git -C ~/libvim merge-base --is-ancestor 44d4a6c10 HEAD && echo "libvim is new enough"
   ```
 
   If not: `./scripts/build-libvim.sh && CGO_ENABLED=1 go build --tags=fts5`.
@@ -54,6 +54,12 @@ freezes); scrolling added 2026-11-15. `docs/HISTORY.md` has the account of each.
 | `:s/alpha/ALPHA/` | line 1 changes; nothing is said for one line |
 | `:%s/o/0/g` | `5 substitutions on 4 lines` |
 | `:g/two/d` and `:v/a/d` | the matching (or non-matching) lines go |
+| `:%s/o/0/gc` (refused before 2026-11-21) | the first `o` is marked in orange, the rest in the search colour, and the message line asks `replace with 0 (y/n/a/q/l)?` with the cursor after it. `y` changes it and goes to the next, which shows the change; `n` leaves it; `a` changes all the rest (`… substitutions on … lines`); `l` changes this one and stops; `q`, Esc or Ctrl-C stops. Any other key asks again |
+| the same, then `u` | one `u` takes back everything that was accepted |
+| `:%s/o/0/gc`, answer `n` to every match | the text is as it was, no mark is left, and the note is not modified |
+| `:g/two/s/o/0/gc`, `:%s/o/0/gc \| echo 'done'`, and `:&&` after either | each asks; `done` is said after the last answer |
+| `:nnoremap Q :%s/o/0/gc<CR>`, then `Q` | asks; with `<CR>yn` on the end of the mapping, the first two are answered by it |
+| resize the window while it asks | the match, the changes so far and the question are all still there |
 | `:2,4d` | `3 fewer lines` |
 | `:2m0`, `:1t$`, `:1,3j` | move line 2 to the top; copy line 1 to the end; join three lines |
 | `:2,3>` | lines 2–3 indented |
@@ -242,7 +248,6 @@ These are refused before vim sees them. The message is
 | `:cd /tmp`, `:lcd ..` | vimango finds its database and settings relative to the working directory |
 | `:!ls`, `:sh`, `:make`, `:grep`, `:vimgrep`, `:terminal` | running other programs from the editor is not supported |
 | `:append`, `:insert`, `:change`, `:if 1`, `:while 1`, `:function Foo()`, `:debug …` | it needs more input than one command line |
-| `:s/a/b/c`, `:%s/a/b/gc` | `:s with the c flag asks before each change, and vimango has no prompt for that` |
 | `:startinsert`, `:colorscheme x`, `:highlight`, `:fold`, `:sign list`, `:menu`, `:lua …`, `:python …` | libvim has no use for it here |
 
 **Two things vim itself refuses, by whatever route** — typed, in a mapping, in
@@ -274,7 +279,7 @@ Worth confirming that these fail the way described, and not some other way.
 
 | What | What happens now |
 |---|---|
-| `:s` with the `c` flag | refused; there is no confirm prompt |
+| Ctrl-E, Ctrl-Y at `:s///c`'s question | the question is asked again; in vim they scroll |
 | `:echo input('name: ')`, `inputlist()`, `inputsecret()` | returns at once with nothing (`''`, or `0`). It no longer freezes, but a script cannot ask you anything |
 | Listings with characters of unusual width | vim pads `:digraphs` by its own count of each character's width, and the columns drift a little where a wide or combining character is drawn otherwise; real vim does the same |
 | `:filter /pat/ registers` | refused, with the "one window" reason, which is wrong: libvim could do it now |

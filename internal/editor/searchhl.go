@@ -44,8 +44,7 @@ func (e *Editor) drawSearchMatches(pab *strings.Builder) {
 		return
 	}
 
-	first := e.firstVisibleRow
-	last := min(first+e.ScreenLines, len(e.ss)) // every row takes at least one screen line
+	first, last, ys := e.visibleRowStarts()
 	if first >= last {
 		return
 	}
@@ -54,34 +53,49 @@ func (e *Editor) drawSearchMatches(pab *strings.Builder) {
 		return
 	}
 
-	// the screen line each visible row starts on, 0-based within the pane
-	ys := make([]int, last-first)
+	pab.WriteString(searchStyle)
+	for _, m := range matches {
+		e.highlightSpan(pab, m.Line, m.Col, m.EndLine, m.EndCol, first, last, ys)
+	}
+	pab.WriteString(sgrReset)
+}
+
+// visibleRowStarts is the rows a redraw can show, [first, last), and for each
+// the screen line it starts on, 0-based within the pane.
+func (e *Editor) visibleRowStarts() (first, last int, ys []int) {
+	first = e.firstVisibleRow
+	last = min(first+e.ScreenLines, len(e.ss)) // every row takes at least one screen line
+	if first >= last {
+		return first, last, nil
+	}
+	ys = make([]int, last-first)
 	y := e.getScreenYFromRowColWW(first, 0) - e.lineOffset
 	for r := first; r < last; r++ {
 		ys[r-first] = y
 		y += e.getLinesInRowWW(r)
 	}
+	return first, last, ys
+}
 
-	pab.WriteString(searchStyle)
-	for _, m := range matches {
-		// one row, or several for a pattern that matches across lines
-		for r := m.Line - 1; r <= m.EndLine-1; r++ {
-			if r < first || r >= last {
-				continue
-			}
-			raw := e.ss[r]
-			lo, hi := 0, len(raw)
-			if r == m.Line-1 {
-				lo = m.Col
-			}
-			if r == m.EndLine-1 {
-				hi = m.EndCol
-			}
-			if lo < 0 || hi > len(raw) || lo >= hi {
-				continue // an empty match, or e.ss out of step with vim's buffer
-			}
-			e.highlightRowRange(pab, e.visualRowText(r), expandedOffset(raw, lo), expandedOffset(raw, hi), ys[r-first])
+// highlightSpan draws, in the style already set, the text from byte col of
+// line (1-based) up to byte endCol of endLine: one row, or several for a
+// match across lines. first, last and ys are visibleRowStarts'.
+func (e *Editor) highlightSpan(pab *strings.Builder, line, col, endLine, endCol, first, last int, ys []int) {
+	for r := line - 1; r <= endLine-1; r++ {
+		if r < first || r >= last {
+			continue
 		}
+		raw := e.ss[r]
+		lo, hi := 0, len(raw)
+		if r == line-1 {
+			lo = col
+		}
+		if r == endLine-1 {
+			hi = endCol
+		}
+		if lo < 0 || hi > len(raw) || lo >= hi {
+			continue // an empty match, or e.ss out of step with vim's buffer
+		}
+		e.highlightRowRange(pab, e.visualRowText(r), expandedOffset(raw, lo), expandedOffset(raw, hi), ys[r-first])
 	}
-	pab.WriteString(sgrReset)
 }

@@ -100,7 +100,11 @@ func (e *Editor) drawSpellErrors(pab *strings.Builder) {
 	if !spellOn || len(e.ss) == 0 {
 		return
 	}
-	syncSpellOption()
+	// not in the middle of a command (confirmSubstitute): this can run one,
+	// and 'spell' cannot have drifted since the command began
+	if e.asked == nil {
+		syncSpellOption()
+	}
 
 	first := e.firstVisibleRow
 	last := first + e.ScreenLines // every row takes at least one screen line

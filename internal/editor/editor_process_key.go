@@ -46,6 +46,16 @@ func (e *Editor) redrawAfter(redraw bool) bool {
 	if e.notice.up && e.mode != HELP && e.mode != EX_COMMAND && e.mode != SEARCH {
 		redraw = true
 	}
+	// ":s" with the c flag asked about a match during this key, and marked
+	// it (confirmSubstitute). The command is over; if every answer was "no"
+	// the text is as it was, and the mark still on it. Under a notice the
+	// text is drawn when the notice closes.
+	if e.askedShown {
+		e.askedShown = false
+		if e.mode != HELP {
+			redraw = true
+		}
+	}
 	return redraw
 }
 

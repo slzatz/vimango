@@ -131,6 +131,13 @@ typedef enum
  * 0, and the commands that put the cursor's line somewhere, where it is 1. */
 typedef void (*ScrollCallback)(scrollDirection_T dir, long count);
 
+/* ":s" with the "c" flag asks about one match: from byte col of lnum up to,
+ * not including, byte endCol of endLnum; sub is the replacement as typed.
+ * The answer is the key the user gave. */
+typedef int (*SubstituteConfirmCallback)(linenr_T lnum, colnr_T col,
+                                         linenr_T endLnum, colnr_T endCol,
+                                         char_u *sub);
+
 /* beginline()'s flags. */
 #define BL_SOL 2 /* to the first non-blank if 'startofline', else keep the column */
 #define BL_FIX 4 /* not onto the NUL of a line of blanks */
@@ -220,5 +227,7 @@ void vimSpellGetErrors(buf_T *buf, linenr_T start_lnum, linenr_T end_lnum,
                        int *num_errors, spellError_T **errors);
 int vimSpellGetSuggestions(char_u **badWord, int *num_suggestions, char_u ***suggestions);
 void vimSetSpellSuggestCallback(VoidCallback callback);
+
+void vimSetSubstituteConfirmCallback(SubstituteConfirmCallback callback);
 
 #endif /* VIMANGO_LIBVIM_API_H */

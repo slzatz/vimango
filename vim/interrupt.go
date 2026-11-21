@@ -38,8 +38,12 @@ func leave(struct{})  { running.Add(-1) }
 // got_int), as a signal handler would.
 //
 // void vimInterrupt(void);
+//
+// While ":s" with the c flag is waiting for its answer (SetSubstituteConfirm)
+// there is nothing to stop, and it reports false: the CTRL-C is a key, for
+// whoever is being asked, and answers the question.
 func Interrupt() bool {
-	if running.Load() == 0 {
+	if running.Load() == 0 || asking.Load() {
 		return false
 	}
 	// recorded first: the call can return as soon as vim has the flag, and

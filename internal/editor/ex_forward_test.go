@@ -15,6 +15,7 @@ func TestClassifyEx(t *testing.T) {
 		// editing
 		"s/a/b/", "%s/a/b/g", "'<,'>s/a/b/", "s#a#b#", "sg", "&&", "~",
 		"g/pat/d", "v/pat/d", "g/pat/normal dd", "g/pat/s/a/b/", "g!/pat/d", "g/pat/",
+		"s/a/b/c", "%s/a/b/gc", "s/a/b/cg | noh", "&&c", "g/pat/s/a/b/c", // the c flag asks (confirm.go)
 		"d", "1,5d", "dl", "y", "pu", "t.", "m0", "'<,'>m$", "j", ">", "<", "'<,'>>",
 		"normal Aend", "'<,'>normal .", "%norm A;", "sort", "'<,'>sort u", "sort /pat/", "retab", "center", "le", "ri",
 		"u", "undo", "red", "earlier 1m", "later 10s",
@@ -73,11 +74,9 @@ func TestClassifyEx(t *testing.T) {
 		"a", "append", "i", "c", "o", "vi", "ex", "fu Foo()", "if 1", "endif", "wh 1", "for i in [1]", "try", "X", "P",
 		// neither
 		"sy on", "fo", "foldo", "startinsert", "star", "stopi", "debug echo 1", "prof start x", "lua print(1)", "py print(1)", "gui", "sign list", "colo x", "filt /x/ ls",
-		// the c flag
-		"s/a/b/c", "%s/a/b/gc", "s/a/b/cg | noh", "&&c",
 		// chained and nested
 		"noh | w notes.txt", "noh | w", "d | sp", "set ts=4 | e x", "%s/a/b/ | w x", "echo 1 | w x", "let x = 1 | q",
-		"g/pat/w >> log", "g/pat/s/a/b/c", "v/pat/sp", "g/pat/!rm x", "silent w x", "sil! e x", "keepj bn",
+		"g/pat/w >> log", "g/pat/s/a/b/c | sp", "v/pat/sp", "g/pat/!rm x", "silent w x", "sil! e x", "keepj bn",
 		// ranges on save and close
 		"1,5w", "'<,'>x", "%q",
 	}
@@ -229,7 +228,7 @@ func TestRefusedCommandsDoNothing(t *testing.T) {
 	for _, line := range []string{
 		"w notes.txt", "w! notes.txt", "wq notes.txt", "sav notes.txt", "'<,'>w part.txt", "redir > out.txt",
 		"e other.txt", "ene", "bn", "b1", "sp", "new", "tabnew", "cd /", "lcd /", "!touch made-by-shell", "sh",
-		"noh | w notes.txt", "g/alpha/w >> log.txt", "s/a/b/c", "append",
+		"noh | w notes.txt", "g/alpha/w >> log.txt", "append",
 	} {
 		msg := exMessage(t, e, line)
 		if !strings.Contains(msg, "vimango") {
