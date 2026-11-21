@@ -294,7 +294,7 @@ func TestResizeWhileSubstituteAsks(t *testing.T) {
 		t.Errorf("the question was written %d times, want 3", n)
 	}
 	// the editor says so, when the command is over, if anything was
-	if i := strings.Index(out, "vimango bug"); i >= 0 {
+	if i := strings.Index(out, "vimango note"); i >= 0 {
 		t.Errorf("the resize sent vim something while it was asking: %q", stripANSI(out[i:]))
 	}
 }

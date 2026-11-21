@@ -1837,7 +1837,9 @@ repositories:
     the binding refuses: keys, commands, expressions, a capture of
     messages, lines set, the current buffer and the cursor changed all do
     nothing while a question is asked, and the editor says
-    `vimango bug: refused … while vim was asking` when the command ends.
+    `vimango note: refused … while vim was asking` when the command ends
+    (worded "vimango bug" at first; Steve found that odd on a message
+    line, and it was changed the same day).
     Steve asked for it after hearing that this was the weakest part. The
     test that draws during a question with spell checking on was shown to
     fail when the editor's one such call (`syncSpellOption`) was put back.

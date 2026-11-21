@@ -58,8 +58,9 @@ func (e *Editor) redrawAfter(redraw bool) bool {
 		// Something tried to send vim a key or a command while it was
 		// asking, and the binding refused it: a bug here or in the host,
 		// harmless because it was refused, and said so that it is found.
+		// To the user it is a note: nothing was lost and nothing is to do.
 		if calls := vim.TakeRefused(); len(calls) > 0 {
-			e.ShowMessage("\x1b[41mvimango bug: refused %s while vim was asking%s", strings.Join(calls, ", "), sgrReset)
+			e.ShowMessage("\x1b[41mvimango note: refused %s while vim was asking%s", strings.Join(calls, ", "), sgrReset)
 		}
 	}
 	return redraw

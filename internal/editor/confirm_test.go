@@ -62,7 +62,7 @@ func TestConfirmAsksAboutEachMatch(t *testing.T) {
 	}
 	// showing the question sent vim nothing: the editor would have said
 	// so when the command ended (redrawAfter)
-	if i := strings.Index(out, "vimango bug"); i >= 0 {
+	if i := strings.Index(out, "vimango note"); i >= 0 {
 		t.Errorf("the editor sent vim something while it was asking: %q", stripANSI(out[i:]))
 	}
 }
@@ -216,7 +216,7 @@ func TestDrawPutsTheQuestionBack(t *testing.T) {
 	if n := strings.Count(out, askedStyle); n != 2 {
 		t.Errorf("the match was marked %d times, want 2", n)
 	}
-	if i := strings.Index(out, "vimango bug"); i >= 0 {
+	if i := strings.Index(out, "vimango note"); i >= 0 {
 		t.Errorf("Draw sent vim something while it was asking: %q", stripANSI(out[i:]))
 	}
 }
@@ -236,7 +236,7 @@ func TestCallsRefusedWhileAskingAreSaid(t *testing.T) {
 	if got := e.vbuf.Lines(); !slices.Equal(got, []string{"foo", "foo"}) {
 		t.Errorf("the note is %q: the command sent during the question ran", got)
 	}
-	if !strings.Contains(out, "vimango bug: refused ExecuteCommand while vim was asking") {
+	if !strings.Contains(out, "vimango note: refused ExecuteCommand while vim was asking") {
 		t.Errorf("the refusal was not said: %q", out[max(0, len(out)-200):])
 	}
 	if calls := vim.TakeRefused(); calls != nil {
