@@ -212,6 +212,23 @@ Typed at the `:` line they last until the editor closes; put them in
 | `ix` Ctrl-\ Ctrl-N | back in NORMAL, as with Esc |
 | `A` Ctrl-N | nothing is inserted; `Completion is not available` |
 
+### Yanks and the clipboard (2026-11-22, macOS)
+
+A yank is also on the system clipboard, and `"+` (or `"*`) is the clipboard.
+In vimango_hybrid, try these with two notes open in two pop-outs.
+
+| Try | Expect |
+|---|---|
+| `yy` in one note, `"+p` in another that was already open | the line is put under the cursor's line |
+| `yiw` in one note, `"+p` in the other | the word is put after the cursor |
+| `3yy`, then Cmd-V in another program | the three lines, with no line numbers and no frame |
+| copy text in another program, then `"+p` | it is put: as lines if it ends in a line end, after the cursor if not |
+| `yy`, then `dd` or `x` elsewhere, then `"+p` | what was yanked: a delete does not go to the clipboard |
+| `"ayy`, then Cmd-V in another program | what was there before: a yank into a named register stays in vim |
+| `"+dd` | the line is cut to the clipboard |
+| `i` Ctrl-R `+` | the clipboard's text is inserted |
+| copy text in another program, then `p` | vim's own last yank or delete, not the clipboard |
+
 ### Saving and closing — vimango's meaning, in any spelling vim accepts
 
 | Try | Expect |
@@ -292,6 +309,9 @@ Worth confirming that these fail the way described, and not some other way.
 | Ctrl-\ e on the `:` line | the Ctrl-\ is dropped and `e` is typed |
 | `i` Ctrl-V Ctrl-O `.` Esc, then `.` | **freezes the editor** (do not try it on a note with unsaved changes; the recovery file keeps them). vim inserts `^O.` again. A control character typed after Ctrl-V is replayed by `.` as the command it is |
 | `feedkeys('…', 'x')` in a script | does nothing; without the `x` the keys are run afterwards |
+| `3"ap`, `3"+p` | puts once: a count typed before a register is dropped. `"a3p` and `"+3p` put three times |
+| `v$y` in one note, `"+p` in another | put as a whole line: the clipboard holds text and no register type, and text that ends in a line end is taken as lines. A block yanked with Ctrl-V comes back as characters |
+| `set clipboard=unnamed` | does nothing: libvim has no 'clipboard' option. Plain `p` never reads the clipboard |
 | A register name after Ctrl-R is not shown | vim draws a `"` while it waits; here nothing is drawn until the name is typed |
 | After a search, `/pattern` stays on the message line | harmless; vim leaves it there too until something else is said |
 | The search match under the cursor | highlighted like the others, not differently |

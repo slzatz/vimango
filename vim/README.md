@@ -27,6 +27,9 @@ libvim and a pure-Go engine, `govim`, which was removed in 2026-07.)
   that waits for the user. While it waits the package refuses whatever would
   change vim (`refuseWhileAsking`): a new function that sends a key, runs a
   command or changes the buffer or the cursor asks it first
+- `clipboard.go`, `clipboard_callback.go` — what leaves vim's registers and
+  what comes into them: who is told of a yank or a delete (`SetYankCallback`),
+  and who supplies the text of `"+` and `"*` (`SetClipboardCallback`)
 - `excommands.go` — vim's command table, for resolving an ex command's name
   as vim does (`FindExCommand`)
 - `spell.go`, `spell_callback.go` — spell checking (the callback has to live

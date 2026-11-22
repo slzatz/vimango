@@ -189,6 +189,9 @@ const editorNormalModeHelp = "Normal Mode:\n\n" +
 	"`  Enter (insert) ` - on a list item, start the next one with the same marker\n\n" +
 	"The same key again removes a decoration or list; the other one swaps it.\n" +
 	"Enter on an empty list item ends the list.\n" +
+	"\nA yank (`y` `yy` `Y`, not a delete) is also on the system clipboard, so it can\n" +
+	"be put in another note or pasted into another program. `\"+p` puts what is on\n" +
+	"the clipboard, as lines if it was copied as lines; `\"+dd` cuts to it.\n" +
 	"\nPasted text goes in as it is, in any mode: no mapping sees it and it is not\n" +
 	"re-indented. In NORMAL mode it is put after the cursor; in VISUAL it replaces\n" +
 	"the selection; on a command line it is put on the line and not run.\n" +

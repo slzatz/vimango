@@ -73,6 +73,11 @@ int main(void)
   VALUE(SCROLL_HALFPAGE_LEFT); VALUE(SCROLL_HALFPAGE_RIGHT); VALUE(SCROLL_COLUMN_LEFT); VALUE(SCROLL_COLUMN_RIGHT);
   STRUCT(ScrollCallback);
   STRUCT(SubstituteConfirmCallback);
+  STRUCT(yankInfo_T);
+  FIELD(yankInfo_T, op_char); FIELD(yankInfo_T, extra_op_char); FIELD(yankInfo_T, regname); FIELD(yankInfo_T, blockType);
+  FIELD(yankInfo_T, start); FIELD(yankInfo_T, end); FIELD(yankInfo_T, numLines); FIELD(yankInfo_T, lines);
+  STRUCT(YankCallback); STRUCT(ClipboardGetCallback);
+  VALUE(MCHAR); VALUE(MLINE); VALUE(MBLOCK);
   VALUE(BL_SOL); VALUE(BL_FIX);
   VALUE(FORWARD); VALUE(BACKWARD);
   VALUE(OK);

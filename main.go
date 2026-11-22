@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/slzatz/vimango/auth"
+	"github.com/slzatz/vimango/internal/clipboard"
 	"github.com/slzatz/vimango/internal/editor"
 	"github.com/slzatz/vimango/rawmode"
 	"github.com/slzatz/vimango/terminal"
@@ -167,6 +168,13 @@ func main() {
 
 	// Registers saved by the previous run (see registers.go)
 	editor.RestoreRegisters()
+
+	// The system clipboard, where there is one: a yank goes to it, and "+
+	// and "* are it (internal/editor/clipboard.go). It is how text gets from
+	// one note to another that is open in a process of its own.
+	if board := clipboard.System(); board != nil {
+		editor.UseClipboard(board)
+	}
 
 	// Spell checking: dictionary in spell/ (see spellcheck.go). Before
 	// vimango.vim so the user can override the spell options there.

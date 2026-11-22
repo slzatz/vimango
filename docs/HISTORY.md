@@ -1884,3 +1884,53 @@ repositories:
   `TestParseBlockScalars`, `TestFrontmatterHTMLBlockScalars`,
   `TestRenderNoteAsHTMLDeckFrontmatter`, and cases in
   `TestRowsAgreesWithSplitAndParse` and `TestFrontmatterIsPlain`.
+- **A yank is on the system clipboard, and `"+` is the clipboard.** Steve
+  asked whether lines yanked in one note could be put in another. In
+  vimango_hybrid they could not if both were open: each note being edited is a
+  process with vim's registers to itself, and `registers.json` is read at
+  startup and written at exit, so it carries a yank to the *next* editor, not
+  to one already running. Cmd-C in the pop-out copies what the terminal
+  shows, line numbers and frame included. libvim had both hooks all along and
+  vimango used neither: one called when a yank or delete has filled a register
+  (`vimSetYankCallback`), one called when a register is read
+  (`vimSetClipboardGetCallback`). Now (`vim/clipboard.go`,
+  `internal/editor/clipboard.go`, `internal/clipboard`) a yank with no
+  register named puts its text on the clipboard, and `"+` and `"*` read and
+  write it: `yy` in one note, `"+p` in the other, or Cmd-V anywhere.
+  - **Deletes do not go there**, nor yanks into a named register, so that
+    `dd` and `x` do not replace what was copied on purpose (the alternative
+    was every yank and delete). `"+dd` cuts.
+  - **`p` is still vim's.** libvim asks the clipboard callback at the read of
+    *every* register and would take an answer for the unnamed one, which is
+    how Onivim did `clipboard=unnamed`; the binding answers for `"+` and `"*`
+    only. For any other register libvim drops the lines it was given without
+    freeing them, so answering there would also leak. The `'clipboard'`
+    option itself is not in libvim (`set clipboard=unnamed`: no error, no
+    effect).
+  - **Found by the tests, about libvim**: with no clipboard callback set,
+    `"+dd` is turned into a plain `dd` before the delete (`adjust_clip_reg`)
+    and reported with no register, while `"+yy` is reported as `+` either
+    way; and a count typed before a register is dropped (`3"ap` puts once,
+    `"a3p` three times), which is older than this and is in Open items.
+  - **The clipboard is AppKit's general pasteboard through cgo**
+    (`clipboard_darwin.m`), not `pbcopy`: no program is started, and the
+    framework was already linked for libvim. Not OSC 52, which Terminal.app
+    does not have and which cannot be relied on to read. Linux has none yet
+    (`System()` is nil and nothing is connected).
+  - **The register type does not travel.** Whole lines go out ending in a
+    line end and text ending in one comes back as lines, vim's own rule. Not
+    done: a second pasteboard type holding the register type, as MacVim has,
+    which would bring a block back as a block.
+  - Tried with two real `--editor` processes running at once on a copy of
+    the database, each in a pty: a line yanked in one was put by `"+p` in the
+    other, which had been started first; a `dd` in between left the
+    clipboard alone; text from `pbcopy` was put by `"+P` as characters.
+    `scripts/test-sanitized.sh --go-only` reports nothing (the lines given
+    to vim are `malloc`ed and vim frees them). No fork change, so
+    `libvim.a` need not be rebuilt. Tests: `TestYankGoesToClipboard`,
+    `TestDeletesAndNamedRegistersLeaveTheClipboard`,
+    `TestClipboardRegisterPuts`, `TestYankInOneNotePutInAnother`,
+    `TestPlainPutIsNotTheClipboard`, `TestEmptyClipboard`, `TestNoClipboard`
+    (`internal/editor`); `TestYankCallback`, `TestClipboardCallback` (`vim`);
+    `TestPasteboardRoundTrip` (`internal/clipboard`), on a pasteboard of its
+    own name, so that no test writes to the user's.

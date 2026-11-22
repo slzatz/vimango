@@ -138,6 +138,34 @@ typedef int (*SubstituteConfirmCallback)(linenr_T lnum, colnr_T col,
                                          linenr_T endLnum, colnr_T endCol,
                                          char_u *sub);
 
+/* What a yank or a delete put in a register: the operator ('y', 'd', 'c'),
+ * the register named with it (0 when none was), and the text. The lines are
+ * the register's own and are read before the callback returns. */
+typedef struct
+{
+  int op_char;
+  int extra_op_char;
+  int regname;
+  int blockType; /* MCHAR, MLINE or MBLOCK */
+  pos_T start;
+  pos_T end;
+  int numLines;
+  char_u **lines;
+} yankInfo_T;
+
+typedef void (*YankCallback)(yankInfo_T *yankInfo);
+
+/* Asked whenever a register is read, whichever it is. A true answer gives
+ * the register's text: an array of lines, the array and each line from
+ * malloc(), which vim keeps and frees. libvim takes the answer for "*, "+
+ * and the unnamed register, and loses the memory for any other. */
+typedef int (*ClipboardGetCallback)(int regname, int *num_lines, char_u ***lines, int *blockType);
+
+/* What a register holds: characters, whole lines, a block. */
+#define MCHAR 0
+#define MLINE 1
+#define MBLOCK 2
+
 /* beginline()'s flags. */
 #define BL_SOL 2 /* to the first non-blank if 'startofline', else keep the column */
 #define BL_FIX 4 /* not onto the NUL of a line of blanks */
@@ -211,6 +239,8 @@ void vimInputTimeout(void);
 void vimInterrupt(void);
 void vimSetFileWritesEnabled(int enabled);
 void vimSetMessageCallback(MessageCallback messageCallback);
+void vimSetYankCallback(YankCallback callback);
+void vimSetClipboardGetCallback(ClipboardGetCallback callback);
 
 void vimSetCursorMoveScreenLineCallback(CursorMoveScreenLineCallback cursorMoveScreenLineCallback);
 void vimSetCursorMoveScreenPositionCallback(CursorMoveScreenPositionCallback cursorMoveScreenPositionCallback);
