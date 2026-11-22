@@ -1867,3 +1867,20 @@ repositories:
   Not done: images are still cached at `image_cache_max_width` (800px), so
   one used as a full slide background is scaled up; the cache is keyed by
   URL, so a second size would be a second key.
+- **Frontmatter takes block scalars.** A Marp deck that styles itself has
+  `style: |` in its frontmatter with CSS on the lines below, and `Parse`
+  declined a block scalar, as it declines whatever it has no display for:
+  the preview showed such a deck's frontmatter as a rule, a paragraph of
+  CSS and an h2, and the editor highlighted it as markdown. Steve met it
+  with the first deck that set a layout. Now the lines under `key: |` or
+  `key: >` (with `-` or `+`) are the key's value (`blockScalar`):
+  those indented further than the key, less the indentation of the first,
+  blank lines at the ends dropped; a `>` one folded the way YAML folds.
+  `Entry.Literal` marks a `|` one, and the card shows it as written, in
+  the code font (`dd.fm-literal`). Still declined: an indentation digit
+  (`|2`), a comment after the mark, and a line that steps back to
+  between the key's indentation and the block's. The editor needed no
+  change: it asks `frontmatter.Rows`, and draws those rows plain. Tests:
+  `TestParseBlockScalars`, `TestFrontmatterHTMLBlockScalars`,
+  `TestRenderNoteAsHTMLDeckFrontmatter`, and cases in
+  `TestRowsAgreesWithSplitAndParse` and `TestFrontmatterIsPlain`.

@@ -122,23 +122,82 @@ func TestParseQuoting(t *testing.T) {
 // silently drop the half it could not read.
 func TestParseBailsOut(t *testing.T) {
 	cases := map[string]string{
-		"block scalar": "---\ndesc: |\n  line one\n  line two\n---\n",
-		"flow json":    "---\na: 1\n{\"b\": 2}\n---\n",
-		"bare prose":   "---\njust a sentence with no colon\n---\n",
-		"leading list": "---\n- orphan item\n---\n",
-		"empty block":  "---\n---\n",
-		"only blanks":  "---\n\n\n---\n",
-		"comment only": "---\n# just a comment\n---\n",
-		"anchor":       "---\na: &anchor\nb: c\n---\n",
-		"alias":        "---\na: x\nb: *anchor\n---\n",
-		"tag":          "---\na: !!str 5\n---\n",
-		"flow seq":     "---\ntags: [one, two]\n---\n",
-		"flow map":     "---\na: {b: c}\n---\n",
+		"block scalar with an indentation digit": "---\ndesc: |2\n    line one\n---\n",
+		"block scalar with a comment":            "---\ndesc: | # why\n  line one\n---\n",
+		"block scalar that steps back":           "---\ndesc: |\n    line one\n  line two\n---\n",
+		"flow json":                              "---\na: 1\n{\"b\": 2}\n---\n",
+		"bare prose":                             "---\njust a sentence with no colon\n---\n",
+		"leading list":                           "---\n- orphan item\n---\n",
+		"empty block":                            "---\n---\n",
+		"only blanks":                            "---\n\n\n---\n",
+		"comment only":                           "---\n# just a comment\n---\n",
+		"anchor":                                 "---\na: &anchor\nb: c\n---\n",
+		"alias":                                  "---\na: x\nb: *anchor\n---\n",
+		"tag":                                    "---\na: !!str 5\n---\n",
+		"flow seq":                               "---\ntags: [one, two]\n---\n",
+		"flow map":                               "---\na: {b: c}\n---\n",
 	}
 	for name, src := range cases {
 		if got := Parse(src); got != nil {
 			t.Errorf("%s: expected nil (fall through), got %+v", name, got)
 		}
+	}
+}
+
+// A block scalar is a value: the lines under "key: |" as they were written,
+// and those under "key: >" folded into running text. The first is a Marp
+// deck's "style: |", which is why this is here: until it was a value, every
+// deck with a style of its own had its frontmatter rendered as markdown.
+func TestParseBlockScalars(t *testing.T) {
+	src := "---\n" +
+		"marp: true\n" +
+		"style: |\n" +
+		"  section {\n" +
+		"    display: flex;\n" +
+		"\n" +
+		"  }\n" +
+		"  section > :last-child { margin-bottom: auto !important; }\n" +
+		"\n" +
+		"description: >-\n" +
+		"  one line\n" +
+		"  and the next,\n" +
+		"\n" +
+		"  then a paragraph\n" +
+		"    kept as written\n" +
+		"  and on.\n" +
+		"metadata:\n" +
+		"  notes: |+\n" +
+		"    a: b\n" +
+		"    - not an item\n" +
+		"\n" +
+		"  type: deck\n" +
+		"empty: |\n" +
+		"last: x\n" +
+		"---\n"
+	want := []Entry{
+		{Key: "marp", Value: "true"},
+		{Key: "style", Value: "section {\n  display: flex;\n\n}\nsection > :last-child { margin-bottom: auto !important; }", Literal: true},
+		{Key: "description", Value: "one line and the next,\nthen a paragraph\n  kept as written\nand on."},
+		{Key: "metadata"},
+		{Key: "notes", Value: "a: b\n- not an item", Depth: 1, Literal: true},
+		{Key: "type", Value: "deck", Depth: 1},
+		{Key: "empty", Literal: true},
+		{Key: "last", Value: "x"},
+	}
+	got := Parse(src)
+	if len(got) != len(want) {
+		t.Fatalf("got %d entries, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("entry %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+
+	// with CRLF line ends, and as the block's last thing
+	got = Parse("---\r\nstyle: |\r\n  a {\r\n    b: c;\r\n  }\r\n---\r\n")
+	if len(got) != 1 || got[0] != (Entry{Key: "style", Value: "a {\n  b: c;\n}", Literal: true}) {
+		t.Errorf("CRLF: got %+v", got)
 	}
 }
 
@@ -154,7 +213,9 @@ func TestRowsAgreesWithSplitAndParse(t *testing.T) {
 		"---\r\nname: a\r\n---\r\nBody.",
 		"---\nname: a\nmetadata:\n  type: user\n---\n# Heading",
 		"---\ntags:\n  - one\n---\nx",
-		"---\n# just a comment\n---\n# Heading", // Parse declines
+		"---\nmarp: true\nstyle: |\n  section {\n    color: red;\n  }\n---\n# Slide", // a block scalar
+		"---\nstyle: |\n    a\n  b\n---\nx",                                          // one Parse declines
+		"---\n# just a comment\n---\n# Heading",                                      // Parse declines
 		"---\njust prose\n---\nx",
 		"---\n---\nx",
 		"---\nname: a\n\nno closer",

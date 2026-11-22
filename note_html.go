@@ -494,6 +494,21 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
            column, which is the whole reason for the grid. 16px is the
            indent the source itself reads as: two spaces of the monospace
            the note is edited in, near enough. */
+        /* A block scalar, the lines under "key: |" (frontmatter.go).
+           pre-wrap because its line breaks and its indentation are the
+           value: it is a Marp deck's CSS as often as prose. The code font
+           for the same reason, and so that the indentation lines up; not
+           the code color, which would make the card's longest value its
+           loudest. A folded value that still holds a line break (fm-lines)
+           keeps the break and the body's font. */
+        dl.frontmatter dd.fm-literal {
+            white-space: pre-wrap;
+            font-family: ui-monospace, 'SF Mono', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.92em;
+        }
+        dl.frontmatter dd.fm-lines {
+            white-space: pre-wrap;
+        }
         dl.frontmatter dt.fm-l1 {
             padding-left: 16px;
         }

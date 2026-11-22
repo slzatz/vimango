@@ -165,6 +165,16 @@ func TestFrontmatterIsPlain(t *testing.T) {
 		t.Errorf("the heading after the frontmatter is drawn %q", rows[3])
 	}
 
+	// a block scalar's lines are frontmatter too: a Marp deck's style
+	e = highlightEditor(t, []string{"---", "marp: true", "style: |", "  **b** {", "  }", "---", "# Heading"})
+	rows = drawnRows(e)
+	if plain := mdStyle(0).sgr() + "  **b** {" + sgrReset; rows[3] != plain {
+		t.Errorf("a block scalar's row drawn %q, want it plain %q", rows[3], plain)
+	}
+	if !strings.HasPrefix(rows[6], mdHeading.sgr()) {
+		t.Errorf("the heading after the frontmatter is drawn %q", rows[6])
+	}
+
 	for _, note := range [][]string{
 		{"---", "title: x", "# a comment", "---"}, // Parse declines it
 		{"---", "title: x", "# the closer is the last row", "---"},
