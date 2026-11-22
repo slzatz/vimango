@@ -16,10 +16,13 @@ var validFlags = map[string]bool{
 	"--editor":      true,
 	"--open":        true, // takes a value: --open <id>; requires --editor
 	"--render-html": true, // takes a value: --render-html <id>; headless, prints HTML and exits
-	"--gdrive-auth": true, // sign in to Google Drive (create/refresh token.json) and exit
-	"--migrate":     true, // bring this machine's vimango.db up to date, report, and exit
-	"--wiki-links":  true, // with --render-html: emit [[refs]] as clickable anchors
-	"--title":       true, // with --render-html: put the note's title at the top as an <h1>
+	// takes a value: --render-markdown <id>; headless, prints the note's
+	// markdown with its Google Drive images inlined, and exits
+	"--render-markdown": true,
+	"--gdrive-auth":     true, // sign in to Google Drive (create/refresh token.json) and exit
+	"--migrate":         true, // bring this machine's vimango.db up to date, report, and exit
+	"--wiki-links":      true, // with --render-html: emit [[refs]] as clickable anchors
+	"--title":           true, // with --render-html: put the note's title at the top as an <h1>
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
@@ -33,7 +36,7 @@ func ValidateArgs(args []string) {
 			skipNext = false
 			continue
 		}
-		if arg == "--open" || arg == "--render-html" {
+		if arg == "--open" || arg == "--render-html" || arg == "--render-markdown" {
 			if i+1 >= len(rest) {
 				fmt.Fprintf(os.Stderr, "Error: %s requires a note id\n\n", arg)
 				ShowHelp()
@@ -52,6 +55,11 @@ func ValidateArgs(args []string) {
 			ShowHelp()
 			os.Exit(2)
 		}
+	}
+	if DetermineRenderHTML(args) != -1 && DetermineRenderMarkdown(args) != -1 {
+		fmt.Fprintf(os.Stderr, "Error: --render-html and --render-markdown are one or the other\n\n")
+		ShowHelp()
+		os.Exit(2)
 	}
 	if editorOnly, openId := DetermineEditorBoot(args); openId != -1 && !editorOnly {
 		fmt.Fprintf(os.Stderr, "Error: --open requires --editor\n\n")
@@ -119,6 +127,14 @@ OPTIONS:
         for host applications embedding a preview pane. Google Drive
         images are inlined as data URIs when Drive is configured.
 
+    --render-markdown <id>
+        Print the markdown of the note with the given database id on
+        stdout and exit, with each Google Drive image replaced by the
+        image itself (a data URI). Headless; for a host that gives the
+        note to a markdown tool of its own (slides made with Marp), which
+        cannot read a gdrive: address. An image that cannot be had
+        becomes a line of text saying so.
+
     --wiki-links
         With --render-html, emit [[note-name]] cross references as
         anchors with a vimango://note/ href instead of inert spans. Only
@@ -156,6 +172,9 @@ EXAMPLES:
 
     # Print note 5 as HTML (e.g. for a host app's preview pane)
     ./vimango --render-html 5
+
+    # Print note 5 as markdown with its Google Drive images inlined
+    ./vimango --render-markdown 5 | marp -o deck.html
 
     # Sign in to Google Drive (creates/refreshes token.json)
     ./vimango --gdrive-auth

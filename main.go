@@ -37,6 +37,12 @@ func main() {
 		os.Exit(RunRenderHTML(id, DetermineWikiLinks(os.Args), DetermineTitle(os.Args)))
 	}
 
+	// --render-markdown <id>, headless too: print the note's markdown with
+	// its Google Drive images inlined, and exit.
+	if id := DetermineRenderMarkdown(os.Args); id != -1 {
+		os.Exit(RunRenderMarkdown(id))
+	}
+
 	// --migrate: bring vimango.db up to date, report, and exit (migrate.go)
 	if CheckForMigrate(os.Args) {
 		os.Exit(RunMigrate())

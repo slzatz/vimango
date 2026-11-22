@@ -119,7 +119,7 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
 	}
 
 	// Pre-process markdown to handle Google Drive images
-	processedMarkdown, err := r.inlineImages(body)
+	processedMarkdown, err := r.inlineImages(body, imagePlaceholderHTML)
 	if err != nil {
 		return "", fmt.Errorf("failed to preprocess markdown images: %v", err)
 	}
@@ -751,11 +751,42 @@ func imagePlaceholderHTML(altText string, err error) string {
 		template.HTMLEscapeString(err.Error()), template.HTMLEscapeString(label), reason)
 }
 
+// imagePlaceholderMarkdown is the same stand-in as plain markdown, for
+// --render-markdown: what reads that output may not pass raw HTML through
+// (Marp escapes it unless asked), and an HTML comment is no place for the
+// error either -- Marp reads one as the slide's presenter notes. The alt text
+// is escaped: in a deck it is as likely Marp's image keywords ("bg
+// right:40%") as words, and neither should turn into markup.
+func imagePlaceholderMarkdown(altText string, err error) string {
+	label := markdownEscaper.Replace(altText)
+	if label == "" {
+		label = "image"
+	}
+	reason := "could not be loaded"
+	if errors.Is(err, ErrGoogleDriveNotConfigured) {
+		reason = "sign in to Google Drive to view it (run `vimango --gdrive-auth` in a terminal)"
+	}
+	return "🖼️ " + label + " — " + reason
+}
+
+var markdownEscaper = strings.NewReplacer(
+	"\\", "\\\\", "*", "\\*", "_", "\\_", "`", "\\`", "[", "\\[", "<", "\\<", "&", "\\&",
+)
+
+// markdown is the note as markdown for something other than vimango to
+// render (--render-markdown): the text as it is stored, frontmatter and all,
+// except that each Google Drive image is the image itself. Still
+// ![alt](...), so whatever the alt text means to the reader -- Marp's "bg",
+// "w:300" -- it still means.
+func (r htmlRenderer) markdown(note string) (string, error) {
+	return r.inlineImages(note, imagePlaceholderMarkdown)
+}
+
 // inlineImages replaces each Google Drive image in the markdown with the image
 // itself, as a data URI, before the conversion to HTML: from the cache, or
 // downloaded and then cached. One that cannot be had becomes a placeholder
-// that says why.
-func (r htmlRenderer) inlineImages(markdown string) (string, error) {
+// that says why, in the form the caller's output can carry.
+func (r htmlRenderer) inlineImages(markdown string, placeholder func(altText string, err error) string) (string, error) {
 
 	// Regular expression to find Google Drive URLs in markdown image syntax
 	// Matches both full URLs and gdrive: format
@@ -792,7 +823,7 @@ func (r htmlRenderer) inlineImages(markdown string) (string, error) {
 				dataURI, err = r.driveImageDataURI(googleURL)
 				if err != nil {
 					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
-					processedMarkdown = strings.Replace(processedMarkdown, fullMatch, imagePlaceholderHTML(altText, err), 1)
+					processedMarkdown = strings.Replace(processedMarkdown, fullMatch, placeholder(altText, err), 1)
 					continue
 				}
 
@@ -807,7 +838,7 @@ func (r htmlRenderer) inlineImages(markdown string) (string, error) {
 			dataURI, err = r.driveImageDataURI(googleURL)
 			if err != nil {
 				log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
-				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, imagePlaceholderHTML(altText, err), 1)
+				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, placeholder(altText, err), 1)
 				continue
 			}
 		}

@@ -118,12 +118,15 @@ vimango itself builds and runs without it; see "HEIC".
 - `--render-html <id>`: headless — print the note as a standalone HTML document and exit. No terminal probes, no vim, no raw mode; safe with stdout piped. Google Drive images are inlined as data URIs through vimango's own auth and cache when configured; otherwise the image markdown passes through.
   - `--title`: put the note's title at the top as an `<h1>`. Off for hybrid's preview pane, which has its own title bar; on for its PDF export.
   - `--wiki-links`: emit `[[refs]]` as `vimango://note/` anchors, for a host that intercepts the clicks.
+- `--render-markdown <id>`: headless, as `--render-html` is — print the note's markdown and exit, as stored except that each Google Drive image is the image itself (a data URI). For a host that gives the note to a markdown tool of its own; one that cannot be had becomes a line of plain text, since what reads the output may not pass HTML through.
 - `--migrate`: bring this machine's `vimango.db` up to date, print what changed, exit. Optional; every start does the same quietly.
 - `--init`: first-time setup (`config.json`, a new database). `--gdrive-auth`: sign in to Google Drive and exit.
 
-**vimango_hybrid uses both host modes**: an `--editor --open <id>` per editing session in a pop-out, and a `--render-html` per preview and per PDF export.
+**vimango_hybrid uses both host modes**: an `--editor --open <id>` per editing session in a pop-out, and a `--render-html` per preview and per PDF export. Its slides (Marp's) are a `--render-markdown` per render.
 
 **`--render-html` builds no `App`** — no organizer, no terminal detection, and the global `app` stays nil. `renderNote` (`render_html.go`) opens the store and makes an `htmlRenderer` (`note_html.go`), a value holding everything rendering takes from outside: the two colours from `config.json` (`webview.accent` / `webview.code_accent`; the names are historical), the flags, a title lookup for `[[tid:N]]` links, and where Drive images come from (`driveImages`, and the disk cache). Anything new the renderer needs goes in that struct, not through a global. It renders one style: left-aligned content, no centered column, since it is shown in a pane. Tests: `render_html_test.go`.
+
+**`--render-markdown` is the image pass of that renderer and nothing else** (`renderNoteMarkdown`, `htmlRenderer.markdown`). `inlineImages` has always been markdown in, markdown out, run before goldmark; this prints its result. It keeps `![alt](…)` and the alt text exactly, because to the reader the alt text may be instructions (Marp: `bg right:40%`, `w:300`), and it touches nothing else — frontmatter, `[[links]]` and callouts go out as written. The placeholder for an image that cannot be had is the caller's to choose (`inlineImages`' second argument): HTML for the page, plain text here — not an HTML comment, which Marp reads as presenter notes. Both modes get Drive and the cache from `driveForRender`.
 
 ## Rules that cut across
 
@@ -418,7 +421,7 @@ Text sizing is enabled only for actual kitty (`isActualKittyTerminal()`, `kitty_
 
 A note's images are `![text](gdrive:<file id>)`, fetched from Google Drive. Two caches:
 
-- **Disk** (`./image_cache/`, `image_cache.go`): base64 files and an index, shared by the TUI and `--render-html`, persistent and terminal-agnostic. Evicted least-recently-used; a cache hit writes the index only when the last use on record is over an hour old (`accessGranularity`).
+- **Disk** (`./image_cache/`, `image_cache.go`): base64 files and an index, shared by the TUI, `--render-html` and `--render-markdown`, persistent and terminal-agnostic. Evicted least-recently-used; a cache hit writes the index only when the last use on record is over an hour old (`accessGranularity`).
 - **Terminal**: the kitty protocol keeps transmitted images in the terminal; reset at each launch, and by `:imagereset`.
 
 ### HEIC

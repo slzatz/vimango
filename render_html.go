@@ -39,8 +39,19 @@ func DetermineTitle(args []string) bool {
 // the flag is absent. ValidateArgs has already guaranteed the value is
 // present and numeric.
 func DetermineRenderHTML(args []string) int {
+	return noteIDFlag(args, "--render-html")
+}
+
+// DetermineRenderMarkdown returns the note id passed to --render-markdown,
+// or -1 if the flag is absent.
+func DetermineRenderMarkdown(args []string) int {
+	return noteIDFlag(args, "--render-markdown")
+}
+
+// noteIDFlag is the note id that follows flag in args, or -1.
+func noteIDFlag(args []string, flag string) int {
 	for i, arg := range args {
-		if arg == "--render-html" && i+1 < len(args) {
+		if arg == flag && i+1 < len(args) {
 			if id, err := strconv.Atoi(args[i+1]); err == nil {
 				return id
 			}
@@ -91,20 +102,7 @@ func renderNote(id int, linkNotes, showTitle bool, stdout, stderr io.Writer) int
 	r := htmlRenderer{linkNotes: linkNotes, showTitle: showTitle, titleForTID: notes.TitleForTID}
 	r.accent, r.codeAccent = config.Webview.Accent, config.Webview.CodeAccent
 
-	// Optional: without Drive the note still renders, with a visible
-	// placeholder where each gdrive: image would be. Headless variant —
-	// stdio is piped, so the interactive OAuth prompt the TUI boot path
-	// falls into on a missing token.json would block forever here.
-	r.images.maxWidth = readPreferences("preferences.json").ImageCacheMaxWidth
-	if r.images.service, err = auth.GetDriveServiceHeadless(); err != nil {
-		fmt.Fprintf(stderr, "Warning: Google Drive unavailable: %v\n", err)
-	}
-	// the disk cache the TUI's inline images share; without one, every
-	// image is downloaded for every render
-	if r.cache, err = NewImageCache(); err != nil {
-		log.Printf("Warning: Failed to initialize image cache: %v", err)
-		r.cache = nil
-	}
+	r.images, r.cache = driveForRender(stderr)
 
 	title, note, err := notes.TitleAndNote(id)
 	if err != nil {
@@ -119,5 +117,76 @@ func renderNote(id int, linkNotes, showTitle bool, stdout, stderr io.Writer) int
 	}
 
 	fmt.Fprint(stdout, html)
+	return 0
+}
+
+// driveForRender is where a headless render's Google Drive images come from:
+// the sign-in, and the disk cache the TUI's inline images share.
+//
+// Both are optional. Without Drive the note still renders, with a visible
+// placeholder where each gdrive: image that is not cached would be; the
+// headless sign-in, because stdio is piped, so the interactive OAuth prompt
+// the TUI boot path falls into on a missing token.json would block forever
+// here. Without a cache every image is downloaded for every render.
+func driveForRender(stderr io.Writer) (images driveImages, cache *ImageCache) {
+	var err error
+	images.maxWidth = readPreferences("preferences.json").ImageCacheMaxWidth
+	if images.service, err = auth.GetDriveServiceHeadless(); err != nil {
+		fmt.Fprintf(stderr, "Warning: Google Drive unavailable: %v\n", err)
+	}
+	if cache, err = NewImageCache(); err != nil {
+		log.Printf("Warning: Failed to initialize image cache: %v", err)
+		cache = nil
+	}
+	return images, cache
+}
+
+// RunRenderMarkdown prints note <id> as markdown that needs no vimango to
+// show its pictures -- each Google Drive image replaced by the image itself,
+// as a data URI -- and returns a process exit code. Headless, as
+// RunRenderHTML is, and for a host that hands the note to a markdown tool of
+// its own: the hybrid app's slides, which are Marp's.
+func RunRenderMarkdown(id int) int {
+	// as in RunRenderHTML: the HEIC worker outlives this process unless
+	// it is killed, on a normal exit and on a signal alike
+	defer ShutdownHEICDecoder()
+	killHEICWorkerOnSignal()
+
+	return renderNoteMarkdown(id, os.Stdout, os.Stderr)
+}
+
+// renderNoteMarkdown is --render-markdown itself: the note's text on stdout,
+// changed only where a Google Drive image was (htmlRenderer.markdown), with
+// anything that went wrong on stderr and in the exit code it returns. Like
+// renderNote, it builds no App.
+func renderNoteMarkdown(id int, stdout, stderr io.Writer) int {
+	config, err := loadConfig("config.json")
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: could not open databases: %v\n", err)
+		return 1
+	}
+	notes, err := openStore(config)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: could not open databases: %v\n", err)
+		return 1
+	}
+	defer notes.Close()
+
+	var r htmlRenderer
+	r.images, r.cache = driveForRender(stderr)
+
+	_, note, err := notes.TitleAndNote(id)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: no note with id %d: %v\n", id, err)
+		return 1
+	}
+
+	markdown, err := r.markdown(note)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: could not render note %d: %v\n", id, err)
+		return 1
+	}
+
+	fmt.Fprint(stdout, markdown)
 	return 0
 }

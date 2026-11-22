@@ -217,3 +217,90 @@ func TestRenderHTMLDriveImages(t *testing.T) {
 		t.Errorf("with no cache and no sign-in, %d placeholders; want 3", n)
 	}
 }
+
+// --render-markdown prints the note as it is stored, but for its Google Drive
+// images: each one the image itself, still as ![alt](...), so that the alt
+// text keeps what it means to whatever reads the output (Marp's image
+// keywords). It builds no App, and takes its images from ./image_cache as
+// --render-html does.
+func TestRenderMarkdown(t *testing.T) {
+	const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+	const raw, uri, missing = "gdrive:rawRAWrawRAWrawRAWrawRAWraw01", "gdrive:uriURIuriURIuriURIuriURIuri02", "gdrive:goneGONEgoneGONEgoneGONEgon03"
+	const front = "---\nmarp: true\npaginate: true\n---\n\n# A slide\n\n"
+	const rest = "\n\n---\n\nSee [[Another note]] and ![web](https://example.com/a.png).\n\n" + "```" + "\ncode\n" + "```" + "\n"
+	note := front + "![bg right:40%](" + raw + ")\n\n![w:300](" + uri + ")\n\n![a *b* <c>](" + missing + ")" + rest
+	id := renderWorkspace(t, "", "A deck", note)
+	prev := app
+	app = nil
+	t.Cleanup(func() { app = prev })
+
+	// the cache as another vimango process left it, in the two forms it holds
+	cache, err := NewImageCache()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.StoreCachedImage(raw, pngBase64); err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.StoreCachedImage(uri, "data:image/jpeg;base64,/9j/abc"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := renderNoteMarkdown(id, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", code, stderr.String())
+	}
+	if app != nil {
+		t.Error("rendering made an App")
+	}
+	want := front +
+		"![bg right:40%](data:image/png;base64," + pngBase64 + ")\n\n" +
+		"![w:300](data:image/jpeg;base64,/9j/abc)\n\n" +
+		"🖼️ a \\*b\\* \\<c> — sign in to Google Drive to view it (run `vimango --gdrive-auth` in a terminal)" +
+		rest
+	if got := stdout.String(); got != want {
+		t.Errorf("the markdown:\n%s\nwant:\n%s", got, want)
+	}
+	if got := stderr.String(); !strings.Contains(got, "Google Drive unavailable") || strings.Contains(got, "Error") {
+		t.Errorf("stderr: %q", got)
+	}
+
+	// a note with no text is no error, and no output
+	stdout.Reset()
+	if code := renderNoteMarkdown(renderWorkspace(t, "", "Empty", ""), &stdout, &stderr); code != 0 || stdout.Len() != 0 {
+		t.Errorf("an empty note: exit %d, stdout %q", code, stdout.String())
+	}
+}
+
+// As for --render-html: what goes wrong is said on stderr and in the exit
+// code, and nothing is written to stdout, which the host reads as the note.
+func TestRenderMarkdownFailures(t *testing.T) {
+	id := renderWorkspace(t, "", "A title", "text")
+	run := func(id int) (code int, out, errs string) {
+		var stdout, stderr bytes.Buffer
+		code = renderNoteMarkdown(id, &stdout, &stderr)
+		return code, stdout.String(), stderr.String()
+	}
+	if code, out, errs := run(id + 1000); code != 1 || out != "" || !strings.Contains(errs, "no note with id") {
+		t.Errorf("a note that is not there: exit %d, stdout %q, stderr %q", code, out, errs)
+	}
+	if err := os.Remove("config.json"); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, errs := run(id); code != 1 || out != "" || !strings.Contains(errs, "could not open databases") {
+		t.Errorf("no config.json: exit %d, stdout %q, stderr %q", code, out, errs)
+	}
+}
+
+func TestRenderFlagsNameTheirNote(t *testing.T) {
+	args := []string{"vimango", "--render-markdown", "5"}
+	if got := DetermineRenderMarkdown(args); got != 5 {
+		t.Errorf("--render-markdown 5: note %d", got)
+	}
+	if got := DetermineRenderHTML(args); got != -1 {
+		t.Errorf("--render-markdown read as --render-html %d", got)
+	}
+	if got := DetermineRenderMarkdown([]string{"vimango", "--render-html", "5"}); got != -1 {
+		t.Errorf("--render-html read as --render-markdown %d", got)
+	}
+}

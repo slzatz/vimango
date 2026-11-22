@@ -1843,3 +1843,27 @@ repositories:
     Steve asked for it after hearing that this was the weakest part. The
     test that draws during a question with spell checking on was shown to
     fail when the editor's one such call (`syncSpellOption`) was put back.
+
+## 2026-11-22
+
+- **`--render-markdown <id>`: a note's markdown with its Drive images
+  inlined.** For vimango_hybrid's slides, which are made by marp-cli: Marp
+  cannot read `gdrive:ID`, and nothing of Drive — the token, the download,
+  the cache, HEIC — can be given to it. It did not have to be.
+  `inlineImages` was already a pass from markdown to markdown, run before
+  goldmark, so the new mode prints what that pass returns: the note as
+  stored, with `![alt](gdrive:ID)` become `![alt](data:image/…)`. The alt
+  text is untouched, which is what lets Marp's image keywords
+  (`![bg right:40%](gdrive:…)`) work on a Drive image. Tried by hand first,
+  with entries from `./image_cache` and marp-cli 4.5.1: an image in the
+  flow, a sized one and a split background all rendered; markdown-it
+  accepts `data:image/` gif, png, jpeg and webp, which is all this writes.
+  The placeholder became an argument of `inlineImages`: HTML for the page
+  as before, plain text for markdown, because Marp escapes raw HTML and
+  reads an HTML comment as presenter notes. `renderNote` and the new
+  `renderNoteMarkdown` share `driveForRender`. Measured on a real note
+  with two cached images: 33ms. Tests: `TestRenderMarkdown`,
+  `TestRenderMarkdownFailures`, `TestRenderFlagsNameTheirNote`.
+  Not done: images are still cached at `image_cache_max_width` (800px), so
+  one used as a full slide background is scaled up; the cache is keyed by
+  URL, so a second size would be a second key.
