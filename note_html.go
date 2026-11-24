@@ -112,7 +112,13 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
 	// identically after this.
 	body := markdownContent
 	var frontmatterCard string
+	var extensions []goldmark.Extender
 	if fm, rest, ok := frontmatter.Split(markdownContent); ok {
+		// A deck's instructions to Marp are labels, and its CSS stays
+		// out of this page (marp.go).
+		if isMarpDeck(fm) {
+			extensions = append(extensions, marpExtension{})
+		}
 		if entries := frontmatter.Parse(fm); entries != nil {
 			frontmatterCard, body = frontmatterHTML(entries), rest
 		}
@@ -125,7 +131,7 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
 	}
 
 	// Convert markdown to HTML using goldmark
-	htmlContent := frontmatterCard + r.markdownToHTML(processedMarkdown)
+	htmlContent := frontmatterCard + r.markdownToHTML(processedMarkdown, extensions...)
 
 	// Wrap in basic HTML template
 	htmlTemplate := `<!DOCTYPE html>
@@ -541,6 +547,23 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
             text-decoration: line-through;
             opacity: 0.6;
         }
+        /* What a Marp deck tells Marp -- directives, style blocks -- as a
+           label where it stands (marp.go). Dim, small and in the code
+           font, without the code color: it is about the slide, not on it,
+           and must neither read as the note's text nor compete with it.
+           Every property a surrounding block might set is set here, since a
+           directive can stand inside a heading, a list item or a quote. */
+        .marp-label {
+            font: normal 400 12px/1.4 ui-monospace, 'SF Mono', 'Menlo', 'Ubuntu Mono', monospace;
+            color: #7f8c8d;
+            margin-right: 12px;
+        }
+        /* Its own lines' worth of height and no more: a deck has one of
+           these on many slides, above the heading as often as not. */
+        div.marp {
+            margin: 4px 0;
+            line-height: 1.4;
+        }
         img {
             max-width: 100%;
             height: auto;
@@ -659,6 +682,9 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
             dl.frontmatter {
                 --fm-bg: rgba(255, 255, 255, 0.09);
             }
+            .marp-label {
+                color: #7d878e;
+            }
             .img-placeholder {
                 border-color: #555;
                 background-color: #2d2d2d;
@@ -682,6 +708,10 @@ func (r htmlRenderer) render(title, markdownContent string) (string, error) {
                 white-space: pre-wrap;
                 overflow-wrap: anywhere;
                 overflow-x: visible;
+            }
+            /* A page is for its reader; these are for the note's author. */
+            .marp-label, div.marp {
+                display: none;
             }
             h1, h2, h3, h4, h5, h6 {
                 break-after: avoid;
@@ -902,8 +932,9 @@ func (r htmlRenderer) driveImageDataURI(googleURL string) (string, error) {
 	return dataURI, nil
 }
 
-// markdownToHTML converts markdown to HTML using goldmark
-func (r htmlRenderer) markdownToHTML(markdown string) string {
+// markdownToHTML converts markdown to HTML using goldmark, with any extensions
+// the note itself calls for.
+func (r htmlRenderer) markdownToHTML(markdown string, extensions ...goldmark.Extender) string {
 	// Configure goldmark with common extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
@@ -920,6 +951,7 @@ func (r htmlRenderer) markdownToHTML(markdown string) string {
 			// through the open database, when there is one.
 			wikiLinkExtension{anchors: r.linkNotes, titleForTID: r.titleForTID},
 		),
+		goldmark.WithExtensions(extensions...),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs
 			// GitHub-style alert callouts (callout.go). A paragraph

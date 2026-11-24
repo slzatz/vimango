@@ -155,7 +155,7 @@ func TestRenderHTMLAccents(t *testing.T) {
 		if !strings.Contains(html, "--accent: "+tc.wantAccent+";") || !strings.Contains(html, "--code-accent: "+tc.wantCode+";") {
 			t.Errorf("accent %q, code %q: the stylesheet does not have %s and %s", tc.accent, tc.code, tc.wantAccent, tc.wantCode)
 		}
-		if strings.Contains(html, "display: none") || strings.Contains(html, "expression(") {
+		if strings.Contains(html, "body { display: none") || strings.Contains(html, "expression(") {
 			t.Errorf("accent %q reached the stylesheet as written", tc.accent)
 		}
 	}

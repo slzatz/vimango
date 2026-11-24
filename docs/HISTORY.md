@@ -1934,3 +1934,21 @@ repositories:
     (`internal/editor`); `TestYankCallback`, `TestClipboardCallback` (`vim`);
     `TestPasteboardRoundTrip` (`internal/clipboard`), on a pasteboard of its
     own name, so that no test writes to the user's.
+
+## 2026-11-24
+
+- **A Marp deck's instructions are labels in `--render-html`** (`marp.go`).
+  Steve's decks crop photos with a `<style scoped>` block per slide, which
+  could not be seen without editing the note. It was also live CSS in the
+  preview, since the renderer runs `WithUnsafe` and browsers ignore
+  `scoped`; only `figure` rules having nothing to match kept it from
+  showing. In a note with `marp: true`, a directive comment is now a dim
+  label and a style block a label with its CSS in the tooltip, the CSS left
+  out of the page. Which comments are directives is Marpit's rule, each case
+  run through marp-cli 4.5.1; the rest are presenter notes and stay hidden.
+  A style tag where Marp reads none is text. Hidden in print. Other notes,
+  code and `--render-markdown` are as before: of the notes holding a comment
+  or a style tag, only the two decks using them rendered differently.
+  `TestRenderHTMLAccents` took any `display: none` in the page for its
+  injected one; it looks for the whole injected text now.
+  Tests: `marp_test.go`.
