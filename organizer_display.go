@@ -536,14 +536,16 @@ func (o *Organizer) displayNote() {
 	app.RenderManager.StartRender(id, note, o.Screen.totaleditorcols)
 }
 
-// extractImageURLs extracts all image URLs from markdown
+// extractImageURLs is the address of each image glamour will draw, in order:
+// not one in a code span, a code block or raw HTML (markdownImages).
+// renderWithImages transmits exactly these, and kittyImageCacheLookup hands
+// them to glamour by position, so an extra one put the wrong picture on every
+// image after it.
 func extractImageURLs(markdown string) []string {
-	matches := markdownImageRegex.FindAllStringSubmatch(markdown, -1)
-	urls := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 2 {
-			urls = append(urls, match[2]) // match[2] is the URL
-		}
+	images := markdownImages(markdown, markdownImageRegex)
+	urls := make([]string, 0, len(images))
+	for _, img := range images {
+		urls = append(urls, img.url)
 	}
 	return urls
 }

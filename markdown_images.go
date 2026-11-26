@@ -1,6 +1,7 @@
 package main
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/slzatz/vimango/internal/frontmatter"
@@ -10,31 +11,40 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// driveImageRef is one Google Drive image in a note's markdown: the bytes
-// [start, end) of ![alt](url).
-type driveImageRef struct {
+// imageRef is one image in a note's markdown: the bytes [start, end) of
+// ![alt](url).
+type imageRef struct {
 	start, end int
 	alt, url   string
 }
 
-// imagesToInline finds the note's Google Drive images: every driveImageRegex
-// match that markdown reads as an image, and so not one inside a code span,
-// a code block or raw HTML, where it is text. The image pass runs ahead of
-// goldmark, so it has to ask: one in backticks was inlined anyway, its
+// imagesToInline finds the note's Google Drive images for the image pass,
+// which runs ahead of goldmark and so has to ask which of them markdown
+// reads as images (markdownImages). One in backticks was inlined anyway, its
 // base64 then shown as the code span's text -- a 2MB photo is a 2.7-million
 // character line, and WebKit stalled laying it out (2026-11-26).
-func imagesToInline(markdown string) []driveImageRef {
-	matches := driveImageRegex.FindAllStringSubmatchIndex(markdown, -1)
+func imagesToInline(markdown string) []imageRef {
+	return markdownImages(markdown, driveImageRegex)
+}
+
+// markdownImages is every match of re -- an image pattern with the alt text
+// as group 1 and the address as group 2 -- that markdown reads as an image,
+// and so not one inside a code span, a code block or raw HTML, where it is
+// text. Whatever pairs a regex scan with a goldmark render has to agree with
+// goldmark on this: the TUI hands glamour its images in order, and one too
+// many shifted every later picture down by one.
+func markdownImages(markdown string, re *regexp.Regexp) []imageRef {
+	matches := re.FindAllStringSubmatchIndex(markdown, -1)
 	if len(matches) == 0 {
 		return nil
 	}
 	literal := literalRanges(markdown)
-	var images []driveImageRef
+	var images []imageRef
 	for _, m := range matches {
 		if inRanges(literal, m[0]) {
 			continue
 		}
-		images = append(images, driveImageRef{
+		images = append(images, imageRef{
 			start: m[0], end: m[1],
 			alt: markdown[m[2]:m[3]], url: markdown[m[4]:m[5]],
 		})
