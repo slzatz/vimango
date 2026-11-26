@@ -848,64 +848,57 @@ var driveImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(((?:https://drive\.goog
 // inlineImages replaces each Google Drive image in the markdown with the image
 // itself, as a data URI, before the conversion to HTML: from the cache, or
 // downloaded and then cached. One that cannot be had becomes a placeholder
-// that says why, in the form the caller's output can carry.
+// that says why, in the form the caller's output can carry. One that markdown
+// shows as text -- in a code span or block, or raw HTML -- is left as typed
+// (imagesToInline).
 func (r htmlRenderer) inlineImages(markdown string, placeholder func(altText string, err error) string) (string, error) {
-
-	matches := driveImageRegex.FindAllStringSubmatch(markdown, -1)
-
-	processedMarkdown := markdown
-
-	for _, match := range matches {
-		fullMatch := match[0] // Full match: ![alt](url)
-		altText := match[1]   // Alt text
-		googleURL := match[2] // Google Drive URL
-
-		var dataURI string
-		var err error
-
-		// Try cache first
-		if r.cache != nil {
-			if cachedData, found := r.cache.GetCachedImage(googleURL); found {
-				// Check if cached data is already a data URI or raw base64
-				if strings.HasPrefix(cachedData, "data:") {
-					// Already a proper data URI, use as-is
-					dataURI = cachedData
-				} else {
-					// Raw base64 from cache - convert to data URI
-					format := detectImageFormat(cachedData)
-					dataURI = fmt.Sprintf("data:image/%s;base64,%s", format, cachedData)
-				}
-			} else {
-				// Cache miss - download and convert to data URI
-				dataURI, err = r.fetch(googleURL)
-				if err != nil {
-					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
-					processedMarkdown = strings.Replace(processedMarkdown, fullMatch, placeholder(altText, err), 1)
-					continue
-				}
-
-				// Store in cache for future use
-				if cacheErr := r.cache.StoreCachedImage(googleURL, dataURI); cacheErr != nil {
-					log.Printf("Warning: Could not cache image %s: %v", googleURL, cacheErr)
-					// Continue anyway - we have the data URI
-				}
-			}
-		} else {
-			// No cache available - fallback to direct conversion
-			dataURI, err = r.fetch(googleURL)
-			if err != nil {
-				log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
-				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, placeholder(altText, err), 1)
-				continue
-			}
-		}
-
-		// Replace the Google Drive URL with the data URI
-		newImageTag := fmt.Sprintf("![%s](%s)", altText, dataURI)
-		processedMarkdown = strings.Replace(processedMarkdown, fullMatch, newImageTag, 1)
+	images := imagesToInline(markdown)
+	if len(images) == 0 {
+		return markdown, nil
 	}
 
-	return processedMarkdown, nil
+	// Spliced by position: the same image can also appear as text earlier
+	// in the note, and a search for the first occurrence would replace that.
+	var b strings.Builder
+	last := 0
+	for _, img := range images {
+		b.WriteString(markdown[last:img.start])
+		last = img.end
+		dataURI, err := r.imageDataURI(img.url)
+		if err != nil {
+			log.Printf("Warning: Could not convert Google Drive image %s: %v", img.url, err)
+			b.WriteString(placeholder(img.alt, err))
+			continue
+		}
+		fmt.Fprintf(&b, "![%s](%s)", img.alt, dataURI)
+	}
+	b.WriteString(markdown[last:])
+	return b.String(), nil
+}
+
+// imageDataURI is one Drive image as a data URI: from the cache, or
+// downloaded and then cached. A nil cache downloads every time.
+func (r htmlRenderer) imageDataURI(googleURL string) (string, error) {
+	if r.cache != nil {
+		if cachedData, found := r.cache.GetCachedImage(googleURL); found {
+			// The TUI caches bare base64, --render-html the data URI it made.
+			if strings.HasPrefix(cachedData, "data:") {
+				return cachedData, nil
+			}
+			return fmt.Sprintf("data:image/%s;base64,%s", detectImageFormat(cachedData), cachedData), nil
+		}
+	}
+	dataURI, err := r.fetch(googleURL)
+	if err != nil {
+		return "", err
+	}
+	if r.cache != nil {
+		if cacheErr := r.cache.StoreCachedImage(googleURL, dataURI); cacheErr != nil {
+			// We have the data URI; it just won't be there next time.
+			log.Printf("Warning: Could not cache image %s: %v", googleURL, cacheErr)
+		}
+	}
+	return dataURI, nil
 }
 
 // driveImageDataURI downloads a Google Drive image and converts it to a data URI

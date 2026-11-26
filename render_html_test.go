@@ -304,3 +304,60 @@ func TestRenderFlagsNameTheirNote(t *testing.T) {
 		t.Errorf("--render-html read as --render-markdown %d", got)
 	}
 }
+
+// A Drive image that markdown shows as text -- in a code span, a code block,
+// raw HTML -- is left as typed: inlined, its base64 was the text, and a photo
+// in backticks was a line of millions of characters (2026-11-26). Each real
+// image is replaced where it stands, even when the same address appears as
+// text before it.
+func TestRenderHTMLDriveImagesInCodeStayText(t *testing.T) {
+	const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+	const img = "gdrive:rawRAWrawRAWrawRAWrawRAWraw01"
+	cache := newTestImageCache(t)
+	if err := cache.StoreCachedImage(img, pngBase64); err != nil {
+		t.Fatal(err)
+	}
+	fetched := 0
+	r := htmlRenderer{cache: cache, download: func(string) (string, error) {
+		fetched++
+		return "data:image/png;base64," + pngBase64, nil
+	}}
+
+	tick := "`![bg right:70%](" + img + ")`"
+	note := "# Slide\n" + tick + "\n![bg](" + img + ")\n\n" +
+		"```\n![in fence](" + img + ")\n```\n\n" +
+		"    ![indented](" + img + ")\n\n" +
+		"<div>\n![in html](" + img + ")\n</div>\n\n" +
+		"Text <!-- ![in comment](" + img + ") --> more.\n"
+	got, err := r.inlineImages(note, imagePlaceholderHTML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(note, "\n![bg]("+img+")", "\n![bg](data:image/png;base64,"+pngBase64+")", 1)
+	if got != want {
+		t.Errorf("inlined:\n%s\nwant:\n%s", got, want)
+	}
+	if fetched != 0 {
+		t.Errorf("%d downloads; the one real image is cached", fetched)
+	}
+
+	html, err := r.render("t", note)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(html, "base64,"); n != 1 {
+		t.Errorf("%d images inlined in the page; want 1", n)
+	}
+	if !strings.Contains(html, "<code>![bg right:70%]("+img+")</code>") {
+		t.Error("the code span does not show the image as typed")
+	}
+
+	// and in --render-markdown's form, frontmatter ahead of it
+	md, err := r.markdown("---\nmarp: true\n---\n" + note)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if md != "---\nmarp: true\n---\n"+want {
+		t.Errorf("--render-markdown:\n%s", md)
+	}
+}

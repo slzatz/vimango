@@ -73,8 +73,8 @@ func refreshNoteImages(id int, stdout, stderr io.Writer) int {
 // for each it could not.
 func (r htmlRenderer) refreshImages(note string) (refreshed int, failures []string) {
 	seen := map[string]bool{}
-	for _, match := range driveImageRegex.FindAllStringSubmatch(note, -1) {
-		url := match[2]
+	for _, img := range imagesToInline(note) {
+		url := img.url
 		// One image may appear in both address forms, or twice: the cache
 		// knows it by its file id, and so does this.
 		key := url
