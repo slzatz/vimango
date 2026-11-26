@@ -485,6 +485,12 @@ func (c *ImageCache) StoreCachedImageData(url, base64Data string, width, height 
 	// pass. The len() guard is what stops a single image larger than the
 	// whole budget from evicting everything and then still not fitting:
 	// the cache goes over budget for that one entry instead.
+	// An image cached anew (--refresh-images) replaces its own entry, whose
+	// file was just overwritten: out of the index before the eviction, or
+	// the eviction could pick it -- and remove the file just written -- and
+	// its old size would count against the budget besides.
+	delete(c.index.Entries, key)
+
 	incoming := fileInfo.Size()
 	total := c.totalBytesLocked()
 	for len(c.index.Entries) > 0 &&

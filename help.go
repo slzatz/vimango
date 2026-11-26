@@ -19,10 +19,13 @@ var validFlags = map[string]bool{
 	// takes a value: --render-markdown <id>; headless, prints the note's
 	// markdown with its Google Drive images inlined, and exits
 	"--render-markdown": true,
-	"--gdrive-auth":     true, // sign in to Google Drive (create/refresh token.json) and exit
-	"--migrate":         true, // bring this machine's vimango.db up to date, report, and exit
-	"--wiki-links":      true, // with --render-html: emit [[refs]] as clickable anchors
-	"--title":           true, // with --render-html: put the note's title at the top as an <h1>
+	// takes a value: --refresh-images <id>; headless, downloads the note's
+	// Google Drive images again into the image cache, and exits
+	"--refresh-images": true,
+	"--gdrive-auth":    true, // sign in to Google Drive (create/refresh token.json) and exit
+	"--migrate":        true, // bring this machine's vimango.db up to date, report, and exit
+	"--wiki-links":     true, // with --render-html: emit [[refs]] as clickable anchors
+	"--title":          true, // with --render-html: put the note's title at the top as an <h1>
 }
 
 // ValidateArgs checks that every argument in args[1:] is a recognized flag.
@@ -36,7 +39,7 @@ func ValidateArgs(args []string) {
 			skipNext = false
 			continue
 		}
-		if arg == "--open" || arg == "--render-html" || arg == "--render-markdown" {
+		if arg == "--open" || arg == "--render-html" || arg == "--render-markdown" || arg == "--refresh-images" {
 			if i+1 >= len(rest) {
 				fmt.Fprintf(os.Stderr, "Error: %s requires a note id\n\n", arg)
 				ShowHelp()
@@ -56,8 +59,14 @@ func ValidateArgs(args []string) {
 			os.Exit(2)
 		}
 	}
-	if DetermineRenderHTML(args) != -1 && DetermineRenderMarkdown(args) != -1 {
-		fmt.Fprintf(os.Stderr, "Error: --render-html and --render-markdown are one or the other\n\n")
+	headless := 0
+	for _, id := range []int{DetermineRenderHTML(args), DetermineRenderMarkdown(args), DetermineRefreshImages(args)} {
+		if id != -1 {
+			headless++
+		}
+	}
+	if headless > 1 {
+		fmt.Fprintf(os.Stderr, "Error: --render-html, --render-markdown and --refresh-images are one at a time\n\n")
 		ShowHelp()
 		os.Exit(2)
 	}
@@ -134,6 +143,15 @@ OPTIONS:
         note to a markdown tool of its own (slides made with Marp), which
         cannot read a gdrive: address. An image that cannot be had
         becomes a line of text saying so.
+
+    --refresh-images <id>
+        Download the Google Drive images of the note with the given
+        database id again, replacing their copies in the image cache, and
+        exit. The cache never asks Drive whether a file has changed, so an
+        image edited there after it was cached (rotated, say) shows as it
+        was until this is run. Prints "refreshed N of M", then a line for
+        each image that could not be downloaded; that image keeps its
+        cached copy. Headless.
 
     --wiki-links
         With --render-html, emit [[note-name]] cross references as

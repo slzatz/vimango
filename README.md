@@ -13,6 +13,7 @@ There are a few semi-notable features:
 - Terminal Markdown rendering supports kitty's text sizing protocol
 - `vimango --render-html <id>` renders a note as a standalone HTML document (it drives vimango_hybrid's preview pane)
 - `vimango --render-markdown <id>` prints a note's markdown with its Google Drive images inlined, for another markdown tool (vimango_hybrid makes Marp slides from it)
+- `vimango --refresh-images <id>` downloads a note's Google Drive images into the image cache again, for an image changed on Drive since it was cached
 - Syncing of notes to a remote PostgreSQL database (optional)
 - Note editing supports full vim keybindings via libvim, which was originally develeped to support the Onivim 2 editor
 - There is full-text search via sqlite's fts5 extension

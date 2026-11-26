@@ -59,6 +59,19 @@ type htmlRenderer struct {
 	// are fetched once. A nil cache downloads every time.
 	images driveImages
 	cache  *ImageCache
+
+	// download stands in for driveImageDataURI, where a test has no Drive
+	// to download from. nil in the program.
+	download func(googleURL string) (string, error)
+}
+
+// fetch downloads one Drive image as a data URI: driveImageDataURI, unless
+// a test said otherwise.
+func (r htmlRenderer) fetch(googleURL string) (string, error) {
+	if r.download != nil {
+		return r.download(googleURL)
+	}
+	return r.driveImageDataURI(googleURL)
 }
 
 // accents resolves config.json's webview.accent and webview.code_accent to
@@ -827,19 +840,18 @@ func (r htmlRenderer) markdown(note string) (string, error) {
 	return r.inlineImages(note, imagePlaceholderMarkdown)
 }
 
+// driveImageRegex is a Google Drive image in markdown, in either form a note
+// holds one: ![alt](gdrive:ID) or ![alt](https://drive.google.com/file/d/...).
+// The alt text is group 1, the address group 2.
+var driveImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(((?:https://drive\.google\.com/file/d/[^)]+)|(?:gdrive:[a-zA-Z0-9_-]+))\)`)
+
 // inlineImages replaces each Google Drive image in the markdown with the image
 // itself, as a data URI, before the conversion to HTML: from the cache, or
 // downloaded and then cached. One that cannot be had becomes a placeholder
 // that says why, in the form the caller's output can carry.
 func (r htmlRenderer) inlineImages(markdown string, placeholder func(altText string, err error) string) (string, error) {
 
-	// Regular expression to find Google Drive URLs in markdown image syntax
-	// Matches both full URLs and gdrive: format
-	// ![alt text](https://drive.google.com/...) or ![alt text](gdrive:ID)
-	googleDriveRegex := regexp.MustCompile(`!\[([^\]]*)\]\(((?:https://drive\.google\.com/file/d/[^)]+)|(?:gdrive:[a-zA-Z0-9_-]+))\)`)
-
-	// Find all Google Drive image references
-	matches := googleDriveRegex.FindAllStringSubmatch(markdown, -1)
+	matches := driveImageRegex.FindAllStringSubmatch(markdown, -1)
 
 	processedMarkdown := markdown
 
@@ -865,7 +877,7 @@ func (r htmlRenderer) inlineImages(markdown string, placeholder func(altText str
 				}
 			} else {
 				// Cache miss - download and convert to data URI
-				dataURI, err = r.driveImageDataURI(googleURL)
+				dataURI, err = r.fetch(googleURL)
 				if err != nil {
 					log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
 					processedMarkdown = strings.Replace(processedMarkdown, fullMatch, placeholder(altText, err), 1)
@@ -880,7 +892,7 @@ func (r htmlRenderer) inlineImages(markdown string, placeholder func(altText str
 			}
 		} else {
 			// No cache available - fallback to direct conversion
-			dataURI, err = r.driveImageDataURI(googleURL)
+			dataURI, err = r.fetch(googleURL)
 			if err != nil {
 				log.Printf("Warning: Could not convert Google Drive image %s: %v", googleURL, err)
 				processedMarkdown = strings.Replace(processedMarkdown, fullMatch, placeholder(altText, err), 1)

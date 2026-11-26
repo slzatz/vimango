@@ -119,10 +119,11 @@ vimango itself builds and runs without it; see "HEIC".
   - `--title`: put the note's title at the top as an `<h1>`. Off for hybrid's preview pane, which has its own title bar; on for its PDF export.
   - `--wiki-links`: emit `[[refs]]` as `vimango://note/` anchors, for a host that intercepts the clicks.
 - `--render-markdown <id>`: headless, as `--render-html` is — print the note's markdown and exit, as stored except that each Google Drive image is the image itself (a data URI). For a host that gives the note to a markdown tool of its own; one that cannot be had becomes a line of plain text, since what reads the output may not pass HTML through.
+- `--refresh-images <id>`: headless — download the note's Google Drive images again, each replacing its entry in the image cache, and exit. The cache is keyed by file id and never asks Drive whether a file changed, so this is how an image edited on Drive after it was cached is seen at all. Stdout is for the host: `refreshed N of M`, then `<address>: <why>` per image that failed, which keeps its cached copy (so a refresh made offline loses nothing). Exit 1 only when the note can't be read. `refresh_images.go`; tests in `refresh_images_test.go`.
 - `--migrate`: bring this machine's `vimango.db` up to date, print what changed, exit. Optional; every start does the same quietly.
 - `--init`: first-time setup (`config.json`, a new database). `--gdrive-auth`: sign in to Google Drive and exit.
 
-**vimango_hybrid uses both host modes**: an `--editor --open <id>` per editing session in a pop-out, and a `--render-html` per preview and per PDF export. Its slides (Marp's) are a `--render-markdown` per render.
+**vimango_hybrid uses both host modes**: an `--editor --open <id>` per editing session in a pop-out, and a `--render-html` per preview and per PDF export. Its slides (Marp's) are a `--render-markdown` per render, and its `:refreshimages` is a `--refresh-images`.
 
 **`--render-html` builds no `App`** — no organizer, no terminal detection, and the global `app` stays nil. `renderNote` (`render_html.go`) opens the store and makes an `htmlRenderer` (`note_html.go`), a value holding everything rendering takes from outside: the two colours from `config.json` (`webview.accent` / `webview.code_accent`; the names are historical), the flags, a title lookup for `[[tid:N]]` links, and where Drive images come from (`driveImages`, and the disk cache). Anything new the renderer needs goes in that struct, not through a global. It renders one style: left-aligned content, no centered column, since it is shown in a pane. Tests: `render_html_test.go`.
 
@@ -434,7 +435,7 @@ Text sizing is enabled only for actual kitty (`isActualKittyTerminal()`, `kitty_
 
 A note's images are `![text](gdrive:<file id>)`, fetched from Google Drive. Two caches:
 
-- **Disk** (`./image_cache/`, `image_cache.go`): base64 files and an index, shared by the TUI, `--render-html` and `--render-markdown`, persistent and terminal-agnostic. Evicted least-recently-used; a cache hit writes the index only when the last use on record is over an hour old (`accessGranularity`).
+- **Disk** (`./image_cache/`, `image_cache.go`): base64 files and an index, shared by the TUI, `--render-html` and `--render-markdown`, persistent and terminal-agnostic. Evicted least-recently-used; a cache hit writes the index only when the last use on record is over an hour old (`accessGranularity`). An entry is never checked against Drive: `--refresh-images` (and the TUI's `:refreshimageinfo!`, which drops entries) is how a changed file is seen. A store replacing an entry takes the old one out of the index before evicting, or a full cache could evict the entry being stored, and delete the file it just wrote.
 - **Terminal**: the kitty protocol keeps transmitted images in the terminal; reset at each launch, and by `:imagereset`.
 
 ### HEIC

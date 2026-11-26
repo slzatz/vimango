@@ -44,6 +44,12 @@ func main() {
 		os.Exit(RunRenderMarkdown(id))
 	}
 
+	// --refresh-images <id>, headless: download the note's Drive images
+	// into the image cache again, report, and exit.
+	if id := DetermineRefreshImages(os.Args); id != -1 {
+		os.Exit(RunRefreshImages(id))
+	}
+
 	// --migrate: bring vimango.db up to date, report, and exit (migrate.go)
 	if CheckForMigrate(os.Args) {
 		os.Exit(RunMigrate())
